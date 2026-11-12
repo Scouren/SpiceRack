@@ -11,7 +11,8 @@
 //! Cites: `rewrite/DIALECT-NGSPICE.md` §2, §3; `rewrite/S3-AREAS.md`.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt)`
+//! `pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt)`,
+//! `pub(super) fn script_line(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, index: usize, span: ir::Span)`
 
 use super::codes::Row;
 use super::read::{Lower, Stmt};
@@ -27,4 +28,22 @@ pub(super) const CODES: &[Row] = &[];
 /// A `.control` block (stub: one `Unread` for the whole block).
 pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt) {
     lw.unread(st);
+}
+
+/// A `*#` line outside a block (R49), statement `index` of `lw.deck_script()`, into `scope` at
+/// `span` (stub: one `Unread` of its text).
+pub(super) fn script_line(
+    lw: &mut Lower<'_, '_>,
+    scope: ir::ScopeId,
+    index: usize,
+    span: ir::Span,
+) {
+    let text = lw.deck_script()[index].clone();
+    lw.opaque_text(
+        scope,
+        &text,
+        span,
+        ir::OpaqueClass::Unread,
+        super::codes::UNREAD,
+    );
 }

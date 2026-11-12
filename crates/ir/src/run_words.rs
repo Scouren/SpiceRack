@@ -363,7 +363,7 @@ pub(crate) fn is_one(design: &Design, e: ExprId) -> bool {
         exp10: 0,
         form: NumForm::Plain,
     };
-    matches!(design.expr(e), Expr::Num(k) if design.num(k).eq_value(one))
+    matches!(design.expr(e), Expr::Num(k) if design.literal_eq(design.num(k), one))
 }
 
 /// Whether `e` is the literal 0, of any form (`0`, `0.0`, `0e3`, the integer 0); `NONE` is not.

@@ -4,11 +4,13 @@
 //! one (G, F, a current B, the semiconductors, R/C/L, X); an R/C/L whose value names the circuit
 //! or the temperature carries only what ngspice's B-source rewrite keeps; a static R/C/L only
 //! the keys its device takes; an instance parameter never one the reader reads as a typed
-//! field; a B-source field only what the B-source grammar spells.
+//! field; a B-source field only what the B-source grammar spells; an instance temperature only
+//! where its bound model's family has one (`read_elements::instance_temp`).
 //!
 //! Contents: `pub(super) fn spellable(&ir::Design, &ir::Element) -> bool`
 
 use super::super::expr_write;
+use super::super::read_elements;
 use super::super::tables::Eval;
 use super::cards::{names_run, passive_fields};
 use crate::ir::{self, ElemKind as K, Expr, ExprId};
@@ -117,12 +119,20 @@ pub(super) fn spellable(d: &ir::Design, e: &ir::Element) -> bool {
         }
         K::Diode | K::Bjt | K::Jfet => {
             let s = d.semi(e);
+            let (temp, dtemp) = read_elements::instance_temp(d, e);
+            if !temp && !none(s.temp_abs) || !dtemp && !none(s.dtemp) {
+                return false;
+            }
             s.initial != ir::semi::InitialState::On
                 && keys_ok(&["area", "ic", "m", "temp", "dtemp"])
         }
         K::Mosfet | K::Mesfet => {
             // a MOS takes no area (no ngspice MOS has the key: InvalidInSource on read)
             let s = d.semi(e);
+            let (temp, dtemp) = read_elements::instance_temp(d, e);
+            if !temp && !none(s.temp_abs) || !dtemp && !none(s.dtemp) {
+                return false;
+            }
             let area = e.kind == K::Mesfet || none(s.area);
             area && s.initial != ir::semi::InitialState::On
                 && keys_ok(&["area", "ic", "m", "temp", "dtemp"])
@@ -153,6 +163,17 @@ fn b_ok(d: &ir::Design, e: ExprId) -> bool {
 /// Whether a tc number survives `eval_tc`'s `%15.8e` (at most 9 significant digits).
 fn tc_spells(d: &ir::Design, e: ExprId) -> bool {
     match d.expr(e) {
+        // a long literal's digits less its leading and trailing zeros (A18)
+        Expr::Num(n) if d.long_digits(d.num(n)).is_some() => {
+            let (significand, _) = d.long_digits(d.num(n)).expect("a long literal");
+            let digits = significand.trim_start_matches(['-', '0', '.']);
+            digits
+                .trim_end_matches(['0', '.'])
+                .bytes()
+                .filter(u8::is_ascii_digit)
+                .count()
+                <= 9
+        }
         Expr::Num(n) => {
             let mut m = d.num(n).mantissa.unsigned_abs();
             // Bounded: at most 19 decimal digits.

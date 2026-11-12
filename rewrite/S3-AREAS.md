@@ -44,11 +44,14 @@ code)`, `lw.framing()` (a statement with no item: `.end`), `lw.span(n)`, `lw.raw
 statement's text, a block's body included), `lw.text(n)` (a field's tokens, one blank per gap),
 `lw.rest(n)` (the head line after its first token), `lw.keyword(n)`, `lw.expr(st, &tree, scope)`
 (appends a parsed expression and queues its parameter reads and user calls for the bind step),
+`lw.number(lit, &fit)` (appends a card number from `number::Scan`'s `literal` and `fit`: a
+`Fit::Long` one as its digits, A18; never `lw.b.literal` on a scanned number),
 `lw.wins(st, def, name, k)` (the declare step's verdict), `lw.include_path(st, path)`, and
 `lw.open(scope, body, container, closer)` to schedule a block's body. Free functions:
 `expr_read::parse(text) -> Result<Tree, Fail>` (picks numparam or the B-source parser by the
 text; `Tree::dynamic()` says which), `number::card(token)` (a card value, `INPevaluate` with
-gobble), `number::scan(text, Grammar)`, `cst::{body, next, closer, line, extent, joined,
+gobble), `number::scan(text, Grammar)` (a `Scan { literal, len, fit }`: `fit` is `Exact`,
+or `Long` past 18 significant digits, A18; negate both with `Fit::negate`), `cst::{body, next, closer, line, extent, joined,
 unquote}`.
 
 Rules the spine asserts or relies on: each statement pushes at least one item into `st.scope`
@@ -61,7 +64,9 @@ Writer (`write.rs`): `Out` holds `design: &ir::Design`, `out: &mut String`, `dia
 `expr_write::value(design, e, out)` (bare number or name, else `{…}`), `expr_write::expr`
 (the expression alone, in the evaluator its tree implies), `expr_write::expr_in(design, e, eval, out)`
 (in a given evaluator: a B source's field is always the B-source parser's),
-`expr_write::spells_in(design, e, eval) -> bool` (every node spellable there; for `admits`), `number::spell(lit, Grammar, out)`,
+`expr_write::spells_in(design, e, eval) -> bool` (every node spellable there; for `admits`), `number::spell(design, lit, Grammar, out)`
+(a `Long` literal as its digits); read a design's literal with `design.literal_value` and
+compare with `design.literal_eq` (`Literal::value`/`eq_value` panic on a `Long`),
 `name::letter(kind)` (the letter of a kind whose letter does not depend on its detail).
 
 ## Open points the areas inherit (reported to the lead with the S3.0 report)

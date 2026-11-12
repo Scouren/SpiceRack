@@ -38,7 +38,7 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn model(lw: &mut Lower<'_, '_>, st: Stmt)`
 
-use super::codes::{self, Row};
+use super::codes::Row;
 use super::cst;
 use super::declare::Class;
 use super::expr_read::{self, Tree};
@@ -215,8 +215,8 @@ type Refusal = (OpaqueClass, Code);
 
 /// A parameter value, parsed and not yet pushed.
 enum Value {
-    /// A card number: its literal, and whether its digits were rounded.
-    Number(ir::Literal, bool),
+    /// A card number: its literal and how its digits fit (`number::Fit`).
+    Number(ir::Literal, number::Fit),
     /// A numparam expression.
     Expr(Tree),
     /// A quoted string, unquoted.
@@ -561,7 +561,7 @@ fn read_value(lw: &Lower<'_, '_>, st: Stmt, node: Node) -> Result<Value, Refusal
         Tag::Str => return Ok(Value::Str(cst::unquote(&text))),
         Tag::Word if numberish(&text) => {
             let s = number::card(&text).ok_or_else(unread)?;
-            return Ok(Value::Number(s.literal, s.rounded));
+            return Ok(Value::Number(s.literal, s.fit));
         }
         Tag::Word if ["true", "false"].contains(&text.to_ascii_lowercase().as_str()) => {
             return Err(unread());
@@ -586,12 +586,7 @@ fn read_value(lw: &Lower<'_, '_>, st: Stmt, node: Node) -> Result<Value, Refusal
 /// Pushes `v` and returns its root (a rounded number is noted).
 fn emit_value(lw: &mut Lower<'_, '_>, st: Stmt, v: &Value) -> ir::ExprId {
     match v {
-        Value::Number(lit, rounded) => {
-            if *rounded {
-                lw.note(st, codes::ROUNDED);
-            }
-            lw.b.literal(*lit)
-        }
+        Value::Number(lit, fit) => lw.number(*lit, fit),
         Value::Expr(tree) => lw.expr(st, tree, st.scope),
         Value::Str(s) => lw.b.string(s),
     }

@@ -126,7 +126,16 @@ pub(super) fn opaque(w: &mut Out<'_>, item: ir::ItemRef) {
         "ngspice write: another family's opaque (dialect::write refuses it)"
     );
     let text = w.design.text(o.text).to_string();
-    w.line(&text);
+    // a `.control` pair is a script region's commands (R49): adjacent pairs join
+    let pair = text.strip_prefix(".control\n").and_then(|t| {
+        let t = t.strip_suffix('\n').unwrap_or(t);
+        t.strip_suffix(".endc")
+            .map(|b| b.strip_suffix('\n').unwrap_or(b))
+    });
+    match pair {
+        Some(body) => body.lines().for_each(|cmd| w.script(cmd)),
+        None => w.line(&text),
+    }
 }
 
 /// `.subckt name ports params: k=v …`, the body, `.ends`.

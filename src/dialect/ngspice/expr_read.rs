@@ -29,6 +29,7 @@
 use super::codes;
 use super::expr_lex::{self, E, Op, PI, Tok};
 use super::name::Folder;
+use super::number::{self, Fit};
 use super::tables::{self, Eval, Named};
 use crate::ir;
 
@@ -53,6 +54,8 @@ pub(super) struct Fail {
 #[derive(Clone, Debug)]
 enum N {
     Num(ir::Literal),
+    /// A number longer than a literal's mantissa (A18).
+    Long(Box<number::Long>),
     Param(String),
     Call(ir::Func, Vec<usize>),
     User(String, Vec<usize>),
@@ -118,8 +121,8 @@ pub(super) fn parse_in(text: &str, eval: Eval) -> Result<Tree, Fail> {
 }
 
 impl Tree {
-    /// The notes its reading gives (a number rounded to 18 digits, A3; a three-argument call of
-    /// a two-argument numparam function read by its first and last argument), each once.
+    /// The notes its reading gives (a three-argument call of a two-argument numparam function
+    /// read by its first and last argument), each once.
     pub(super) fn notes(&self) -> &[ir::Code] {
         &self.notes
     }
@@ -154,6 +157,7 @@ impl Tree {
             };
             let e = match node {
                 N::Num(lit) => b.literal(*lit),
+                N::Long(l) => b.long_literal(&l.significand, l.exp10, l.written),
                 N::Param(name) => {
                     let e = b.param_ref(&names.fold(name));
                     pending.push((e, scope));
@@ -216,7 +220,9 @@ fn children(n: &N) -> Vec<usize> {
         N::Un(_, a) => vec![*a],
         N::Bin(_, l, r) => vec![*l, *r],
         N::Tern(c, t, f) => vec![*c, *t, *f],
-        N::Num(_) | N::Param(_) | N::V(..) | N::I(_) | N::Time | N::Temp | N::Freq => Vec::new(),
+        N::Num(_) | N::Long(_) | N::Param(_) | N::V(..) | N::I(_) | N::Time | N::Temp | N::Freq => {
+            Vec::new()
+        }
     }
 }
 
@@ -241,18 +247,16 @@ impl Parser<'_> {
                     }
                     Tok::Op(Op::Minus) if numparam && !start => {
                         // numparam: the sign of the number after an operator, else an error
-                        let Some(Tok::Num(lit, r)) = self.toks.get(k).cloned() else {
+                        let Some(Tok::Num(mut lit, mut r)) = self.toks.get(k).cloned() else {
                             return Err(Fail {
                                 code: codes::NEGATION,
                                 class: ir::OpaqueClass::InvalidInSource,
                             });
                         };
                         k += 1;
-                        let neg = ir::Literal {
-                            mantissa: -lit.mantissa,
-                            ..lit
-                        };
-                        self.leaf(N::Num(neg), r);
+                        lit.mantissa = -lit.mantissa;
+                        r.negate();
+                        self.number(lit, r);
                         (operand, start) = (false, false);
                     }
                     Tok::Op(Op::Plus) if numparam && !start => return Err(Fail::invalid()),
@@ -287,20 +291,20 @@ impl Parser<'_> {
                         start = true;
                     }
                     Tok::Num(lit, r) => {
-                        self.leaf(N::Num(lit), r);
+                        self.number(lit, r);
                         (operand, start) = (false, false);
                     }
                     Tok::Ident(name) => {
                         let node = self.ident(&name);
-                        self.leaf(node, false);
+                        self.leaf(node);
                         (operand, start) = (false, false);
                     }
                     Tok::V(n, m) => {
-                        self.leaf(N::V(n, m), false);
+                        self.leaf(N::V(n, m));
                         (operand, start) = (false, false);
                     }
                     Tok::I(e) => {
-                        self.leaf(N::I(e), false);
+                        self.leaf(N::I(e));
                         (operand, start) = (false, false);
                     }
                     Tok::Close | Tok::Comma | Tok::Op(_) => return Err(Fail::invalid()),
@@ -385,11 +389,16 @@ impl Parser<'_> {
         N::Param(name.to_string())
     }
 
+    /// Appends a number read by the lexer as a leaf (a long one as its digits, A18).
+    fn number(&mut self, lit: ir::Literal, fit: Fit) {
+        self.leaf(match fit {
+            Fit::Long(l) => N::Long(l),
+            Fit::Exact => N::Num(lit),
+        });
+    }
+
     /// Appends a leaf and pushes it as an operand.
-    fn leaf(&mut self, n: N, rounded: bool) {
-        if rounded {
-            self.note(codes::ROUNDED);
-        }
+    fn leaf(&mut self, n: N) {
         let k = self.push(n);
         self.out.push(k);
     }
@@ -504,6 +513,10 @@ impl Parser<'_> {
             (None, _) => a,
             (Some(ir::UnOp::Neg), N::Num(lit)) if fold == Some(a) && !self.paren[a] => {
                 lit.mantissa = -lit.mantissa;
+                a
+            }
+            (Some(ir::UnOp::Neg), N::Long(l)) if fold == Some(a) && !self.paren[a] => {
+                l.negate();
                 a
             }
             (Some(op), _) => self.push(N::Un(op, a)),

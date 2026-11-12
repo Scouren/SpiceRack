@@ -13,7 +13,12 @@
 //! Contents: `pub(super) struct Out<'a>`,
 //! `pub(super) fn write(&ir::Design, ir::FileId, &mut String, &mut ir::Diags)`,
 //! `pub(super) fn admits(&ir::Design, &mut ir::Diags)`,
-//! `Out::open(&mut self, ir::ScopeId, String)`, `Out::line(&mut self, &str)`
+//! `Out::open(&mut self, ir::ScopeId, String)`, `Out::open_script(&mut self, ir::ScopeId, String)`,
+//! `Out::line(&mut self, &str)`, `Out::script(&mut self, &str)`, `Out::scripted(&self) -> bool`
+//!
+//! A script region (R49, A27): consecutive `Out::script` commands share one `.control` …
+//! `.endc` pair; any deck line (`Out::line`) or a frame's tail closes it first, as does the end
+//! of the file. A frame scheduled with `Out::open_script` writes its tail as a command instead.
 
 use super::{
     write_control, write_elements, write_models, write_outputs, write_run, write_structure,
@@ -30,13 +35,18 @@ pub(super) struct Out<'a> {
     #[allow(dead_code, reason = "the areas' writers note through it (S3.1-S3.4)")]
     pub(super) diags: &'a mut ir::Diags,
     frames: Vec<Frame<'a>>,
+    /// Whether a `.control` line is open.
+    region: bool,
+    /// Whether this deck's run plan takes the script form (`write_control::needs_script`).
+    scripted: bool,
 }
 
-/// A body still to write, and the text that closes it.
+/// A body still to write, and the text that closes it (a script command when `script`).
 struct Frame<'a> {
     items: &'a [ir::ItemRef],
     at: usize,
     tail: String,
+    script: bool,
 }
 
 /// Appends `file` of `design` as ngspice text.
@@ -68,24 +78,36 @@ pub(super) fn write(
         out,
         diags,
         frames: Vec::new(),
+        region: false,
+        scripted: deck && write_control::needs_script(design, f.top),
     };
     let tail = if deck { ".end\n" } else { "" };
     w.frames.push(Frame {
         items: &items[first..],
         at: 0,
         tail: tail.to_string(),
+        script: false,
     });
     // Bounded: each step writes one item or closes one frame.
     while let Some(f) = w.frames.last_mut() {
         let Some(&item) = f.items.get(f.at) else {
             let f = w.frames.pop().expect("a frame is open");
-            w.out.push_str(&f.tail);
+            if f.script {
+                for cmd in f.tail.lines() {
+                    w.script(cmd);
+                }
+            } else if !f.tail.is_empty() {
+                w.close();
+                w.out.push_str(&f.tail);
+            }
             continue;
         };
         f.at += 1;
         dispatch(&mut w, item);
     }
+    w.close();
     assert!(w.out.len() >= start, "the writer only appends");
+    debug_assert!(!w.region, "the file ends with no script region open");
 }
 
 /// `Write::admits` (R21): a refusal for each reachable item ngspice cannot spell for a reason no
@@ -126,17 +148,66 @@ impl<'a> Out<'a> {
     /// Schedules `scope`'s items after the item being written, then `tail` (its closing lines).
     pub(super) fn open(&mut self, scope: ir::ScopeId, tail: String) {
         let items = self.design.items(scope);
-        self.frames.push(Frame { items, at: 0, tail });
+        self.frames.push(Frame {
+            items,
+            at: 0,
+            tail,
+            script: false,
+        });
     }
 
-    /// Appends `text` and a line break.
+    /// [`Out::open`] for a script body (a `foreach`): `tail`'s lines are commands of the open
+    /// region, not deck lines.
+    #[allow(dead_code, reason = "the control writer calls it (S3.4)")]
+    pub(super) fn open_script(&mut self, scope: ir::ScopeId, tail: String) {
+        let items = self.design.items(scope);
+        self.frames.push(Frame {
+            items,
+            at: 0,
+            tail,
+            script: true,
+        });
+    }
+
+    /// Appends `text` and a line break, a deck line: an open script region closes first.
     pub(super) fn line(&mut self, text: &str) {
+        self.close();
         self.out.push_str(text);
         self.out.push('\n');
+    }
+
+    /// Appends the script command `cmd`, opening a `.control` region when none is open.
+    pub(super) fn script(&mut self, cmd: &str) {
+        debug_assert!(!cmd.contains('\n'), "one command per call");
+        if !self.region {
+            self.out.push_str(".control\n");
+            self.region = true;
+        }
+        self.out.push_str(cmd);
+        self.out.push('\n');
+    }
+
+    /// Whether this deck's run plan takes the script form (R49, A27): run items are spelled as
+    /// commands through [`Out::script`].
+    #[allow(
+        dead_code,
+        reason = "the run, outputs and control writers read it (S3.4)"
+    )]
+    pub(super) fn scripted(&self) -> bool {
+        self.scripted
     }
 }
 
 // ---- private ----
+
+impl Out<'_> {
+    /// Closes an open script region with `.endc`.
+    fn close(&mut self) {
+        if std::mem::replace(&mut self.region, false) {
+            self.out.push_str(".endc\n");
+        }
+    }
+}
 
 /// The one dispatch: an item's kind → its area function.
 fn dispatch(w: &mut Out<'_>, item: ir::ItemRef) {

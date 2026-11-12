@@ -360,3 +360,13 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Rename table for the dialect owners. `SweepLinPoints` → `SweepDcLinPoints` | `SweepLoopLinPoints` | `SweepFreqLinPoints`, by the sweep's use; the same for `Dec`, `Oct`, `Log` and `List`. New: `Sweep{Dc,Loop,Freq}LinStep`, which every lin-by-step sweep now sets. `Tran.max_step` and `Tran.cap` → `Tran.ceiling`.
 - Reach over 4,000 full-set seeds: the least-reached run feature is in 45 seeds (`DcAxisParam`); `PssOscDiff` 47; every sweep member 67 or more.
 - The generator's cost is no longer linear under `FeatureSet::ALL`: 10⁵ items 1.2 s, 3·10⁵ 9.9 s, 10⁶ 105 s. The kernel set alone is still linear (10⁶ in 1.8 s). The change came in with ir-circuit 67dae602: on the same machine, ir-run 163ee90d built 3·10⁵ in 1.2 s and 67dae602 in 9.5 s. This A24 part adds nothing measurable: the red commit 8f2334d1 built 3·10⁵ in 10.5 s, the bodies 9.9 s.
+
+## A18 applied (long literals)
+
+- The significands live in a dedicated pool (`Exprs::long`), not the text pool the proposal named: `eq_meaning` compares the text pool exactly, so long digits there would make two spellings of one decimal unequal. `eq_ignoring_spans` compares the long pool exactly; `eq_meaning` compares each literal pair by exact decimal value.
+- The design-level twins take a `Literal`, not a `NumId` (a writer holds the literal): `Design::literal_value(Literal)`, `Design::literal_eq(Literal, Literal)`, `Design::long_digits(Literal) -> Option<(&str, NumForm)>`; `text::write_num(&Design, Literal, &mut String)` beside `write_literal`.
+- A long `Mil` or `Int` literal is no `Long` (the written form is `Plain`, `Exponent` or `Scale`): an integer beyond 2^53 is a domain error anyway, and a long `mil` would need the decimal product by 25.4e-6 on strings. A reader that meets one keeps R37's interim rule.
+- `Words::number` (no caller) reads short literals only; the expression parser reads both through `text_parse::push_number`.
+- The owners' two generic literal reads moved to the design: `circuit_check`'s sign test (`literal_value`) and `run_words::is_one` (`literal_eq`).
+- `check`'s long-literal arm is `literal::long_violation` (check.rs passed 500 lines).
+

@@ -12,6 +12,7 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
+//! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
 //! `pub(super) fn load`, `loop_`, `alter`
 
 use super::codes::Row;
@@ -27,6 +28,13 @@ pub(super) const CODES: &[Row] = &[];
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
 /// (R21, `Write::admits`). Stub: nothing (no item of this area is legal yet).
 pub(super) fn admits(_design: &ir::Design, _item: ir::ItemRef, _diags: &mut ir::Diags) {}
+
+/// Whether the deck whose top scope is `scope` writes its run plan as a script (R49, A27: its
+/// run items hold an `Alter`, a `Loop`, a from-here state item, a `Load` or a restore). Stub:
+/// never (no such item is legal yet).
+pub(super) fn needs_script(_design: &ir::Design, _scope: ir::ScopeId) -> bool {
+    false
+}
 
 /// A `Load` (stub: unreachable).
 pub(super) fn load(_w: &mut Out<'_>, _item: ir::ItemRef) {

@@ -1,5 +1,5 @@
 //! The laws every dialect passes (REWRITE-PLAN §4.2), run for every row of
-//! `dialect::BUILTIN` on the sides it has: L1 totality (any bytes, and the empty text), L2
+//! `dialect::BUILTIN` on the sides it has: L1 totality (any bytes, and the text of zero bytes), L2
 //! validity, L3 determinism (reader); L4 writer totality over what `legalize` accepted, L7
 //! feature honesty, L8 isolation (writer); L5 round trip (both); L6 corpus fixpoint (both,
 //! `--features corpus` only). L9 belongs to each dialect's own simulator tests.
@@ -35,11 +35,6 @@ const SIZE: Size = Size {
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
-    (
-        "l1-empty",
-        "ngspice",
-        "a blank line 1 is a deck's empty Title (the lead's ruling, follow-up 3 of S3.0); an empty text has none",
-    ),
     (
         "l3",
         "ngspice",
@@ -86,25 +81,26 @@ fn l1_l2_any_bytes_read_returns_and_checks_clean() {
     }
 }
 
+/// The text of zero bytes is one file with no item and no row (R46). A text of one line break
+/// is each dialect's own fixture: whether a blank line 1 is a statement (ngspice: the deck's
+/// title) is its lexicon's call, not the spine's.
 #[test]
 fn l1_an_empty_text_is_one_file_with_no_item() {
     reader_laws("l1-empty", |row, _| {
-        for text in ["", "\n"] {
-            let (design, diags) = read_text(row, text);
-            let files: Vec<ir::FileId> = design.files().collect();
-            if files.len() != 1 || !design.reachable().is_empty() || !diags.is_empty() {
-                return Err(format!(
-                    "{text:?}: {} files, {} items, rows {:?}",
-                    files.len(),
-                    design.reachable().len(),
-                    diags.rows()
-                ));
-            }
-            if design.str(design.file(files[0]).path) != "law" {
-                return Err(format!("{text:?}: the file is not at its source path"));
-            }
+        let (design, diags) = read_text(row, "");
+        let files: Vec<ir::FileId> = design.files().collect();
+        if files.len() != 1 || !design.reachable().is_empty() || !diags.is_empty() {
+            return Err(format!(
+                "{} files, {} items, rows {:?}",
+                files.len(),
+                design.reachable().len(),
+                diags.rows()
+            ));
         }
-        Ok(())
+        match design.str(design.file(files[0]).path) == "law" {
+            true => Ok(()),
+            false => Err("the file is not at its source path".to_string()),
+        }
     });
 }
 

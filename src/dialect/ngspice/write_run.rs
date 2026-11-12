@@ -138,7 +138,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
             let f: Four = design.detail(a.detail);
             // a given count is ngspice's default; none is the deck's `nfreqs` (A16)
             let nine = f.harmonics.is_none()
-                || matches!(design.expr(f.harmonics), ir::Expr::Num(n) if design.num(n).value() == 9.0);
+                || matches!(design.expr(f.harmonics), ir::Expr::Num(n) if design.literal_value(design.num(n)) == 9.0);
             if !nine {
                 refuse(FOUR_HARMONICS);
             }
@@ -161,7 +161,8 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     check_values(design, &values, &mut refuse);
 }
 
-/// An `Analysis` as its card.
+/// An `Analysis` as its card, or as its script command when the deck takes the script form
+/// (`Out::scripted`, R49).
 pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let a: ir::Analysis = d.row(item.index);
@@ -310,7 +311,17 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
             unreachable!("ngspice write: FEATURES lacks Analysis({other:?})")
         }
     }
-    w.line(&t);
+    if w.scripted() {
+        // R49: a deck whose plan needs a script runs every analysis as a command, the card
+        // without its dot (`read_run::read_analysis` reads it back the same way); `.four` is the
+        // `fourier` command, which the frontend runs for the card too (`fourier.c`)
+        let cmd = t
+            .strip_prefix(".four ")
+            .map_or_else(|| t[1..].to_string(), |rest| format!("fourier {rest}"));
+        w.script(&cmd);
+    } else {
+        w.line(&t);
+    }
 }
 
 /// An `Option` as `.options key[=value]` (`method=trap|gear` for the method flags).
@@ -432,7 +443,7 @@ const fn refusal(
 fn value(d: &ir::Design, e: ir::ExprId, out: &mut String) {
     out.push(' ');
     if let ir::Expr::Num(n) = d.expr(e) {
-        number::spell(d.num(n), Grammar::Inp, out);
+        number::spell(d, d.num(n), Grammar::Inp, out);
         return;
     }
     out.push('{');

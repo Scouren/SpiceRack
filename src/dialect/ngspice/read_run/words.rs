@@ -11,7 +11,6 @@
 //! Contents: `pub(in super::super) enum Val`, `pub(in super::super) fn split`, `pub(super) fn value`,
 //! `pub(super) fn emit`, `pub(super) fn node`, `pub(super) fn invalid`
 
-use super::super::codes;
 use super::super::declare::Class;
 use super::super::expr_read::{self, Fail, Tree};
 use super::super::number::{self, Grammar};
@@ -22,8 +21,8 @@ use crate::ir;
 /// A card value read but not yet appended.
 #[derive(Clone, Debug)]
 pub(in super::super) enum Val {
-    /// A number as written, and whether its digits were rounded (A3).
-    Lit(ir::Literal, bool),
+    /// A number as written and how its digits fit (`number::Fit`).
+    Lit(ir::Literal, number::Fit),
     /// A numparam expression (`{…}`).
     Expr(Tree),
 }
@@ -84,22 +83,18 @@ pub(super) fn value(lw: &Lower<'_, '_>, st: Stmt, word: &str) -> Result<Val, Fai
         _ => (false, word),
     };
     let s = number::scan(digits, Grammar::Inp).ok_or_else(invalid)?;
-    let mut lit = s.literal;
+    let (mut lit, mut fit) = (s.literal, s.fit);
     if negative && lit.mantissa != 0 {
         lit.mantissa = -lit.mantissa;
+        fit.negate();
     }
-    Ok(Val::Lit(lit, s.rounded))
+    Ok(Val::Lit(lit, fit))
 }
 
 /// Appends `v` for an item of `st` and returns its root.
 pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
     match v {
-        Val::Lit(lit, rounded) => {
-            if *rounded {
-                lw.note(st, codes::ROUNDED);
-            }
-            lw.b.literal(*lit)
-        }
+        Val::Lit(lit, fit) => lw.number(*lit, fit),
         Val::Expr(tree) => lw.expr(st, tree, st.scope),
     }
 }

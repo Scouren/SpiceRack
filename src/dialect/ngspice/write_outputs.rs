@@ -245,7 +245,7 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
     // dc swaps a window given in the other order (measure_parse_stdParams): only numbers, in order
     let ordered = |a: &Event, b: &Event| {
         let num = |e: &Event| match d.expr(e.value) {
-            ir::Expr::Num(n) => Some(d.num(n).value()),
+            ir::Expr::Num(n) => Some(d.literal_value(d.num(n))),
             _ => None,
         };
         !dc || a.kind != EventKind::At
@@ -318,7 +318,7 @@ fn threshold(d: &ir::Design, e: ir::ExprId) -> Option<String> {
 
 /// Whether `e` is the literal zero (`to=0` is "no limit" to ngspice).
 fn zero(d: &ir::Design, e: ir::ExprId) -> bool {
-    matches!(d.expr(e), ir::Expr::Num(n) if d.num(n).mantissa == 0)
+    matches!(d.expr(e), ir::Expr::Num(n) if d.literal_eq(d.num(n), ir::Literal::ZERO))
 }
 
 /// ` p …` for each probe of the list.

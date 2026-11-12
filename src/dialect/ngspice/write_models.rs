@@ -189,7 +189,7 @@ const fn refusal(
 fn mesa_level(d: &ir::Design, params: ir::ParamList) -> bool {
     d.params(params).iter().any(|&(name, v)| {
         d.str(name) == "level"
-            && matches!(d.expr(v), ir::Expr::Num(n) if [2.0, 3.0, 4.0].contains(&d.num(n).value()))
+            && matches!(d.expr(v), ir::Expr::Num(n) if [2.0, 3.0, 4.0].contains(&d.literal_value(d.num(n))))
     })
 }
 
@@ -200,7 +200,7 @@ fn version_text(d: &ir::Design, e: ir::ExprId) -> Option<String> {
         ir::Expr::Str(s) => Some(d.str(s).to_string()),
         ir::Expr::Num(n) => {
             let mut out = String::new();
-            number::spell(d.num(n), Grammar::Inp, &mut out);
+            number::spell(d, d.num(n), Grammar::Inp, &mut out);
             Some(out)
         }
         _ => None,
@@ -219,7 +219,7 @@ fn bare(text: &str) -> bool {
 /// `expr_write::value`.
 fn spell(d: &ir::Design, e: ir::ExprId, out: &mut String) {
     match d.expr(e) {
-        ir::Expr::Num(n) => number::spell(d.num(n), Grammar::Inp, out),
+        ir::Expr::Num(n) => number::spell(d, d.num(n), Grammar::Inp, out),
         ir::Expr::Str(s) => {
             out.push('"');
             out.push_str(d.str(s));

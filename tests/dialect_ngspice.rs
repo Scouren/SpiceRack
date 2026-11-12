@@ -36,15 +36,17 @@ const READ: &[&str] = &[
     "limit_three",
     "negation_refused",
     "numbers",
+    "numbers_long",
     "param_last_wins",
     "param_reads_circuit",
     "param_temp_class",
     "subckt_nested",
+    "title_blank",
     "title_comments_end",
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["expr_parens", "numbers", "structure"];
+const WRITE: &[&str] = &["expr_parens", "numbers", "script_pairs", "structure"];
 
 // ---- private ----
 

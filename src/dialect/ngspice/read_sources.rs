@@ -187,8 +187,8 @@ pub(super) const CODES: &[Row] = &[
 /// A value read and not yet pushed.
 #[derive(Clone, Debug)]
 pub(super) enum Val {
-    /// A number, and whether its digits were rounded (A3).
-    Lit(ir::Literal, bool),
+    /// A number and how its digits fit (`number::Fit`).
+    Lit(ir::Literal, number::Fit),
     /// An expression numparam evaluates.
     Tree(Tree),
 }
@@ -234,7 +234,7 @@ pub(super) fn source(lw: &mut Lower<'_, '_>, st: Stmt) {
 /// A value token: a number, or an expression numparam evaluates (its `{…}`/`'…'` dropped).
 pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, tok: &str) -> Result<Val, Fail> {
     if let Some(s) = number::card(tok) {
-        return Ok(Val::Lit(s.literal, s.rounded));
+        return Ok(Val::Lit(s.literal, s.fit));
     }
     let text = unwrap(tok);
     if lw.class(st.container, text, &[]) != Class::Constant {
@@ -249,12 +249,7 @@ pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, tok: &str) -> Result<Val, Fail> 
 /// Appends a value.
 pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
     match v {
-        Val::Lit(lit, rounded) => {
-            if *rounded {
-                lw.note(st, super::codes::ROUNDED);
-            }
-            lw.b.literal(*lit)
-        }
+        Val::Lit(lit, fit) => lw.number(*lit, fit),
         Val::Tree(t) => lw.expr(st, t, st.scope),
     }
 }
@@ -276,7 +271,7 @@ pub(super) fn int(n: i64) -> Val {
             form: ir::NumForm::Plain,
         }
     };
-    Val::Lit(lit, false)
+    Val::Lit(lit, number::Fit::Exact)
 }
 
 /// An `Unread` failure with `code`.
