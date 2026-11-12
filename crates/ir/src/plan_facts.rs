@@ -239,7 +239,9 @@ impl RowFacts for Loop {
         let op_ok = features.contains(Feature::Item(ItemKind::Analysis))
             && features.contains(Feature::Analysis(AnalysisKind::Op))
             && (d.analyses.is_empty() || has(RunExtra::SeveralAnalyses))
-            && (!crate::state_order::nested(d, body) || has(RunExtra::RunItemNested));
+            && (!crate::state_order::nested(d, body) || has(RunExtra::RunItemNested))
+            // the guard Analysis::generate keeps: without `LoopScoped`, inside every loop
+            && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len());
         if kind == LoopKind::Sweep
             && has(RunExtra::LoopOverOp)
             && op_ok
