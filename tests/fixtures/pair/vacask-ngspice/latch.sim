@@ -1,0 +1,20 @@
+latch: F8 (R75): a two-axis DC sweep of a bistable latch (two CMOS inverters a->b->c, c fed back to a through rf); VACASK carries the last solve into the next outer step, ngspice starts the inner sweep afresh: at outer step 2 (rin 10.1k), vin 2 V, v(c) is 4.97 V on VACASK and 3.49 V on ngspice
+load "spice/mos1.osdi"
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model nm sp_mos1 type=1.0 vto=1.0 kp=1e-4
+model pm sp_mos1 type=-1.0 vto=-1.0 kp=1e-4
+vdd (vdd 0) vsource dc=5.0
+vin (in 0) vsource dc=0.0
+rin (in a) resistor r=10k
+rf (c a) resistor r=20k
+m1p (b a vdd vdd) pm w=10u l=1u
+m1n (b a 0 0) nm w=10u l=1u
+m2p (c b vdd vdd) pm w=10u l=1u
+m2n (c b 0 0) nm w=10u l=1u
+control
+  sweep outer instance="rin" parameter="r" values=[10k, 10.1k]
+    sweep inner instance="vin" parameter="dc" from=2.0 to=5.0 step=0.5
+      analysis dc1 op
+endc
