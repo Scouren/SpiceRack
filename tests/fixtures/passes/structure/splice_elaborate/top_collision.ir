@@ -1,0 +1,7 @@
+file "a.sp" deck
+  title "t"
+  element resistor r1 (1 0) value=1k
+  subckt par ()
+    element resistor r1 (2 0) value=9k
+  elaborate (par)
+  analysis op

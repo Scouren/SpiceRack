@@ -2,13 +2,15 @@
 //! standing before every run item, replaced by its circuits: each named subcircuit's body items
 //! moved into the deck's top scope where the subcircuit stood (their definitions with them),
 //! its formals made top-level parameters of their defaults, the subcircuit item gone. It
-//! removes `Item(Elaborate)` (ngspice's top circuit is its deck's top scope; VACASK's is what
-//! `elaborate` names, A12 R1) and requires `Item(Param)` (the formals).
+//! removes `Item(Elaborate)` (ngspice's top circuit is its deck's top scope; VACASK's is the
+//! default top joined by what `elaborate` names, A12 R1) and requires `Item(Param)` (the
+//! formals). The top's own elements stay: VACASK keeps them beside the named bodies (run
+//! `tests/fixtures/pair/vacask-ngspice/elaborate_top.sim`: v(2) = 8.1818 = 10·4.5k/5.5k with
+//! the top's divider and the body's parallel resistor both in the circuit).
 //!
 //! Left with a note (`ELABORATE_KEPT`): a second `Elaborate` (ngspice cannot swap its top
-//! circuit), one after a run item, a top scope that holds elements of its own, a named
-//! subcircuit some element instantiates or with a formal without a default, and a name two
-//! spliced bodies (or a body and the top) both define.
+//! circuit), one after a run item, a named subcircuit some element instantiates or with a
+//! formal without a default, and a name two spliced bodies (or a body and the top) both define.
 //!
 //! Cites: `rewrite/AMEND-A12.md` R1; `rewrite/DIALECT-VACASK.md` §6 (VS V1, V2).
 //!
@@ -43,7 +45,7 @@ pub fn splice_elaborate(design: &mut ir::Design, diags: &mut ir::Diags) {
 // ---- private ----
 
 /// The subcircuits of `e`, in its order, when it can be spliced exactly: listed in a deck's
-/// top before every analysis, loop or alter there, a top with no element of its own, each
+/// top before every analysis, loop or alter there, each
 /// circuit a subcircuit of that top no element instantiates and whose formals all have
 /// defaults, and no name two bodies (or a body and the top) define or list.
 fn spliceable(design: &ir::Design, e: ir::ItemRef, top: ir::ScopeId) -> Option<Vec<ir::ItemRef>> {
@@ -59,9 +61,6 @@ fn spliceable(design: &ir::Design, e: ir::ItemRef, top: ir::ScopeId) -> Option<V
         ir::ItemKind::Alter,
     ];
     if items[..at].iter().any(|i| run.contains(&i.kind)) {
-        return None;
-    }
-    if items.iter().any(|i| i.kind == ir::ItemKind::Element) {
         return None;
     }
     let row = design.row::<ir::plan::Elaborate>(e.index);

@@ -11,12 +11,13 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cmd-overview, cmd-sweep, cmd-analysis-*.
 //!
-//! Contents: `analysis`, `control_span`, `admits` (crate-private), and for the children
+//! Contents: `analysis`, `control_span`, `admit` (crate-private), and for the children
 //! `quote`, `name_of`, `fold_alters`, `body`
 
 mod analyses;
 mod plan;
 
+pub(super) use super::expr_write::string as quote;
 use super::read_run::{
     MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM, RESET_CLASS,
     SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, identifier,
@@ -71,12 +72,15 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// the first analysis), across comments; with no run item, the first and last control-command
 /// opaque of class Private, Inert or Hint (the classes only this area gives a command line). A
 /// command word alone is no proof: outside a block `print …` or `save v(…)` is another area's
-/// opaque (Unread, or InvalidInSource: run fx). So a block that holds only refused statements
-/// reads back as refused statements at the top: VACASK rejects both.
+/// opaque (InvalidInSource P2013: run fx). So a block that holds only refused statements reads
+/// back as refused statements at the top: VACASK rejects both.
 pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
     let items = design.items(top);
     let command = |k: usize| command_opaque(design, items[k]);
-    let ours = |k: usize| command(k).is_some_and(|c| c != ir::OpaqueClass::Unread);
+    // ponytail: every class widens, a top-level invalid command line beside the block
+    // included (it reads back inside the block: VACASK rejects that deck either way); an
+    // invalid statement inside a block (a refused `save (…)`) must not cut the block short.
+    let ours = |k: usize| command(k).is_some();
     let comment = |k: usize| items[k].kind == ir::ItemKind::Comment;
     if let Some(mut first) = items.iter().position(|&at| run_item(at)) {
         let mut last = items.iter().rposition(|&at| run_item(at))?;
@@ -117,54 +121,45 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
 /// node set no analysis line that takes its list follows (W2308: VACASK states `ic=` and
 /// `nodeset=` on an analysis only); an `mc` loop inside another (W2310: VD cmd-analysis-mc, no
 /// nesting); a transfer or noise analysis whose output is no node or node pair (W2311).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, scope) in design.reachable() {
-        if output_unspelled(design, at) {
-            diags.push_at(OUTPUT_FORM, design, at, 0);
+pub(super) fn admit(
+    design: &ir::Design,
+    at: ir::ItemRef,
+    scope: ir::ScopeId,
+    diags: &mut ir::Diags,
+) {
+    if output_unspelled(design, at) {
+        diags.push_at(OUTPUT_FORM, design, at, 0);
+    }
+    if is_mc(design, at) && within_mc(design, scope) {
+        diags.push_at(MC_NESTED, design, at, 0);
+    }
+    if at.kind == ir::ItemKind::NodeSet && !on_an_analysis(design, scope, at) {
+        diags.push_at(NODE_SET_PLACE, design, at, 0);
+    }
+    if at.kind == ir::ItemKind::Option
+        && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
+    {
+        diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
+    }
+    if !names_spelled(design, at) {
+        diags.push_at(NAME_SPELLING, design, at, 0);
+    }
+    for t in swept_targets(design, at) {
+        if t.kind != ir::TargetKind::SourceDc {
+            continue;
         }
-        if is_mc(design, at) && within_mc(design, scope) {
-            diags.push_at(MC_NESTED, design, at, 0);
-        }
-        if at.kind == ir::ItemKind::NodeSet && !on_an_analysis(design, scope, at) {
-            diags.push_at(NODE_SET_PLACE, design, at, 0);
-        }
-        if at.kind == ir::ItemKind::Option
-            && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
-        {
-            diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
-        }
-        if !names_spelled(design, at) {
-            diags.push_at(NAME_SPELLING, design, at, 0);
-        }
-        for t in swept_targets(design, at) {
-            if t.kind != ir::TargetKind::SourceDc {
-                continue;
+        match source_of(design, t) {
+            None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
+            Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
+                diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
             }
-            match source_of(design, t) {
-                None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
-                Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
-                    diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
-                }
-                Some(_) => {}
-            }
-        }
-        let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
-        if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
-            diags.push_at(RESET_CLASS, design, at, 0);
+            Some(_) => {}
         }
     }
-}
-
-/// `text` as a VACASK string (`"…"`, `"` and `\` escaped).
-pub(super) fn quote(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        if c == '"' || c == '\\' {
-            out.push('\\');
-        }
-        out.push(c);
+    let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
+    if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
+        diags.push_at(RESET_CLASS, design, at, 0);
     }
-    out.push('"');
 }
 
 /// The hierarchical name of `path` (`x1:r1`).

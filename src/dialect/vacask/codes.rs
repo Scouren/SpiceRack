@@ -5,7 +5,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §7; `REWRITE-PLAN.md` §4.5.
 //!
-//! Contents: `CODES`, `info` (crate-private), and the spine's codes `UNREAD`, `PRIVATE`, `UNCLOSED`
+//! Contents: `CODES`, `info` (crate-private), and the spine's codes `NO_SYNTAX`, `SKIPPED`, `PRIVATE`, `UNCLOSED`
 
 use crate::ir;
 
@@ -14,8 +14,10 @@ use super::{
     read_structure, write_structure,
 };
 
-/// A statement the reader has no rule for yet (an area not written): kept as an `Unread` opaque.
-pub(super) const UNREAD: ir::Code = ir::Code::new(b'P', 2004);
+/// A statement VACASK has no syntax for (an ngspice card, a `*` line): invalid in source.
+pub(super) const NO_SYNTAX: ir::Code = ir::Code::new(b'P', 2013);
+/// The same at a library's top outside every section: skipped when included by section.
+pub(super) const SKIPPED: ir::Code = ir::Code::new(b'P', 2014);
 /// A construct only VACASK has and no pass reads: kept as a `Private` opaque.
 pub(super) const PRIVATE: ir::Code = ir::Code::new(b'P', 2003);
 
@@ -43,11 +45,20 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
-        UNREAD,
+        NO_SYNTAX,
         ir::Info {
-            title: "a VACASK statement the reader has no rule for yet",
-            cite: "rewrite/DIALECT-VACASK.md §2 (the areas of S4.1–S4.3)",
-            explain: "The statement is kept as an `Unread` opaque: VACASK's own writer copies it, another dialect refuses it, and a strict read refuses the deck.",
+            title: "a statement VACASK has no syntax for",
+            cite: "DIALECT-VACASK run fx; settle star_deck, star_in_section (VACASK 36be560: \"Syntax error, unexpected string.\")",
+            explain: "No VACASK statement begins this way (an ngspice card, a `*` comment line, a top-level `save`); VACASK rejects it in a deck and in the section a deck includes.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        SKIPPED,
+        ir::Info {
+            title: "text outside every section of a library, which VACASK skips",
+            cite: "settle star_outside_section, junk_outside_section (VACASK 36be560 runs a deck that includes such a library by section=)",
+            explain: "VACASK reads only the chosen section of a library it includes by section; a statement outside every section is never read there, so it moves no number (a plain include of the library would reject it).",
             kind: ir::Kind::Note,
         },
     ),

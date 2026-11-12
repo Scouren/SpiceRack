@@ -43,6 +43,9 @@
 //!
 //! Contents: none (tests only).
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "common/cmp.rs"]
 mod cmp;
 #[allow(dead_code)]
@@ -208,6 +211,7 @@ fn cell(c: &Cell) {
                 path,
                 policy: Policy::Strict,
                 simulate: true,
+                missing: Vec::new(),
             }
         })
         .collect();

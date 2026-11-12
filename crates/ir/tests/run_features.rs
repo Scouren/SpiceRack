@@ -183,6 +183,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::AnalysisUnnamed, "  analysis op", "  analysis op name=o1"),
     (RunExtra::DcAxisUnnamed, D, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1"),
     (RunExtra::LoopUnnamed, L, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op"),
+    (RunExtra::TranPrintStep, T, "  analysis tran stop=1u cap=none"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
@@ -210,7 +211,7 @@ fn features(lines: &str) -> FeatureSet {
     let text = format!("file \"t.sp\" deck\n{lines}\n");
     let mut d = Design::new();
     let mut diags = Diags::new();
-    parse(&text, &mut d.builder(), &mut diags);
+    spicerack_ir::parse_unchecked(&text, &mut d.builder(), &mut diags);
     assert!(
         diags.is_empty(),
         "the deck reads with no diagnostic before any feature is looked at\n{text}: {:?}",
@@ -259,7 +260,8 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Run(RunExtra::SaveWholeRunMidRun))
         .with(Feature::Run(RunExtra::OptionFromHere))
         .with(Feature::Run(RunExtra::SaveWholeRun))
-        .with(Feature::Run(RunExtra::AnalysisUnnamed));
+        .with(Feature::Run(RunExtra::AnalysisUnnamed))
+        .with(Feature::Run(RunExtra::TranPrintStep));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
 

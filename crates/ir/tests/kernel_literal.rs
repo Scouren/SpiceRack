@@ -225,3 +225,101 @@ fn meaning_compares_reals_by_value_and_ints_by_form() {
         );
     }
 }
+
+#[test]
+fn digits_as_written_are_one_literal() {
+    // the dialects' audit, row 7: the digits-to-literal arithmetic each reader carried, once
+    // (oracle: the literals worked by hand below)
+    use spicerack_ir::literal::{Decimal, decimal};
+    let short = |m, f, e, form| Some(Decimal::Short(lit(m, f, e, form)));
+    let cases: [(&str, i32, NumForm, Option<Decimal<'_>>); 13] = [
+        ("0.005", 0, NumForm::Plain, short(5, 3, 0, NumForm::Plain)),
+        (
+            "-1.50",
+            3,
+            NumForm::Scale,
+            short(-150, 2, 3, NumForm::Scale),
+        ),
+        ("007", 0, NumForm::Plain, short(7, 0, 0, NumForm::Plain)),
+        (
+            "2.",
+            -2,
+            NumForm::Exponent,
+            short(2, 0, -2, NumForm::Exponent),
+        ),
+        ("25", 0, NumForm::Mil, short(25, 0, 0, NumForm::Mil)),
+        (
+            "-0.00",
+            0,
+            NumForm::Plain,
+            Some(Decimal::Short(Literal::ZERO)),
+        ),
+        ("0", 0, NumForm::Int, short(0, 0, 0, NumForm::Int)),
+        // 19 significant digits: the digits stay as written (A18)
+        (
+            "1234567890123456789",
+            0,
+            NumForm::Plain,
+            Some(Decimal::Long("1234567890123456789", 0, NumForm::Plain)),
+        ),
+        // more fraction digits than a literal holds: the fraction moves into the power, exactly
+        (
+            "0.0000000000000000001",
+            0,
+            NumForm::Plain,
+            short(1, 0, -19, NumForm::Exponent),
+        ),
+        ("1", 400, NumForm::Exponent, None), // not finite
+        ("1", 1, NumForm::Plain, None),      // a plain literal has no power
+        ("1", 40_000, NumForm::Exponent, None),
+        ("1x", 0, NumForm::Plain, None),
+    ];
+    let mut wrong = Vec::new();
+    for (digits, exp10, form, want) in cases {
+        let got = decimal(digits, exp10, form);
+        if got != want {
+            wrong.push(format!(
+                "{digits} e{exp10} {form:?}: {got:?}, want {want:?}"
+            ));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+#[test]
+fn a_decimal_is_the_correctly_rounded_value_of_its_digits() {
+    // oracle: Rust's decimal parser on the same digits and power, an independent decimal ->
+    // double; 10^4 random significands of 1 to 25 digits, a point anywhere, a sign, a power
+    use spicerack_ir::literal::{Decimal, decimal};
+    let mut state = 7u64;
+    let mut d = Design::new();
+    for k in 0..10_000 {
+        let len = 1 + (next(&mut state) % 25) as usize;
+        let mut s: String = (0..len)
+            .map(|_| char::from(b'0' + (next(&mut state) % 10) as u8))
+            .collect();
+        let point = (next(&mut state) % (len as u64 + 1)) as usize;
+        if point < len {
+            s.insert(point, '.');
+        }
+        if next(&mut state).is_multiple_of(2) {
+            s.insert(0, '-');
+        }
+        let exp10 = (next(&mut state) % 61) as i32 - 30;
+        let want: f64 = format!("{s}e{exp10}").parse().expect("Rust reads it");
+        let got = match decimal(&s, exp10, NumForm::Exponent) {
+            Some(Decimal::Short(l)) => l.value(),
+            Some(Decimal::Long(digits, e, form)) => {
+                let mut b = d.builder();
+                let id = b.long_literal(digits, e, form);
+                let spicerack_ir::Expr::Num(n) = d.expr(id) else {
+                    unreachable!("a literal row")
+                };
+                d.literal_value(d.num(n))
+            }
+            None => panic!("case {k}: {s}e{exp10} is a literal"),
+        };
+        // `==`, not the bits: the IR's one zero literal is +0 (`Literal::ZERO`), `-0` too
+        assert!(got == want, "case {k}: {s}e{exp10}: {got} against {want}");
+    }
+}

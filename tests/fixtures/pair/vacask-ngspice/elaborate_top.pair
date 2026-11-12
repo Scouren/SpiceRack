@@ -1,0 +1,3 @@
+# One elaborate whose top holds elements of its own (VACASK corpus benchmark/c6288/vacask/debug_run.sim's shape).
+owner = runrules
+proves = splice_elaborate

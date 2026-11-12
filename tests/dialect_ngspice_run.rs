@@ -17,6 +17,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::path::PathBuf;
 
 use spicerack::dialect::{self, DialectRow, Policy, Sources};

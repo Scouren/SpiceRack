@@ -8,6 +8,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
 #[path = "passes_run/loops.rs"]
@@ -93,6 +96,11 @@ fn whole_run_to_from_here_keeps_the_state_at_every_analysis() {
 #[test]
 fn whole_run_save_to_from_here_keeps_the_saves_at_every_analysis() {
     keeps_state("whole_run_save_to_from_here", ir::RunExtra::SaveWholeRun);
+}
+
+#[test]
+fn save_set_to_all_keeps_the_saves_at_every_analysis() {
+    keeps_state("save_set_to_all", ir::RunExtra::SaveAnalysisSet);
 }
 
 #[test]

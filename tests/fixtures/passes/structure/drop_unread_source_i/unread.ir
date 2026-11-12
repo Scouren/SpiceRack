@@ -1,0 +1,4 @@
+file "a.sp" deck
+  model vsource source_v
+  model isource source_i
+  element vsource v1 (1 0) dc=1

@@ -398,12 +398,9 @@ pub(crate) fn gen_event(
     if pick == 2 {
         return Event::BOUND;
     }
-    // the value is a `Handle::ExprDyn` field: its operators take the dynamic form (A19)
-    g.dyn_form = true;
+    // a `Handle::ExprDyn` field whose operators take its class's form (R66)
     if pick == 1 {
-        let at = g.expr(b, features, Reads::Constant);
-        g.dyn_form = false;
-        return Event::at(at);
+        return Event::at(g.expr(b, features, Reads::Constant));
     }
     let signal = gen_probe(g, b, features, true);
     let reads = if has(features, RunExtra::MeasCircuitThreshold) && g.chance(3) {
@@ -412,7 +409,6 @@ pub(crate) fn gen_event(
         Reads::Constant
     };
     let value = g.expr(b, features, reads);
-    g.dyn_form = false;
     let edge = Edge::ALL[g.below(3) as usize];
     let last = has(features, RunExtra::MeasLast) && g.chance(3);
     let skip_initial = !last && has(features, RunExtra::MeasSkipInitial) && g.chance(3);

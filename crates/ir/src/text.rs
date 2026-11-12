@@ -113,12 +113,13 @@
 //! `name#k` only when the lookup would bind another definition than the row's.
 //!
 //! Contents: `pub fn dump(&Design, FileId, &mut String)`,
-//! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `Words` (re-exported from `text_words`), the
+//! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`,
+//! `pub fn parse_unchecked(&str, &mut Builder<'_>, &mut Diags)`, `Words` (re-exported from `text_words`), the
 //! writers `Ctx`, `write_expr`, `write_value`, `write_exprs`, `write_names`, `write_params`,
 //! `write_ref`, `write_name`, `write_string`, `write_literal`, `write_num` (re-exported from `text_expr`); crate:
 //! `pub(crate) fn keyword(ItemKind) -> &'static str`
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::build::Builder;
 use crate::design::Design;
@@ -304,8 +305,21 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
 /// `diag::TEXT_SYNTAX` row (span: the line's bytes in `text`, file `NONE`) and is skipped; what
 /// it can read is still built. Each item line goes to its kind's `RowFacts::parse` by its keyword
 /// (one exhaustive dispatch over `ItemKind`); then `link` binds every reference, `name?` ones
-/// excepted (module header).
+/// excepted (module header). A text that states an invalid design is refused, not built: a line
+/// read only in part leaves no item, and an item `check` names in the linked design (an
+/// instance of another port count, R61/A36; a definition cycle, A28; a field domain) is one
+/// `TEXT_SYNTAX` row at its span and is taken out of its scope, every reference to its
+/// definitions left unbound. So `check` of what `parse` built is empty, apart from rows about
+/// no item. Cost: one `check` beside the read.
 pub fn parse(text: &str, b: &mut Builder<'_>, diags: &mut Diags) {
+    parse_unchecked(text, b, diags);
+    refuse_invalid(b.design, diags);
+}
+
+/// As [`parse`], but builds the design the text states whether `check` accepts it or not (a
+/// line read only in part is still refused): the door for `check`'s own fixtures, which state
+/// invalid designs on purpose. A dialect's reader is [`parse`].
+pub fn parse_unchecked(text: &str, b: &mut Builder<'_>, diags: &mut Diags) {
     let lines = line_ranges(text);
     let mut stack: Vec<ScopeId> = Vec::new(); // stack[d - 1]: the scope of a depth-d line
     let mut chains: Vec<Option<Chain>> = Vec::new(); // per depth: an `if` awaiting `elif`/`else`
@@ -353,7 +367,7 @@ pub fn parse(text: &str, b: &mut Builder<'_>, diags: &mut Diags) {
             .truncate(before + (diags.len() > before) as usize); // one row per bad line
     }
     link(b.design, diags);
-    clear_held(b.design);
+    unbind(b.design, &|def| def == DefId::HELD);
 }
 
 // ---- private ----
@@ -422,12 +436,19 @@ fn statement(
                 return true;
             };
             let scopes_before = b.design().scopes.len();
+            let before = diags.len();
             let item = for_kind!(kind, R => R::parse(w, scope, b, diags));
             if item == ItemRef::NONE {
                 return true;
             }
             if !w.at_end() {
                 w.error(diags);
+            }
+            if diags.len() > before {
+                // a line it cannot read wholly is skipped wholly: a row that reported and still
+                // pushed its item (a field it could not read left `NONE`) leaves the design
+                b.design.editor().remove_item(scope, item);
+                return true;
             }
             let d = b.design();
             let body = (scopes_before..d.scopes.len())
@@ -564,25 +585,65 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &
     }
 }
 
-/// After the link: a reference held as `name?` becomes unresolved (`DefId::HELD` never
-/// survives `parse`).
-fn clear_held(d: &mut Design) {
+/// Leaves unbound every reference to a definition `gone` names: expression reads and calls
+/// (every row: an unlisted one is never read) and the `Ref` fields of every reachable item.
+/// After the link it clears the references held as `name?` (`DefId::HELD` never survives
+/// `parse`); after a refusal, the references to a refused item's definitions. O(items +
+/// expressions).
+fn unbind(d: &mut Design, gone: &dyn Fn(DefId) -> bool) {
+    d.derived_changed();
     let x = &mut d.exprs;
     for (i, tag) in x.tags.iter().enumerate() {
-        if *tag == ExprTag::Param && x.b[i] == DefId::HELD.0 {
+        if *tag == ExprTag::Param && gone(DefId(x.b[i])) {
             x.b[i] = DefId::NONE.0;
         }
     }
     for call in &mut x.calls {
-        if call.func.def == DefId::HELD {
+        if gone(call.func.def) {
             call.func.def = DefId::NONE;
         }
     }
     for (item, _) in d.reachable() {
         d.editor().map_refs(item, &mut |r, _| {
-            if r.def == DefId::HELD {
+            if gone(r.def) {
                 r.def = DefId::NONE;
             }
+        });
+    }
+}
+
+/// Refuses what only the whole, linked design shows to be invalid: every item a `check` row
+/// names (an instance bound to a subcircuit of another port count, R61/A36; a definition cycle,
+/// A28; a field domain, a string where a number stands, ...) is one `TEXT_SYNTAX` row at its
+/// span and leaves its scope's list. Every reference bound to a refused item's definition is
+/// left unbound (legal, A4), and the rest is checked again, since a refusal can unbind what
+/// another row relied on. Rows about no item are left for `check` (no text states one). One
+/// `check` for a valid design; at most one round per item.
+fn refuse_invalid(d: &mut Design, diags: &mut Diags) {
+    let mut gone = vec![false; d.defs.len()];
+    let rounds = d.reachable().len() + 1;
+    for round in 0..=rounds {
+        assert!(round < rounds, "each round refuses at least one item");
+        let mut found = Diags::new();
+        crate::check::check(d, &mut found);
+        let named: HashSet<ItemRef> = found.rows.iter().map(|r| r.item).collect();
+        let bad: Vec<(ItemRef, ScopeId)> = d
+            .reachable()
+            .into_iter()
+            .filter(|(item, _)| named.contains(item))
+            .collect();
+        if bad.is_empty() {
+            return;
+        }
+        for (k, def) in d.defs.iter().enumerate() {
+            gone[k] |= named.contains(&def.item);
+        }
+        for &(item, scope) in &bad {
+            diags.push(crate::diag::TEXT_SYNTAX, d.span_of(item), 0);
+            d.editor().remove_item(scope, item);
+        }
+        unbind(d, &|def| {
+            def.index_checked(gone.len()).is_some_and(|k| gone[k])
         });
     }
 }

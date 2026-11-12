@@ -9,8 +9,12 @@
 //!
 //! Contents: tests only.
 
+#[path = "../common/memcap.rs"]
+mod memcap;
+
 mod corpus;
 mod probe;
 mod read;
 mod settle;
+mod settle_syntax;
 mod write;

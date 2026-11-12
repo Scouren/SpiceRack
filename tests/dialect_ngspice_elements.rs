@@ -15,6 +15,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::path::PathBuf;
 
 use spicerack::dialect::{self, DialectRow, Policy, Sources};
@@ -378,7 +381,10 @@ fn an_instance_temperature_on_a_family_without_one_is_refused_by_the_writer() {
         )
     };
     for (family, refused) in [("bsim4", true), ("mos1", false), ("hicum2", false)] {
-        let mut design = parse_ir(&ir(family));
+        // unchecked: a BSIM4 model with no version is X0015 for `check`, which `text::parse`
+        // now runs (the case is the writer's refusal, not the invariant)
+        let mut design = ir::Design::new();
+        ir::parse_unchecked(&ir(family), &mut design.builder(), &mut ir::Diags::new());
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row(), &mut diags);
         let got = diags.rows().iter().any(|d| d.code.to_string() == "W1100");

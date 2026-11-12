@@ -1,0 +1,7 @@
+star comment
+model vsource vsource
+* a star line
+v1 (a 0) vsource dc=1
+control
+  analysis op1 op
+endc

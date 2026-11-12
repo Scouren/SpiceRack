@@ -40,6 +40,9 @@ pub struct Deck {
     pub policy: Policy,
     /// Whether the simulators run.
     pub simulate: bool,
+    /// The files the sources name that could not be loaded (a kit outside the corpus): the
+    /// deck fails step 1 as `environment`, a fact of the machine, not of the converter.
+    pub missing: Vec<String>,
 }
 
 /// A failed step: its class (what the expected list names) and what was seen.
@@ -80,7 +83,7 @@ struct Spine {
     devices: BTreeSet<String>,
 }
 
-/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run`).
+/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
 
 /// `name_with_letter`'s note at a renamed element, `arg` the old name (the pass's `RENAMED`,
@@ -98,6 +101,13 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
             written,
         }
     };
+    if !deck.missing.is_empty() {
+        let f = fail(
+            "environment",
+            format!("not found: {}", deck.missing.join(", ")),
+        );
+        return stop(fails, 1, f, None);
+    }
     let spine = match spine(from, to, &deck.src, deck.policy) {
         Ok(s) => s,
         Err((step, f)) => return stop(fails, step, f, None),
@@ -111,20 +121,33 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         let f = fail("slow", "quarantined by the corpus's source list".into());
         return stop(fails, 4, f, written);
     }
-    // ponytail: a written include outside the run directory's top level is not run (the run
-    // directory links the deck's folder, read-only in the store); place it when a corpus
-    // deck needs it.
-    if let Some((p, _)) = rest.iter().find(|(p, _)| p.contains('/')) {
-        let f = fail(
-            "harness-path",
-            format!("written include {p} not at the top level"),
-        );
-        return stop(fails, 4, f, written);
+    // The written includes, relative to the entry's folder: the run directory holds the
+    // entry and links that folder's files.
+    // ponytail: an include outside that folder's top level is not run (the linked folder is
+    // read-only in the store); place it when a corpus deck needs it.
+    let base = std::path::Path::new(&entry.0)
+        .parent()
+        .unwrap_or(std::path::Path::new(""));
+    let mut placed = Vec::new();
+    for (p, t) in rest {
+        match std::path::Path::new(p).strip_prefix(base) {
+            Ok(r) if !r.to_string_lossy().contains('/') => {
+                placed.push((r.to_string_lossy().into_owned(), t.clone()));
+            }
+            _ => {
+                let f = fail(
+                    "harness-path",
+                    format!("written include {p} not beside the deck"),
+                );
+                return stop(fails, 4, f, written);
+            }
+        }
     }
+    let rest = &placed[..];
     let text = &deck.src.files()[0].1;
     let ran = guard(4, || {
-        let a = sim::run(c.from_sim, &deck.path, text, &[], SECS);
-        let b = sim::run(
+        let a = sim::run_checked(c.from_sim, &deck.path, text, &[], SECS);
+        let b = sim::run_checked(
             c.to_sim,
             &deck.path.with_extension(c.to_ext),
             &entry.1,

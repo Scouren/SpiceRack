@@ -71,7 +71,8 @@ pub struct Tran {
     pub record_start: ExprId,
     /// The output interval, s (ngspice `tstep`, Spectre `step`); `NONE` = the simulator
     /// chooses (Xyce and LTspice step 0; ngspice has no such thing: its writer lacks
-    /// `RunExtra::TranSimulatorStep`).
+    /// `RunExtra::TranSimulatorStep`). Given, it is `RunExtra::TranPrintStep` (VACASK has no
+    /// output interval, R67/A41).
     pub print_step: ExprId,
     /// The first step's size, s (Xyce's first field); `NONE` = the simulator's guess.
     pub initial_step: ExprId,
@@ -204,7 +205,9 @@ impl DetailFacts for Tran {
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
+        // R67/A41: exactly one of the twins
         flag(set, self.print_step.is_none(), RunExtra::TranSimulatorStep);
+        flag(set, !self.print_step.is_none(), RunExtra::TranPrintStep);
         flag(set, !self.record_start.is_none(), RunExtra::TranRecordStart);
         flag(set, !self.initial_step.is_none(), RunExtra::TranInitialStep);
         flag(
@@ -310,6 +313,11 @@ impl DetailFacts for Tran {
         if caps.is_empty() && !own_cap {
             return None;
         }
+        // every transient sets one of the twins (R67/A41)
+        let twins = [RunExtra::TranSimulatorStep, RunExtra::TranPrintStep];
+        if !twins.iter().any(|&x| has(features, x)) {
+            return None;
+        }
         let value = |g: &mut Gen, b: &mut Builder<'_>, on: bool| {
             if on {
                 g.expr(b, features, Reads::Constant)
@@ -320,7 +328,14 @@ impl DetailFacts for Tran {
         let stop = value(g, b, true);
         let on = has(features, RunExtra::TranRecordStart) && g.chance(3);
         let record_start = if on { nonzero(g, b) } else { ExprId::NONE };
-        let chosen = has(features, RunExtra::TranSimulatorStep) && g.chance(3);
+        // R67/A41: the print step by which twin the set holds (both: a third chosen)
+        let chosen = match (
+            has(features, RunExtra::TranSimulatorStep),
+            has(features, RunExtra::TranPrintStep),
+        ) {
+            (true, true) => g.chance(3),
+            (sim, _) => sim,
+        };
         let print_step = value(g, b, !chosen);
         let on = has(features, RunExtra::TranInitialStep) && g.chance(3);
         let initial_step = value(g, b, on);

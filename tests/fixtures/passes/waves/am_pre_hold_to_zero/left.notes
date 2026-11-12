@@ -1,0 +1,2 @@
+U0206  # v1: the offset 0.5 before the delay (VACASK); ngspice 0
+U0206  # v2: sin(90 deg) at the delay

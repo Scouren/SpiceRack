@@ -11,6 +11,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
 #[path = "passes_structure/r53.rs"]
@@ -43,7 +46,6 @@ const PENDING_PAIRS: &[&str] = &[
     "formal_defaults_to_instances_default",
     "formal_defaults_to_instances_outer",
     "formal_defaults_to_instances_unbound",
-    "splice_elaborate",
     "constant_param_to_formal",
     "name_with_letter",
 ];
@@ -481,22 +483,35 @@ fn splice_and_constant_params_keep_what_every_read_binds() {
 
 /// R53 over seeded designs of the shape it converts (R55: built for the rule, not drawn from
 /// the generator, whose expressions rarely evaluate): top parameters, a wrapper subcircuit
-/// shadowing some of them, a subcircuit whose formals default to constants, to unbound reads of
-/// those parameters, and to sibling formals, and instances at the top and in the wrapper
-/// passing random subsets of actuals. Every formal's value at every instance (`passes_structure/
-/// r53.rs`, ngspice's rule as bindings) is the same, bit for bit, before and after the pass.
+/// shadowing some of them, a subcircuit whose formals default to constants, to reads of those
+/// parameters, and to sibling formals, and instances at the top and in the wrapper passing
+/// random subsets of actuals. The reads are unbound (R53: from each instance's scope) or bound
+/// to the top's definition (R62's lexical rule: the wrapper's shadow is not seen). Every
+/// formal's value at every instance (`passes_structure/r53.rs`: an unbound read looked up from
+/// the instance's scope, a bound one by its definition) is the same, bit for bit, before and
+/// after each row.
 #[test]
 fn formal_defaults_keep_every_instances_values() {
     use passes::structure::formal_defaults_to_instances as f;
-    r53::keeps_every_instances_values(
-        "formal_defaults_to_instances",
-        f::formal_defaults_to_instances,
-    );
-    // every seeded default reads unbound (or a sibling): the unbound row converts the same designs
-    r53::keeps_every_instances_values(
-        "formal_defaults_to_instances_unbound",
-        f::formal_defaults_to_instances_unbound,
-    );
+    use r53::Read::{Lexical, Unbound};
+    let base: Run = f::formal_defaults_to_instances;
+    // every seeded default reads unbound (or a sibling), or bound where the definition stands
+    for (name, run, read) in [
+        ("formal_defaults_to_instances", base, Unbound),
+        (
+            "formal_defaults_to_instances_unbound",
+            f::formal_defaults_to_instances_unbound,
+            Unbound,
+        ),
+        ("formal_defaults_to_instances", base, Lexical),
+        (
+            "formal_defaults_to_instances_outer",
+            f::formal_defaults_to_instances_outer,
+            Lexical,
+        ),
+    ] {
+        r53::keeps_every_instances_values(name, run, read);
+    }
 }
 
 #[test]

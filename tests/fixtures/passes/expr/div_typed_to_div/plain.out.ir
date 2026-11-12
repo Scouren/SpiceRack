@@ -3,4 +3,4 @@ file "d.sp" deck
   param q = trunc(a / 2i)
   param h = a / 2
   param n = trunc(q / 2i)
-  element behav b1 (n 0) expr=(v(n) / q)
+  element behav b1 (n 0) expr=(v(n) /: q)
