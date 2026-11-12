@@ -216,7 +216,8 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Analysis(AnalysisKind::Tran))
         .with(Feature::Option(OptionKey::Klu))
         .with(Feature::Run(RunExtra::TranCapNone))
-        .with(Feature::Run(RunExtra::TranUic));
+        .with(Feature::Run(RunExtra::TranUic))
+        .with(Feature::Run(RunExtra::StateFromHere));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
 
