@@ -16,7 +16,8 @@
 //! Contents: `analysis` (crate-private)
 
 use super::sweep::{
-    BAD, Spec, Sweep, Why, check, get, pairs, private, range, spec, sweep, target, value, vector,
+    BAD, Spec, Sweep, Why, check, check_arg, get, pairs, private, range, spec, sweep, target,
+    value, vector,
 };
 use super::{ANALYSIS_FIELD, ANALYSIS_HB_SMALL, HB_FORM, OWN_PSS, PSS_PERIOD, bare_name, string};
 use crate::dialect::vacask::number;
@@ -300,7 +301,7 @@ fn tran(l: &Lower<'_, '_, '_>, pairs: &[(String, u32)]) -> Result<Tran, Why> {
             _ => return Err(BAD),
         },
     };
-    check(l, &[stop, step, start, maxstep, fmax, fmin, seed])?;
+    check_arg(l, &[stop, step, start, maxstep, fmax, fmin, seed])?;
     // A literal zero is VACASK's "none" for these (run e7; VD: noisefmin 0 is the default).
     let maxstep = if zero(l, maxstep) { NONE } else { maxstep };
     // `start=0` records from 0: no record start (R47; check refuses a literal-0 one).

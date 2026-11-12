@@ -8,7 +8,9 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cir-instance, cir-mfactor,
 //! dev-builtin-behavioral; R21 (`admits`).
 //!
-//! Contents: `MASTERLESS`, `PORTS`, `UNRESOLVED_MULT`, `KIND`, `BEHAV_FIELD`, `admit`, `element` (crate-private)
+//! Contents: `MASTERLESS`, `PORTS`, `UNRESOLVED_MULT`, `KIND`, `BEHAV_FIELD`, `Index` (`Index::of`), `admit`, `element` (crate-private)
+
+use std::collections::{HashMap, HashSet};
 
 use super::expr_write::write_expr;
 use super::families::{self, Name};
@@ -32,6 +34,19 @@ pub(super) const KIND: ir::Code = ir::Code::new(b'W', 2108);
 /// A behavioural source with a field VACASK's `b` source has no parameter for.
 pub(super) const BEHAV_FIELD: ir::Code = ir::Code::new(b'W', 2106);
 
+/// The tables `admit` reads, built in one walk per `admits` call: which masters stand where
+/// VACASK looks (the visible `model` and `subckt` statements, VACASK's own text among them, by
+/// subcircuit and name), the element kinds each model name gives, and each family's word. A walk
+/// per element made `admits` quadratic (the powergrid decks).
+pub(super) struct Index {
+    /// Each family's module word.
+    pub(super) words: families::Words,
+    /// `(subckt, kind, name)` of each reachable model or subcircuit statement (`NONE`: the top).
+    defs: HashSet<(ir::ScopeId, ir::DefKind, String)>,
+    /// `(subckt, model name)` → the element kinds its models give (`families::kind`).
+    kinds: HashMap<(ir::ScopeId, ir::NameId), Vec<ir::ElemKind>>,
+}
+
 /// The kinds the sources area writes (`write.rs` routes them): their masters are its check.
 const SOURCE_KINDS: [ir::ElemKind; 8] = [
     ir::ElemKind::VSource,
@@ -43,6 +58,89 @@ const SOURCE_KINDS: [ir::ElemKind; 8] = [
     ir::ElemKind::Coupling,
     ir::ElemKind::LosslessLine,
 ];
+
+impl Index {
+    /// The tables of `design`.
+    pub(super) fn of(design: &ir::Design) -> Index {
+        let mut defs = HashSet::new();
+        let mut kinds: HashMap<(ir::ScopeId, ir::NameId), Vec<ir::ElemKind>> = HashMap::new();
+        for (at, s) in design.reachable() {
+            // A subckt's own row stands in its parent's scope.
+            let place = subckt_of(design, s);
+            match at.kind {
+                ir::ItemKind::Model => {
+                    let m: ir::Model = design.row(at.index);
+                    defs.insert((place, ir::DefKind::Model, design.str(m.name).to_string()));
+                    kinds
+                        .entry((place, m.name))
+                        .or_default()
+                        .push(families::kind(m.family));
+                }
+                ir::ItemKind::Subckt => {
+                    let sub: ir::item::Subckt = design.row(at.index);
+                    defs.insert((place, ir::DefKind::Subckt, design.str(sub.name).to_string()));
+                }
+                ir::ItemKind::Opaque => {
+                    let text = design.text(design.row::<ir::item::Opaque>(at.index).text);
+                    for (word, kind) in [
+                        ("model ", ir::DefKind::Model),
+                        ("subckt ", ir::DefKind::Subckt),
+                    ] {
+                        if let Some(rest) = text.strip_prefix(word)
+                            && let Some(end) = rest.find(' ')
+                        {
+                            defs.insert((place, kind, rest[..end].to_string()));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Index {
+            words: families::Words::of(design),
+            defs,
+            kinds,
+        }
+    }
+
+    /// Whether a `model` (of `kind` Model) or `subckt` (Subckt) statement named `name` stands
+    /// where VACASK looks from `scope`: in the element's own subckt (any scope inside it) or at
+    /// the top level of any file, sections and branches at the top included (the reader's
+    /// declared table; VD cir-masters "Scope").
+    fn visible(
+        &self,
+        design: &ir::Design,
+        scope: ir::ScopeId,
+        kind: ir::DefKind,
+        name: ir::NameId,
+    ) -> bool {
+        let own = subckt_of(design, scope);
+        let name = design.str(name).to_string();
+        [own, ir::ScopeId::NONE]
+            .into_iter()
+            .any(|place| self.defs.contains(&(place, kind, name.clone())))
+    }
+
+    /// The element kinds the visible models named `name` give an instance.
+    fn model_kinds(
+        &self,
+        design: &ir::Design,
+        scope: ir::ScopeId,
+        name: ir::NameId,
+    ) -> Vec<ir::ElemKind> {
+        let own = subckt_of(design, scope);
+        let mut places = vec![own];
+        if !own.is_none() {
+            places.push(ir::ScopeId::NONE);
+        }
+        places
+            .into_iter()
+            .filter_map(|p| self.kinds.get(&(p, name)))
+            .flatten()
+            .copied()
+            .collect()
+    }
+}
 
 /// One `Element` row as its instance statement.
 pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
@@ -59,7 +157,7 @@ pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
         w.out.push('\n');
         return;
     }
-    for (key, value) in fields(d, &e) {
+    for (key, value) in fields(d, &w.words, &e) {
         w.out.push(' ');
         name::spell(&key, Place::Other, w.out);
         w.out.push('=');
@@ -81,6 +179,7 @@ pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// W2106).
 pub(super) fn admit(
     design: &ir::Design,
+    index: &Index,
     at: ir::ItemRef,
     scope: ir::ScopeId,
     diags: &mut ir::Diags,
@@ -90,14 +189,14 @@ pub(super) fn admit(
     // so one it does not find reads back `Unresolved` (law L5, seed 1).
     if let Some(kind) = e.kind.master_kind()
         && !e.model.name.is_none()
-        && !visible(design, scope, kind, e.model.name)
+        && !index.visible(design, scope, kind, e.model.name)
     {
         diags.push_at(MASTERLESS, design, at, 0);
     }
     // VACASK takes the kind from the master: a model of another kind's family reads back as
     // that kind.
     if e.kind.master_kind() == Some(ir::DefKind::Model) && !SOURCE_KINDS.contains(&e.kind) {
-        let kinds = model_kinds(design, scope, e.model.name);
+        let kinds = index.model_kinds(design, scope, e.model.name);
         if !kinds.is_empty() && !kinds.contains(&e.kind) {
             diags.push_at(KIND, design, at, 0);
         }
@@ -123,13 +222,13 @@ pub(super) fn admit(
     {
         diags.push_at(write_models::UNSPELLED, design, at, 0);
     }
-    let Some(word) = module(design, &e) else {
+    let Some(word) = module(design, &index.words, &e) else {
         return;
     };
     if families::module(&word).is_some_and(|m| usize::from(m.terminals) != e.terminals.len()) {
         diags.push_at(PORTS, design, at, 0);
     }
-    let lacked = fields(design, &e).iter().any(|(key, _)| {
+    let lacked = fields(design, &index.words, &e).iter().any(|(key, _)| {
         key != "$mfactor" && !matches!(families::instance_name_in(&word, key), Name::Ir(_))
     });
     if lacked {
@@ -138,54 +237,6 @@ pub(super) fn admit(
 }
 
 // ---- private ----
-
-/// Whether a reachable `model` (of `kind` Model) or `subckt` (Subckt) statement named `name`
-/// stands where VACASK looks from `scope`: in the element's own subckt (any scope inside it) or
-/// at the top level of any file, sections and branches at the top included (the reader's
-/// declared table; VD cir-masters "Scope"). A statement kept as VACASK's text counts too.
-fn visible(design: &ir::Design, scope: ir::ScopeId, kind: ir::DefKind, name: ir::NameId) -> bool {
-    let own = subckt_of(design, scope);
-    let word = match kind {
-        ir::DefKind::Subckt => "subckt ",
-        _ => "model ",
-    };
-    let head = format!("{word}{} ", design.str(name));
-    design.reachable().into_iter().any(|(at, s)| {
-        let place = subckt_of(design, s);
-        // A subckt's own row stands in its parent's scope.
-        if place != own && !place.is_none() {
-            return false;
-        }
-        match (at.kind, kind) {
-            (ir::ItemKind::Model, ir::DefKind::Model) => {
-                design.row::<ir::Model>(at.index).name == name
-            }
-            (ir::ItemKind::Subckt, ir::DefKind::Subckt) => {
-                design.row::<ir::item::Subckt>(at.index).name == name
-            }
-            (ir::ItemKind::Opaque, _) => design
-                .text(design.row::<ir::item::Opaque>(at.index).text)
-                .starts_with(&head),
-            _ => false,
-        }
-    })
-}
-
-/// The element kinds the visible models named `name` give an instance (`families::kind`).
-fn model_kinds(design: &ir::Design, scope: ir::ScopeId, name: ir::NameId) -> Vec<ir::ElemKind> {
-    let own = subckt_of(design, scope);
-    design
-        .reachable()
-        .into_iter()
-        .filter(|&(at, s)| {
-            let place = subckt_of(design, s);
-            at.kind == ir::ItemKind::Model && (place == own || place.is_none())
-        })
-        .map(|(at, _)| design.row::<ir::Model>(at.index))
-        .filter(|m| m.name == name)
-        .map(|m| families::kind(m.family))
-        .collect()
-}
 
 /// The innermost subckt scope holding `scope` (itself included), `NONE` at the top level.
 fn subckt_of(design: &ir::Design, scope: ir::ScopeId) -> ir::ScopeId {
@@ -205,18 +256,23 @@ fn subckt_of(design: &ir::Design, scope: ir::ScopeId) -> ir::ScopeId {
 }
 
 /// The module word of `e`'s bound model, when it has one.
-fn module(d: &ir::Design, e: &ir::Element) -> Option<String> {
+fn module(d: &ir::Design, words: &families::Words, e: &ir::Element) -> Option<String> {
     if e.model.def.is_none() || e.kind.master_kind() != Some(ir::DefKind::Model) {
         return None;
     }
     let def = d.def(e.model.def);
-    (def.item.kind == ir::ItemKind::Model).then(|| write_models::word(d, &d.row(def.item.index)))
+    (def.item.kind == ir::ItemKind::Model)
+        .then(|| write_models::word(d, words, &d.row(def.item.index)))
 }
 
 /// `e`'s parameters as written: the typed fields, then the instance parameters, then
 /// `$mfactor`; `None` stands for the literal 0 (`noisy=0`).
-fn fields(d: &ir::Design, e: &ir::Element) -> Vec<(String, Option<ir::ExprId>)> {
-    let word = module(d, e);
+fn fields(
+    d: &ir::Design,
+    words: &families::Words,
+    e: &ir::Element,
+) -> Vec<(String, Option<ir::ExprId>)> {
+    let word = module(d, words, e);
     let mut out = Vec::new();
     let mut put = |key: &str, v: ir::ExprId| {
         if !v.is_none() {
