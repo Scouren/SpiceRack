@@ -328,3 +328,42 @@ fn a_title_outside_a_decks_top_is_a_field_domain() {
         "moved into a subckt body"
     );
 }
+
+#[test]
+fn a_row_names_the_item_it_is_about() {
+    // A25 (R48): `Diag.item` names the refused item, so a design with no spans (built, or
+    // generated) still says which element; a row about no item has `ItemRef::NONE`
+    let mut d = Design::new();
+    let (title, top) = {
+        let mut b = d.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let title = b.title(top, "t", Span::NONE);
+        (title, top)
+    };
+    let body = {
+        let mut b = d.builder();
+        b.subckt(top, "s", &[], &[], Span::NONE).1
+    };
+    {
+        let mut e = d.editor();
+        let t = e.items_mut(top).remove(0);
+        e.items_mut(body).push(t);
+    }
+    let mut diags = Diags::new();
+    check(&d, &mut diags);
+    assert_eq!(diags.rows().len(), 1);
+    assert_eq!(diags.rows()[0].item, title, "the moved title");
+    // check_legal names the item that uses the feature
+    let mut legal = Diags::new();
+    crate::check::check_legal(&d, &crate::feature::FeatureSet::EMPTY, &mut legal);
+    assert!(legal.rows().iter().any(|r| r.item == title));
+    // push_at takes the span from the item; push names none
+    let mut rows = Diags::new();
+    rows.push_at(violation_code(Violation::FieldDomain), &d, title, 7);
+    rows.push(violation_code(Violation::FieldDomain), Span::NONE, 7);
+    assert_eq!(rows.rows()[0].span, d.span_of(title));
+    assert_eq!(
+        (rows.rows()[0].item, rows.rows()[1].item),
+        (title, ItemRef::NONE)
+    );
+}

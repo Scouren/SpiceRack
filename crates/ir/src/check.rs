@@ -25,7 +25,8 @@ use crate::literal;
 use crate::span::Span;
 
 /// One invariant of a well-formed design. Each has its `X` code (`diag::violation_code`); the
-/// span is the offending item's (or `Span::NONE` for a non-item row) and `arg` is stated per
+/// item is the offending one (its span the item's; `ItemRef::NONE` and `Span::NONE` for a non-item
+/// row, A25) and `arg` is stated per
 /// variant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -143,7 +144,7 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
         let mut used = FeatureSet::EMPTY;
         item_features(design, item, scope, &mut walk, &mut used);
         for f in used.minus(*legal).iter() {
-            diags.push(UNSUPPORTED, design.span_of(item), f.index() as u32);
+            diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
         }
     }
     let mut whole = FeatureSet::EMPTY;
@@ -190,15 +191,15 @@ fn probe_classes(out: &mut Out<'_>) {
                 .max()
                 .unwrap_or(ExprClass::Constant);
             if class == ExprClass::Circuit {
-                out.report(Violation::ProbeContext, d.span_of(item), e.0);
+                out.report(Violation::ProbeContext, item, e.0);
             }
         }
     }
 }
 
 impl Out<'_> {
-    fn report(&mut self, v: Violation, span: Span, arg: u32) {
-        self.diags.push(violation_code(v), span, arg);
+    fn report(&mut self, v: Violation, at: ItemRef, arg: u32) {
+        self.diags.push_at(violation_code(v), self.design, at, arg);
     }
 }
 
@@ -208,13 +209,13 @@ fn files_and_scopes(out: &mut Out<'_>) {
     let n_scopes = d.scopes.len();
     for (k, f) in d.files.iter().enumerate() {
         if f.path.index_checked(d.names.len()).is_none() {
-            out.report(Violation::HandleRange, Span::NONE, f.path.0);
+            out.report(Violation::HandleRange, ItemRef::NONE, f.path.0);
         }
         let top_ok = f.top.0 < n_scopes as u32
             && d.scopes[f.top.index()].kind == ScopeKind::File
             && d.scopes[f.top.index()].file.0 as usize == k;
         if !top_ok {
-            out.report(Violation::ScopeTree, Span::NONE, f.top.0);
+            out.report(Violation::ScopeTree, ItemRef::NONE, f.top.0);
         }
     }
     let mut listed: HashSet<ItemRef> = HashSet::new();
@@ -231,22 +232,22 @@ fn files_and_scopes(out: &mut Out<'_>) {
         let owner_ok =
             s.owner == ItemRef::NONE || (s.owner.index as usize) < table_len(d, s.owner.kind);
         if !parent_ok || (s.file.0 as usize) >= d.files.len() || !owner_ok {
-            out.report(Violation::HandleRange, Span::NONE, id);
+            out.report(Violation::HandleRange, ItemRef::NONE, id);
             continue;
         }
         if !reaches_a_file(d, ScopeId(id)) {
-            out.report(Violation::ScopeTree, Span::NONE, id);
+            out.report(Violation::ScopeTree, ItemRef::NONE, id);
             continue;
         }
         for &item in &d.scope_items[k] {
             if (item.index as usize) >= table_len(d, item.kind) {
-                out.report(Violation::HandleRange, Span::NONE, item.index);
+                out.report(Violation::HandleRange, ItemRef::NONE, item.index);
             } else if !listed.insert(item) {
-                out.report(Violation::ScopeTree, d.span_of(item), id);
+                out.report(Violation::ScopeTree, item, id);
             }
         }
         if s.kind != ScopeKind::File && !owner_matches(d, ScopeId(id), &listing) {
-            out.report(Violation::ScopeOwner, Span::NONE, id);
+            out.report(Violation::ScopeOwner, ItemRef::NONE, id);
         }
     }
 }
@@ -304,9 +305,9 @@ fn definitions(out: &mut Out<'_>) {
             || def.name.index_checked(d.names.len()).is_none()
             || !item_ok
         {
-            out.report(Violation::HandleRange, Span::NONE, k as u32);
+            out.report(Violation::HandleRange, ItemRef::NONE, k as u32);
         } else if !seen.insert((def.scope, def.kind, def.name)) {
-            out.report(Violation::DuplicateDef, d.span_of(def.item), k as u32);
+            out.report(Violation::DuplicateDef, def.item, k as u32);
         }
     }
 }
@@ -330,15 +331,15 @@ fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
                 match x.nums.get(a as usize) {
                     Some(l) if l.form == NumForm::Long => {
                         if let Some(v) = literal::long_violation(&x.long, *l) {
-                            out.report(v, Span::NONE, i as u32);
+                            out.report(v, ItemRef::NONE, i as u32);
                         }
                         true
                     }
                     Some(l) => {
                         if !l.shape_ok() {
-                            out.report(Violation::LiteralShape, Span::NONE, i as u32);
+                            out.report(Violation::LiteralShape, ItemRef::NONE, i as u32);
                         } else if !l.finite() {
-                            out.report(Violation::NonFinite, Span::NONE, i as u32);
+                            out.report(Violation::NonFinite, ItemRef::NONE, i as u32);
                         }
                         true
                     }
@@ -386,22 +387,22 @@ fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
             | ExprTag::Tnom => (true, true),
         };
         if !range_ok {
-            out.report(Violation::HandleRange, Span::NONE, i as u32);
+            out.report(Violation::HandleRange, ItemRef::NONE, i as u32);
             bad[i] = true;
             continue;
         }
         if !arity_ok {
-            out.report(Violation::ExprArity, Span::NONE, i as u32);
+            out.report(Violation::ExprArity, ItemRef::NONE, i as u32);
             bad[i] = true;
             continue;
         }
         kids.clear();
         d.children(ExprId(i as u32), &mut kids);
         if kids.iter().any(|k| k.index_checked(n).is_none()) {
-            out.report(Violation::HandleRange, Span::NONE, i as u32);
+            out.report(Violation::HandleRange, ItemRef::NONE, i as u32);
             bad[i] = true;
         } else if kids.iter().any(|k| k.0 >= i as u32) {
-            out.report(Violation::ExprOrder, Span::NONE, i as u32);
+            out.report(Violation::ExprOrder, ItemRef::NONE, i as u32);
             bad[i] = true;
         }
     }
@@ -426,103 +427,93 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
             row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
-        let span = d.span_of(item);
         for (r, kind) in refs {
             if !r.is_resolved() {
                 continue;
             }
             if !def_ok(d, r.def) {
-                out.report(Violation::HandleRange, span, r.def.0);
+                out.report(Violation::HandleRange, item, r.def.0);
             } else if d.defs[r.def.index()].kind != kind || d.defs[r.def.index()].name != r.name {
-                out.report(Violation::RefTarget, span, r.def.0);
+                out.report(Violation::RefTarget, item, r.def.0);
             }
         }
         for h in handles.clone() {
-            handle(out, item, span, h, bad, &mut walk);
+            handle(out, item, h, bad, &mut walk);
         }
     }
 }
 
 /// One handle of a reachable item.
-fn handle(
-    out: &mut Out<'_>,
-    item: ItemRef,
-    span: Span,
-    h: Handle,
-    bad: &[bool],
-    walk: &mut ExprWalk,
-) {
+fn handle(out: &mut Out<'_>, item: ItemRef, h: Handle, bad: &[bool], walk: &mut ExprWalk) {
     let d = out.design;
     // a list lies in its pool, and an empty one is `List::EMPTY` (start 0)
     let in_pool = |start: u32, len: u32, pool: usize| {
         start as usize + len as usize <= pool && (len > 0 || start == 0)
     };
     match h {
-        Handle::Name(n) => name(out, span, n),
+        Handle::Name(n) => name(out, item, n),
         Handle::Names(l) => {
             if !in_pool(l.start, l.len, d.name_pool.len()) {
-                return out.report(Violation::HandleRange, span, l.start);
+                return out.report(Violation::HandleRange, item, l.start);
             }
             for &n in d.names(l) {
-                name(out, span, n);
+                name(out, item, n);
             }
         }
         Handle::Params(l) => {
             if !in_pool(l.start, l.len, d.param_pool.len()) {
-                return out.report(Violation::HandleRange, span, l.start);
+                return out.report(Violation::HandleRange, item, l.start);
             }
             for &(n, v) in d.params(l) {
-                name(out, span, n);
-                expression(out, item, span, v, false, bad, walk);
+                name(out, item, n);
+                expression(out, item, v, false, bad, walk);
             }
         }
         Handle::Exprs(l) => {
             if !in_pool(l.start, l.len, d.expr_pool.len()) {
-                return out.report(Violation::HandleRange, span, l.start);
+                return out.report(Violation::HandleRange, item, l.start);
             }
             for &e in d.exprs(l) {
-                expression(out, item, span, e, false, bad, walk);
+                expression(out, item, e, false, bad, walk);
             }
         }
-        Handle::Expr(e) => expression(out, item, span, e, false, bad, walk),
-        Handle::ExprDyn(e) => expression(out, item, span, e, true, bad, walk),
+        Handle::Expr(e) => expression(out, item, e, false, bad, walk),
+        Handle::ExprDyn(e) => expression(out, item, e, true, bad, walk),
         Handle::Ref(_) => {} // references are reached through `map_refs`
         Handle::Scope(s) => {
             if !s.is_none() && s.index() >= d.scopes.len() {
-                out.report(Violation::HandleRange, span, s.0);
+                out.report(Violation::HandleRange, item, s.0);
             }
         }
         Handle::Text(t) => {
             if !t.is_none() && t.index() >= d.texts.len() {
-                out.report(Violation::HandleRange, span, t.0);
+                out.report(Violation::HandleRange, item, t.0);
             }
         }
         Handle::Branches(l) => {
             if !in_pool(l.start, l.len, d.branch_pool.len()) {
-                out.report(Violation::HandleRange, span, l.start);
+                out.report(Violation::HandleRange, item, l.start);
             }
         }
     }
 }
 
 /// A name handle: in range, and non-empty.
-fn name(out: &mut Out<'_>, span: Span, n: NameId) {
+fn name(out: &mut Out<'_>, item: ItemRef, n: NameId) {
     if n.is_none() {
         return;
     }
     if n.index() >= out.design.names.len() {
-        out.report(Violation::HandleRange, span, n.0);
+        out.report(Violation::HandleRange, item, n.0);
     } else if out.design.str(n).is_empty() {
-        out.report(Violation::EmptyName, span, n.0);
+        out.report(Violation::EmptyName, item, n.0);
     }
 }
 
 /// An expression handle: in range, its references, and (when constant in time) no circuit read.
-#[allow(clippy::too_many_arguments)]
 fn expression(
     out: &mut Out<'_>,
     item: ItemRef,
-    span: Span,
     e: ExprId,
     dynamic: bool,
     bad: &[bool],
@@ -533,7 +524,7 @@ fn expression(
         return;
     }
     if e.index() >= bad.len() {
-        return out.report(Violation::HandleRange, span, e.0);
+        return out.report(Violation::HandleRange, item, e.0);
     }
     for &node in walk.tree(d, e) {
         if bad[node.index()] {
@@ -541,16 +532,16 @@ fn expression(
         }
         match d.expr(node) {
             Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq if !dynamic => {
-                out.report(Violation::ProbeContext, span, node.0)
+                out.report(Violation::ProbeContext, item, node.0)
             }
             Expr::Call(f, _) if f.reads_circuit() && !dynamic => {
-                out.report(Violation::ProbeContext, span, node.0)
+                out.report(Violation::ProbeContext, item, node.0)
             }
             Expr::Param(r) if r.is_resolved() && !param_target_ok(d, item, r) => {
-                out.report(Violation::RefTarget, span, r.def.0)
+                out.report(Violation::RefTarget, item, r.def.0)
             }
             Expr::UserCall(r, _) if r.is_resolved() && !same(d, r, DefKind::Func) => {
-                out.report(Violation::RefTarget, span, r.def.0)
+                out.report(Violation::RefTarget, item, r.def.0)
             }
             Expr::Num(_)
             | Expr::Str(_)

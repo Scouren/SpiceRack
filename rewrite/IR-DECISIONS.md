@@ -361,3 +361,27 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The owners' two generic literal reads moved to the design: `circuit_check`'s sign test (`literal_value`) and `run_words::is_one` (`literal_eq`).
 - `check`'s long-literal arm is `literal::long_violation` (check.rs passed 500 lines).
 
+## A26 applied (`Form`, `root_form`, `rewrite_exprs_in`)
+
+- `features_used` now reads each root's use from the row's handles (`feature::roots_with_use`, `map_exprs`'s order) instead of testing membership in the `ExprDyn` list. A root id listed under both kinds of handle counts in each field's own form, where before one `ExprDyn` listing made every listing dynamic.
+- `rewrite_exprs` and `rewrite_exprs_in` are one walk (`rewrite_where`). Each root's form is decided before the builder opens, while the class table is cached, and `map_exprs` stores back by position in the same order.
+
+## A25 item 1 applied (`Diag.item`)
+
+- `check`'s report takes the item instead of a span; non-item rows (expression rows, definitions' own faults at `Span::NONE`, the design-level features) pass `ItemRef::NONE`. The owners' row checks (`item_facts::field_domain`, the opaque check, `element::design_check`, `circuit_check`, `analysis_facts::report`) push at the item too; `Diags::push(code, span, arg)` stays for a reader's syntax rows and sets no item.
+
+## A25 items 2, 3, 5 applied
+
+- `FormalNotConstant` counts `$tnom` through the row's tree walk (`item_facts::reads_dependent`, which replaced `reads_param`), not through the class: `$tnom` is a constant of the run, and only a head default reading it is dependent (VACASK run c3).
+- `SubcktConstantParam` is a `Param` row fact for a `Param` listed directly in a `Subckt` body. A `Param` in a branch inside a body is not one, since VACASK's `parameters` at that place is the branch's. The generator lists no `Param` in a subcircuit body when the set lacks it; dependent locals are dropped there too, a simplification that costs no reachable feature under `FeatureSet::ALL`.
+- A generated `Load`'s path ends in `.va` for `VerilogA` and `.osdi` for `Osdi`. The `DeviceLibrary` path half is the circuit owner's generator, in its round-5 head.
+- Item 4 (string or list values) waits for `ng-scaffold`'s and `vacask-plan`'s answers on the contexts each accepts.
+
+## The generator's tracked class is the tree's
+
+- `Gen::class` now adds a node's own class (a circuit-reading function, a user function's noted class) when the node is built, not when it is chosen. A node chosen and then abandoned for a leaf (a tree that still owed its probe) no longer raises it. `gen_expr::tests::the_tracked_class_is_the_trees` pins it against `expr_class`. Found by the circuit owner: a generator choice that read `g.class` built a design check refused. `Gen::new` is the constructor `generate` and the test share.
+
+## The scaling gate
+
+- `cargo run --release --features gen --example throughput -- scaling` measures build, dump, parse and check over `FeatureSet::ALL` at 1e5 and 4e5 items (best of two runs) and exits 1 when a ratio exceeds 8: a linear phase measures 4.4 to 4.9 here, a quadratic one about 16. It is a release binary, not a test: a debug-build test at sizes cheap enough for the suite cannot tell a quadratic term from cache effects, and a release-only test would skip in debug. It goes in the merge tier beside the gate's commands (IR-PERF.md, How it is measured). On 68c6be2d it is red on build (13.6), the circuit regression.
+

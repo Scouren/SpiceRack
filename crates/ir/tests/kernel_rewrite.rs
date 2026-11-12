@@ -12,8 +12,9 @@
 
 use spicerack_ir::r#gen::{Size, generate};
 use spicerack_ir::{
-    Bindings, Design, Diags, Dist, DrawPer, DrawWhen, ExprId, ExprUse, FeatureSet, Handle,
-    ItemKind, ItemRef, NameId, Ref, check, eval, rewrite_exprs,
+    Bindings, Design, Diags, Dist, DrawPer, DrawWhen, ExprId, ExprUse, Feature, FeatureSet, Form,
+    Handle, ItemKind, ItemRef, NameId, Ref, UnOp, check, eval, features_used, rewrite_exprs,
+    rewrite_exprs_in, root_form,
 };
 
 const SIZE: Size = Size {
@@ -243,4 +244,95 @@ fn a_deep_tree_rewrites_without_recursion() {
     let mut diags = Diags::new();
     check(&d, &mut diags);
     assert!(diags.is_empty(), "{:?}", diags.rows());
+}
+
+#[test]
+fn a_rewrite_of_one_form_keeps_the_other() {
+    // A26: wrapping every node of the roots of one form in `-(-e)` adds that form's Neg feature
+    // and never the other's; the other form's roots keep their ids; every value is unchanged
+    for form in [Form::Static, Form::Dynamic] {
+        let (wrapper, other) = match form {
+            Form::Static => (Feature::Unary(UnOp::Neg), Feature::UnaryDyn(UnOp::Neg)),
+            Form::Dynamic => (Feature::UnaryDyn(UnOp::Neg), Feature::Unary(UnOp::Neg)),
+        };
+        let mut reached = false;
+        for seed in 0..100u64 {
+            let d = generate(seed, &FeatureSet::ALL, SIZE);
+            let items: Vec<ItemRef> = d.reachable().into_iter().map(|(i, _)| i).collect();
+            let before: Vec<Vec<(ExprId, ExprUse)>> =
+                items.iter().map(|&i| visited(&d, i)).collect();
+            let forms: Vec<Vec<Form>> = before
+                .iter()
+                .map(|roots| roots.iter().map(|&(e, u)| root_form(&d, e, u)).collect())
+                .collect();
+            let mut after = d.clone();
+            rewrite_exprs_in(&mut after, form, &mut |b, e| {
+                let once = b.unary(UnOp::Neg, e);
+                Some(b.unary(UnOp::Neg, once))
+            });
+            let (used_before, used_after) = (features_used(&d), features_used(&after));
+            assert_eq!(
+                used_after.contains(other),
+                used_before.contains(other),
+                "seed {seed}, {form:?}: the other form's feature is not added"
+            );
+            for ((&item, old), kinds) in items.iter().zip(&before).zip(&forms) {
+                let new = visited(&after, item);
+                for ((&(o, _), &(n, _)), &f) in old.iter().zip(&new).zip(kinds) {
+                    if o.is_none() {
+                        continue;
+                    }
+                    if f == form {
+                        assert_ne!(o, n, "seed {seed}, {item:?}: a root of the form changes");
+                        reached = true;
+                    } else {
+                        assert_eq!(o, n, "seed {seed}, {item:?}: the other form keeps its id");
+                    }
+                    match (eval(&d, o, &Fixed), eval(&after, n, &Fixed)) {
+                        (Ok(x), Ok(y)) => assert!(
+                            x.to_bits() == y.to_bits() || (x.is_nan() && y.is_nan()),
+                            "seed {seed}, {item:?}: {x} became {y}"
+                        ),
+                        (Err(_), Err(_)) => {}
+                        (x, y) => panic!("seed {seed}, {item:?}: {x:?} became {y:?}"),
+                    }
+                }
+            }
+            if forms.iter().flatten().any(|&f| f == form) {
+                assert!(
+                    used_after.contains(wrapper),
+                    "seed {seed}, {form:?}: the wrapper counts"
+                );
+            }
+            let mut diags = Diags::new();
+            check(&after, &mut diags);
+            assert!(diags.is_empty(), "seed {seed}: {:?}", diags.rows());
+        }
+        assert!(reached, "{form:?}: some root of the form was rewritten");
+    }
+}
+
+#[test]
+fn the_form_decision_is_the_feature_count_s() {
+    // A26: a root counts dynamic when its field may read the circuit or its class is Temp or
+    // above: root_form is what features_used counts (oracle: the A19 and R14 spec examples)
+    let read = |text: &str| {
+        let mut d = Design::new();
+        spicerack_ir::parse(text, &mut d.builder(), &mut Diags::new());
+        d
+    };
+    let d = read("file \"t.sp\" deck\n  param p = 2 + 3\n  param t = $temp + 1\n");
+    let roots: Vec<(ExprId, ExprUse)> = d
+        .reachable()
+        .into_iter()
+        .flat_map(|(i, _)| visited(&d, i))
+        .collect();
+    let forms: Vec<Form> = roots.iter().map(|&(e, u)| root_form(&d, e, u)).collect();
+    assert_eq!(
+        forms,
+        vec![Form::Static, Form::Dynamic],
+        "a constant, then $temp"
+    );
+    // the same constant in a field that may read the circuit counts dynamic
+    assert_eq!(root_form(&d, roots[0].0, ExprUse::Circuit), Form::Dynamic);
 }

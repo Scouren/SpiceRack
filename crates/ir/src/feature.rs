@@ -24,7 +24,9 @@
 //! - `pub fn features_used(&Design) -> FeatureSet`
 //! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
-//!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`
+//!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`,
+//!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; `pub enum Form`,
+//!   `pub fn root_form(&Design, ExprId, ExprUse) -> Form`
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
@@ -32,7 +34,7 @@ use crate::class::{ExprClass, def_classes, node_class};
 use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{ItemKind, Role, ScopeKind};
 use crate::model::ModelFamily;
@@ -92,6 +94,17 @@ pub enum Feature {
     Placed(ScopeKind, ItemKind),
 }
 
+/// Which of a function's or operator's two features a root counts (`Func` or `FuncDyn`, and so
+/// on: R14, A19, A26): a pass that removes one feature rewrites only the roots of its form.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Form {
+    /// The root stands in a constant-in-time field and reads nothing of class `Temp` or above.
+    Static,
+    /// The root stands in a field that may read the circuit, or it or what it reads is of class
+    /// `Temp` or above.
+    Dynamic,
+}
+
 /// The kernel's features that are fields or placements, not kinds. The circuit and run owners'
 /// are `CircuitExtra` and `RunExtra`, in their own files (A7).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -110,8 +123,8 @@ pub enum Extra {
     /// the item's own subcircuit: neither its own subcircuit nor a file's top (A12 K2: VACASK
     /// resolves in the own scope, then the top, never an enclosing subcircuit).
     EnclosingRef,
-    /// A `Subckt` head default that is not a constant: it holds a `Param` read, or its class is
-    /// `Temp` (A12 K2, widened by A15: VACASK lets an instance override only a formal whose
+    /// A `Subckt` head default that is not a constant: it holds a `Param` read or `$tnom` (A25,
+    /// VACASK run c3), or its class is `Temp` (A12 K2, widened by A15: VACASK lets an instance override only a formal whose
     /// default folds to a constant; it was `FormalReadsParam`).
     FormalNotConstant,
     /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
@@ -127,6 +140,10 @@ pub enum Extra {
     /// mantissa. A writer that spells them verbatim lists it; another target gets the pass that
     /// writes the correctly rounded shortest double.
     LongLiteral,
+    /// A `Param` listed in a `Subckt` body whose value is a constant (no parameter read, no
+    /// `$tnom`, class `Constant`): VACASK reads `parameters x=1` there as a formal, ngspice's
+    /// `.param` there is none (A25, R48). A structure pass makes it a formal.
+    SubcktConstantParam,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -274,7 +291,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::LongLiteral as usize + 1] = [
+    pub const ALL: [Extra; Extra::SubcktConstantParam as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
@@ -285,6 +302,7 @@ impl Extra {
         Extra::FormalWithoutDefault,
         Extra::IfConditionDynamic,
         Extra::LongLiteral,
+        Extra::SubcktConstantParam,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -465,22 +483,16 @@ pub(crate) fn item_features(
     if enclosing {
         *set = set.with(Feature::Extra(Extra::EnclosingRef));
     }
-    // A19 (R38): a field that may read the circuit counts the dynamic form whatever its class
-    let circuit_fields: Vec<ExprId> = handles
-        .iter()
-        .filter_map(|h| match h {
-            Handle::ExprDyn(e) => Some(*e),
-            _ => None,
-        })
-        .collect();
-    for root in expr_roots(design, &handles) {
+    for (root, use_) in roots_with_use(design, &handles) {
         let nodes = walk.tree(design, root);
-        // the Dyn features are class >= Temp (R14, A11): transitive through reads
+        // the one form decision (A26): the field's use and the tree's class (R14, A19)
         let table = def_classes(design);
-        let dynamic = circuit_fields.contains(&root)
-            || nodes
-                .iter()
-                .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
+        let class = nodes
+            .iter()
+            .map(|&e| node_class(design, e, table))
+            .max()
+            .unwrap_or(ExprClass::Constant);
+        let dynamic = form_of(use_, class) == Form::Dynamic;
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
             if let Expr::Num(n) = design.expr(e) {
@@ -570,15 +582,26 @@ impl ExprWalk {
 /// The expression roots among a row's handles: value fields, list elements, parameter values.
 /// Out-of-range lists are skipped (`check` reports them).
 pub(crate) fn expr_roots(design: &Design, handles: &[Handle]) -> Vec<ExprId> {
+    roots_with_use(design, handles)
+        .into_iter()
+        .map(|(e, _)| e)
+        .collect()
+}
+
+/// The expression roots `handles` lists with how each field reads, in `RowFacts::map_exprs`'s
+/// order (A23): `Circuit` for `ExprDyn`, `Constant` for `Expr`, `Exprs` elements and `Params`
+/// values. A list outside its pool lists nothing (`check` reports it).
+pub(crate) fn roots_with_use(design: &Design, handles: &[Handle]) -> Vec<(ExprId, ExprUse)> {
     let mut roots = Vec::new();
     for h in handles {
         match *h {
-            Handle::Expr(e) | Handle::ExprDyn(e) => roots.push(e),
+            Handle::Expr(e) => roots.push((e, ExprUse::Constant)),
+            Handle::ExprDyn(e) => roots.push((e, ExprUse::Circuit)),
             Handle::Exprs(l) if l.start as usize + l.len() <= design.expr_pool.len() => {
-                roots.extend_from_slice(design.exprs(l))
+                roots.extend(design.exprs(l).iter().map(|&e| (e, ExprUse::Constant)))
             }
             Handle::Params(l) if l.start as usize + l.len() <= design.param_pool.len() => {
-                roots.extend(design.params(l).iter().map(|p| p.1))
+                roots.extend(design.params(l).iter().map(|p| (p.1, ExprUse::Constant)))
             }
             Handle::Exprs(_)
             | Handle::Params(_)
@@ -609,7 +632,27 @@ pub(crate) fn chain_kinds(design: &Design, scope: ScopeId) -> [bool; ScopeKind::
     kinds
 }
 
+/// The form a root counts its functions and operators in, given how its field reads (`use`, as
+/// `RowFacts::map_exprs` reports it): `Dynamic` for a field that may read the circuit or a tree of
+/// class `Temp` or above (A19, R14), else `Static`. The one decision: `features_used` makes it
+/// through the same rule. O(the tree) once the definitions' classes are cached.
+pub fn root_form(design: &Design, root: ExprId, use_: ExprUse) -> Form {
+    form_of(
+        use_,
+        crate::class::tree_class(design, root, def_classes(design)),
+    )
+}
+
 // ---- private ----
+
+/// The form decision itself, shared by `root_form` and `features_used` (A26).
+fn form_of(use_: ExprUse, class: ExprClass) -> Form {
+    if use_ == ExprUse::Circuit || class >= ExprClass::Temp {
+        Form::Dynamic
+    } else {
+        Form::Static
+    }
+}
 
 /// The index of a group's first feature: the member counts of the groups before it.
 const fn offset(group: usize) -> usize {

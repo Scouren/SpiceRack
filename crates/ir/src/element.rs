@@ -679,9 +679,10 @@ pub(crate) fn design_check(design: &Design, out: &mut Diags) {
             }
             let element: Element = design.row(item.index);
             if !seen.insert(element.name) {
-                out.push(
+                out.push_at(
                     violation_code(Violation::DuplicateElement),
-                    design.span_of(item),
+                    design,
+                    item,
                     item.index,
                 );
             }
