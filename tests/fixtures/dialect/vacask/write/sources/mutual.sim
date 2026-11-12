@@ -1,0 +1,4 @@
+mutual written
+model m mutual
+m1 () m k=0.5 ind1="l1" ind2="l2"
+m2 () m ind1="la" ind2="lb"

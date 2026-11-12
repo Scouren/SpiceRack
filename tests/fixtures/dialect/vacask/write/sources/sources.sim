@@ -1,0 +1,19 @@
+sources written
+model vsource vsource
+model isource isource
+model e vcvs
+model f cccs
+v1 (a 0) vsource dc=1
+v2 (b 0) vsource mag=1
+v3 (b 0) vsource phase=30
+i1 (c 0) isource type="pulse" width=1u $mfactor=2
+v4 (d 0) vsource type="sine" ampl=2 tdphase=90
+v5 (e 0) vsource type="exp" delay=1u td2=2u tau1=1u tau2=0.5u
+v6 (g 0) vsource type="pwl" wave=[0., 1, 1u, 1, 2u, 3] delay=1u
+v7 (h 0) vsource type="pwl" wave=[1u, 1, 2u, 3] period=4u
+v8 (k 0) vsource type="pwl" file="points.txt"
+v9 (l 0) vsource type="am" freq=10k modindex=0.7
+v10 (n 0) vsource type="fm" sinedc=0.5 delay=20u modphase=45
+e1 (o 0 a 0) e
+e2 (o 0 a 0) e gain=10
+f1 (0 o2) f ctlinst="v1" gain=2

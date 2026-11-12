@@ -1,0 +1,12 @@
+controlled sources
+model vsource vsource
+model e vcvs
+model g vccs
+model f cccs
+model h ccvs
+vp (a b) vsource dc=0
+e1 (o1 0 a 0) e gain=10
+e2 (o2 0 a 0) e
+g1 (o3 0 a b) g gain=1m $mfactor=2
+f1 (0 o4) f ctlinst="vp" gain=3
+h1 (o5 0) h ctlinst="vp" gain=1k ctlnode="flow(br)"

@@ -1,0 +1,4 @@
+mutual
+model m mutual
+m1 () m k=0.95 ind1="l1" ind2="l2"
+m2 () m ind1="l1" ind2="l3"

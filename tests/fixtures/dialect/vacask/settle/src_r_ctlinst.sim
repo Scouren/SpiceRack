@@ -1,0 +1,8 @@
+refused: ctlinst
+model vsource vsource
+model f cccs
+v0 (a 0) vsource dc=1
+f1 (a 0) f gain=2
+control
+  analysis op1 op
+endc

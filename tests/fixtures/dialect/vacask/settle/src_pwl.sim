@@ -1,0 +1,12 @@
+pwl: hold before the first point, delay, the periodic law
+model vsource vsource
+v1 (a 0) vsource type="pwl" wave=[1u, 1, 2u, 3]
+v2 (b 0) vsource type="pwl" wave=[1u, 1, 2u, 3] delay=1u
+v3 (c 0) vsource type="pwl" wave=[0, 0, 1u, 1] period=2u
+v4 (d 0) vsource type="pwl" wave=[1u, 1, 2u, 3] period=4u
+v5 (e 0) vsource type="pwl" wave=[1u, 1, 2u, 3] period=4u delay=1u
+control
+  options rawfile="ascii"
+  analysis op1 op
+  analysis tr1 tran stop=9u step=1n maxstep=5n
+endc

@@ -1,0 +1,6 @@
+pulse
+model vsource vsource
+model isource isource
+v1 (a 0) vsource type="pulse"
+v2 (b 0) vsource type="pulse" val0=0 val1=1.8 delay=1u rise=1u fall=0 width=1u period=4u
+i1 (c 0) isource type="pulse" val0=-1m val1=1m rise=1n fall=2n width=5n period=20n

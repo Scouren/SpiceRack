@@ -1,0 +1,5 @@
+sine
+model vsource vsource
+v1 (a 0) vsource type="sine"
+v2 (b 0) vsource type="sine" sinedc=1 ampl=2 freq=10k delay=1u theta=1k tdphase=90 mag=1
+v3 (c 0) vsource dc=0 type="sine" ampl=0.5

@@ -41,12 +41,9 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
+#[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
-    (
-        "l5",
-        "vacask",
-        "seed 2 Untyped: an analysis with no name (`analysis xf …`) is written with a generated name (`acxf1`, W2301) and reads back named; VACASK requires a name, so an unnamed analysis needs a feature VACASK lacks or a naming pass (vc-run's)",
-    ),
+    ("l5", "vacask", "an unnamed analysis comes back named (S4-AREAS, Known failures)"),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
 ];
 
@@ -64,31 +61,16 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 /// A row whose reason starts with `interim` names a fixture fixpoint in its place: accepted and
 /// printed on every run until the dialect's gate (S3.5 ngspice, S4.5 VACASK), which fails on it.
 /// Strict both ways (`reach_every_kind_the_row_claims`).
+#[rustfmt::skip] // a table: one row per line
 const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
-    (
-        "vacask",
-        "Item(Save)",
-        "generated_save_plans_read_back_to_their_meaning",
-        "W2303: VACASK spells two save shapes only (R29/S12)",
-    ),
-    (
-        "vacask",
-        "Elem(Capacitor)",
-        "proven_device_kinds_round_trip",
-        "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws",
-    ),
-    (
-        "vacask",
-        "Elem(Diode)",
-        "every_reader_fixture_is_a_fixpoint_of_write_and_read",
-        "interim: as Elem(Capacitor); covered by the devices' semis fixture (diodes) until proven_device_kinds_round_trip builds diodes too",
-    ),
-    (
-        "vacask",
-        "Elem(Mosfet)",
-        "proven_device_kinds_round_trip",
-        "as Elem(Capacitor), and the module's terminal count (W2105: sp_mos1 has 4)",
-    ),
+    ("vacask", "Item(Save)", "generated_save_plans_read_back_to_their_meaning", "W2303: VACASK spells two save shapes only (R29/S12)"),
+    ("vacask", "Elem(Capacitor)", "proven_device_kinds_round_trip", "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws"),
+    ("vacask", "Elem(Inductor)", "proven_device_kinds_round_trip", "as Elem(Capacitor)"),
+    ("vacask", "Elem(Coupling)", "property_am_and_mutual_round_trip", "the generator makes no coupling over seeds 0..512 (it needs two inductor names and a Mutual model), so none is generated, let alone refused"),
+    ("vacask", "Elem(Diode)", "every_reader_fixture_is_a_fixpoint_of_write_and_read", "interim: as Elem(Capacitor); covered by the devices' semis fixture (diodes) until proven_device_kinds_round_trip builds diodes too"),
+    ("vacask", "Elem(Mosfet)", "proven_device_kinds_round_trip", "as Elem(Capacitor); W2105"),
+    ("vacask", "Elem(ModuleModel)", "every_reader_fixture_is_a_fixpoint_of_write_and_read", "interim: an instance of a user module needs its Load and a model of that module (W2104, W2102 on Gen's names); covered by the devices' semis fixture until a covering property builds one"),
+    ("vacask", "Wave(Am)", "property_am_and_mutual_round_trip", "VACASK's AM fixes the modulation offset at 1 (W2201 until A31's AmModOffset lands); the generator draws mod_offset freely, so no admitted design holds an Am"),
 ];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics

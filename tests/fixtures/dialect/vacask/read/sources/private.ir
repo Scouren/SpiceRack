@@ -1,0 +1,22 @@
+# Oracle: DIALECT-VACASK §3.2 (pwl shaping and breakpoints, a `ctlnode` other than the branch
+# flow: Private) and VD dev-builtin-src: `scale offset stretch tdphase` not at their defaults
+# (1 0 1 0), `break` other than "all" (its default by run src-dump; VD says "auto") or a
+# slope tolerance off its default, the (quasi)periodic small-signal spurs, a `type` that is no
+# string literal. A parameter the source's type does not read moves no number with no
+# `alter … type=` (R42): v4 is read, its pulse parameters dropped with the note P2203.
+# codes: P2202 P2202 P2202 P2202 P2203 P2204 P2205 P2205 P2207 S0002 S0002 S0002 S0002 S0002 S0002 S0002 S0002
+file "private.sim" deck
+  title "private sources"
+  param t = "sine"
+  model vsource source_v
+  model f cccs
+  model m mutual
+  opaque vacask private "v1 (a 0) vsource type=\"pwl\" wave=[0, 0, 1u, 1] scale=2"
+  opaque vacask private "v2 (a 0) vsource type=\"pwl\" wave=[0, 0, 1u, 1] break=\"auto\""
+  opaque vacask private "v3 (a 0) vsource type=\"pwl\" wave=[0, 0, 1u, 1] period=2u tdphase=90"
+  element vsource v4 (a 0) model=vsource dc=-6i
+  opaque vacask private "v5 (a 0) vsource dc=1 spur={1k} smag=[1]"
+  opaque vacask private "v6 (a 0) vsource type=t"
+  opaque vacask private "f1 (a 0) f ctlinst=\"v1\" ctlnode=\"foo\""
+  opaque vacask private "m1 () m k=0.5 ind1=\"l1\" ind2=\"l2\" ctlnode1=\"x\""
+  opaque vacask private "v7 (a 0) vsource type=\"pwl\" wave=[0, 0, 1u, 1] slopeglob=0.1"

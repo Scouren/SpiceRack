@@ -1,0 +1,20 @@
+# Oracle: R42 and settle dcw (VACASK equals ngspice-45: op -6, the pulse in the transient, op
+# -6 again): a type="dc" source with the alternation of `type="pulse"` before the transient
+# and `type="dc"` before the DC-kind analysis is DcRule::Given with the pulse read from its
+# own parameters (v1). v2: no type alter reaches it, its pulse parameter dropped with P2203.
+# v3: a type alter outside the alternation (a wave source set to dc): its line Private P2208,
+# the alter Private P2313 (the control block's). v1's two alters are framing of the fold: no
+# items (S4-AREAS "dc plus type alters"); the analyses are the run area's rows (DIALECT-VACASK
+# §3.4: tran's step the initial step, the span/50 cap).
+# codes: P2203 P2208 P2313 S0002 S0002
+file "fold.sim" deck
+  title "dc and a wave by type alters"
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource dc=-6i wave=pulse(v1=0i v2=1i delay=0 rise=1u fall=1u width=1u period=4u law=vacask)
+  element vsource v2 (b 0) model=vsource dc=2i
+  opaque vacask private "v3 (c 0) vsource type=\"sine\" ampl=1"
+  analysis op name=op1
+  analysis tran name=tr1 stop=6u initial_step=10n cap=span_over50
+  analysis op name=op2
+  opaque vacask private "alter instance(\"v3\") type=\"dc\""
+  analysis op name=op3

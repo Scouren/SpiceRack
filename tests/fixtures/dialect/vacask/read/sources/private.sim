@@ -1,0 +1,14 @@
+private sources
+parameters t="sine"
+model vsource vsource
+model f cccs
+model m mutual
+v1 (a 0) vsource type="pwl" wave=[0, 0, 1u, 1] scale=2
+v2 (a 0) vsource type="pwl" wave=[0, 0, 1u, 1] break="auto"
+v3 (a 0) vsource type="pwl" wave=[0, 0, 1u, 1] period=2u tdphase=90
+v4 (a 0) vsource type="dc" dc=-6 val0=1 val1=-1 rise=1n
+v5 (a 0) vsource dc=1 spur={1k} smag=[1]
+v6 (a 0) vsource type=t
+f1 (a 0) f ctlinst="v1" ctlnode="foo"
+m1 () m k=0.5 ind1="l1" ind2="l2" ctlnode1="x"
+v7 (a 0) vsource type="pwl" wave=[0, 0, 1u, 1] slopeglob=0.1

@@ -1,0 +1,12 @@
+# Oracle: VD dev-builtin-src (AM, FM: sinedc 0, ampl 1, freq 1k, tdphase 0, delay 0, modfreq
+# 1k, modphase 0, modindex 0.5) and run src-amfm (VD's two formulas, every parameter off its
+# default, at six times to 9 digits; before delay the value at delay). AM: the general Am with
+# mod_offset 1 and mod_time Delay; FM: Sffm law Spice3, both PreDelay::HoldDelayValue.
+# codes:
+file "am_fm.sim" deck
+  title "am and fm"
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource wave=am(offset=0 amplitude=1 mod_offset=1 mod_index=0.5 mod_freq=1k carrier_freq=1k delay=0 phase_m_deg=0 phase_c_deg=0 pre=hold_delay_value) dc_rule=wave_at_zero
+  element vsource v2 (b 0) model=vsource wave=am(offset=0.5 amplitude=2i mod_offset=1 mod_index=0.7 mod_freq=1k carrier_freq=10k delay=20u phase_m_deg=45i phase_c_deg=30i pre=hold_delay_value) dc_rule=wave_at_zero
+  element vsource v3 (c 0) model=vsource wave=sffm(offset=0 amplitude=1 carrier_freq=1k mod_index=0.5 signal_freq=1k delay=0 phase_c_deg=0 phase_m_deg=0 pre=hold_delay_value) dc_rule=wave_at_zero
+  element vsource v4 (d 0) model=vsource wave=sffm(offset=0.5 amplitude=2i carrier_freq=10k mod_index=0.7 signal_freq=1k delay=20u phase_c_deg=30i phase_m_deg=45i pre=hold_delay_value) dc_rule=wave_at_zero
