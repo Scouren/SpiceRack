@@ -23,7 +23,6 @@
 //! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
 //!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`,
-//!   `pub(crate) fn after_run_item`,
 //!   `pub(crate) fn in_scope_kind`, `pub(crate) fn loop_depth`,
 //!   `pub(crate) fn reachable`
 
@@ -35,8 +34,6 @@ use crate::design::Design;
 use crate::diag::Diags;
 use crate::expr::{Expr, Literal, NumForm};
 use crate::feature::{Feature, FeatureSet};
-#[cfg(any(test, feature = "gen"))]
-use crate::id::ItemRef;
 use crate::id::{ExprId, ExprList, List, NameId, NameList, POOL_MAX, Ref, ScopeId};
 #[cfg(any(test, feature = "gen"))]
 use crate::item::ItemKind;
@@ -363,20 +360,6 @@ pub(crate) fn is_one(design: &Design, e: ExprId) -> bool {
         form: NumForm::Plain,
     };
     matches!(design.expr(e), Expr::Num(k) if design.num(k).eq_value(one))
-}
-
-/// Whether position `pos` of `scope` comes after a run item (an analysis, loop or alter) of
-/// that scope, or `scope` is a loop body.
-#[cfg(any(test, feature = "gen"))]
-pub(crate) fn after_run_item(design: &Design, scope: ScopeId, pos: usize) -> bool {
-    let items = design.items(scope);
-    let run = |it: &ItemRef| {
-        matches!(
-            it.kind,
-            ItemKind::Analysis | ItemKind::Loop | ItemKind::Alter
-        )
-    };
-    in_scope_kind(design, scope, ScopeKind::Loop) || items[..pos.min(items.len())].iter().any(run)
 }
 
 /// Whether `scope` or one of its ancestors is of `kind`. Bounded by the scope count.

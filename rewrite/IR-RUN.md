@@ -24,6 +24,22 @@ meaning: an `Alter` changes the circuit for every run item after it. This is the
 | `Target` | a small row `{ kind, a: NameId, b: NameId }` | `Temp`, `Param(name)`, `SourceDc(element)`, `ElementValue(element)`, `DeviceParam(element, param)`, `ModelParam(model, param)`, `Option(key)`. Temperature is its own kind on every simulator, never a parameter named `temp` |
 | `SweepSpec` | `{ kind: Lin \| Dec \| Oct \| List, start, stop, step, points, values: ExprList, end: SweepEnd }` | a set of values with one pinned reading: `Lin` by `step` or by `points` = the number of values (Spectre's `lin=4` is 5 values: its reader adds one, its writer subtracts: spelling, not conversion); `Dec`/`Oct`: `points` per decade or octave; `end: Grid \| OnStop` (LTspice ends a log sweep on the stop value even off the grid, `INV-semantics.md` 8.06, 8.07). Shared by `Loop`, DC axes, AC, noise |
 
+**Order (A14, R25).** Run items are listed in the order their source lists them; no reader
+permutes them and no writer reorders them. Analyses with no `Alter`, no loop boundary and no
+`FromHere` state item between them are independent: their order changes no number, only the
+order of the results, and that order is a run fact of the dialect that ran them (ngspice's batch
+mode runs by analysis type, reverse card order only within a type), not a property of the
+design.
+
+**State that holds for the whole run (A14, R24).** `Option`, `Env` and `NodeSet` carry `holds:
+Applies::{FromHere, WholeRun}`. `FromHere` (the default) holds for the run items after it;
+`WholeRun` holds for every run item of its deck wherever it stands, and among `WholeRun` items
+that set the same thing the last in listed order holds (an `Include` read as the items of the
+file it names, in place). An `Env` sets what it names: `temp` and `tnom` are each optional, not
+both absent. A run item is its deck's wherever it stands (R26): an analysis, option or `Env`
+inside a subcircuit or section body is marked `RunExtra::RunItemNested`; a `NodeSet` there keeps
+its own meaning (`NodeSetInSubckt`: nodes local to each instance).
+
 A `Loop` of kind `Sweep` whose body is exactly one `Op` uses `RunExtra::LoopOverOp` (A12 R2,
 RULINGS R20): it is not a `Dc` (one result over the grid, each point continued from the last,
 against one result per value); a target that spells both the same lacks the feature and a pass
@@ -61,7 +77,7 @@ Decisions:
 
 ## 3. State (`option.rs`)
 
-- `Env { temp: ExprId, tnom: ExprId }`, degrees Celsius, both always present. A reader fills its
+- `Env { temp: ExprId, tnom: ExprId, holds }`, degrees Celsius, each optional (A14; not both absent). A reader fills its
   simulator's defaults (HSPICE 25/25, the others 27/27). A list of temperatures is a `Loop` over
   `Target::Temp`.
 - `OptionRow { key: OptionKey, private: NameId, dialect: NameId, value: ExprId }`. `OptionKey` is

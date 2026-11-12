@@ -209,3 +209,21 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Run(RunExtra::TranUic));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
+
+#[test]
+fn listed_order_reads_an_include_in_place() {
+    // A14: a whole-run option in an included library comes after the deck's analysis when the
+    // include stands after it, and before it when the include stands first.
+    let used = |deck: &str| {
+        let text = format!(
+            "file \"t.sp\" deck\n{deck}\nfile \"lib.sp\" library\n  option klu whole_run\n"
+        );
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        parse(&text, &mut d.builder(), &mut diags);
+        assert!(diags.is_empty(), "{text}: {:?}", diags.rows());
+        features_used(&d).contains(Feature::Run(RunExtra::WholeRunMidRun))
+    };
+    assert!(used("  analysis op\n  include \"lib.sp\""));
+    assert!(!used("  include \"lib.sp\"\n  analysis op"));
+}

@@ -32,7 +32,6 @@ use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::plan::target_refs;
-#[cfg(any(test, feature = "gen"))]
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::reachable;
@@ -176,8 +175,11 @@ impl RowFacts for Analysis {
         }
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
+        if crate::state_order::nested(design, scope) {
+            *set = set.with(Feature::Run(RunExtra::RunItemNested));
+        }
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
@@ -240,6 +242,11 @@ impl RowFacts for Analysis {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let design = b.design();
+        if crate::state_order::nested(design, scope)
+            && !features.contains(Feature::Run(RunExtra::RunItemNested))
+        {
+            return ItemRef::NONE;
+        }
         let several = features.contains(Feature::Run(RunExtra::SeveralAnalyses));
         if analysis_count(design) > 0 && !several {
             return ItemRef::NONE;

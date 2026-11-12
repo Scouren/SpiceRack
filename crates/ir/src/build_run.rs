@@ -365,11 +365,13 @@ impl Builder<'_> {
         )
     }
 
-    /// The temperature and nominal temperature, °C. Asserts neither is `NONE`.
+    /// The temperature and nominal temperature, °C, from here on (`Applies::FromHere`, the
+    /// default: a reader of whole-run state pushes the row with `WholeRun`). Either may be
+    /// `NONE` (an env sets what it names); asserts not both.
     pub fn env(&mut self, scope: ScopeId, temp: ExprId, tnom: ExprId, span: Span) -> ItemRef {
         assert!(
-            !temp.is_none() && !tnom.is_none(),
-            "env: temp and tnom are always present"
+            !temp.is_none() || !tnom.is_none(),
+            "an env names temp or tnom"
         );
         self.push(
             scope,

@@ -124,7 +124,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - I4 → `RelTol, VnTol, AbsTol, ChgTol, Itl1, Scale, Gmin, PivRel, PivTol` (each key's doc), `temp`/`tnom` → `Env`.
 - I5 → each key's doc (`tran_method`, `tran_maxord`, `op_itl`, `tran_itl`, `homotopy_*`, `op_skipinitial`); `gshunt` → `Gshunt` (reciprocal of `Rshunt`: a pass); cosmetic keys → `OptionClass::Output` or Private; `rawfile`: Private.
 - I6 → writer refusal per key: gap K1 (`Feature::Option(OptionKey)` requested).
-- I7 → `Env::temp`; script `set temp=`/`option temp=` between runs → `Alter` of `Target::TEMP`.
+- I7 → `Env::temp` (`holds: WholeRun` for a deck-global `.temp`, A14); script `set temp=`/`option temp=` between runs → `Alter` of `Target::TEMP`.
 - I8 → `Env::tnom` (always present, reader fills its default).
 - I9 → `NodeSet { kind: Ic, node, value }`; expression values allowed.
 - I10 → `NodeSet { kind: Nodeset }`; VACASK per-analysis → `next_only`.
@@ -172,7 +172,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - K3 → `Opaque` `Inert`.
 - K4 → `alterparam` → `Alter` (`Param`, `SubcktParam`); `alter` → `Alter` (`DeviceParam`/`ElementValue`); `altermod` → `Alter` (`ModelParam`); `option` → `Alter` (`TargetKind::Option`) or `OptionRow` mid-run; `set temp=` → `Alter` of `Target::TEMP`; `let @dev[p]` → `Alter` `DeviceParam`; `source`: refusal.
 - K5 → unrolled by the reader into items (bounded); `foreach` over values → `LoopKind::Sweep` with `LoopEnd::KeepLast`; data-dependent: `Opaque` `Script`.
-- K6 → reader rule: batch order is the run order the reader writes (ngspice reverse order, 8.04).
+- K6 → listed order kept (R25); ngspice's state cards are `holds: WholeRun` (R24).
 - K7 → writer lowering of `Loop`/`Alter` (a pass or the ngspice writer).
 - K8 → writer rule.
 - K9 → `options` → `OptionRow`; `sweep` → `Loop`; `analysis` → `Analysis`; `save` → `Save`; `alter` → `Alter`; `elaborate` → `ItemKind::Elaborate` (A12 R1); `var`: `Param`; `abort`/`print`/`postprocess` → `Opaque` `Script`.
@@ -202,7 +202,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - 8.01 → `Tran` fields named, `NONE` ≠ 0; `StepCap` for the default ceiling; `segments` for HSPICE.
 - 8.02 → `Tran::max_step`, `StepCap`, `OptionKey::MaxStep`; VACASK `tran_rmax`: Private.
 - 8.03 → `Tran::print_step` `NONE` (`Extra::TranSimulatorStep`); a non-positive span: reader's refusal.
-- 8.04 → item order is run order; `Extra::SeveralAnalyses`; Xyce and ngspice-batch orders: reader rules; results keyed by item: RUN.
+- 8.04 → item order is the source's listed order (A14 R25; the row's "reverse order" is wrong: ngspice runs by type rank); independent analyses' result order is a run fact (S12); `RunExtra::SeveralAnalyses`.
 - 8.05 → `TargetKind` (typed, never a string).
 - 8.06 → `SweepSpec { kind, points = values }`; Spectre "no step parameter" spacing: reader picks `Lin`/`Log`; downward Spectre sweep: writer rule.
 - 8.07 → `SweepEnd::{Grid, OnStop}`; ngspice `dec` "rescales" and the HSPICE rule: gap G-LOGEND.

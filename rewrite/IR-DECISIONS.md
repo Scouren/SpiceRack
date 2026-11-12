@@ -246,3 +246,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `kernel_gen::the_full_set_runs_every_property`: under `FeatureSet::ALL`, 400 seeds are valid, stay within the set and round-trip through IR text; up to 4,000 seeds between them use every feature but `Func(Ddt)` and `Func(Idt)`, named in the test. A `ddt`/`idt` makes its tree class `Circuit`, so it only ever counts as `FuncDyn`, and no valid design holds the non-dynamic pair. The pair stays in the enum: it is an index any writer's `FEATURES` may list, and nothing sets it.
 - The generator makes `Extra::CaseSensitiveNames` (`Gen::case_ok`): when the set has it, one fresh name in 16 is the upper-case twin of the previous index (`G4` after `g4`). Before this, no generator made it.
 
+
+## Amendment A14, run owner
+
+- `NodeSet` already had a field `applies: IcScope` (which operating points hold an `Ic`), so A14's mode is named `holds: Applies` on all three state rows, the last field of each (IR text: a trailing `whole_run` word). `FromHere` is the default of every builder method and of IR text without the word: it is the meaning state items had before A14, so existing text and tests keep it; a reader of whole-run state (ngspice) pushes rows with `WholeRun`.
+- Listed order for the mid-run features is one walk per deck file (items depth first, each body right after its item, an `Include` read in place once per walk); files no deck includes are walked alone. `OptionMidRun`, `EnvMidRun`, `NodeSetMidRun` mark a `FromHere` item after a run item, `WholeRunMidRun` (one member for the three kinds) a `WholeRun` one; all are set by `design_features` (reported at `Span::NONE`). `RunItemNested` is set per row (an analysis, option or `Env` in a subcircuit or section body), so it is reported at its item.
+- The generator treats "a run item exists anywhere" as "after a run item" (generation follows listed order), and refuses a nested analysis, option or `Env` without `RunItemNested`.

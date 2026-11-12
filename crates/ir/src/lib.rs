@@ -131,6 +131,7 @@ mod plan_facts;
 pub mod probe;
 pub mod run_extra;
 mod run_words;
+mod state_order;
 pub mod stats;
 pub mod sweep;
 pub mod tran;
