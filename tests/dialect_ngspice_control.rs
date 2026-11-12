@@ -63,6 +63,7 @@ const READ: &[&str] = &[
 /// The write fixtures, by name.
 const WRITE: &[&str] = &[
     "load",
+    "load_then_deck",
     "opaque_pairs",
     "script_alter",
     "script_loop",
@@ -74,23 +75,11 @@ const WRITE: &[&str] = &[
 
 /// The fixtures and decks that fail today, by name, with the test that fails and why. Strict
 /// both ways: a listed one that passes fails the test until its line goes.
-const PENDING: &[(&str, &str, &str)] = &[
-    (
-        "option_commands",
-        "fixpoint",
-        "ng-run: a FromHere option as a script `option` (after A27's one form)",
-    ),
-    (
-        "script_option",
-        "write",
-        "ng-run: a FromHere option as a script `option` (after A27's one form)",
-    ),
-    (
-        "options",
-        "simulator",
-        "ng-run: a FromHere option as a script `option` (after A27's one form)",
-    ),
-];
+const PENDING: &[(&str, &str, &str)] = &[(
+    "load_then_deck",
+    "write",
+    "ng-scaffold: write_structure's comment and if_ write before Out::line closes the region",
+)];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in
@@ -215,6 +204,104 @@ fn a_written_deck_runs_on_ngspice_to_the_original_vectors() {
             dir.display()
         );
     }
+}
+
+#[test]
+fn generated_script_plans_read_back_to_their_meaning() {
+    // Oracle: law L5 (`read(write(x)) ≅ x`, `eq_meaning`) on designs this test builds from a
+    // seed, with literal loop values, which the shared generator never draws (its loop values
+    // are expressions, which ngspice's `foreach` cannot spell: W1402). Every loop form the
+    // writer spells (a named and an unnamed KeepLast list sweep, nested), every alter target,
+    // and bodies of analyses and alters. A design the writer refuses (W1401: an `alterparam`'s
+    // `reset` would drop a live alter) is counted, not compared; the admitted count is pinned
+    // above a floor so the property cannot go vacuous.
+    let mut admitted = 0;
+    let mut loops = 0;
+    for seed in 0..256u64 {
+        let text = plan_text(seed);
+        let design = parse_ir("generated", &text);
+        let mut legal = design.clone();
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut legal, row(), &mut diags);
+        if diags.rows().iter().any(|d| dialect::refuses(d.code)) {
+            continue;
+        }
+        let written = write_entry(&legal);
+        let (back, _) = read_deck("g.sp", &written);
+        assert!(
+            back.eq_meaning(&design),
+            "seed {seed}:\n{text}\nwritten as\n{written}\nread back as\n{}",
+            dump(&back)
+        );
+        admitted += 1;
+        loops += usize::from(text.contains("  loop "));
+    }
+    assert!(
+        admitted >= 128 && loops >= 64,
+        "{admitted} admitted, {loops} with a loop"
+    );
+}
+
+/// A deck in IR text from `seed`: a parameter, then up to six run items, a loop holding up to
+/// three (one nested loop at most).
+fn plan_text(seed: u64) -> String {
+    let mut r = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    let mut next = |n: u64| {
+        r = r
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (r >> 33) % n
+    };
+    const TARGETS: [&str; 5] = [
+        "(element_value r1)",
+        "(source_dc v1)",
+        "(device_param m1 w)",
+        "(model_param nch vth0)",
+        "(param p)",
+    ];
+    const VALUES: [&str; 6] = ["1k", "2.2k", "0.5", "10u", "-1", "3meg"];
+    let mut out = String::from("file \"g.sp\" deck\n  title \"g\"\n  param p = 1k\n");
+    let item = |depth: usize, out: &mut String, next: &mut dyn FnMut(u64) -> u64| {
+        let pad = "  ".repeat(depth + 1);
+        match next(3) {
+            0 => out.push_str(&format!("{pad}analysis op\n")),
+            1 => out.push_str(&format!(
+                "{pad}analysis tran stop=5u print_step=1u cap=ngspice_rule\n"
+            )),
+            _ => out.push_str(&format!(
+                "{pad}alter {} value={}\n",
+                TARGETS[next(5) as usize],
+                VALUES[next(6) as usize]
+            )),
+        }
+    };
+    for _ in 0..1 + next(6) {
+        if next(3) > 0 {
+            item(0, &mut out, &mut next);
+            continue;
+        }
+        let name = if next(2) == 0 { " name=v" } else { "" };
+        let values: Vec<&str> = (0..1 + next(3)).map(|_| VALUES[next(6) as usize]).collect();
+        out.push_str(&format!(
+            "  loop sweep keep_last{name} {} (list values=[{}])\n",
+            TARGETS[next(5) as usize],
+            values.join(", ")
+        ));
+        for _ in 0..1 + next(3) {
+            if next(4) == 0 {
+                out.push_str(&format!(
+                    "    loop sweep keep_last {} (list values=[{}])\n      analysis op\n",
+                    TARGETS[next(5) as usize],
+                    VALUES[next(6) as usize]
+                ));
+            } else {
+                item(1, &mut out, &mut next);
+            }
+        }
+    }
+    out
 }
 
 /// The names `PENDING` lists for `test`, in list order.

@@ -9,6 +9,9 @@
 //! pair is exact where the writer puts it). A command the IR cannot state is an opaque of its
 //! own at its place; data-dependent flow, a typed command reading a reprinted variable, or a
 //! state change in a deck with dot-card analyses (R49 (3)) makes the whole script one `Script`.
+//! A `foreach` variable named `sr<depth>` at that loop depth is read as an unnamed loop: it is
+//! the variable the writer makes up for one (R42's pattern; a user's own `sr1` at depth 1
+//! round-trips to the same text).
 //!
 //! The function validates the whole statement before it pushes anything, binds references by
 //! ngspice's rules (R3) and never learns a target. Codes: `P1400–P1499`.
