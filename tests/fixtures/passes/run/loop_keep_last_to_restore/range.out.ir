@@ -1,0 +1,4 @@
+file "a.sp" deck
+  param r = 1k
+  loop sweep keep_last (param r) (lin start=1k stop=10k step=1k)
+    analysis op

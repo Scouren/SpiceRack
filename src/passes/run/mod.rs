@@ -19,11 +19,12 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod names_dropped`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
+//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod run_items_together`, `pub mod tran_ceiling_given`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod ic_next_only;
+pub mod loop_end;
 pub mod names_dropped;
 pub mod run_items_together;
 pub mod tran_ceiling_given;
@@ -123,6 +124,26 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[names_dropped::LOOP_NAME_READ],
         run: names_dropped::loop_name_dropped,
     },
+    Pass {
+        name: "loop_restore_to_keep_last",
+        removes: ir::Feature::Run(ir::RunExtra::LoopRestore),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Run(ir::RunExtra::LoopKeepLast))
+            .with(ir::Feature::Item(ir::ItemKind::Alter))
+            .with(ir::Feature::Run(ir::RunExtra::AlterParam)),
+        notes: &[loop_end::LOOP_END_KEPT],
+        run: loop_end::loop_restore_to_keep_last,
+    },
+    Pass {
+        name: "loop_keep_last_to_restore",
+        removes: ir::Feature::Run(ir::RunExtra::LoopKeepLast),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Run(ir::RunExtra::LoopRestore))
+            .with(ir::Feature::Item(ir::ItemKind::Alter))
+            .with(ir::Feature::Run(ir::RunExtra::AlterParam)),
+        notes: &[loop_end::LOOP_END_KEPT],
+        run: loop_end::loop_keep_last_to_restore,
+    },
     // after `whole_run_state_first`: a move may interleave
     Pass {
         name: "run_items_together",
@@ -204,6 +225,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a named loop whose body may read its name",
             cite: "rewrite/AMEND-A12.md A27",
             explain: "The target has no loop name. This loop's body holds a statement kept as its dialect's text, which may read the name as the loop variable, so the name cannot be dropped and the loop is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        loop_end::LOOP_END_KEPT,
+        ir::Info {
+            title: "a loop whose targets' value after it the target cannot state",
+            cite: "rewrite/AMEND-A12.md A22, A27",
+            explain: "The target ends this loop the other way (restoring its targets, or keeping the last value), so an alter after the loop must set what the source holds there. It cannot here: a target is not a parameter, the value is not a stated expression (a range sweep, a Monte Carlo loop) or holds a random draw, the loop stands in a body, or something before it already changed the target. The loop is refused.",
             kind: ir::Kind::Note,
         },
     ),

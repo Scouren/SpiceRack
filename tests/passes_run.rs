@@ -10,6 +10,8 @@
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_run/params.rs"]
+mod params;
 #[path = "passes_run/state.rs"]
 mod state;
 #[path = "passes_run/walk.rs"]
@@ -37,6 +39,8 @@ const PENDING_PAIRS: &[&str] = &[
     "analysis_name_dropped",
     "dc_axis_name_dropped",
     "loop_name_dropped",
+    "loop_restore_to_keep_last",
+    "loop_keep_last_to_restore",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -80,6 +84,50 @@ fn names_dropped_keep_the_state_at_every_analysis() {
     keeps_state("analysis_name_dropped", ir::RunExtra::AnalysisNamed);
     keeps_state("dc_axis_name_dropped", ir::RunExtra::DcAxisNamed);
     keeps_state("loop_name_dropped", ir::RunExtra::LoopNamed);
+}
+
+/// The loop-end rows keep the value every swept or altered parameter holds at every analysis
+/// (`passes_run/params.rs`), over generated designs and the fixtures' cases.
+#[test]
+fn loop_ends_keep_every_parameter_value() {
+    for (name, feature) in [
+        ("loop_restore_to_keep_last", ir::RunExtra::LoopRestore),
+        ("loop_keep_last_to_restore", ir::RunExtra::LoopKeepLast),
+    ] {
+        let pass = passes::all().find(|p| p.name == name).expect("registered");
+        let mut ran = 0;
+        let mut converted = 0;
+        for seed in SEEDS {
+            let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+            if !ir::features_used(&design).contains(ir::Feature::Run(feature)) {
+                continue;
+            }
+            ran += 1;
+            let before = params::values(&design);
+            let mut diags = ir::Diags::new();
+            (pass.run)(&mut design, &mut diags);
+            converted += diags.rows().iter().filter(|d| d.code.number == 409).count();
+            assert_eq!(params::values(&design), before, "{name} seed {seed}");
+        }
+        assert!(ran > 0, "{name}: no generated design");
+        eprintln!("{name}: {ran} generated designs, {converted} loops left with U0409");
+        // and the fixture's converted case, which the generated designs rarely reach
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/passes/run")
+            .join(name);
+        let text = std::fs::read_to_string(root.join("plain.ir")).expect("the plain case");
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(&text, &mut design.builder(), &mut diags);
+        let before = params::values(&design);
+        (pass.run)(&mut design, &mut diags);
+        let feature = ir::Feature::Run(feature);
+        assert!(
+            !ir::features_used(&design).contains(feature),
+            "{name}: plain"
+        );
+        assert_eq!(params::values(&design), before, "{name}: plain");
+    }
 }
 
 #[test]
