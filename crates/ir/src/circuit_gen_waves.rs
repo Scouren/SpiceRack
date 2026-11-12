@@ -272,16 +272,29 @@ impl R<'_, '_> {
     }
 
     fn pwl(&mut self) -> Pwl {
-        let repeat = self.pick(&[
+        // a periodic PWL needs a join the set allows: a jump is a feature there (A24)
+        let mut repeats = vec![
             (PwlRepeat::Never, None),
             (PwlRepeat::From, Some(X::PwlRepeatFrom)),
-            (PwlRepeat::Period, Some(X::PwlRepeatPeriod)),
-        ]);
+        ];
+        let periodic_joins = [
+            X::PwlPeriodJump,
+            X::PwlJoinRamp,
+            X::PwlJoinRampWidth,
+            X::PwlJoinExtrapolate,
+        ];
+        if periodic_joins.iter().any(|&x| self.has(x)) {
+            repeats.push((PwlRepeat::Period, Some(X::PwlRepeatPeriod)));
+        }
+        let repeat = self.pick(&repeats);
         let join = if repeat == PwlRepeat::Never {
             PwlJoin::Jump
         } else {
             self.pick(&[
-                (PwlJoin::Jump, None),
+                (
+                    PwlJoin::Jump,
+                    (repeat == PwlRepeat::Period).then_some(X::PwlPeriodJump),
+                ),
                 (PwlJoin::Ramp, Some(X::PwlJoinRamp)),
                 (PwlJoin::RampWidth, Some(X::PwlJoinRampWidth)),
                 (PwlJoin::Extrapolate, Some(X::PwlJoinExtrapolate)),

@@ -26,6 +26,35 @@ expr_depth: 4, files: 1 }`, seed 1) and times, in one process, in a release buil
 Machine: Intel Core i9-14900HX (32 threads, one used), 31 GB RAM, NixOS; rustc 1.95.0 inside
 `nix develop`; the crate's default release profile.
 
+## Numbers after A18 and round 5 (2026-11-12, `ir-rewrite` 5f087948 and later)
+
+Same machine and binary. The full set now also holds long literals (A18), `Placed`, and the
+owners' rounds 4 and 5; the circuit owner's quadratic build (rounds 4 and 5) is fixed.
+
+| set | items | build | dump | parse (with link) | link alone | check | peak RSS |
+|---|---|---|---|---|---|---|---|
+| all | 250,000 | 0.81 s (308 k items/s) | 0.126 s (137 MB/s) | 0.35 s (**49.6 MB/s**) | 0.07 s | 0.170 s (1.47 M items/s) | 189 MB |
+| all | 1,000,000 | 4.19 s (239 k items/s) | 0.535 s (132 MB/s) | 1.45 s (**48.9 MB/s**) | 0.28 s | 0.889 s (1.12 M items/s) | 754 MB |
+| kernel | 1,000,000 | 2.30 s (434 k items/s) | 0.31 s (134 MB/s) | 0.88 s (**47.3 MB/s**) | 0.24 s | 0.556 s (1.80 M items/s) | |
+
+Against M5 at 10⁶ over every feature: build 4.0 → 4.19 s, dump 132 → 132 MB/s, parse 48.9 → 48.9
+MB/s, check 0.91 → 0.889 s, peak RSS 751 → 754 MB (the long-literal pool). No phase regressed.
+A first 10⁶ run on a loaded machine measured parse 36 MB/s and check 1.64 s; the two re-runs
+above, minutes later, agree with each other and with M5, so the first is not reported.
+
+**The scaling gate** (merge tier; `cargo run --release --features gen --example throughput --
+scaling`): every phase over every feature at 10⁵ and 4·10⁵ items, best of two runs, ratio bound
+8 (linear is about 4 with the cache, quadratic about 16); exit 1 over it.
+
+| head | build | dump | parse | check | verdict |
+|---|---|---|---|---|---|
+| 68c6be2d (before the circuit fix) | 13.59 | 4.43 | 4.48 | 4.84 | FAIL (build) |
+| 5f087948 (round 5) | 3.06 | 3.16 | 3.07 | 4.58 | pass |
+
+It exists because the round-4 merge made the full-set build quadratic (170 s at 10⁶ became
+100 s after one owner's fix, 4 s after both) and nothing in the gate saw it: IR-PERF stated
+linearity as a measured fact, and a merge broke it silently.
+
 ## Numbers, every feature (M5; best of three runs at 10⁶; each run is one process)
 
 `target/release/examples/throughput N all` and `N kernel`, same machine and profile as below.

@@ -54,7 +54,7 @@ use crate::run_words::{
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::sweep::gen_sweep;
-use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
+use crate::sweep::{SweepUse, dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
 use crate::text_expr::Ctx;
 
@@ -84,7 +84,7 @@ impl DetailFacts for Dc {
         for axis in axes {
             flag(set, !axis.name.is_none(), RunExtra::DcAxisNamed);
             target_features(&axis.target, TargetUse::Dc, set);
-            sweep_features(&axis.sweep, set);
+            sweep_features(&axis.sweep, SweepUse::Dc, set);
         }
     }
 
@@ -147,7 +147,7 @@ impl DetailFacts for Dc {
         let mut axes = Vec::with_capacity(n);
         for _ in 0..n {
             let target = gen_target(g, b, features, TargetUse::Dc)?;
-            let sweep = gen_sweep(g, b, features);
+            let sweep = gen_sweep(g, b, features, SweepUse::Dc);
             // after the sweep: the text interns the name after the sweep's values
             let name = if has(features, RunExtra::DcAxisNamed) && g.chance(3) {
                 g.fresh_name(b)
@@ -177,7 +177,7 @@ impl DetailFacts for Ac {
         r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(sweep_valid(&self.sweep))
@@ -203,7 +203,7 @@ impl DetailFacts for Ac {
         features: &FeatureSet,
     ) -> Option<Self> {
         Some(Ac {
-            sweep: gen_sweep(g, b, features),
+            sweep: gen_sweep(g, b, features, SweepUse::Freq),
         })
     }
 }
@@ -223,7 +223,7 @@ impl DetailFacts for Noise {
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
         flag(
             set,
             !self.points_per_summary.is_none(),
@@ -297,7 +297,7 @@ impl DetailFacts for Noise {
             output.kind = ProbeKind::V;
         }
         let source = g.fresh_name(b);
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let points_per_summary = if has(features, RunExtra::NoiseSummary) && g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {
@@ -459,7 +459,7 @@ impl DetailFacts for Xf {
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
@@ -490,7 +490,7 @@ impl DetailFacts for Xf {
         let output = gen_probe(g, b, features, true);
         Some(Xf {
             output,
-            sweep: gen_sweep(g, b, features),
+            sweep: gen_sweep(g, b, features, SweepUse::Freq),
         })
     }
 }
@@ -507,7 +507,7 @@ impl DetailFacts for SensAc {
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Freq, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
@@ -538,7 +538,7 @@ impl DetailFacts for SensAc {
         let output = gen_probe(g, b, features, true);
         Some(SensAc {
             output,
-            sweep: gen_sweep(g, b, features),
+            sweep: gen_sweep(g, b, features, SweepUse::Freq),
         })
     }
 }

@@ -17,7 +17,7 @@
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
 //! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
-//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `pub(crate) fn placeable(&Design, ScopeId, ItemKind, &FeatureSet) -> bool`, `Gen::fresh(&mut self) -> String`,
+//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::new(u64, &FeatureSet, Size) -> Gen`, `pub(crate) fn placeable(&Design, ScopeId, ItemKind, &FeatureSet) -> bool`, `Gen::fresh(&mut self) -> String`,
 //! `Gen::word(&mut self) -> &'static str`, `Gen::line_word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
 //! `Gen::note(&mut self, DefId, ExprClass)`
 
@@ -126,26 +126,7 @@ const WORDS: [&str; 8] = [
 /// a feature in it may not (the set is an upper bound).
 pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
     let mut design = Design::new();
-    let mut g = Gen {
-        state: seed,
-        size,
-        items_left: size.items,
-        fresh: 0,
-        scope: ScopeId::NONE,
-        formals: Vec::new(),
-        by_kind: vec![Vec::new(); DefKind::COUNT],
-        def_class: Vec::new(),
-        class: ExprClass::Constant,
-        dynamic: false,
-        reads: Reads::Constant,
-        int_literals: false,
-        long_literals: false,
-        enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
-        param_reads: true,
-        case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
-        constant_only: false,
-        dyn_form: false,
-    };
+    let mut g = Gen::new(seed, features, size);
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
     for k in 0..files {
@@ -296,6 +277,31 @@ impl Gen {
         self.def_class[def.index()] = class;
     }
 
+    /// A generator at `seed` for `features` and `size`, with no scope chosen yet (`generate`'s
+    /// start; crate tests drive `expr` from it).
+    pub(crate) fn new(seed: u64, features: &FeatureSet, size: Size) -> Gen {
+        Gen {
+            state: seed,
+            size,
+            items_left: size.items,
+            fresh: 0,
+            scope: ScopeId::NONE,
+            formals: Vec::new(),
+            by_kind: vec![Vec::new(); DefKind::COUNT],
+            def_class: Vec::new(),
+            class: ExprClass::Constant,
+            dynamic: false,
+            reads: Reads::Constant,
+            int_literals: false,
+            long_literals: false,
+            enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
+            param_reads: true,
+            case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
+            constant_only: false,
+            dyn_form: false,
+        }
+    }
+
     /// A word for a string value or a text (`WORDS`).
     pub(crate) fn word(&mut self) -> &'static str {
         WORDS[self.below(WORDS.len() as u32) as usize]
@@ -396,7 +402,12 @@ fn candidates(
             ItemKind::If => opens && exprs,
             ItemKind::Loop => opens,
             ItemKind::Func => exprs,
-            ItemKind::Param => exprs,
+            // A25: a constant local of a subcircuit only when the set has it
+            ItemKind::Param => {
+                exprs
+                    && (d.scope(scope).kind != ScopeKind::Subckt
+                        || has(Feature::Extra(Extra::SubcktConstantParam)))
+            }
             ItemKind::Comment
             | ItemKind::Load
             | ItemKind::Model

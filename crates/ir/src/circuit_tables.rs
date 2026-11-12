@@ -162,10 +162,15 @@ pub(crate) fn typed_key(kind: DetailKind, key: &str) -> bool {
         || names.contains(&"temp_abs") && is("temp")
 }
 
-/// Whether a model of `f` needs no `DeviceLibrary` on any target: the builtins of A12 C5. The
-/// ideal line (A20) is a builtin that VACASK loads, so it is not one of them.
+/// Whether a model of `f` needs no `DeviceLibrary` on any target: the builtins of A12 C5, and
+/// the families with no library at all (R44, A24: a user module's code comes from a `Load`, a
+/// code model's and an unknown family's is unbound). The ideal line (A20) is a builtin that
+/// VACASK loads, so it is not one of them.
 pub(crate) fn library_free(f: ModelFamily) -> bool {
-    builtin_kind(f).is_some() && f != ModelFamily::TlineIdeal
+    matches!(
+        f,
+        ModelFamily::Module | ModelFamily::CodeModel | ModelFamily::Other
+    ) || builtin_kind(f).is_some() && f != ModelFamily::TlineIdeal
 }
 
 /// The element kind a builtin family's model serves (AMEND-A12 C5), or `None` for every other
