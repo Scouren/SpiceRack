@@ -88,6 +88,11 @@ pub enum Violation {
     /// the cycle, at its item; what merely reads the cycle is not reported again. `arg`: the
     /// definition.
     DefinitionCycle,
+    /// The definition index holds an entry, in a live scope, whose definition's item no live
+    /// scope lists (a pass removed or moved an item through `Editor::items_mut`, bypassing
+    /// `Editor::remove_item` and `Editor::move_item`), or a reference is bound to a definition
+    /// the index does not hold. `arg`: the definition.
+    StaleDefinition,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -98,7 +103,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::DefinitionCycle as usize + 1] = [
+    pub const ALL: [Violation; Violation::StaleDefinition as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -116,6 +121,7 @@ impl Violation {
         Violation::FieldDomain,
         Violation::DuplicateElement,
         Violation::DefinitionCycle,
+        Violation::StaleDefinition,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();

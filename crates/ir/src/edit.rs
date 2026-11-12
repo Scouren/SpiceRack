@@ -14,13 +14,15 @@
 //! `Editor::items_mut(&mut self, ScopeId) -> &mut Vec<ItemRef>`,
 //! `Editor::set<R: ItemRow>(&mut self, u32, R)`,
 //! `Editor::set_detail<D: DetailRow>(&mut self, u32, D)`,
+//! `Editor::remove_item(&mut self, ScopeId, ItemRef)`, `Editor::move_item(&mut self, ScopeId, ItemRef, ScopeId, usize)`,
+//! `Editor::redefine(&mut self, DefId, ItemRef)`, `Editor::rename_def(&mut self, DefId, NameId)`,
 //! `Editor::map_exprs(&mut self, ItemRef, &mut dyn FnMut(&mut ExprId, ExprUse))`,
 //! `Editor::map_refs(&mut self, ItemRef, &mut dyn FnMut(&mut Ref, DefKind))`
 
 use crate::build::Builder;
 use crate::design::{Design, DetailRow, ItemRow};
 use crate::facts::{ExprUse, RowFacts};
-use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{DefId, ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::DefKind;
 
 /// Rewrites one design. Holds it mutably for its lifetime.
@@ -40,6 +42,33 @@ impl<'d> Editor<'d> {
         Builder {
             design: self.design,
         }
+    }
+
+    /// Takes `item` out of `scope`'s list and every definition of `item` out of the index, so no
+    /// lookup finds it; its body scopes are then dead (A28). Asserts `item` is listed in `scope`.
+    pub fn remove_item(&mut self, scope: ScopeId, item: ItemRef) {
+        todo!()
+    }
+
+    /// Moves `item` from `from`'s list to position `at` of `to`'s (a hoist): its definitions in
+    /// `from` are re-keyed to `to`, its body scopes' parent becomes `to`, and references already
+    /// bound stay bound. Asserts it is listed in `from`, `at <= ` the list's length, both scopes
+    /// in one file, and no definition of the same kind and name in `to`.
+    pub fn move_item(&mut self, from: ScopeId, item: ItemRef, to: ScopeId, at: usize) {
+        todo!()
+    }
+
+    /// Makes `item` the defining item of `def` (a local parameter made a formal); every
+    /// reference bound to `def` stays bound. Asserts both in range.
+    pub fn redefine(&mut self, def: DefId, item: ItemRef) {
+        todo!()
+    }
+
+    /// Re-keys `def` under `name` in its scope. References bound to it keep the `DefId`; their
+    /// names are the pass's to rename (`map_refs`, `rewrite_exprs`), else `check` reports
+    /// `RefTarget`. Asserts no definition of its kind is named `name` in its scope.
+    pub fn rename_def(&mut self, def: DefId, name: NameId) {
+        todo!()
     }
 
     /// The ordered item list of `scope`. An item taken out of every list is dead (its row stays,
