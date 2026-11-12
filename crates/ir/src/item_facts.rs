@@ -321,7 +321,7 @@ impl RowFacts for Subckt {
             .map(|p| p.1)
             .filter(|e| !e.is_none());
         if defaults.into_iter().any(|e| reads_param(design, e)) {
-            *set = set.with(Feature::Extra(Extra::FormalReadsParam));
+            *set = set.with(Feature::Extra(Extra::FormalNotConstant));
         }
         // A15 K2: a formal an instance must pass
         if design.params(self.params).iter().any(|p| p.1.is_none()) {

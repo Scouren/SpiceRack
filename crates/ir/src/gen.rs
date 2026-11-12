@@ -77,7 +77,7 @@ pub struct Gen {
     pub(crate) int_literals: bool,
     /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
     /// `Extra::EnclosingRef`), and whether the expression being built may read a parameter
-    /// (cleared around a head default when the set lacks `Extra::FormalReadsParam`).
+    /// (cleared around a head default when the set lacks `Extra::FormalNotConstant`).
     pub(crate) enclosing_ok: bool,
     pub(crate) param_reads: bool,
     /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has

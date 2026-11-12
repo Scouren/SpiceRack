@@ -246,7 +246,7 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             },
         ),
         (
-            Extra::FormalReadsParam,
+            Extra::FormalNotConstant,
             |b, top| {
                 let one = b.num(1.0);
                 b.param(top, "w0", one, Span::NONE);
@@ -435,4 +435,21 @@ fn placement_is_enclosure_at_any_depth() {
             placed(S::Loop, ItemKind::Loop)
         ]
     );
+}
+
+#[test]
+fn a_temperature_default_is_not_a_constant() {
+    // A15 widening of A12 K2: a head default of class Temp (VACASK run: `$temp` cannot be
+    // overridden either) sets FormalNotConstant, as a parameter read does; a literal does not
+    let f = Feature::Extra(Extra::FormalNotConstant);
+    let temp = used(|b, top| {
+        let t = b.temp();
+        b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
+    });
+    assert!(temp.contains(f), "w = $temp");
+    let tnom = used(|b, top| {
+        let t = b.tnom();
+        b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
+    });
+    assert!(!tnom.contains(f), "w = $tnom is a constant of the run");
 }
