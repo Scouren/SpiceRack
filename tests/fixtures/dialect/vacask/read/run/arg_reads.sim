@@ -1,0 +1,11 @@
+analysis arguments that read the temperature or a parameter
+parameters k=2
+control
+  var v=1
+  analysis t1 tran stop=1m*(1+$temp/100)
+  analysis t2 tran stop=1m*k
+  analysis a1 ac from=1 to=10*$tnom mode="lin" points=1
+  sweep s1 option="temp" from=0 to=k step=1
+    analysis op1 op
+  analysis t3 tran stop=1m*v
+endc

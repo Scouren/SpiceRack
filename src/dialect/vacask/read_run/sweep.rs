@@ -9,7 +9,7 @@
 //! temperature), `option=` a typed key or VACASK's own option by name. The principal parameter,
 //! `continuation=0`, values by a variable's name and a sweep of a variable are Private (R43).
 //!
-//! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`,
+//! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`, `check_arg`,
 //! `vector`, `range`, `sweep`, `value`, `spec`, `target` (crate-private)
 
 use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, check_value, string};
@@ -96,6 +96,25 @@ pub(super) fn check(l: &Lower<'_, '_, '_>, nodes: &[u32]) -> Result<(), Why> {
     Ok(())
 }
 
+/// Checks each analysis argument or sweep-range node of `nodes` that is given ([`check`]), and
+/// refuses one that reads `$temp`, `$tnom` or a top-level parameter: VACASK sees only circuit
+/// variables and constants there and fails the analysis (R68, A42; settle run/temp_*,
+/// param_tran: "Variable or constant … not defined.", exit code 0), P2316.
+pub(super) fn check_arg(l: &Lower<'_, '_, '_>, nodes: &[u32]) -> Result<(), Why> {
+    check(l, nodes)?;
+    for &node in nodes.iter().filter(|&&x| x != NONE) {
+        let read = expr_read::names_read(l, node);
+        let bad = |n: &String| n == "$temp" || n == "$tnom" || super::top_param(l, n);
+        if read.iter().any(bad) {
+            return Err(Why {
+                class: ir::OpaqueClass::InvalidInSource,
+                code: Some(super::ARG_READS),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// The elements of a `[…]` vector node, or `None` for any other node.
 pub(super) fn vector(l: &Lower<'_, '_, '_>, node: u32) -> Option<Vec<u32>> {
     let ast = &l.cst.ast;
@@ -126,7 +145,7 @@ pub(super) fn range(
         if !alone || items.is_empty() {
             return Err(private(code));
         }
-        check(l, &items)?;
+        check_arg(l, &items)?;
         return Ok(Spec { values, ..none });
     }
     if from == NONE || to == NONE {
@@ -146,7 +165,7 @@ pub(super) fn range(
     if step == NONE && points == NONE {
         return Err(private(code));
     }
-    check(l, &[from, to, step, points])?;
+    check_arg(l, &[from, to, step, points])?;
     Ok(Spec {
         kind,
         from,
