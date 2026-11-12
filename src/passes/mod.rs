@@ -1,13 +1,14 @@
 //! Legalization: a design and a target's feature set in, the same design rewritten to use only
 //! what the target has out, or `U0001` refusals (`ir::check_legal`'s, one at each item) for
-//! what no pass removes. Passes know features, never dialects: this file (and each pass, one
-//! per file under `passes/` once the first lands) imports `crate::ir` only
-//! (`tests/layering.rs`).
+//! what no pass removes. Passes know features, never dialects: this file and each pass (one
+//! per file in this folder) import `crate::ir` only (`tests/layering.rs`).
 //!
 //! Cites: `REWRITE-PLAN.md` §4.4; `rewrite/SPINE.md` §4.
 //!
-//! Contents: `pub struct Pass`, `pub static PASSES: &[Pass]`,
+//! Contents: `pub mod deck_title`, `pub struct Pass`, `pub static PASSES: &[Pass]`,
 //! `pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir::Diags)`
+
+pub mod deck_title;
 
 use crate::ir;
 
@@ -24,7 +25,8 @@ pub struct Pass {
     pub run: fn(&mut ir::Design, &mut ir::Diags),
 }
 
-/// The registered passes, in the order `legalize` tries them. Empty in slice S2.
+/// The registered passes, in the order `legalize` tries them. `deck_title::deck_title` joins
+/// when the kernel's `Extra::DeckWithoutTitle` lands (its test goes red as the cue).
 pub static PASSES: &[Pass] = &[];
 
 /// Rounds of: the features `design` uses and `target` lacks; for each, the first pass of

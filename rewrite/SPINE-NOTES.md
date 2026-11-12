@@ -4,8 +4,8 @@ Each line: question → choice → why.
 
 ## Decisions
 
-1. `src/passes/mod.rs` alone fails `check_style.py` (a folder holding one file) → `src/passes.rs`;
-   it becomes `passes/mod.rs` with the first pass file → the house rule; `layering.rs` covers both forms.
+1. `passes` was `src/passes.rs` while it held no pass (check_style.py refuses a one-file folder);
+   with `deck_title` it is `src/passes/mod.rs` + one file per pass, as SPINE §4 says.
 2. `Sources` and `Reference` → `src/dialect/sources.rs` (spine file, re-exported from `dialect`) →
    keeps `mod.rs` one transform; `layering.rs` lists `mod`, `facade`, `sources` as spine, not dialects.
 3. `Sources` entries → the first file `add`ed is the entry; `load` marks its `entries` (all leading);
@@ -24,12 +24,10 @@ Each line: question → choice → why.
 8. `Policy::Strict` → `dialect::read` pushes `STRICT_UNREAD` (`S0101`, the spine's own table, ruling 1)
    at each `Opaque` row of class `Unread` (scanning the `Opaque` table). `S0001` (the reader's note)
    stays a note.
-9. Text family (R11) → `dialect::legalize` (once per design and target, in place) walks every reachable
-   item: another family's `Opaque` of class `Inert` is removed from its scope with an `INERT_DROPPED`
-   note (`S0102`), any other class is refused (`U0001`, `arg` = `Feature::Item(Opaque)`) at the item;
-   `ANY_FAMILY = "*"` (the IR text writer) skips the step. The walk is a private stand-in for
-   `Design::reachable()` (Subckt, Section, If, Loop bodies; files in id order), swapped when the
-   kernel makes it public (ruling 5).
+9. Text family (R11) → `dialect::legalize` (once per design and target, in place) walks
+   `Design::reachable()`: another family's `Opaque` of class `Inert` is removed from its listing
+   scope with an `INERT_DROPPED` note (`S0102`), any other class is refused (`U0001`, `arg` =
+   `Feature::Item(Opaque)`) at the item; `ANY_FAMILY = "*"` (the IR text writer) skips the step.
 10. `write` (R11) → calls the writer only; legality is the caller's contract (debug assertions:
     features inside the writer's set, no foreign `Opaque`). `transpile` = read → refused? → legalize →
     refused? → write of the entry. The facade's `render_kit` keeps today's one-file-per-call shape:
@@ -60,22 +58,58 @@ Each line: question → choice → why.
     `--check` it is a usage error (exit 2). `--dump-ir` writes every file of the design as IR text to
     `<stem>.ir` and prints its path; `--dump-ir=legal` needs `--to` with a new-pipeline writer.
     A side the new pipeline lacks (e.g. `--dialect ngspice --dump-ir`) fails the deck (exit 1).
-20. `IrText::features` → every feature, built once at run time (`OnceLock`) from
-    `Feature::from_index`, until `FeatureSet::ALL` lands as a `const` (ruling 4), then swapped.
+20. `IrText::features` → `&ir::FeatureSet::ALL`.
 21. The IR reader reads each `Sources` text with `ir::parse`; the text's own `file` lines name the
     design's files (the `Sources` path is not used) → IR text is self-describing.
 22. L1's "statement count in = out" → not asserted for `ir` (no statement counter the IR exposes);
-    L1 asserts the read returns and L2 that `check` adds no `X` row. L6's corpus for `ir` is the
-    worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous with one row.
-
+    L1 asserts the read returns, L2 that `check` adds no `X` row, and the empty-text case that ""
+    and "\n" read as one file with no item and no row. L6's corpus for `ir` is a kernel-kinds text
+    and the worked example of `text.rs` (`--features corpus`). L8's "registry order" is vacuous
+    with one row.
 23. `Write::admits` (AMEND-A12 S1) → default empty; `dialect::legalize` calls it last; `write`'s debug
     assertions run it into a scratch list that must stay empty. L4 skips a generated design
     `legalize` refuses (any refusal) and fails when no admitted design holds an item kind the
     writer claims (checked over `Feature::Item` only; kinds outside the kernel's join when the
     generator builds them).
-24. `OpaqueClass::Hint` (R19) is not in the kernel yet: `legalize`'s match over classes is exhaustive,
-    so the member's arrival stops the build; then a spine note row (distinct from `INERT_DROPPED`:
-    "the numbers may move within the solver's tolerance") and the drop.
+24. `OpaqueClass::Hint` (R19, kernel b32ee486) → another family's hint is dropped from its scope with
+    the spine's `HINT_DROPPED` note (`S0103`: "a solver hint of another dialect was dropped"; the
+    numbers may move within the target solver's tolerance), distinct from `INERT_DROPPED`; its own
+    family keeps it.
+25. The `Read` contract (lead's ruling on surprise 4) → a reader creates a file for every text of
+    `src`, the entry first, even when empty. `IrText` meets it by opening an empty file at the
+    `Sources` path when a text opens no `file` block (empty, comments only, or refused lines): an
+    empty `.ir` is then one empty deck, not a panic in `Design::entry` (the lead's exception, "a text
+    with no `file` line is a `P9001`", does not hold: an empty or comment-only text gives no row).
+    `transpile` asserts an entry after a read with no refusal.
+
+26. Each file its own text (law harness) → every row, `ir` included: `write_all` puts each file of a
+    design in one `Sources` at the design's path, the entry first (its role setting the form,
+    `Sources::set_form`), and the row reads them back. IR text needs no exception: each dumped
+    file is a standalone `file` block, so reading the files one text each rebuilds the same
+    design. `Read::names_its_files` (a9b9f257) is therefore removed again: the smallest way to
+    express the exception is none. The harness is the ngspice scaffold's (460dd86f/3e97620b) with
+    mine on top (decision 28).
+27. `deck_title` (the first pass) → `src/passes/deck_title.rs`, `pub fn deck_title`: an empty
+    `Title` first in each `Deck` whose top scope has none, built with `Builder::title` and moved to
+    the front of the list; no diagnostic. Tested as SPINE §4 says (IR text in, IR text out,
+    nothing else moves, only `Item(Title)` can be gained). Not in `PASSES` yet:
+    `Extra::DeckWithoutTitle` is not in the kernel at cf98e0d4. Cue: its test asserts the design
+    loses no feature, which goes red when the kernel reports the member; then the test asserts
+    it loses exactly that, and the row `{removes: Extra(DeckWithoutTitle), requires: EMPTY}` joins
+    `PASSES`.
+
+28. `tests/dialect_laws.rs` reconciled → the ngspice scaffold's file (3e97620b) as the base: per-row
+    laws checked against a strict `KNOWN` list of (law, row, why), L3/L5/L8 on legalized designs
+    read back from one `Sources`, no generated `Opaque` for a row that is not lossless. On top:
+    the full feature set (no kernel restriction), `admits` and the item-kind anti-vacuity check
+    in L4, the empty-text L1 case (now a per-row reader law, `l1-empty`, through the same
+    `KNOWN` check), the worked example in the L6 corpus, the entry first in `write_all`. `KNOWN`
+    is empty here: this branch has only the `ir` row, and an entry for a row it lacks would fail
+    as an unexpected pass. Each dialect branch keeps its own entries when it merges this.
+29. Golden input set → `tests/fixtures/dialect/` is excluded from the fixtures walk
+    (`inputs.rs`, `FIXTURES_EXCLUDED`, unit test `a_dialect_fixture_is_not_an_input_…`): those
+    are the new pipeline's per-dialect fixtures, read by each dialect's own tests; the old
+    pipeline never had them, so they are no golden input.
 
 ## Requests (ruled by the lead)
 
@@ -106,8 +140,34 @@ index; `ir::diag::info` answers the kernel's codes). Differences found:
 5. A repeated port (`subckt s (a a)`) is a `P9001` with nothing pushed, as `item_text.rs` says; an
    unresolved name (`param p = q + 1`) is no row (legal, C8).
 
+## The IR at cf98e0d4
+
+6. `Design::entry()` is the first `Deck` file, else file 0, not "the first file". A kit read with a
+   library as its entry (`facade::render_kit` on an included file) whose walk reaches a deck file
+   would write that deck instead. Today's walk follows the entry's own references only, so a deck
+   is reached only when a library includes one. Either `transpile` writes file 0 (the `Read`
+   contract puts the entry first), or `entry()` states the case; the spine keeps `entry()` until
+   ruled.
+
+## The IR at b32ee486
+
+- Surprise 1 resolved (b8035c65): `parse` names each span's file block; a routed IR-text diagnostic
+  prints `name:3:…` (`a_routed_ir_text_diagnostic_names_its_line` lost its marker).
+- Surprise 4 resolved: `Design::entry()` is total (`FileId::NONE`); `transpile`'s assertion is now the
+  reader-bug check it was meant to be.
+- Surprise 6 still open in the kernel: `entry()` is still the first `Deck`. Ruled: file 0.
+  `a_kit_whose_entry_is_a_library_writes_the_library` carries the marker until it lands.
+7. The facade maps `span.file` to the `Sources` entry of that index. For a reader that names its
+   files (IR text) one `Sources` text holds several design files, so a row in the second `file`
+   block of one text prints `name:0:0:` (its offset is into the first text, its file id 1). Today
+   only `ir` is such a reader and the facade never routes it; a fix needs either `span.file` →
+   the source text's index from the reader, or the facade asking `names_its_files` and using
+   text 0.
+
 ## Open
 
-- The gate item "`spice2rack --dialect ir --to ir` is a fixpoint on the worked example" waits for the
-  circuit and run rows (`the_worked_example_is_a_fixpoint_of_the_ir_dialect` carries the marker); the
-  kernel-kinds twin `kernel_kinds_are_a_fixpoint_of_the_ir_dialect` passes.
+- Done at cf98e0d4: `spice2rack --dialect ir --to ir` (and `--dump-ir`) is a byte fixpoint on the
+  worked example of `text.rs`; `the_worked_example_is_a_fixpoint_of_the_ir_dialect` passes.
+- Waiting for the kernel: `span.file` set by `parse` (then a routed IR-text diagnostic prints its file
+  and line; test `a_routed_ir_text_diagnostic_names_its_line` carries the marker), a total
+  `Design::entry()`, `OpaqueClass::Hint` (decision 24).

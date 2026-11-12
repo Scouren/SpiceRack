@@ -1,15 +1,18 @@
 //! The laws every dialect passes (REWRITE-PLAN §4.2), run for every row of
-//! `dialect::BUILTIN` on the sides it has: L1 totality, L2 validity, L3 determinism (reader);
-//! L4 writer totality over what `legalize` accepted, L7 feature honesty, L8 isolation (writer);
-//! L5 round trip (both); L6 corpus fixpoint (both, `--features corpus` only). L9 belongs to each dialect's own simulator
-//! tests. In slice S2 the only row is `ir`.
+//! `dialect::BUILTIN` on the sides it has: L1 totality (any bytes, and the empty text), L2
+//! validity, L3 determinism (reader); L4 writer totality over what `legalize` accepted, L7
+//! feature honesty, L8 isolation (writer); L5 round trip (both); L6 corpus fixpoint (both,
+//! `--features corpus` only). L9 belongs to each dialect's own simulator tests.
+//!
+//! Each law runs per row and its failing rows are compared with [`KNOWN`], strictly both ways:
+//! an unexpected failure and an unexpected pass both fail. Every file a writer writes is its own
+//! text at its own path, read back as one `Sources` (entry first). A row that is not lossless
+//! generates no `Opaque` (an opaque's class is its reader's judgement of the text, which a
+//! generated text cannot carry).
 //!
 //! Oracles: generated designs (`ir::gen::generate(seed, row's features, size)`, valid and legal
 //! for the set by construction) and their canonical IR text (`ir::dump`, which has no spans:
-//! `≅`); fixed seeds, each printed in the failing assertion.
-//!
-//! Until the circuit and run owners' rows land, designs are generated over the kernel's item
-//! kinds only (`KERNEL_KINDS`); then `kernel()` goes and each law runs on the writer's whole set.
+//! `≅`); fixed seeds, each printed in the failing message.
 //!
 //! Contents: tests only.
 
@@ -20,22 +23,6 @@ use spicerack::ir::r#gen::{Size, generate};
 /// The seeds every generated law runs (printed on failure).
 const SEEDS: std::ops::Range<u64> = 0..64;
 
-/// The item kinds whose rows the kernel owns (bodies landed, M1–M4); the circuit and run
-/// owners' kinds join when their rows land, then this set is the writer's whole set.
-const KERNEL_KINDS: [ir::ItemKind; 11] = [
-    ir::ItemKind::Title,
-    ir::ItemKind::Comment,
-    ir::ItemKind::Include,
-    ir::ItemKind::Global,
-    ir::ItemKind::Load,
-    ir::ItemKind::Opaque,
-    ir::ItemKind::Subckt,
-    ir::ItemKind::Section,
-    ir::ItemKind::If,
-    ir::ItemKind::Param,
-    ir::ItemKind::Func,
-];
-
 /// A moderate design: the merge tier's size (REWRITE-PLAN §7.5).
 const SIZE: Size = Size {
     items: 48,
@@ -44,27 +31,29 @@ const SIZE: Size = Size {
     files: 3,
 };
 
-/// The laws a row fails today, by name, with why. Strict both ways (`laws`). The `ngspice`
-/// row: every generated design is refused by its `admits` (R21) for a form no feature states
-/// yet (a head parameter with no default, a blank or multi-line title or comment, a literal
-/// form ngspice reads back otherwise, a section in a section, a definition in an `.if` branch,
-/// an `.if` condition that reads the temperature), so L3, L4, L5 and L8 run on nothing; and it
-/// lacks the S3.1–S3.4 areas' features, which have neither a pass nor a citation yet (L7).
+/// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
+/// that fails a law it is not listed for fails, and so does a listed row that passes. Each
+/// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "l1-empty",
+        "ngspice",
+        "a blank line 1 is a deck's empty Title (the lead's ruling, follow-up 3 of S3.0); an empty text has none",
+    ),
     (
         "l3",
         "ngspice",
-        "no admitted design (features requested in the S3.0 report)",
+        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
     ),
     (
         "l4",
         "ngspice",
-        "no admitted design (features requested in the S3.0 report)",
+        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
     ),
     (
         "l5",
         "ngspice",
-        "no admitted design (features requested in the S3.0 report)",
+        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
     ),
     (
         "l7",
@@ -74,7 +63,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l8",
         "ngspice",
-        "no admitted design (features requested in the S3.0 report)",
+        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
     ),
 ];
 
@@ -95,6 +84,28 @@ fn l1_l2_any_bytes_read_returns_and_checks_clean() {
         }
         let _ = reader.references(&noise(1, 400));
     }
+}
+
+#[test]
+fn l1_an_empty_text_is_one_file_with_no_item() {
+    reader_laws("l1-empty", |row, _| {
+        for text in ["", "\n"] {
+            let (design, diags) = read_text(row, text);
+            let files: Vec<ir::FileId> = design.files().collect();
+            if files.len() != 1 || !design.reachable().is_empty() || !diags.is_empty() {
+                return Err(format!(
+                    "{text:?}: {} files, {} items, rows {:?}",
+                    files.len(),
+                    design.reachable().len(),
+                    diags.rows()
+                ));
+            }
+            if design.str(design.file(files[0]).path) != "law" {
+                return Err(format!("{text:?}: the file is not at its source path"));
+            }
+        }
+        Ok(())
+    });
 }
 
 #[test]
@@ -226,7 +237,7 @@ fn l7_legalized_designs_use_only_the_writers_features() {
             }
         }
         for seed in SEEDS {
-            let mut design = generate(seed, &kernel(all), SIZE);
+            let mut design = generate(seed, all, SIZE);
             let mut diags = ir::Diags::new();
             spicerack::passes::legalize(&mut design, writer.features(), &mut diags);
             let refused: Vec<u32> = diags
@@ -290,6 +301,24 @@ fn laws(name: &str, law: impl Fn(&DialectRow, &dyn Write) -> Result<(), String>)
             messages.push(format!("{}: {m}", row.name));
         }
     }
+    check_known(name, &failing, &messages);
+}
+
+/// [`laws`] over the rows with a reader.
+fn reader_laws(name: &str, law: impl Fn(&DialectRow, &dyn Read) -> Result<(), String>) {
+    let mut failing = Vec::new();
+    let mut messages = Vec::new();
+    for (row, reader) in readers() {
+        if let Err(m) = law(row, reader) {
+            failing.push(row.name);
+            messages.push(format!("{}: {m}", row.name));
+        }
+    }
+    check_known(name, &failing, &messages);
+}
+
+/// The rows that failed law `name` against its [`KNOWN`] rows, in `BUILTIN` order.
+fn check_known(name: &str, failing: &[&str], messages: &[String]) {
     let known: Vec<&str> = KNOWN
         .iter()
         .filter(|(law, _, _)| *law == name)
@@ -311,11 +340,11 @@ fn some(admitted: usize) -> Result<(), String> {
     Ok(())
 }
 
-/// The set a law generates over: the writer's features (the kernel's kinds), without `Opaque`
+/// The set a law generates over: the writer's features, without `Opaque`
 /// for a row that is not lossless (an opaque's class is its reader's judgement of the text,
 /// which a generated text cannot carry).
 fn generated(row: &DialectRow, writer: &dyn Write) -> ir::FeatureSet {
-    let set = kernel(writer.features());
+    let set = *writer.features();
     if row.text_family == dialect::ANY_FAMILY {
         return set;
     }
@@ -330,39 +359,29 @@ fn admitted_design(seed: u64, row: &DialectRow, writer: &dyn Write) -> Option<ir
     (!diags.rows().iter().any(|d| dialect::refuses(d.code))).then_some(design)
 }
 
-/// Every file of `design` written by `row`, with its path, in file order.
-fn write_all(design: &ir::Design, row: &DialectRow) -> Vec<(String, String)> {
+/// Every file of `design` written by `row` as one source set: each file its own text at the
+/// path the design gives it, the entry first (its role setting the form), then file order.
+fn write_all(design: &ir::Design, row: &DialectRow) -> Sources {
     let mut diags = ir::Diags::new();
-    design
-        .files()
-        .map(|f| {
-            let path = design.str(design.file(f).path).to_string();
-            (path, dialect::write(design, f, row, &mut diags))
-        })
-        .collect()
+    let entry = design.entry();
+    let mut src = Sources::new();
+    for f in std::iter::once(entry).chain(design.files().filter(|&f| f != entry)) {
+        let path = design.str(design.file(f).path).to_string();
+        src.add(&path, &dialect::write(design, f, row, &mut diags));
+    }
+    src.set_form(match design.file(entry).role {
+        ir::Role::Deck => ir::Role::Deck,
+        ir::Role::Library | ir::Role::VerilogA | ir::Role::Missing => ir::Role::Library,
+    });
+    src
 }
 
-/// The files read back by `row` as one source set, leniently, the first one the entry.
-fn read_all(row: &DialectRow, files: &[(String, String)]) -> ir::Design {
-    let mut src = Sources::new();
-    for (path, text) in files {
-        src.add(path, text);
-    }
+/// `src` read back by `row`, leniently.
+fn read_all(row: &DialectRow, src: &Sources) -> ir::Design {
     let mut design = ir::Design::new();
     let mut diags = ir::Diags::new();
-    dialect::read(&src, row, Policy::Lenient, &mut design, &mut diags);
+    dialect::read(src, row, Policy::Lenient, &mut design, &mut diags);
     design
-}
-
-/// `set` without the item kinds the kernel does not own yet (what `generate` may build today).
-fn kernel(set: &ir::FeatureSet) -> ir::FeatureSet {
-    let others = ir::ItemKind::ALL
-        .iter()
-        .filter(|k| !KERNEL_KINDS.contains(k));
-    let others = others.fold(ir::FeatureSet::EMPTY, |acc, &k| {
-        acc.with(ir::Feature::Item(k))
-    });
-    set.minus(others)
 }
 
 /// The rows with a reader.
@@ -439,9 +458,9 @@ fn noise(seed: u64, len: usize) -> String {
 #[cfg(feature = "corpus")]
 fn corpus(name: &str) -> Vec<String> {
     match name {
-        // The kernel's kinds; the worked example of `text.rs` (elements, an analysis) joins
-        // when the circuit and run owners' rows land.
+        // The kernel's kinds, and the worked example of `crates/ir/src/text.rs`.
         "ir" => vec![
+            "file \"rc.sp\" deck\n  title \"rc divider\"\n  param rval = 1k\n  subckt div (in out gnd) r=rval\n    element resistor r1 (in out) value=r\n    element resistor r2 (out gnd) value=(r / 2)\n  element instance x1 (a b 0) model=div\n  element vsource v1 (a 0) dc=1.8\n  analysis op\n".to_string(),
             "file \"kit.sp\" deck\n  title \"kernel kinds\"\n  global vdd vss\n  param w = 2u\n  subckt cell (a b) r=w\n    param k = r * 2\n  if (w > 1u)\n    param m = 1\n  else\n    param m = 3\nfile \"models.lib\" library\n  section tt\n    param vth = 0.4\n".to_string(),
         ],
         _ => Vec::new(),

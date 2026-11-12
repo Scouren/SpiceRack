@@ -38,11 +38,12 @@ struct Head {
 }
 
 /// Line 1 of a deck: its text as the title, blank too (every ngspice deck has a title line,
-/// INV 14.12); a library's line 1 is the reader's own blank line, framing.
+/// INV 14.12); a library's line 1 is the reader's own blank line, and an empty text has no
+/// line 1: framing.
 pub(super) fn title(lw: &mut Lower<'_, '_>, st: Stmt) {
     let text = lw.toks.text(lw.ast.main_token(st.node));
     let text = text.trim_end_matches('\r');
-    if lw.role != ir::Role::Deck {
+    if lw.role != ir::Role::Deck || lw.toks.source().is_empty() {
         lw.framing();
         return;
     }
