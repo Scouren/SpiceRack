@@ -289,31 +289,21 @@ fn script_items_ngspice_cannot_spell_are_refused() {
     // Oracle: ngspice-45's forms. pre_osdi takes a path (inp.c:791-797) and the modules are the
     // binary's; a foreach word is no expression (control.c:462-466); an alter takes one number
     // (device.c ft_getpnames); alterparam applies at a reset that drops live alters
-    // (runcoms2.c:172-240).
+    // (runcoms2.c:172-240); a bare alter of a device other than R, C, L (V, I for a DC) sets its
+    // own default parameter (spiceif.c:951; L5 seed 11's `g149`).
+    #[rustfmt::skip] // a table: one row per line
     const REFUSED: &[(&str, &str, &str)] = &[
-        (
-            "a load naming its modules",
-            "  load osdi \"a.osdi\" modules=(m1)",
-            "W1405",
-        ),
+        ("a load naming its modules", "  load osdi \"a.osdi\" modules=(m1)", "W1405"),
         ("a Verilog-A load", "  load veriloga \"a.va\"", "W1404"),
-        (
-            "a loop over an expression",
-            "  param p = 1\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op",
-            "W1402",
-        ),
-        (
-            "a parameter alter not right before a reset",
-            "  param p = 1\n  alter (param p) value=3\n  analysis op",
-            "W1401",
-        ),
-        (
-            "a parameter loop whose body does not start with a reset",
-            "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op",
-            "W1401",
-        ),
+        ("a loop over an expression", "  param p = 1\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op", "W1402"),
+        ("a parameter alter not right before a reset", "  param p = 1\n  alter (param p) value=3\n  analysis op", "W1401"),
+        ("a parameter loop whose body does not start with a reset", "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op", "W1401"),
         ("a partial reset", "  reset values saves", "W1406"),
+        ("an element-value alter of a G", "  alter (element_value g1) value=2", "W1407"),
+        ("a G loop", "  loop sweep keep_last (element_value g1) (list values=[1])", "W1407"),
+        ("an R's source DC", "  alter (source_dc r1) value=2", "W1407"),
     ];
+
     for (why, items, code) in REFUSED {
         let mut design = parse_ir(why, &format!("file \"r.sp\" deck\n{items}\n"));
         let mut diags = ir::Diags::new();
@@ -594,37 +584,4 @@ fn raw_r(dir: &Path, stem: &str, deck: &str) -> Vec<u8> {
         .collect::<Vec<_>>()
         .join("\n")
         .into_bytes()
-}
-
-#[test]
-fn an_element_value_alter_of_another_letter_is_refused_by_the_writer() {
-    // L5 seed 11: `alter g149 $sr1` is no element value to ngspice (a bare alter of a G sets its
-    // own default parameter, spiceif.c:951), and the reader keeps it Unread (P1408); the writer
-    // refuses it (W1407). Neighbours: an R's value and a V's DC, written and read back.
-    let target = |t: &str| {
-        format!(
-            "file \"f.sp\" deck\n  title \"t\"\n  loop sweep keep_last {t} (list values=[-73.384558234620672336478e-8])\n  alter {t} value=2\n"
-        )
-    };
-    for (t, refused) in [
-        ("(element_value g149)", true),
-        ("(source_dc r1)", true),
-        ("(element_value r1)", false),
-        ("(source_dc v1)", false),
-    ] {
-        let mut design = parse_ir(t, &target(t));
-        let mut diags = ir::Diags::new();
-        dialect::legalize(&mut design, row(), &mut diags);
-        let codes: Vec<String> = diags.rows().iter().map(|d| d.code.to_string()).collect();
-        let want: Vec<String> = if refused {
-            vec!["W1407".into(); 2]
-        } else {
-            vec![]
-        };
-        assert_eq!(codes, want, "{t}");
-        if !refused {
-            let (back, _) = read_deck("f.sp", &write_entry(&design));
-            assert!(back.eq_meaning(&design), "{t}: {}", dump(&back));
-        }
-    }
 }

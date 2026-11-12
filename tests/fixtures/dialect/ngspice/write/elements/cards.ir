@@ -18,4 +18,5 @@ file "cards.sp" deck
   element lossless_line T2 (a 0 b 0) z0=75 freq=1g nl=0.5
   element rc_line U1 (a b 0) model=umod? length=1m lumps=5
   element instance X1 (a b) model=sub? mult=2 mult_law=ngspice_append
+  element module_model N1 (a b) model=nmod? params=(w=1) mult=2
   element code_model A1 (in out) model=amod?
