@@ -98,7 +98,21 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Circuit(X::SwitchInitial),
     Feature::Circuit(X::LineFreqNl),
     Feature::Circuit(X::LineLumps),
-]);
+])
+// elements in a subcircuit (manual §2.4.3), a `.lib` section (run: a section's `R` conducts)
+// and an `.if` branch (manual §2.15; run: a nested branch's `R` in a subcircuit conducts)
+.union(FeatureSet::placed(
+    ir::ScopeKind::Subckt,
+    &[ItemKind::Element],
+))
+.union(FeatureSet::placed(
+    ir::ScopeKind::Section,
+    &[ItemKind::Element],
+))
+.union(FeatureSet::placed(
+    ir::ScopeKind::Branch,
+    &[ItemKind::Element],
+));
 
 /// An element card ngspice cannot read: too few nodes, no master, a value or parameter its
 /// device does not take (`unknown parameter`), a line it ignores: `InvalidInSource`.

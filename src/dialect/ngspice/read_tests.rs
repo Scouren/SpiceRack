@@ -361,10 +361,11 @@ fn any_bytes_read_returns_and_checks_clean() {
 }
 
 #[test]
-fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
-    // R21 (`Write::admits`): never a literal (R28: respelled exactly), a head parameter with no default (manual
-    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once),
-    // a string value (numparam has none).
+fn what_ngspice_cannot_spell_is_refused_by_a_feature_and_a_string_value_by_admits() {
+    // A15: a head parameter with no default is `FormalWithoutDefault`, an `.if` reading the
+    // temperature `IfConditionDynamic`, both outside FEATURES (U0001 at legalize); R28: literals
+    // in a form ngspice has no letter for are respelled, never refused; R21: what no feature
+    // states stays `admits`'s: a string value where numparam reads an expression (W1006).
     let mut d = ir::Design::new();
     {
         let mut b = d.builder();
@@ -376,15 +377,7 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
             form: ir::NumForm::Scale,
         });
         b.param(top, "a", centi, ir::Span::NONE);
-        let mil = b.literal(ir::Literal {
-            mantissa: 2,
-            frac: 0,
-            exp10: 0,
-            form: ir::NumForm::Mil,
-        });
-        b.param(top, "b", mil, ir::Span::NONE);
         b.subckt(top, "s", &["p"], &[("w", ir::ExprId::NONE)], ir::Span::NONE);
-        b.comment(top, "two\nlines", ir::Span::NONE);
         let t = b.temp();
         b.if_(top, &[t], ir::Span::NONE);
         let text = b.string("4.8.3");
@@ -393,20 +386,19 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
     let row = dialect::by_name("ngspice").expect("row");
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut d, row, &mut diags);
-    // the admits rows; `U0001` for `Expr(Str)` also comes until the model area's FEATURES add it
-    let mut got: Vec<ir::Code> = codes_of(&diags)
+    let feature = |f: ir::Feature| {
+        diags
+            .rows()
+            .iter()
+            .any(|r| r.code == ir::diag::UNSUPPORTED && r.arg == u32::from(f.index()))
+    };
+    assert!(feature(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)));
+    assert!(feature(ir::Feature::Extra(ir::Extra::IfConditionDynamic)));
+    let w: Vec<ir::Code> = codes_of(&diags)
         .into_iter()
         .filter(|c| c.letter == b'W')
         .collect();
-    got.sort();
-    let mut want = vec![
-        codes::NO_DEFAULT,
-        codes::LINE_BREAK,
-        codes::READS_RUN,
-        codes::TEXT_VALUE,
-    ];
-    want.sort();
-    assert_eq!(got, want);
+    assert_eq!(w, [codes::TEXT_VALUE]);
 }
 
 #[test]

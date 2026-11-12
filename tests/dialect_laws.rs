@@ -43,27 +43,27 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l3",
         "ngspice",
-        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
+        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
     ),
     (
         "l4",
         "ngspice",
-        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
+        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
     ),
     (
         "l5",
         "ngspice",
-        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
+        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
     ),
     (
         "l7",
         "ngspice",
-        "lacked features with no pass or citation (S3.1-S3.4, citations.toml)",
+        "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
     ),
     (
         "l8",
         "ngspice",
-        "no admitted design (admits refuses every generated design; Placed and A15 remove that)",
+        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
     ),
 ];
 

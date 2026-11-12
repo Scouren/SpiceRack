@@ -49,12 +49,12 @@ use super::tables::{self, Eval};
 use crate::ir::{self, Code, Feature, Info, Kind, ModelFamily as F, OpaqueClass, Polarity};
 use crate::syntax::ast::{NONE, Node, Tag};
 
-/// What this area adds to `FEATURES`, the image of its reader: models, inside subcircuits too,
-/// bins, with no device library, a string (a model's version), and the families ngspice has. A model in an `.if` branch (R33) joins as
-/// `Placed(Branch, Model)` when the kernel's placement class lands (AMEND-A12 A15).
+/// What this area adds to `FEATURES`, the image of its reader: models, bins, with no device
+/// library, a string (a model's version), and the families ngspice has; a model in a
+/// subcircuit (fixture local_model), a `.lib` section (run: a section's `.model` conducts as its
+/// card says) and an `.if` branch (R33, fixture branch).
 pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ir::ItemKind::Model),
-    Feature::Extra(ir::Extra::LocalModel),
     Feature::Circuit(ir::CircuitExtra::ModelBin),
     // ngspice's devices are built in: no model needs a `DeviceLibrary` (A12 C5)
     Feature::Circuit(ir::CircuitExtra::ModelWithoutLibrary),
@@ -99,7 +99,19 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Family(F::Urc),
     Feature::Family(F::CodeModel),
     Feature::Family(F::Module),
-]);
+])
+.union(ir::FeatureSet::placed(
+    ir::ScopeKind::Subckt,
+    &[ir::ItemKind::Model],
+))
+.union(ir::FeatureSet::placed(
+    ir::ScopeKind::Section,
+    &[ir::ItemKind::Model],
+))
+.union(ir::FeatureSet::placed(
+    ir::ScopeKind::Branch,
+    &[ir::ItemKind::Model],
+));
 
 /// This area's codes, `P1200–P1299, R1200–R1299`.
 pub(super) const CODES: &[Row] = &[

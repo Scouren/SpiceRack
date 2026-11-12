@@ -18,7 +18,7 @@
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`, `ROUNDED`,
 //! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
-//! `MISSING_FILE`, `NO_DEFAULT`, `LINE_BREAK`, `PLACEMENT`, `READS_RUN`, `TEXT_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
+//! `MISSING_FILE`, `TEXT_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, write_control,
@@ -68,17 +68,6 @@ pub(super) const DUPLICATE_PARAM: Code = Code::new(b'R', 1001);
 pub(super) const DUPLICATE_DEF: Code = Code::new(b'R', 1002);
 /// An include or library call whose file is not among the sources.
 pub(super) const MISSING_FILE: Code = Code::new(b'R', 1003);
-
-/// A subcircuit parameter with no default: ngspice's `params:` gives every one a value.
-pub(super) const NO_DEFAULT: Code = Code::new(b'W', 1001);
-/// A title or a comment that holds a line break: line 1 and a `*` line hold one line each.
-pub(super) const LINE_BREAK: Code = Code::new(b'W', 1002);
-/// A definition or include ngspice does not read where it stands: a `.lib` section inside a
-/// section, a `.subckt`, `.lib` section, `.func` or `.include` in an `.if` branch.
-pub(super) const PLACEMENT: Code = Code::new(b'W', 1004);
-/// An `.if` condition that reads the temperature or the circuit, or a parameter or head default
-/// that reads the circuit (numparam evaluates them once, before the run).
-pub(super) const READS_RUN: Code = Code::new(b'W', 1005);
 
 /// A string or list value where ngspice reads an expression (a `.param`, head default, `.if`
 /// or `.func`): numparam has no string or vector values.
@@ -147,34 +136,10 @@ pub(super) const CODES: &[Row] = &[
         "ground is global already; kept as Inert text.",
     ),
     refusal(
-        NO_DEFAULT,
-        "a subcircuit parameter with no default",
-        "ngspice manual §2.4.3 (params:)",
-        "ngspice gives every subcircuit parameter a value; refused.",
-    ),
-    refusal(
-        LINE_BREAK,
-        "a title or comment that ngspice cannot hold on one line",
-        "ngspice manual §1.5, §2.3",
-        "line 1 is the whole title and a * line one line of comment; a line break in either would read back otherwise; refused.",
-    ),
-    refusal(
-        PLACEMENT,
-        "a definition or include where ngspice does not read it",
-        "ngspice manual §2.8, §2.15",
-        "sections do not nest; an .if branch holds instances and models only; refused.",
-    ),
-    refusal(
         TEXT_VALUE,
         "a string or list where ngspice reads an expression",
         "ngspice-45 xpressn.c formula",
         "a .param, head default, .if condition or .func body is a number expression; refused.",
-    ),
-    refusal(
-        READS_RUN,
-        "a condition or parameter that reads the run",
-        "rewrite/RULINGS.md R14; ngspice manual §2.15",
-        "numparam evaluates an .if once and a .param has no circuit to read; refused.",
     ),
     row(
         FIRST_LAST,
