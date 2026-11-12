@@ -1,0 +1,11 @@
+an ac bound from a var and a constant
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a 0) res r=1k
+parameters f0=1k n=2
+control
+  var fv=1k
+  analysis ac2 ac from=fv to=10*M_PI mode="dec" points=2
+endc

@@ -15,7 +15,7 @@ file "mc.sim" deck
     analysis op name=op1
     loop sweep name=s1 (device_param r1 r) (list values=[1k, 2k])
       analysis tran name=t1 stop=1m cap=span_over50
-  loop monte_carlo name=m2 runs=n
+  loop monte_carlo name=m2 runs=(2i * 2i)
     analysis op name=op2
   opaque vacask private "mc m3 samples=2 debug=1"
   opaque vacask private "analysis op3 op"

@@ -239,12 +239,12 @@ pub(super) fn body(w: &mut Writer<'_, '_>, scope: ir::ScopeId) {
 
 // ---- private ----
 
-/// Whether analysis `at`'s own fields (a DC analysis's axes included) or sweep loop `at`'s range
+/// Whether analysis `at`'s own fields (a DC analysis's axes included) or loop `at`'s range or
+/// sample count and seed
 /// read a parameter, `$temp` or `$tnom`, which VACASK's analysis arguments cannot see (R68).
 fn args_read_params(design: &ir::Design, at: ir::ItemRef) -> bool {
-    let sweep_loop = at.kind == ir::ItemKind::Loop
-        && design.row::<ir::Loop>(at.index).kind == ir::LoopKind::Sweep;
-    if at.kind != ir::ItemKind::Analysis && !sweep_loop {
+    // A Monte Carlo loop's sample count and seed are `mc`'s arguments (settle run/mc_param).
+    if at.kind != ir::ItemKind::Analysis && at.kind != ir::ItemKind::Loop {
         return false;
     }
     let mut handles = Vec::new();

@@ -377,3 +377,25 @@ fn corpus_forms_this_vacask_rejects() {
         r.out
     );
 }
+
+#[test]
+fn ac_and_mc_arguments_see_variables_and_constants_not_parameters() {
+    // R68, A42: `ac from=f0` with `parameters f0=1k` fails its analysis (exit 0); `mc
+    // samples=n` with `parameters n=2` stops the run; a `var` and `M_PI` run.
+    let r = settle("ac_param.sim");
+    assert!(
+        r.out.contains("Variable or constant 'f0' not defined."),
+        "{}",
+        r.out
+    );
+    let r = settle("mc_param.sim");
+    assert!(
+        r.out.contains("Variable or constant 'n' not defined."),
+        "{}",
+        r.out
+    );
+    for deck in ["ac_var.sim", "mc_var.sim"] {
+        let r = settle(deck);
+        assert!(!r.out.contains("not defined"), "{deck}: {}", r.out);
+    }
+}

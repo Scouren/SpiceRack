@@ -77,11 +77,14 @@ pub(super) fn mc(l: &mut Lower<'_, '_, '_>, n: Node) -> Option<bool> {
         },
     };
     let seed = get("seed");
-    for v in [Some(samples), seed].into_iter().flatten() {
-        if let Err(r) = check_value(l, v) {
-            read::opaque(l, n, r.class, Some(r.code));
-            return Some(true);
-        }
+    // R68, A42: `samples` and `seed` are analysis arguments (settle run/mc_param: "Variable or
+    // constant 'n' not defined." for a parameter; a `var` runs, mc_var).
+    let given: Vec<u32> = [Some(samples), seed].into_iter().flatten().collect();
+    if let Err(w) = super::sweep::check_arg(l, &given) {
+        read::opaque(l, n, w.class, w.code);
+        // Kept as text with its body when Private (a `var`'s read); refused like any bad `mc`
+        // line when invalid, its body read as the statements it holds.
+        return (w.class == ir::OpaqueClass::Private).then_some(true);
     }
     let runs = expr_read::expr(l, samples, Context::Param).expect("checked");
     let seed = seed.map_or(ir::ExprId::NONE, |s| {
