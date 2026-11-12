@@ -77,5 +77,8 @@ pub(super) fn cdl() -> DialectDef {
         // --- S2
         // CDL writes no analysis, so no state between two of them.
         .omit(Construct::Epochs, Code::W0028)
-    // --- S3
+        // --- S3
+        // --- S4
+        // CDL leaves all kept text out (`ForeignText`'s cell; never asked).
+        .omit(Construct::InertText, Code::W0028)
 }

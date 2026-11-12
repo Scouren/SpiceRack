@@ -238,5 +238,11 @@ pub(super) fn hspice() -> DialectDef {
         // ZERO-LEDGER P5-001 step 5); a plan no table of states holds is
         // W0130 (`render/spice/states.rs`).
         .spell(Construct::Epochs, Alt::AlterBlocks)
-    // --- S3
+        // --- S3
+        // --- S4
+        // A statement another dialect's simulator runs to the same numbers
+        // without (its `kept_word` rows) is left out, noted.
+        // ponytail: HSPICE has Xyce's `.SAVE` and ngspice's `.WIDTH` as its
+        // own cards; a copy cell for those words when a deck needs them.
+        .omit(Construct::InertText, Code::W0336)
 }

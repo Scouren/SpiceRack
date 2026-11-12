@@ -240,6 +240,17 @@ pub(super) fn xyce() -> DialectDef {
         // coupling out (`refused.rs::Rd::private_line`).
         .kept_word("k", Construct::PrivateText)
         .kept_word(".sens", Construct::XyceSens)
+        // Lines a Xyce run gives the same numbers without, left out off
+        // Xyce (W0336; ZERO-LEDGER P4-072). `.SAVE` writes the operating
+        // point to a file (RG 7.10 §2.1.34); Xyce 7.10 reads past `.DCOP`,
+        // `.OBJECTIVE` and `.PROBE` ("Unrecognized dot line will be
+        // ignored"; RG §6.1.4) and past an `.ENDS` no `.SUBCKT` opened
+        // ("Subcircuit .ENDS without .SUBCKT, ignoring").
+        .kept_word(".save", Construct::InertText)
+        .kept_word(".dcop", Construct::InertText)
+        .kept_word(".objective", Construct::InertText)
+        .kept_word(".probe", Construct::InertText)
+        .kept_word(".ends", Construct::InertText)
         // The dot rules: `.LIN` (RG `.LIN`) is the S-parameter analysis over
         // the deck's `.AC` sweep.
         .dot_rule("lin", DotRule::SParams)
@@ -309,5 +320,9 @@ pub(super) fn xyce() -> DialectDef {
         // step 5); a plan no table of states holds is W0130
         // (`render/spice/states.rs`).
         .spell(Construct::Epochs, Alt::StatesData)
-    // --- S3
+        // --- S3
+        // --- S4
+        // A statement another dialect's simulator runs to the same numbers
+        // without (its `kept_word` rows) is left out, noted.
+        .omit(Construct::InertText, Code::W0336)
 }

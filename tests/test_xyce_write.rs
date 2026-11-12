@@ -637,3 +637,38 @@ fn p4_012_xyce_vbic_1p3_is_vacasks_vbic13() {
     let codes = oracle::refusal(l11, Dialect::Hspice, Dialect::Xyce);
     assert!(codes.contains(&Code::W0104), "HSPICE's on Xyce: {codes:?}");
 }
+
+/// Ledger P4-071 (spec S4-rf-inert-text). ngspice manual §11.6.7: `.width
+/// out=` is the characters a printed row holds; §2.13: `.csparam` copies a
+/// parameter into a vector for `.control` scripts. ngspice-45 runs this
+/// deck with both lines and without them to the same 0.5 V
+/// (research/impl/evidence/S4-rf-inert-text/RESULTS.txt §2) and no other
+/// family has either line (Xyce 7.10: "Unrecognized dot line will be
+/// ignored"), so each is left out with a note (W0336); ngspice and ESPice
+/// keep the text.
+#[test]
+fn p4_071_no_op_ngspice_lines_are_left_out() {
+    let ng = Dialect::Ngspice;
+    let plain = "* t\n.param rr=1k\nV1 1 0 1\nR1 1 2 1k\nR2 2 0 {rr}\n.op\n.end\n";
+    let inert = plain.replace(".op\n", ".width out=80\n.csparam rr=rr\n.op\n");
+    // 1 V over 1k/1k: ngspice on the source, Xyce on the written deck.
+    both_op(&inert, "2", 0.5);
+    for to in [
+        Dialect::Xyce,
+        Dialect::Hspice,
+        Dialect::Ltspice,
+        Dialect::Spectre,
+        Dialect::Vacask,
+    ] {
+        let w = oracle::written(&inert, ng, to);
+        assert_eq!(w.text, oracle::write(plain, ng, to), "{to:?}");
+        let notes = oracle::notes(&w);
+        let left_out = notes.iter().filter(|&&c| c == Code::W0336).count();
+        assert_eq!(left_out, 2, "{to:?}: {notes:?}");
+    }
+    for own in [ng, Dialect::Espice] {
+        let text = oracle::write(&inert, ng, own);
+        let kept = text.contains(".width out=80\n.csparam rr=rr\n");
+        assert!(kept, "{own:?}\n{text}");
+    }
+}

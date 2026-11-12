@@ -77,5 +77,8 @@ pub(super) fn verilog() -> DialectDef {
         // --- S2
         // Structural Verilog writes no testbench (never asked).
         .omit(Construct::Epochs, Code::W0029)
-    // --- S3
+        // --- S3
+        // --- S4
+        // Structural Verilog writes no kept text (never asked).
+        .omit(Construct::InertText, Code::W0029)
 }

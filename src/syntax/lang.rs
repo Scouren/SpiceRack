@@ -50,7 +50,7 @@ pub struct Lang(u16);
 pub type Cells = [Action; CONSTRUCT_COUNT];
 
 /// How many [`Construct`]s there are.
-pub const CONSTRUCT_COUNT: usize = 45;
+pub const CONSTRUCT_COUNT: usize = 46;
 
 /// How many languages can be registered, the built-ins among them.
 pub const LANGS_MAX: usize = 64;
@@ -104,6 +104,7 @@ pub const CONSTRUCTS: [Construct; CONSTRUCT_COUNT] = [
     Construct::HspiceWLine,
     Construct::VacaskElaborate,
     Construct::Epochs,
+    Construct::InertText,
 ];
 
 /// A code a definition declared (`DialectDef::code`): what a `W0201` or
@@ -413,5 +414,6 @@ const fn position(c: Construct) -> usize {
         Construct::HspiceWLine => 42,
         Construct::VacaskElaborate => 43,
         Construct::Epochs => 44,
+        Construct::InertText => 45,
     }
 }

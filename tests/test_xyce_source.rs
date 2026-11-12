@@ -270,3 +270,44 @@ fn p6_014_xyce_preprocess_removeunused_addresistors() {
     let both = unused.replace(".end\n", ".preprocess replaceground true\n.end\n");
     oracle::spec_refusal(cite, &both, xy, ng, &[Code::W0039]);
 }
+
+// Ledger P4-072 (spec S4-rf-inert-text). Xyce 7.10 reads past `.DCOP`,
+// `.OBJECTIVE` and `.PROBE/CSD` ("Unrecognized dot line will be ignored";
+// RG 7.10 §6.1.4: "Xyce does not support the .PROBE statement") and past
+// an `.ENDS` no `.SUBCKT` opened ("Subcircuit .ENDS without .SUBCKT,
+// ignoring"); `.SAVE` stores the operating point in a file (§2.1.34). Its
+// run of this deck with the five lines and without them prints the same
+// 0.5 V (research/impl/evidence/S4-rf-inert-text/RESULTS.txt §1), so every
+// other family gets the deck without them, each line noted (W0336), and
+// Xyce its own text back. LINEAR: one linear solve.
+#[test]
+fn p4_072_lines_xyce_reads_past_are_left_out() {
+    let (xy, ng, es) = (Dialect::Xyce, Dialect::Ngspice, Dialect::Espice);
+    let plain = "* t\nV1 1 0 1\nR1 1 2 1k\nR2 2 0 1k\n.dc V1 1 1 1\n.print dc v(2)\n.end\n";
+    let inert = plain.replace(
+        ".end\n",
+        ".DCOP input=bleem.op\n.SAVE type=ic file=t.ic level=all\n\
+         .objective vsq function=L2NORM file=t.dat value={v(2)}\n.PROBE/CSD\n.ends\n.end\n",
+    );
+    // 1 V over 1k/1k.
+    oracle::closed_form(xy, &inert, &[xy, ng, es], "2", At::First, 0.5, LINEAR);
+    for to in [
+        ng,
+        es,
+        Dialect::Hspice,
+        Dialect::Ltspice,
+        Dialect::Spectre,
+        Dialect::Vacask,
+    ] {
+        let w = oracle::written(&inert, xy, to);
+        assert_eq!(w.text, oracle::write(plain, xy, to), "{to:?}");
+        let notes = oracle::notes(&w);
+        let left_out = notes.iter().filter(|&&c| c == Code::W0336).count();
+        assert_eq!(left_out, 5, "{to:?}: {notes:?}");
+    }
+    // Xyce keeps its own lines, as text.
+    let own = oracle::written(&inert, xy, xy);
+    assert!(own.text.lines().any(|l| l == ".PROBE/CSD"), "{}", own.text);
+    assert!(own.text.lines().any(|l| l == ".ends"), "{}", own.text);
+    assert!(!oracle::notes(&own).contains(&Code::W0336));
+}

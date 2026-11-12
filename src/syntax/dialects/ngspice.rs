@@ -195,6 +195,13 @@ pub(super) fn ngspice() -> DialectDef {
         .builtin_device("NUMD")
         .builtin_device("NUMD2")
         .builtin_device("NUMOS")
+        // The kept words: statements an ngspice run gives the same numbers
+        // without, left out off its family (W0336; ZERO-LEDGER P4-071).
+        // `.width` is the characters a printed row holds (manual §11.6.7),
+        // `.csparam` a parameter copied into a vector for `.control`
+        // scripts (§2.13); ngspice-45 runs.
+        .kept_word(".width", Construct::InertText)
+        .kept_word(".csparam", Construct::InertText)
         // The capability column.
         .refuse(Construct::ForeignText, Code::W0001)
         .refuse(Construct::PrivateText, Code::W0039)
@@ -253,5 +260,9 @@ pub(super) fn ngspice() -> DialectDef {
         // script: `alterparam` then `reset` (manual §13.5.5; ngspice-45
         // run, ZERO-LEDGER P5-001 step 2).
         .spell(Construct::Epochs, Alt::ControlScript)
-    // --- S3
+        // --- S3
+        // --- S4
+        // A statement another dialect's simulator runs to the same numbers
+        // without (its `kept_word` rows) is left out, noted.
+        .omit(Construct::InertText, Code::W0336)
 }

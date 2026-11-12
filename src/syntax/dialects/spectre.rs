@@ -342,5 +342,9 @@ pub(super) fn spectre() -> DialectDef {
         // named writer asks once it writes one (ZERO-LEDGER P5-050);
         // until then the statement is kept text (W0001).
         .native(Construct::Epochs)
-    // --- S3
+        // --- S3
+        // --- S4
+        // A statement another dialect's simulator runs to the same numbers
+        // without (its `kept_word` rows) is left out, noted.
+        .omit(Construct::InertText, Code::W0336)
 }

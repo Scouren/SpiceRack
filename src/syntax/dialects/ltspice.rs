@@ -166,6 +166,10 @@ pub(super) fn ltspice() -> DialectDef {
         .kept_word(".savestate", Construct::PrivateText)
         .kept_word(".loadstate", Construct::PrivateText)
         .kept_word(".savebias", Construct::PrivateText)
+        // `.wave` writes nodes to a .wav file (help, `.WAVE`; LTspice
+        // 26.1.1 runs to the same numbers without it): left out off
+        // LTspice, noted (W0336; ZERO-LEDGER P4-073).
+        .kept_word(".wave", Construct::InertText)
         // The dot rules: `.backanno` names port currents for LTspice's
         // viewer and changes no number (LTspice help): left out, noted.
         .dot_rule("backanno", DotRule::Note(Code::W0036))
@@ -224,5 +228,9 @@ pub(super) fn ltspice() -> DialectDef {
         // 5); a plan no table of states holds is W0130
         // (`render/spice/states.rs`).
         .spell(Construct::Epochs, Alt::StatesTable)
-    // --- S3
+        // --- S3
+        // --- S4
+        // A statement another dialect's simulator runs to the same numbers
+        // without (its `kept_word` rows) is left out, noted.
+        .omit(Construct::InertText, Code::W0336)
 }

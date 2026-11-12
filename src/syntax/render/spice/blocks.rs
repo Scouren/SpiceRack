@@ -10,7 +10,7 @@
 //! - `W::file_cards(&mut self, b: &Block)`, `W::params_and_models(&mut self, b: &Block)`
 //! - `W::subckt(&mut self, sc: &Block)`, `W::section(&mut self, s: &Section)`
 //! - `W::body(&mut self, b: &Block, rser: bool)`, `W::coupled(&self, b: &Block) -> Vec<String>`,
-//!   `W::raw_lines(&self, raw: &[Raw]) -> Vec<String>`
+//!   `W::omitted(&self, tok: u32) -> bool`, `W::raw_lines(&self, raw: &[Raw]) -> Vec<String>`
 
 use super::{W, bench};
 use crate::syntax::behaviour::{CardRules, IncludeScope, ParamForm};
@@ -224,18 +224,24 @@ impl W<'_, '_> {
         out
     }
 
-    /// The text of `raw`, one string per line; a VACASK script line
-    /// (`Rd::vacask_script`, noted by `checks`) is left out, but CDL's
-    /// layout copies it as it copies all kept text.
+    /// Whether the statement kept as text at token `tok` (its first) is
+    /// left out: text of another family whose construct the target omits
+    /// (`Rd::kept_construct`: a VACASK script line, an inert statement).
+    /// `checks` notes each one.
+    pub(super) fn omitted(&self, tok: u32) -> bool {
+        let foreign = self.rd.text_behaviours(tok).text_family != self.b.text_family;
+        let cell = self.cells[self.rd.kept_construct(tok) as usize];
+        foreign && matches!(cell, Action::Spell(Alt::Omit(_)))
+    }
+
+    /// The text of `raw`, one string per line; a statement the target
+    /// omits ([`W::omitted`]) is left out, but CDL's layout copies it as
+    /// it copies all kept text.
     pub(super) fn raw_lines(&self, raw: &[Raw]) -> Vec<String> {
         let mut out = Vec::new();
         for &r in raw {
             let (Raw::Line(n) | Raw::Lines(n) | Raw::Joined(n)) = r;
-            let omit = matches!(
-                self.cells[Construct::VacaskScript as usize],
-                Action::Spell(Alt::Omit(_))
-            );
-            if omit && self.rd.vacask_script(self.rd.main(n)) {
+            if self.omitted(self.rd.main(n)) {
                 continue;
             }
             match r {

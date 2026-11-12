@@ -430,5 +430,9 @@ pub(super) fn vacask() -> DialectDef {
         // `alter` in the control block (`docs/cmd-alter.md`): the
         // statement is copied where it stood.
         .native(Construct::Epochs)
-    // --- S3
+        // --- S3
+        // --- S4
+        // A statement another dialect's simulator runs to the same numbers
+        // without (its `kept_word` rows) is left out, noted.
+        .omit(Construct::InertText, Code::W0336)
 }
