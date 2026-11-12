@@ -24,6 +24,10 @@ pub(super) struct Writer<'d, 'o> {
     pub(super) depth: usize,
     /// The directory of the file being written (`""` for none), which its paths are relative to.
     pub(super) dir: String,
+    /// Each family's module word, built once per call (`families::Words`).
+    pub(super) words: super::families::Words,
+    /// The scope each reachable item is listed in, built once per call.
+    pub(super) scopes: std::collections::HashMap<ir::ItemRef, ir::ScopeId>,
 }
 
 /// One step of the walk: an item, a branch head of an `If`, or a block's closing line.
@@ -80,6 +84,8 @@ pub(super) fn write(design: &ir::Design, file: ir::FileId, out: &mut String) {
         out,
         depth: 0,
         dir,
+        words: super::families::Words::of(design),
+        scopes: design.reachable().into_iter().collect(),
     };
     if design.file(file).role == ir::Role::Deck {
         let title = design

@@ -22,6 +22,7 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let row: ir::Analysis = d.row(at.index);
     assert!(!row.name.is_none(), "FEATURES lacks AnalysisUnnamed");
     let name = d.str(row.name).to_string();
+    let scope = w.scopes.get(&at).copied();
     super::fold_alters(w, at);
     if row.kind == ir::AnalysisKind::Dc {
         let dc: ir::dc_ac::Dc = d.detail(row.detail);
@@ -90,7 +91,7 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
         ir::AnalysisKind::Tran => tran(d, d.detail(row.detail), out),
         k => unreachable!("FEATURES lacks Analysis({k:?}): legalize refused it"),
     }
-    lists(d, at, out);
+    lists(d, scope, at, out);
     out.push('\n');
     if row.kind == ir::AnalysisKind::Dc {
         w.depth -= 1;
@@ -261,8 +262,8 @@ fn tran(d: &ir::Design, t: ir::tran::Tran, out: &mut String) {
 
 /// The ` ic={…}` and ` nodeset={…}` lists of the `NodeSet` rows just before `at` in its scope,
 /// each kind's list where its first row stood.
-fn lists(d: &ir::Design, at: ir::ItemRef, out: &mut String) {
-    let Some((_, scope)) = d.reachable().into_iter().find(|(item, _)| *item == at) else {
+fn lists(d: &ir::Design, scope: Option<ir::ScopeId>, at: ir::ItemRef, out: &mut String) {
+    let Some(scope) = scope else {
         return;
     };
     let items = d.items(scope);

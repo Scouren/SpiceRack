@@ -186,8 +186,7 @@ pub(super) fn name_of(design: &ir::Design, path: ir::NameList) -> String {
 /// analysis's (the line starts at dc). Contract: S4-AREAS.md "dc plus type alters".
 pub(super) fn fold_alters(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let d = w.design;
-    let reached = d.reachable();
-    let Some(&(_, scope)) = reached.iter().find(|(item, _)| *item == at) else {
+    let Some(&scope) = w.scopes.get(&at) else {
         return;
     };
     let top = d.file(d.scope(scope).file).top;
