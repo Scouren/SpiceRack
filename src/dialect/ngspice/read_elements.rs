@@ -78,7 +78,8 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Circuit(X::MultResistor),
     Feature::Circuit(X::MultCapacitor),
     Feature::Circuit(X::MultInductor),
-    Feature::Circuit(X::MultControlled),
+    // `m` on G, F and a current B (R58); an E's or H's multiplies a voltage: not this member
+    Feature::Circuit(X::MultControlledCurrent),
     Feature::Circuit(X::MultSemi),
     Feature::Circuit(X::MultInstanceNgspiceAppend),
     // an N's `m=` (settle osdi_mult.sp); an A card takes none (admits refuses one)

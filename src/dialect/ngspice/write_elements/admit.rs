@@ -44,7 +44,8 @@ pub(super) enum Why {
     /// A table's points not all numbers, or its input not in the B grammar.
     Table = 10,
     /// A behavioural source the B, E or G form does not spell (tc not from 27 C, temperatures
-    /// on E/G, mult on a voltage, an expression outside the B grammar).
+    /// on E/G, an expression outside the B grammar; a mult on a voltage is
+    /// `MultControlledVoltage`, which FEATURES lack).
     Behav = 11,
     /// An instance temperature on a family that has none.
     SemiTemp = 12,
@@ -138,15 +139,13 @@ pub(super) fn spellable(d: &ir::Design, e: &ir::Element) -> Result<(), Why> {
                 Why::Charge,
             )
         }
-        K::Coupling | K::Vcvs | K::Ccvs | K::Poly => {
-            need(no_params && e.mult.is_none(), Why::ParamsOrMult)
-        }
-        K::Vccs | K::Cccs => need(no_params, Why::ParamsOrMult),
+        K::Coupling | K::Poly => need(no_params && e.mult.is_none(), Why::ParamsOrMult),
+        // a multiplicity on a voltage output is `MultControlledVoltage`, which FEATURES lack
+        K::Vcvs | K::Ccvs | K::Vccs | K::Cccs => need(no_params, Why::ParamsOrMult),
         K::Table => {
             let t = d.table_source(e);
-            let mult_ok = e.mult.is_none() || want == b'g';
             let nums = d.exprs(t.points).iter().all(|&p| is_num(d, p));
-            need(no_params && mult_ok, Why::ParamsOrMult)?;
+            need(no_params, Why::ParamsOrMult)?;
             need(nums && b_ok(d, t.input), Why::Table)
         }
         K::Behav => {
@@ -161,10 +160,7 @@ pub(super) fn spellable(d: &ir::Design, e: &ir::Element) -> Result<(), Why> {
             let tc = (none(b.tc1) && none(b.tc2))
                 || (want == b'b' && b.tc_base == ir::passive::TcBase::Fixed27);
             need(no_params, Why::ParamsOrMult)?;
-            need(
-                form && tc && (!voltage || e.mult.is_none()) && b_ok(d, b.expr),
-                Why::Behav,
-            )
+            need(form && tc && b_ok(d, b.expr), Why::Behav)
         }
         K::Diode | K::Bjt | K::Jfet => {
             let s = d.semi(e);

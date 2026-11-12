@@ -288,7 +288,11 @@ pub fn read(
         for read in ir::unbound_reads(design).into_iter().filter(|r| !r.held) {
             diags.push_at(STRICT_UNBOUND, design, read.item, read.name.0);
         }
-        unbound_targets(design, diags);
+        // a run item whose target provably names nothing (R70, A43): the IR's list, which
+        // leaves out a path through an unresolved master (a kit may bind it)
+        for t in ir::unbound_targets(design) {
+            diags.push_at(STRICT_UNBOUND_TARGET, design, t.item, t.name.0);
+        }
     }
 }
 
@@ -426,38 +430,6 @@ pub fn refuses(code: ir::Code) -> bool {
 }
 
 // ---- private ----
-
-/// One [`STRICT_UNBOUND_TARGET`] row per name a run item (alter, loop, analysis, elaborate)
-/// targets that nothing defines (R70, A43): a definition reference nothing binds
-/// (`Design::item_refs`), and an element name its scope does not list (`Design::element_uses`;
-/// an unresolvable scope is `NONE`, never guessed).
-fn unbound_targets(design: &ir::Design, diags: &mut ir::Diags) {
-    use ir::ItemKind as K;
-    let run = |k: K| matches!(k, K::Alter | K::Loop | K::Analysis | K::Elaborate);
-    let mut refs = Vec::new();
-    for (item, _) in design.reachable() {
-        if !run(item.kind) {
-            continue;
-        }
-        refs.clear();
-        design.item_refs(item, &mut refs);
-        for (r, _) in &refs {
-            if !r.is_resolved() && !r.name.is_none() {
-                diags.push_at(STRICT_UNBOUND_TARGET, design, item, r.name.0);
-            }
-        }
-    }
-    for (item, u) in design.element_uses() {
-        let listed = !u.scope.is_none()
-            && design
-                .items(u.scope)
-                .iter()
-                .any(|i| i.kind == K::Element && design.row::<ir::Element>(i.index).name == u.name);
-        if run(item.kind) && !listed {
-            diags.push_at(STRICT_UNBOUND_TARGET, design, item, u.name.0);
-        }
-    }
-}
 
 /// Whether any row of `diags` refuses.
 fn refused(diags: &ir::Diags) -> bool {

@@ -19,8 +19,8 @@ mod plan;
 
 pub(super) use super::expr_write::string as quote;
 use super::read_run::{
-    ARG_READS_PARAM, MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM,
-    RESET_CLASS, SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, TARGET_UNFOUND, identifier,
+    MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM, RESET_CLASS,
+    SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, TARGET_UNFOUND, identifier,
 };
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
@@ -121,18 +121,15 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
 /// node set no analysis line that takes its list follows (W2308: VACASK states `ic=` and
 /// `nodeset=` on an analysis only); an `mc` loop inside another (W2310: VD cmd-analysis-mc, no
 /// nesting); a transfer or noise analysis whose output is no node or node pair (W2311); a
-/// device or top-level parameter target VACASK would not find (W2312); an analysis argument or
-/// sweep range reading a parameter or the temperature (W2313, R68: goes with A42's feature and
-/// invariant).
+/// device or top-level parameter target VACASK would not find (W2312). (An analysis argument or
+/// sweep range reading a parameter is `AnalysisParamArgument`, which FEATURES lack, and one
+/// reading the temperature X0023: R68, A42; W2313 went with them.)
 pub(super) fn admit(
     design: &ir::Design,
     at: ir::ItemRef,
     scope: ir::ScopeId,
     diags: &mut ir::Diags,
 ) {
-    if args_read_params(design, at) {
-        diags.push_at(ARG_READS_PARAM, design, at, 0);
-    }
     if output_unspelled(design, at) {
         diags.push_at(OUTPUT_FORM, design, at, 0);
     }
@@ -239,44 +236,6 @@ pub(super) fn body(w: &mut Writer<'_, '_>, scope: ir::ScopeId) {
 }
 
 // ---- private ----
-
-/// Whether analysis `at`'s own fields (a DC analysis's axes included) or sweep loop `at`'s range
-/// read a parameter, `$temp` or `$tnom`, which VACASK's analysis arguments cannot see (R68).
-fn args_read_params(design: &ir::Design, at: ir::ItemRef) -> bool {
-    let sweep_loop = at.kind == ir::ItemKind::Loop
-        && design.row::<ir::Loop>(at.index).kind == ir::LoopKind::Sweep;
-    if at.kind != ir::ItemKind::Analysis && !sweep_loop {
-        return false;
-    }
-    let mut handles = Vec::new();
-    design.item_handles(at, &mut handles);
-    let mut todo: Vec<ir::ExprId> = Vec::new();
-    for h in handles {
-        match h {
-            ir::Handle::Expr(e) | ir::Handle::ExprDyn(e) => todo.push(e),
-            ir::Handle::Exprs(list) => todo.extend_from_slice(design.exprs(list)),
-            _ => {}
-        }
-    }
-    // Bounded: each expression row is taken once per parent that reads it (a tree).
-    while let Some(e) = todo.pop() {
-        if e.is_none() {
-            continue;
-        }
-        match design.expr(e) {
-            ir::Expr::Param(_) | ir::Expr::Temp | ir::Expr::Tnom => return true,
-            ir::Expr::Unary(_, x) => todo.push(x),
-            ir::Expr::Binary(_, a, b) => todo.extend([a, b]),
-            ir::Expr::Ternary(c, a, b) => todo.extend([c, a, b]),
-            ir::Expr::Call(_, args)
-            | ir::Expr::UserCall(_, args)
-            | ir::Expr::Draw(_, _, _, args)
-            | ir::Expr::List(args) => todo.extend_from_slice(design.exprs(args)),
-            _ => {}
-        }
-    }
-    false
-}
 
 /// Whether analysis `at` is a `dcxf`, `acxf` or `noise` whose output is neither a node nor a
 /// node pair (VD cmd-analysis-dcxf, -acxf, -noise: `out` names one node or two).

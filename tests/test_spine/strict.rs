@@ -132,6 +132,21 @@ fn strict_passes_a_run_item_whose_target_is_defined() {
     }
 }
 
+#[test]
+fn strict_passes_an_alter_through_an_instance_whose_master_is_unresolved() {
+    // R70, A43: nothing proves the element missing when the path walks into a master no read
+    // file defines (a kit not loaded): `ir::unbound_targets` leaves it out.
+    let text = "file \"t.sp\" deck\n  element instance x1 (a 0) model=nosub\n  \
+                alter (device_param r1 r path=(x1)) value=2k\n";
+    let (_, diags) = strict(text);
+    let codes: Vec<ir::Code> = diags.rows().iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&STRICT_UNBOUND_TARGET),
+        "{:?}",
+        diags.rows()
+    );
+}
+
 /// `text` (IR text) read strictly through the `ir` row.
 fn strict(text: &str) -> (ir::Design, ir::Diags) {
     let mut design = ir::Design::new();
