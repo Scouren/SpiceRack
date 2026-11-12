@@ -97,6 +97,7 @@ fn bind_ref_binds_a_row_reference_pushed_before_its_definition() {
                 params: ParamList::EMPTY,
                 mult: ExprId::NONE,
                 detail: NO_ROW,
+                mult_law: spicerack_ir::MultLaw::Parallel,
             };
             let x1 = b.push(top, row, Span::NONE);
             b.subckt(top, "inv", &[], &[], Span::NONE);

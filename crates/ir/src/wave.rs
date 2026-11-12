@@ -14,7 +14,8 @@
 //! `rewrite/INV-semantics.md` 5.01–5.12, 5.18, 5.22, 5.25, 5.33.
 //!
 //! Contents:
-//! - `pub enum WaveKind`, `pub enum PreDelay`, `pub enum PulseLaw`, `pub enum TdFrom`,
+//! - `pub enum WaveKind`, `pub enum PreDelay`, `pub enum GivenZero`, `pub enum PulseLaw`,
+//!   `pub enum TdFrom`,
 //!   `pub enum SffmLaw`, `pub enum PwlRepeat`,
 //!   `pub enum PwlJoin`, `pub enum AmModTime`, `pub enum TrRandomKind`; on each: `ALL`, `COUNT`
 //! - `pub struct WaveRef`, `WaveRef::NONE`, `WaveRef::is_none(self) -> bool`
@@ -57,13 +58,29 @@ pub enum WaveKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum PreDelay {
-    /// The offset alone (ng, xy, hs SIN: VO before TD).
+    /// The offset alone (xy, hs SIN: VO before TD; their slices confirm).
     Offset,
-    /// The waveform's value at t = delay, held (lt SIN: VO + VA·sin(φ); sp, va: the value at
-    /// t = delay, also at the operating point).
+    /// The waveform's value at t = delay, held (ng SIN, `vsrcload.c`, AMEND-A12 A17; lt SIN:
+    /// VO + VA·sin(φ); sp, va: the value at t = delay, also at the operating point).
     HoldDelayValue,
-    /// Zero, also at the operating point (ng AM).
+    /// Zero for t ≤ delay, the delay included, and at the operating point (ng AM, SFFM).
     Zero,
+}
+
+/// What a zero in a wave field means (AMEND-A12 A17, R35), on the waves that have such fields
+/// (`Pulse`, `Sin`, `Exp`, `Sffm`; IR-CIRCUIT §3 lists the fields and their defaults).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum GivenZero {
+    /// A field means what it holds: a zero `rise` is an ideal edge. Every field is present.
+    AsGiven,
+    /// ngspice's rule (`vsrcload.c`): a listed field that evaluates to zero after parameter
+    /// substitution, or that the card omits (`NONE`), means its default (PULSE rise and fall
+    /// TSTEP, width and period TSTOP; SIN frequency 1/TSTOP; EXP `td1`, `tau1`, `tau2` TSTEP,
+    /// `td2` = `td1` + TSTEP; SFFM carrier 500/TSTOP). A field holds what the card holds; no
+    /// reader copies a default in, and a pass that converts to `AsGiven` writes the
+    /// `TStep`/`TStop` leaves.
+    SpiceDefault,
 }
 
 /// Which pulse law (AMEND-A12 C1; DIALECT-VACASK runs p1, p2).
@@ -175,20 +192,24 @@ pub struct Pulse {
     pub v2: ExprId,
     /// Delay to the first rising edge (s). Never `NONE` (the reader writes 0).
     pub delay: ExprId,
-    /// Rise time (s). Never `NONE`; a zero is an ideal edge; ngspice's given-or-defaulted zero
-    /// is the leaf `TStep` (5.05). va refuses 0, its reader never writes one.
+    /// Rise time (s); a zero under `AsGiven` is an ideal edge, under `SpiceDefault` TSTEP
+    /// (5.05), and `NONE` only under `SpiceDefault` (omitted). va refuses 0, its reader never
+    /// writes one.
     pub rise: ExprId,
     /// Fall time (s), as `rise`.
     pub fall: ExprId,
-    /// Pulse width (s). Never `NONE`; ngspice's zero is `TStop`.
+    /// Pulse width (s); under `SpiceDefault` a zero or `NONE` is TSTOP.
     pub width: ExprId,
-    /// Period (s). Never `NONE`; ngspice's zero is `TStop`.
+    /// Period (s); under `SpiceDefault` a zero or `NONE` is TSTOP.
     pub period: ExprId,
-    /// Number of pulses, after which the value holds `v1` (ng NP, lt Ncycles, 5.04). `NONE`:
-    /// unlimited; ngspice's 0 is `NONE`; Xyce ignores a count, so its reader writes `NONE`.
+    /// Number of pulses, after which the value holds `v1` (ng NP, lt Ncycles, 5.04): a value
+    /// above 0 is a count, any other value unlimited (A17); `NONE`: unlimited. Xyce ignores a
+    /// count, so its reader writes `NONE`.
     pub cycles: ExprId,
     /// Which pulse law (AMEND-A12 C1).
     pub law: PulseLaw,
+    /// What a zero in `rise`, `fall`, `width`, `period` means (A17).
+    pub given_zero: GivenZero,
 }
 
 /// `SIN(offset amplitude freq delay damping phase [cycles])`: for t ≥ delay,
@@ -200,7 +221,7 @@ pub struct Sin {
     pub offset: ExprId,
     /// Amplitude. Never `NONE`.
     pub amplitude: ExprId,
-    /// Frequency (Hz). Never `NONE`; ngspice's default is 1/`TStop`.
+    /// Frequency (Hz); under `SpiceDefault` a zero or `NONE` is 1/TSTOP (A17).
     pub freq: ExprId,
     /// Delay (s); may be negative (ng = xy, 5.06). Never `NONE`.
     pub delay: ExprId,
@@ -214,13 +235,16 @@ pub struct Sin {
     pub amplitude2: ExprId,
     /// Second tone's frequency (Hz, sp `freq2`). Present exactly when `amplitude2` is.
     pub freq2: ExprId,
-    /// What the source is before `delay`.
+    /// What the source is before `delay` (ngspice: `HoldDelayValue`, A17).
     pub pre: PreDelay,
+    /// What a zero in `freq` means (A17).
+    pub given_zero: GivenZero,
 }
 
 /// `EXP(v1 v2 td1 tau1 td2 tau2)`: v1 before td1; rising towards v2 with tau1 from td1;
-/// falling back with tau2 from td2 (counted as `td2_from` says). Every field is required (never `NONE`); ngspice's zero
-/// defaults are `TStep`-based expressions written by its reader (5.05).
+/// falling back with tau2 from td2 (counted as `td2_from` says). Every field is required (never
+/// `NONE`) under `GivenZero::AsGiven`; under `SpiceDefault` `td1`, `tau1`, `td2`, `tau2` may be
+/// `NONE` and a zero or `NONE` means its default (A17, 5.05).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Exp {
     /// Initial value.
@@ -238,6 +262,8 @@ pub struct Exp {
     pub tau2: ExprId,
     /// Where `td2` counts from.
     pub td2_from: TdFrom,
+    /// What a zero in `td1`, `tau1`, `td2`, `tau2` means (A17).
+    pub given_zero: GivenZero,
 }
 
 /// `PWL(t1 v1 t2 v2 …)`: absolute (time, value) points, linear between them, the last value
@@ -275,7 +301,7 @@ pub struct Sffm {
     pub offset: ExprId,
     /// Amplitude VA. Never `NONE`.
     pub amplitude: ExprId,
-    /// Carrier frequency (Hz). Never `NONE`; ngspice's default is 500/`TStop`.
+    /// Carrier frequency (Hz); under `SpiceDefault` a zero or `NONE` is 500/TSTOP (A17).
     pub carrier_freq: ExprId,
     /// Modulation index. Never `NONE`.
     pub mod_index: ExprId,
@@ -289,8 +315,11 @@ pub struct Sffm {
     pub phase_m_deg: ExprId,
     /// Which formula.
     pub law: SffmLaw,
-    /// What the source is before `delay` (AMEND-A12 C3; va holds its value at `delay`, ng is 0).
+    /// What the source is before `delay` (AMEND-A12 C3; va holds its value at `delay`, ng is 0
+    /// for t ≤ delay).
     pub pre: PreDelay,
+    /// What a zero in `carrier_freq` means (A17).
+    pub given_zero: GivenZero,
 }
 
 /// Amplitude modulation, the general formula every dialect's AM restricts (5.03): for
@@ -325,7 +354,7 @@ pub struct Am {
     pub pre: PreDelay,
 }
 
-/// ngspice `TRNOISE(na nt nalpha namp rtsam rtscapt rtsemit)`: noise added to the DC value in
+/// ngspice `TRNOISE(na nt nalpha namp rtsam rtscapt rtsemit)`: noise superposed on a given DC value in
 /// the transient only, silent in `.noise` (5.18). `NONE` in an optional field: that term is
 /// absent.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -346,8 +375,9 @@ pub struct TrNoise {
     pub rts_emission: ExprId,
 }
 
-/// ngspice `TRRANDOM(type ts [td [p1 [p2]]])`: a random value drawn every `ts`, added to the
-/// DC value, transient only. Every field required (the reader writes ngspice's defaults:
+/// ngspice `TRRANDOM(type ts [td [p1 [p2]]])`: a random value drawn every `ts`, superposed on a
+/// given DC value, transient only; before its first draw and at the operating point it is the
+/// offset of its distribution (A17). Every field required (the reader writes ngspice's defaults:
 /// td 0, p1 1, p2 0).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrRandom {
@@ -472,6 +502,13 @@ impl WaveKind {
 impl PreDelay {
     /// Every member, in declaration order.
     pub const ALL: [PreDelay; 3] = [PreDelay::Offset, PreDelay::HoldDelayValue, PreDelay::Zero];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+impl GivenZero {
+    /// Every member, in declaration order.
+    pub const ALL: [GivenZero; 2] = [GivenZero::AsGiven, GivenZero::SpiceDefault];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
 }
