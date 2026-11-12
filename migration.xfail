@@ -3136,3 +3136,11 @@ xyce/SUBCKT/subckt_a4_ends_warning.cir ltspice now written: an extra `.ENDS` lef
 xyce/SUBCKT/subckt_a4_ends_warning.cir ngspice now written: an extra `.ENDS` left out with a note (W0336) (S4-rf-inert-text)
 xyce/SUBCKT/subckt_a4_ends_warning.cir spectre now written: an extra `.ENDS` left out with a note (W0336) (S4-rf-inert-text)
 xyce/SUBCKT/subckt_a4_ends_warning.cir vacask now written: an extra `.ENDS` left out with a note (W0336) (S4-rf-inert-text)
+# S4: batch-18: seven cdl keys the P4-130/P4-065/P4-066 predictions missed; each is only its kept line's comment recoded W0001 -> W0039 (checked against tool-batch).
+xyce/Certification_Tests/BUG_1922/bug1922.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
+xyce/Certification_Tests/BUG_1922/pspice_netlist.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
+xyce/Certification_Tests/BUG_991_SON/BH_nogap.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
+xyce/Certification_Tests/BUG_991_SON/BH_nogap_lv2.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
+xyce/Certification_Tests/BUG_991_SON/BH_test.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
+xyce/Certification_Tests/BUG_991_SON/BH_test_lv2.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)
+xyce/DIGITAL_DFF/DFF_Verify_Xyce.cir cdl the kept line's CDL comment names W0039, the code every other target refuses it with (P4-130, P4-065, P4-066)

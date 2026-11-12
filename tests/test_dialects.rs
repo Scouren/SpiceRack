@@ -123,10 +123,11 @@ fn hspice_card_forms() {
 /// Text kept as written (a card the reader has no form for), at the top or
 /// inside a subcircuit, reaches its own family only: ngspice and ESPice
 /// copy it (a `W0027` note), every other target refuses it (`W0001`)
-/// rather than drop it.
+/// rather than drop it. The card is one no simulator has: `.width`, the
+/// example before, is now an inert card left out with W0336 (P4-071).
 #[test]
 fn kept_text_is_refused_not_dropped() {
-    let line = ".width out=80";
+    let line = ".nosuchcard out=80";
     for at_top in [true, false] {
         let deck = match at_top {
             true => circuit(&format!("{line}\n.op\n"), false),
