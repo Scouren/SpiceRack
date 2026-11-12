@@ -384,18 +384,30 @@ fn read_back(to: &DialectRow, spine: &Spine) -> Result<(), Fail> {
     let normal =
         |d: &ir::Design| laws::canonical(&laws::read_all(ir_row, &laws::write_all(d, ir_row)));
     let (want, got) = (normal(&spine.legal), normal(&back));
-    // Every differing line, the first four: a known difference must not hide another.
-    let pairs = want.lines().zip(got.lines()).filter(|(w, g)| w != g);
-    let lines: Vec<String> = pairs
-        .take(4)
-        .map(|(w, g)| format!("legalized `{}`, read back `{}`", w.trim(), g.trim()))
-        .collect();
-    let said = match lines.is_empty() {
-        false => lines.join(" | "),
-        true => format!(
-            "{} lines legalized, {} read back",
-            want.lines().count(),
-            got.lines().count()
+    // The items each side holds that the other does not (lines of the normal form, counted, so
+    // an inserted or moved item does not shift every line after it), the first four of each.
+    let count = |t: &str| {
+        let mut m: BTreeMap<String, i64> = BTreeMap::new();
+        for l in t.lines() {
+            *m.entry(l.trim().to_string()).or_default() += 1;
+        }
+        m
+    };
+    let (cw, cg) = (count(&want), count(&got));
+    let only = |a: &BTreeMap<String, i64>, b: &BTreeMap<String, i64>| -> Vec<String> {
+        a.iter()
+            .filter(|(l, n)| **n > b.get(*l).copied().unwrap_or(0))
+            .map(|(l, _)| format!("`{l}`"))
+            .take(4)
+            .collect()
+    };
+    let (lost, gained) = (only(&cw, &cg), only(&cg, &cw));
+    let said = match (lost.is_empty(), gained.is_empty()) {
+        (true, true) => "the same items in another order".to_string(),
+        _ => format!(
+            "legalized only: {} | read back only: {}",
+            lost.join(", "),
+            gained.join(", ")
         ),
     };
     Err(fail("differs", said))
