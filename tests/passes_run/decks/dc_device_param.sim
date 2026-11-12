@@ -1,11 +1,13 @@
-dc_device_param: a divider's upper resistor swept over listed values (v(out) = 1 * 1k/(r + 1k): 0.5, 1/3, 1/4)
+dc_device_param: a resistor and a diode from 1 V, the diode's area (an instance parameter, no element value) swept over listed values; v(out) falls as the area grows
 load "spice/resistor.osdi"
+load "spice/diode.osdi"
 model vsource vsource
 model resistor sp_resistor
+model dm sp_diode is=1e-14
 v1 (in 0) vsource dc=1.0
 r1 (in out) resistor r=1k
-r2 (out 0) resistor r=1k
+d1 (out 0) dm area=1.0
 control
-  sweep sw instance="r1" parameter="r" values=[1k, 2k, 3k]
+  sweep sw instance="d1" parameter="area" values=[1.0, 2.0, 4.0]
     analysis dc1 op
 endc

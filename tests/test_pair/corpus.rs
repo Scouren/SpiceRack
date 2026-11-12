@@ -233,8 +233,14 @@ fn budgeted(
         }
     });
     let slow = || Done {
-        fails: [(1, run::fail("converter-slow", format!("{name}: past {BUDGET} s converting")))]
-            .into(),
+        fails: [(
+            1,
+            run::fail(
+                "converter-slow",
+                format!("{name}: past {BUDGET} s converting"),
+            ),
+        )]
+        .into(),
         last: 1,
         written: None,
     };
@@ -302,7 +308,10 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
         }
     }
     let pass = decks - first.len();
-    let slow = seen.values().filter(|f| f.class == "converter-slow").count();
+    let slow = seen
+        .values()
+        .filter(|f| f.class == "converter-slow")
+        .count();
     let mut out = format!(
         "pass all six: {pass}; converter-slow (must be 0 before a release): {slow}\nfirst failing step and class:\n"
     );
