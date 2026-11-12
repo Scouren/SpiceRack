@@ -1,0 +1,5 @@
+# oracle: inpcom.c inp_fix_param_values (a name or expression value in braces, a number bare), inpeval.c INPevaluate (each card number form), R1; written by hand
+file "values.sp" deck
+  title "values"
+  param vt = 0.45
+  model m1 mos1 polarity=n params=(vto=(vt * 2) kp=vt lambda=-0.02 phi=2mil tox=1.5e-8 gamma=0.5 cj=100u)

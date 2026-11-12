@@ -23,7 +23,7 @@
 //! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
 //!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`,
-//!   `pub(crate) fn in_scope_kind`, `pub(crate) fn loop_depth`
+//!   `pub(crate) fn loop_depth`
 
 use std::fmt::{Debug, Write as _};
 
@@ -363,23 +363,7 @@ pub(crate) fn is_one(design: &Design, e: ExprId) -> bool {
         exp10: 0,
         form: NumForm::Plain,
     };
-    matches!(design.expr(e), Expr::Num(k) if design.num(k).eq_value(one))
-}
-
-/// Whether `scope` or one of its ancestors is of `kind`. Bounded by the scope count.
-pub(crate) fn in_scope_kind(design: &Design, scope: ScopeId, kind: ScopeKind) -> bool {
-    let mut s = scope;
-    for _ in 0..=design.scopes.len() {
-        if s.is_none() {
-            return false;
-        }
-        let row = design.scope(s);
-        if row.kind == kind {
-            return true;
-        }
-        s = row.parent;
-    }
-    unreachable!("the scope tree has a cycle")
+    matches!(design.expr(e), Expr::Num(k) if design.literal_eq(design.num(k), one))
 }
 
 /// How many `Loop` scopes enclose `scope`, itself included. Bounded by the scope count.

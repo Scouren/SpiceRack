@@ -12,6 +12,7 @@ use super::{N, R};
 use crate::build::Builder;
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_features::dc_at_zero;
+use crate::circuit_features::reads_circuit;
 use crate::controlled::{Behav, OutKind};
 use crate::element::{ElemKind, NO_ROW};
 use crate::r#gen::Gen;
@@ -21,7 +22,7 @@ use crate::id::{List, NameId};
 use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::ModelFamily;
-use crate::passive::{IcMode, Parasitics, Passive};
+use crate::passive::{IcMode, Parasitics, Passive, TcBase, TcLaw};
 use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::span::Span;
 use crate::wave::WaveRef;
@@ -55,7 +56,32 @@ impl R<'_, '_> {
         } else {
             self.ex()
         };
-        let tc = self.maybe(X::PassiveTc);
+        // a circuit-valued element's coefficient needs a base (and a capacitor's a law) the set
+        // allows (A15 C2)
+        let dynamic = reads_circuit(self.b.design(), value);
+        let cap = kind == ElemKind::Capacitor;
+        let bases = [
+            (TcBase::Tnom, X::TcBaseTnom),
+            (TcBase::Fixed27, X::TcBaseFixed27),
+        ];
+        let laws = [
+            (TcLaw::Direct, X::TcLawDirect),
+            (TcLaw::Reciprocal, X::TcLawReciprocal),
+        ];
+        let base_ok = bases.iter().any(|b| self.has(b.1));
+        let law_ok = laws.iter().any(|l| self.has(l.1));
+        let tc = self.maybe(X::PassiveTc) && (!dynamic || base_ok && (!cap || law_ok));
+        let (tc_base, tc_law) = if tc && dynamic {
+            let base = self.pick(&bases.map(|(m, x)| (m, Some(x))));
+            let law = if cap {
+                self.pick(&laws.map(|(m, x)| (m, Some(x))))
+            } else {
+                TcLaw::Direct
+            };
+            (base, law)
+        } else {
+            (TcBase::Tnom, TcLaw::Direct)
+        };
         let tc1 = if tc { self.ex() } else { N };
         let tc2 = if tc && self.g.chance(2) { self.ex() } else { N };
         let tce = self.opt(X::PassiveTce);
@@ -92,7 +118,8 @@ impl R<'_, '_> {
         } else {
             NO_ROW
         };
-        let noisy = !self.maybe(X::PassiveNoiseless);
+        // A19: noiseless only where there is thermal noise to switch off
+        let noisy = !((kind == ElemKind::Resistor || dynamic) && self.maybe(X::PassiveNoiseless));
         Passive {
             value,
             ic,
@@ -106,6 +133,8 @@ impl R<'_, '_> {
             parasitics,
             ic_mode,
             noisy,
+            tc_base,
+            tc_law,
         }
     }
 
@@ -205,7 +234,28 @@ impl R<'_, '_> {
 
     pub(super) fn behav(&mut self, kind: ElemKind) -> Behav {
         let expr = self.dy();
-        let tc = self.maybe(X::BehavTc);
+        // a charge-defined capacitor's coefficient also needs a law the set has (A17)
+        let charge = kind == ElemKind::ChargeCapacitor;
+        let law_ok = self.has(X::TcLawDirect) || self.has(X::TcLawReciprocal);
+        let tc = self.maybe(X::BehavTc)
+            && (self.has(X::TcBaseTnom) || self.has(X::TcBaseFixed27))
+            && (!charge || law_ok);
+        let tc_law = if tc && charge {
+            self.pick(&[
+                (TcLaw::Direct, Some(X::TcLawDirect)),
+                (TcLaw::Reciprocal, Some(X::TcLawReciprocal)),
+            ])
+        } else {
+            TcLaw::Direct
+        };
+        let tc_base = if tc {
+            self.pick(&[
+                (TcBase::Tnom, Some(X::TcBaseTnom)),
+                (TcBase::Fixed27, Some(X::TcBaseFixed27)),
+            ])
+        } else {
+            TcBase::Tnom
+        };
         let tc1 = if tc { self.ex() } else { N };
         let tc2 = if tc && self.g.chance(2) { self.ex() } else { N };
         let temp_abs = self.opt(X::InstanceTemp);
@@ -233,6 +283,8 @@ impl R<'_, '_> {
             dtemp,
             rpar,
             output,
+            tc_base,
+            tc_law,
         }
     }
 

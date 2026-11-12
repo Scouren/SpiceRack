@@ -238,7 +238,7 @@ pub(super) fn temp(lw: &mut Lower<'_, '_>, st: Stmt) {
             exp10: 0,
             form: ir::NumForm::Plain,
         };
-        Val::Lit(lit, false)
+        Val::Lit(lit, super::super::number::Fit::Exact)
     };
     let span = lw.span(st.node);
     let temp = words::emit(lw, st, &v);

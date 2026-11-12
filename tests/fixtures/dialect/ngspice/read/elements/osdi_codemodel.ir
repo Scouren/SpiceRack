@@ -1,0 +1,7 @@
+# codes: P1106
+file "osdi_codemodel.sp" deck
+  title "osdi_codemodel"
+  comment " oracle: ngspice-45 inp2n.c (OSDI: nodes, model, the module's parameters); ngspice manual ch.12 (XSPICE A lines, port modifiers)"
+  element module_model N1 (a b c) model=mymod? params=(w=1 m=2)
+  element code_model A1 (in out) model=amod?
+  opaque ngspice private "A2 %v(in) out amod"

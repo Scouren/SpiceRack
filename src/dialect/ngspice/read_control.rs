@@ -21,7 +21,8 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes `pub(super) const FLOW`, `READS`, `EFFECT`, `STATE_WITH_CARDS`, `UNROLL`, `DISPLAY`,
 //! `NO_RESET`, `FORM`, `OWN`, `IN_BRANCH`, `NO_COMMAND`, `REJECTED`,
-//! `pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt)`
+//! `pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt)`,
+//! `pub(super) fn script_line(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, index: usize, span: ir::Span)`
 
 mod args;
 mod plan;
@@ -32,8 +33,7 @@ mod table;
 use super::codes::Row;
 use super::read::{Lower, Stmt};
 use super::tables;
-use crate::ir::{self, Feature, ItemKind, RunExtra};
-use crate::syntax::ast::{Node, Tag};
+use crate::ir::{self, Feature, ItemKind, RunExtra, ScopeKind};
 
 /// What this area's reader produces (the image its writer spells, L5).
 pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
@@ -41,7 +41,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::Loop),
     Feature::Item(ItemKind::Load),
     Feature::Run(RunExtra::LoopKeepLast),
-    Feature::Run(RunExtra::LoopNested),
+    Feature::Run(RunExtra::LoopNamed),
     Feature::Run(RunExtra::LoopOverOp),
     Feature::Run(RunExtra::LoopParam),
     Feature::Run(RunExtra::LoopSourceDc),
@@ -55,6 +55,15 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::AlterDeviceParam),
     Feature::Run(RunExtra::AlterModelParam),
     Feature::Run(RunExtra::StateFromHere),
+    Feature::Run(RunExtra::OptionMidRun),
+    Feature::Run(RunExtra::EnvMidRun),
+    Feature::Run(RunExtra::SweepBodyNotOne),
+    Feature::Placed(ScopeKind::Loop, ItemKind::Analysis),
+    Feature::Placed(ScopeKind::Loop, ItemKind::Alter),
+    Feature::Placed(ScopeKind::Loop, ItemKind::Loop),
+    Feature::Placed(ScopeKind::Loop, ItemKind::Option),
+    Feature::Placed(ScopeKind::Loop, ItemKind::Env),
+    Feature::Placed(ScopeKind::Loop, ItemKind::Opaque),
 ]);
 
 /// Data-dependent flow (`if`, `while`, `dowhile`, `break`, `continue`, `label`, `goto`, an
@@ -164,27 +173,56 @@ pub(super) const CODES: &[Row] = &[
     ),
 ];
 
-/// A control block or a `*#` line: the deck's script read once, this statement's part pushed.
+/// A control block: the deck's script read once, this statement's part pushed.
 pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt) {
     if in_branch(lw, st.scope) {
         return lw.opaque(st, ir::OpaqueClass::Private, IN_BRANCH);
     }
-    let (texts, me, cards) = deck(lw, st);
-    assert!(
-        me < texts.len(),
-        "control: the statement is one of the deck's script"
-    );
-    let blocks: Vec<script::Block> = texts.iter().map(|t| script::block(t)).collect();
-    let planned = plan::plan(&blocks, cards);
-    let ops = match planned {
+    let me = lw.script_index(st);
+    let ops = match planned(lw, me) {
         Err(code) => return lw.opaque(st, ir::OpaqueClass::Script, code),
-        Ok(mut by_block) => std::mem::take(&mut by_block[me]),
+        Ok(ops) => ops,
     };
     if ops.is_empty() {
         return lw.framing();
     }
     let ready = push::ready(lw, st, &ops);
     push::push(lw, st, st.scope, &ready);
+}
+
+/// A `*#` line outside a block (R49): statement `index` of `lw.deck_script()`, into `scope` at
+/// `span`. It has no CST node, so only what needs none is typed (a `Load`, an opaque); a typed
+/// command that reads a value is `Unread` here.
+// ponytail: an analysis or alter on a `*#` line stays Unread (no corpus deck has one); type it
+// when `read_analysis` takes a span instead of a statement.
+pub(super) fn script_line(
+    lw: &mut Lower<'_, '_>,
+    scope: ir::ScopeId,
+    index: usize,
+    span: ir::Span,
+) {
+    let text = lw.deck_script()[index].clone();
+    if in_branch(lw, scope) {
+        return lw.opaque_text(scope, &text, span, ir::OpaqueClass::Private, IN_BRANCH);
+    }
+    let ops = match planned(lw, index) {
+        Err(code) => return lw.opaque_text(scope, &text, span, ir::OpaqueClass::Script, code),
+        Ok(ops) => ops,
+    };
+    if ops.is_empty() {
+        return lw.opaque_text(scope, &text, span, ir::OpaqueClass::Inert, DISPLAY);
+    }
+    for op in &ops {
+        match op {
+            plan::Op::Load { path, .. } => {
+                lw.b.load(scope, ir::LoadKind::Osdi, path, span);
+            }
+            plan::Op::Opaque { class, code, cmd } => {
+                lw.opaque_text(scope, &cmd.opaque_text(), span, *class, *code);
+            }
+            _ => lw.opaque_text(scope, &text, span, ir::OpaqueClass::Unread, FORM),
+        }
+    }
 }
 
 // ---- private ----
@@ -222,31 +260,17 @@ fn in_branch(lw: &Lower<'_, '_>, scope: ir::ScopeId) -> bool {
     false
 }
 
-/// The deck's script statements (raw text, file order), this statement's index among them, and
-/// whether the deck has a dot-card analysis.
-// ponytail: this file's statements only, until the scaffold's declare step gives the deck's
-// (includes inlined): a block in an included file is read alone.
-fn deck(lw: &Lower<'_, '_>, st: Stmt) -> (Vec<String>, usize, bool) {
-    let root = lw.ast.root();
-    let mut texts = Vec::new();
-    let mut me = None;
-    let mut cards = false;
-    for &n in lw.ast.fields(root) {
-        let node = Node(n);
-        match lw.ast.tag(node) {
-            Tag::Control => {
-                if node == st.node {
-                    me = Some(texts.len());
-                }
-                texts.push(lw.raw(node));
-            }
-            Tag::Analysis => cards = true,
-            _ => {}
-        }
-    }
-    let me = me.unwrap_or_else(|| {
-        texts.push(lw.raw(st.node));
-        texts.len() - 1
-    });
-    (texts, me, cards)
+/// The operations of script statement `me`, the deck's whole script read (R49 (2)), or the
+/// whole script's `Script` code.
+// ponytail: the deck is this file's script statements (`Lower::deck_script`), until the
+// declare step inlines includes: a block in an included file is read alone.
+fn planned(lw: &Lower<'_, '_>, me: usize) -> Result<Vec<plan::Op>, ir::Code> {
+    let texts = lw.deck_script();
+    assert!(
+        me < texts.len(),
+        "control: the statement is one of the deck's script"
+    );
+    let blocks: Vec<script::Block> = texts.iter().map(|t| script::block(t)).collect();
+    let mut by_block = plan::plan(&blocks, lw.deck_has_card_analysis())?;
+    Ok(std::mem::take(&mut by_block[me]))
 }

@@ -20,10 +20,11 @@
 //! R1. Runs (ngspice-45): `{2*2mil}` = 4e-3 and `2*2mil` in a B source = 1.016e-4; `{1d3}` is an
 //! error, `1d3` in a B source is 1000; `{1e3k}` = 1e6.
 //!
-//! Contents: `pub(super) enum Grammar`, `pub(super) struct Scan`,
+//! Contents: `pub(super) enum Grammar`, `pub(super) struct Scan`, `pub(super) enum Fit`
+//! (`negate`, `build`), `pub(super) struct Long` (`negate`),
 //! `pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan>`,
 //! `pub(super) fn card(token: &str) -> Option<Scan>`,
-//! `pub(super) fn spell(lit: ir::Literal, grammar: Grammar, out: &mut String)`
+//! `pub(super) fn spell(d: &ir::Design, lit: ir::Literal, grammar: Grammar, out: &mut String)`
 
 use crate::ir;
 
@@ -37,18 +38,66 @@ pub(super) enum Grammar {
 }
 
 /// A number read from the start of a text.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Scan {
-    /// The literal, valid (`Literal::is_valid`).
+    /// The literal, valid (`Literal::is_valid`); for a [`Fit::Long`] the digits rounded half to
+    /// even to 18, for the reader's own checks only (the design gets the long digits).
     pub(super) literal: ir::Literal,
     /// Bytes taken: digits, point, exponent, scale and unit tail.
     pub(super) len: usize,
-    /// Whether the digits were rounded to 18 significant ones (A3: the reader notes it).
-    pub(super) rounded: bool,
+    /// How the digits fit a literal's mantissa.
+    pub(super) fit: Fit,
+}
+
+/// How a number's digits fit a literal's 18-digit mantissa.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Fit {
+    /// They fit: `literal` is the number as written.
+    Exact,
+    /// More digits than the mantissa holds (A18, R37): the design holds them as written.
+    Long(Box<Long>),
+}
+
+/// A long number's parts for `Builder::long_literal` (A18).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Long {
+    /// `[-]digits[.digits]` as written.
+    pub(super) significand: String,
+    /// The exponent plus the scale letter's power.
+    pub(super) exp10: i16,
+    /// `Plain`, `Exponent` or `Scale`.
+    pub(super) written: ir::NumForm,
 }
 
 /// Significant digits a literal's mantissa holds (`|mantissa| < 10^18`).
 const DIGITS_MAX: usize = 18;
+
+impl Long {
+    /// The negated number: the sign before the significand flips.
+    pub(super) fn negate(&mut self) {
+        self.significand = match self.significand.strip_prefix('-') {
+            Some(rest) => rest.to_string(),
+            None => format!("-{}", self.significand),
+        };
+    }
+}
+
+impl Fit {
+    /// The fit of the negated number (`literal`'s mantissa is negated by the caller).
+    pub(super) fn negate(&mut self) {
+        if let Fit::Long(l) = self {
+            l.negate();
+        }
+    }
+
+    /// Appends the number to `b`: `lit` as it is, or the long digits (A18).
+    pub(super) fn build(&self, b: &mut ir::Builder<'_>, lit: ir::Literal) -> ir::ExprId {
+        match self {
+            Fit::Long(l) => b.long_literal(&l.significand, l.exp10, l.written),
+            Fit::Exact => b.literal(lit),
+        }
+    }
+}
 
 /// The number at the start of `text` under `grammar`, or `None` when `text` does not start with
 /// one (no digit) or its value is not a finite double (`1e999`).
@@ -57,6 +106,7 @@ pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan> {
     let mut at = 0;
     let mut digits = String::new();
     let mut frac = 0usize;
+    // `at` after the significand's last byte: the long form's text as written
     while at < bytes.len() && bytes[at].is_ascii_digit() {
         digits.push(bytes[at] as char);
         at += 1;
@@ -72,6 +122,7 @@ pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan> {
     if digits.is_empty() {
         return None;
     }
+    let significand = &text[..at];
     let (exponent, after) = exponent(bytes, at, grammar);
     at = after;
     let (scale, after) = scale(bytes, at, grammar);
@@ -80,10 +131,31 @@ pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan> {
     let (literal, rounded) = literal(&digits, frac, exponent, scale)?;
     debug_assert!(literal.is_valid(), "scan builds valid literals");
     debug_assert!(at <= text.len(), "a scan takes bytes of the text");
+    let long = ir::literal::exceeds_mantissa(ir::literal::significant_digits(significand));
+    debug_assert_eq!(long, rounded, "one digit bound (the kernel's)");
+    let written = match (exponent, scale) {
+        (None, None) => Some(ir::NumForm::Plain),
+        (None, Some(Some(_))) => Some(ir::NumForm::Scale),
+        (Some(_), Some(Some(_)) | None) => Some(ir::NumForm::Exponent),
+        (_, Some(None)) => None, // mil
+    };
+    let fit = match written {
+        _ if !long => Fit::Exact,
+        // a long `mil` folds 254 into 18 rounded digits: no literal holds it (`literal` refused it)
+        None => unreachable!("ngspice read: a long mil number has no literal"),
+        Some(written) => {
+            let power = i64::from(exponent.unwrap_or(0)) + scale.flatten().map_or(0, i64::from);
+            Fit::Long(Box::new(Long {
+                significand: significand.to_string(),
+                exp10: i16::try_from(power).ok()?,
+                written,
+            }))
+        }
+    };
     Some(Scan {
         literal,
         len: at,
-        rounded,
+        fit,
     })
 }
 
@@ -100,6 +172,7 @@ pub(super) fn card(token: &str) -> Option<Scan> {
     let mut s = scan(rest, Grammar::Inp)?;
     if negative && s.literal.mantissa != 0 {
         s.literal.mantissa = -s.literal.mantissa;
+        s.fit.negate();
     }
     s.len = token.len();
     Some(s)
@@ -108,10 +181,16 @@ pub(super) fn card(token: &str) -> Option<Scan> {
 /// Appends `lit` as `grammar` spells it: the digits with `frac` of them after the point, then
 /// `e<exp10>` (Exponent), the scale letter ngspice has for the power (Scale; `e<exp10>` for
 /// a power it has no letter for: 10⁻², 10¹⁵), `mil` (Mil, `Inp` only; under `Numparam` `mil`
-/// reads as milli, so the exact value is spelled in exponent form).
-pub(super) fn spell(lit: ir::Literal, grammar: Grammar, out: &mut String) {
-    assert!(lit.is_valid(), "spell: a valid literal");
+/// reads as milli, so the exact value is spelled in exponent form). A `Long` literal (A18) is
+/// its significand as written, then its power in its written form.
+pub(super) fn spell(d: &ir::Design, lit: ir::Literal, grammar: Grammar, out: &mut String) {
     let start = out.len();
+    if let Some((significand, written)) = d.long_digits(lit) {
+        out.push_str(significand);
+        power(lit.exp10, written, out);
+        return;
+    }
+    assert!(lit.is_valid(), "spell: a valid literal");
     if lit.form == ir::NumForm::Mil && grammar == Grammar::Numparam {
         // 25.4e-6 = 254e-7: the same exact decimal, in a form numparam reads.
         let mantissa = i128::from(lit.mantissa) * 254;
@@ -121,25 +200,28 @@ pub(super) fn spell(lit: ir::Literal, grammar: Grammar, out: &mut String) {
     }
     digits_into(i128::from(lit.mantissa), u32::from(lit.frac), out);
     match lit.form {
-        // an `Int` literal (A12, outside FEATURES: `Extra::IntLiteral`) is its digits, as Plain
-        ir::NumForm::Plain | ir::NumForm::Int => {}
-        ir::NumForm::Exponent => {
-            out.push('e');
-            out.push_str(&lit.exp10.to_string());
-        }
-        ir::NumForm::Scale => match letter(lit.exp10) {
-            Some(l) => out.push_str(l),
-            None => {
-                out.push('e');
-                out.push_str(&lit.exp10.to_string());
-            }
-        },
         ir::NumForm::Mil => out.push_str("mil"),
+        // an `Int` literal (A12, outside FEATURES: `Extra::IntLiteral`) is its digits, as Plain
+        ir::NumForm::Int => {}
+        form => power(lit.exp10, form, out),
     }
     debug_assert!(out.len() > start, "a literal spells at least one digit");
 }
 
 // ---- private ----
+
+/// Appends the power `exp10` written in `form`: nothing (Plain), `e<exp10>` (Exponent), the
+/// scale letter (Scale; `e<exp10>` for a power ngspice has no letter for).
+fn power(exp10: i16, form: ir::NumForm, out: &mut String) {
+    match (form, letter(exp10)) {
+        (ir::NumForm::Plain, _) => debug_assert_eq!(exp10, 0, "Plain has no power"),
+        (ir::NumForm::Scale, Some(l)) => out.push_str(l),
+        _ => {
+            out.push('e');
+            out.push_str(&exp10.to_string());
+        }
+    }
+}
 
 /// The exponent at `at` (`e`, `E`; `d`, `D` under `Inp`), with its sign and digits: its value
 /// (`None` for none) and where it ends. `INPevaluate` takes an exponent letter with no digits
@@ -234,6 +316,8 @@ fn literal(
     let significant = digits.trim_start_matches('0');
     let mut frac = frac as i32;
     let mut power: i32 = 0;
+    // more significant digits than the mantissa holds: rounded half to even on the digits (no
+    // float), the reader's own approximation; the design gets the digits (`Fit::Long`, A18)
     let (mut mantissa, rounded) = if significant.len() > DIGITS_MAX {
         power += (significant.len() - DIGITS_MAX) as i32;
         (round_digits(significant, DIGITS_MAX), true)
@@ -249,6 +333,12 @@ fn literal(
     let shift = power.min(frac);
     frac -= shift;
     power -= shift;
+    // more fraction digits than a literal holds (18): the whole fraction moves into the power,
+    // exactly (`0.0027500000000000003` is 27500000000000003 × 10^-19, form Exponent)
+    if frac > 18 {
+        power -= frac;
+        frac = 0;
+    }
     if mantissa == 0 {
         return Some((ir::Literal::ZERO, rounded));
     }
@@ -404,13 +494,57 @@ mod tests {
     }
 
     #[test]
-    fn more_than_eighteen_digits_round_half_to_even_with_a_flag() {
-        // A3: a literal with more than 18 significant digits is rounded to 18, noted.
+    fn more_than_eighteen_digits_are_kept_as_written() {
+        // A18, R37: the significand as written and its power, the kernel's digit bound; the
+        // literal beside it is rounded half to even (the reader's own checks only).
+        let long = |significand: &str, exp10, written| {
+            Fit::Long(Box::new(Long {
+                significand: significand.to_string(),
+                exp10,
+                written,
+            }))
+        };
         let s = scan("1234567890123456789012", Grammar::Inp).expect("a number");
-        assert!(s.rounded);
+        assert_eq!(s.fit, long("1234567890123456789012", 0, ir::NumForm::Plain));
         assert_eq!(s.literal.mantissa, 123456789012345679);
-        assert_eq!(s.literal.value(), 1234567890123456789012.0_f64);
-        assert!(!scan("12", Grammar::Inp).expect("a number").rounded);
+        let s = card("-0.0012345678901234567890e3k").expect("a card number");
+        assert_eq!(
+            s.fit,
+            long("-0.0012345678901234567890", 6, ir::NumForm::Exponent)
+        );
+        let s = scan("1.234567890123456789u", Grammar::Numparam).expect("a number");
+        assert_eq!(s.fit, long("1.234567890123456789", -6, ir::NumForm::Scale));
+        // 18 digits fit; a long `mil` is no number (no literal holds 254 times 18 digits)
+        assert_eq!(
+            scan("123456789012345678", Grammar::Inp).expect("18").fit,
+            Fit::Exact
+        );
+        assert!(scan("1234567890123456789mil", Grammar::Inp).is_none());
+    }
+
+    #[test]
+    fn a_long_literal_spells_its_digits_and_reads_back_to_them() {
+        // Round trip through the design (A18): spell, then scan gives the same parts.
+        let mut design = ir::Design::default();
+        let cases = [
+            "1234567890123456789012",
+            "-0.0012345678901234567890e6",
+            "1.234567890123456789u",
+            "1.2345678901234567890e-2",
+        ];
+        let mut built = Vec::new();
+        for text in cases {
+            let s = card(text).expect(text);
+            built.push((text, s.fit.build(&mut design.builder(), s.literal)));
+        }
+        for (text, e) in built {
+            let ir::Expr::Num(n) = design.expr(e) else {
+                panic!("a literal")
+            };
+            let mut out = String::new();
+            spell(&design, design.num(n), Grammar::Inp, &mut out);
+            assert_eq!(out, text);
+        }
     }
 
     #[test]
@@ -418,6 +552,20 @@ mod tests {
         assert!(scan("e3", Grammar::Inp).is_none());
         assert!(scan(".", Grammar::Inp).is_none());
         assert!(scan("1e999", Grammar::Inp).is_none());
+    }
+
+    #[test]
+    fn a_fraction_longer_than_a_literal_holds_moves_into_the_exponent_exactly() {
+        // sky130 BSIM4 cards (ng-models' census: 95 of 6616): 19 digits after the point.
+        let s = card("0.0027500000000000003").expect("ngspice reads it");
+        assert_eq!(
+            s.literal,
+            lit(27500000000000003, 0, -19, ir::NumForm::Exponent)
+        );
+        assert_eq!(s.literal.value(), 0.0027500000000000003);
+        let mut out = String::new();
+        spell(&ir::Design::default(), s.literal, Grammar::Inp, &mut out);
+        assert_eq!(scan(&out, Grammar::Inp).expect(&out).literal, s.literal);
     }
 
     #[test]
@@ -436,11 +584,16 @@ mod tests {
         ];
         for l in cases {
             let mut s = String::new();
-            spell(l, Grammar::Inp, &mut s);
+            spell(&ir::Design::default(), l, Grammar::Inp, &mut s);
             assert_eq!(scan(&s, Grammar::Inp).expect(&s).literal, l, "{s}");
         }
         let mut s = String::new();
-        spell(lit(5, 3, 0, Plain), Grammar::Numparam, &mut s);
+        spell(
+            &ir::Design::default(),
+            lit(5, 3, 0, Plain),
+            Grammar::Numparam,
+            &mut s,
+        );
         assert_eq!(s, "0.005");
     }
 
@@ -448,10 +601,20 @@ mod tests {
     fn spelling_a_power_ngspice_has_no_letter_for_uses_an_exponent() {
         // ngspice's letters are t g meg k m u n p f a (inpeval.c); centi and peta are not.
         let mut s = String::new();
-        spell(lit(3, 0, -2, ir::NumForm::Scale), Grammar::Inp, &mut s);
+        spell(
+            &ir::Design::default(),
+            lit(3, 0, -2, ir::NumForm::Scale),
+            Grammar::Inp,
+            &mut s,
+        );
         assert_eq!(s, "3e-2");
         s.clear();
-        spell(lit(2, 0, 0, ir::NumForm::Mil), Grammar::Numparam, &mut s);
+        spell(
+            &ir::Design::default(),
+            lit(2, 0, 0, ir::NumForm::Mil),
+            Grammar::Numparam,
+            &mut s,
+        );
         assert_eq!(s, "508e-7");
         assert_eq!(
             scan(&s, Grammar::Numparam).expect("e-form").literal.value(),

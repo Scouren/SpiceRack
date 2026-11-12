@@ -13,22 +13,29 @@
 //!
 //! Contents (crate-private): `pub(crate) enum Field`, `pub(crate) enum Side`,
 //! `pub(crate) trait Choice` (`Choice::get`, `Choice::set`, `Choice::words`),
-//! `pub(crate) trait Fields` (`Fields::BLANK`, `Fields::fields`), its impls for every circuit row
+//! `pub(crate) trait Fields` (`Fields::BLANK`, `Fields::fields`), its impls for every circuit row,
+//! `pub(crate) fn element_map_exprs`, `pub(crate) fn model_map_exprs`
 
+use crate::circuit_text::get_row;
 use crate::controlled::{
     Behav, Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm,
     OutKind, Poly, Quantity, TableLaw, TableSource,
 };
+use crate::design::{Design, DetailRow};
+use crate::element::MultLaw;
 use crate::element::NO_ROW;
-use crate::id::{ExprId, ExprList, List, NameId, NameList};
+use crate::element::{DetailKind, Element};
+use crate::facts::ExprUse;
+use crate::id::{ExprId, ExprList, List, NameId, NameList, ParamList};
 use crate::line::Line;
+use crate::model::Model;
 use crate::model::Polarity;
-use crate::passive::{Coupling, IcMode, Parasitics, Passive};
+use crate::passive::{Coupling, IcMode, Parasitics, Passive, TcBase, TcLaw};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::wave::{
-    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
-    Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveRef,
+    Am, AmModTime, Exp, GivenZero, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat,
+    Sffm, SffmLaw, Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
 };
 
 /// One field of a row, borrowed mutably, by the kind of value it holds.
@@ -147,6 +154,10 @@ choices! {
     PulseLaw: ["spice", "vacask"];
     TdFrom: ["zero", "td1"];
     DcRule: ["given", "wave_at_zero"];
+    GivenZero: ["as_given", "spice_default"];
+    TcBase: ["tnom", "fixed27"];
+    TcLaw: ["direct", "reciprocal"];
+    MultLaw: ["parallel", "ngspice_append"];
 }
 
 fields! {
@@ -154,6 +165,7 @@ fields! {
         value: Dyn = N, ic: Expr = N, tc1: Expr = N, tc2: Expr = N, tce: Expr = N,
         temp_abs: Expr = N, dtemp: Expr = N, ac: Expr = N, scale: Expr = N,
         parasitics: Side[Parasitics] = NO_ROW, ic_mode: Choice = IcMode::None, noisy: Flag = true,
+        tc_base: Choice = TcBase::Tnom, tc_law: Choice = TcLaw::Direct,
     }
     Parasitics { rser: Expr = N, lser: Expr = N, rpar: Expr = N, cpar: Expr = N, rlshunt: Expr = N }
     Coupling { inductors: Names = NL, k: Dyn = N }
@@ -176,7 +188,8 @@ fields! {
     }
     Behav {
         expr: Dyn = N, tc1: Expr = N, tc2: Expr = N, temp_abs: Expr = N, dtemp: Expr = N,
-        rpar: Expr = N, output: Choice = OutKind::Voltage,
+        rpar: Expr = N, output: Choice = OutKind::Voltage, tc_base: Choice = TcBase::Tnom,
+        tc_law: Choice = TcLaw::Direct,
     }
     Laplace {
         num: Exprs = EL, den: Exprs = EL, input: Dyn = N, output: Choice = Quantity::Voltage,
@@ -199,15 +212,16 @@ fields! {
     Pulse {
         v1: Expr = N, v2: Expr = N, delay: Expr = N, rise: Expr = N, fall: Expr = N,
         width: Expr = N, period: Expr = N, cycles: Expr = N, law: Choice = PulseLaw::Spice,
+        given_zero: Choice = GivenZero::AsGiven,
     }
     Sin {
         offset: Expr = N, amplitude: Expr = N, freq: Expr = N, delay: Expr = N,
         damping: Expr = N, phase_deg: Expr = N, cycles: Expr = N, amplitude2: Expr = N,
-        freq2: Expr = N, pre: Choice = PreDelay::Offset,
+        freq2: Expr = N, pre: Choice = PreDelay::Offset, given_zero: Choice = GivenZero::AsGiven,
     }
     Exp {
         v1: Expr = N, v2: Expr = N, td1: Expr = N, tau1: Expr = N, td2: Expr = N, tau2: Expr = N,
-        td2_from: Choice = TdFrom::Zero,
+        td2_from: Choice = TdFrom::Zero, given_zero: Choice = GivenZero::AsGiven,
     }
     Pwl {
         points: Exprs = EL, delay: Expr = N, repeat_at: Expr = N, repeat_count: Expr = N,
@@ -218,19 +232,126 @@ fields! {
         offset: Expr = N, amplitude: Expr = N, carrier_freq: Expr = N, mod_index: Expr = N,
         signal_freq: Expr = N, delay: Expr = N, phase_c_deg: Expr = N, phase_m_deg: Expr = N,
         law: Choice = SffmLaw::Spice3, pre: Choice = PreDelay::Offset,
+        given_zero: Choice = GivenZero::AsGiven,
     }
     Am {
         offset: Expr = N, amplitude: Expr = N, mod_offset: Expr = N, mod_index: Expr = N,
         mod_freq: Expr = N, carrier_freq: Expr = N, delay: Expr = N, phase_m_deg: Expr = N,
         phase_c_deg: Expr = N, mod_time: Choice = AmModTime::Delay, pre: Choice = PreDelay::Offset,
+        given_zero: Choice = GivenZero::AsGiven,
     }
     TrNoise {
         na: Expr = N, nt: Expr = N, nalpha: Expr = N, namp: Expr = N, rts_amp: Expr = N,
         rts_capture: Expr = N, rts_emission: Expr = N,
     }
-    TrRandom { ts: Expr = N, td: Expr = N, p1: Expr = N, p2: Expr = N, kind: Choice = TrRandomKind::Uniform }
+    TrRandom {
+        ts: Expr = N, td: Expr = N, p1: Expr = N, p2: Expr = N, kind: Choice = TrRandomKind::Uniform,
+        given_zero: Choice = GivenZero::AsGiven,
+    }
     Pattern {
         high: Expr = N, low: Expr = N, delay: Expr = N, rise: Expr = N, fall: Expr = N,
         sample: Expr = N, bits: Name = NN, repeats: Expr = N, repeat_start: Expr = N,
+    }
+}
+
+/// Calls `f` on every expression root of the element at `index`, in `element_handles`' order
+/// (`params`' values, `mult`, then the detail row's fields with their side and wave rows in
+/// place), and stores back what `f` changed (A23). Asserts `index` is in range.
+pub(crate) fn element_map_exprs(
+    design: &mut Design,
+    index: u32,
+    f: &mut dyn FnMut(&mut ExprId, ExprUse),
+) {
+    let mut row: Element = design.row(index);
+    map_params(design, row.params, f);
+    f(&mut row.mult, ExprUse::Constant);
+    design.editor().set(index, row);
+    match row.kind.detail() {
+        DetailKind::None => {}
+        DetailKind::Passive => map_row::<Passive>(design, row.detail, f),
+        DetailKind::Coupling => map_row::<Coupling>(design, row.detail, f),
+        DetailKind::Source => map_row::<Source>(design, row.detail, f),
+        DetailKind::Controlled => map_row::<Controlled>(design, row.detail, f),
+        DetailKind::Poly => map_row::<Poly>(design, row.detail, f),
+        DetailKind::Table => map_row::<TableSource>(design, row.detail, f),
+        DetailKind::Behav => map_row::<Behav>(design, row.detail, f),
+        DetailKind::Laplace => map_row::<Laplace>(design, row.detail, f),
+        DetailKind::FreqTable => map_row::<FreqTable>(design, row.detail, f),
+        DetailKind::Delay => map_row::<Delay>(design, row.detail, f),
+        DetailKind::Semi => map_row::<Semi>(design, row.detail, f),
+        DetailKind::Switch => map_row::<Switch>(design, row.detail, f),
+        DetailKind::Line => map_row::<Line>(design, row.detail, f),
+    }
+}
+
+/// Calls `f` on the model's expression roots at `index`, in `model_handles`' order (`params`'
+/// values, then `version`), and stores back what `f` changed (A23).
+pub(crate) fn model_map_exprs(
+    design: &mut Design,
+    index: u32,
+    f: &mut dyn FnMut(&mut ExprId, ExprUse),
+) {
+    let mut row: Model = design.row(index);
+    map_params(design, row.params, f);
+    f(&mut row.version, ExprUse::Constant);
+    design.editor().set(index, row);
+}
+
+// ---- private ----
+
+/// Calls `f` on each value of `list`, in place in the pool.
+fn map_params(design: &mut Design, list: ParamList, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+    let start = list.start as usize;
+    let end = start + list.len as usize;
+    assert!(end <= design.param_pool.len(), "a param list in range");
+    for p in &mut design.param_pool[start..end] {
+        f(&mut p.1, ExprUse::Constant);
+    }
+}
+
+/// Calls `f` on each element of `list`, in place in the pool.
+fn map_list(design: &mut Design, list: ExprList, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+    let start = list.start as usize;
+    let end = start + list.len as usize;
+    assert!(end <= design.expr_pool.len(), "an expression list in range");
+    for e in &mut design.expr_pool[start..end] {
+        f(e, ExprUse::Constant);
+    }
+}
+
+/// Walks the roots of row `index` of `D`'s table (`row_handles`' order) and writes it back.
+fn map_row<D: Fields + DetailRow>(
+    design: &mut Design,
+    index: u32,
+    f: &mut dyn FnMut(&mut ExprId, ExprUse),
+) {
+    let Some(mut row) = get_row::<D>(design, index) else {
+        return;
+    };
+    row.fields(&mut |_, field| match field {
+        Field::Expr(e) => f(e, ExprUse::Constant),
+        Field::Dyn(e) => f(e, ExprUse::Circuit),
+        Field::Exprs(l) => map_list(design, *l, f),
+        Field::Name(_) | Field::Names(_) | Field::Count(_) | Field::Flag(_) | Field::Choice(_) => {}
+        Field::Side(i, Side::Parasitics) => map_row::<Parasitics>(design, *i, f),
+        Field::Side(i, Side::Port) => map_row::<PortSpec>(design, *i, f),
+        Field::Side(i, Side::Distof) => map_row::<Distof>(design, *i, f),
+        Field::Wave(w) => map_wave(design, *w, f),
+    });
+    design.editor().set_detail(index, row);
+}
+
+/// Walks a waveform row's roots, if it exists.
+fn map_wave(design: &mut Design, w: WaveRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+    match w.kind {
+        WaveKind::Pulse => map_row::<Pulse>(design, w.index, f),
+        WaveKind::Sin => map_row::<Sin>(design, w.index, f),
+        WaveKind::Exp => map_row::<Exp>(design, w.index, f),
+        WaveKind::Pwl => map_row::<Pwl>(design, w.index, f),
+        WaveKind::Sffm => map_row::<Sffm>(design, w.index, f),
+        WaveKind::Am => map_row::<Am>(design, w.index, f),
+        WaveKind::TrNoise => map_row::<TrNoise>(design, w.index, f),
+        WaveKind::TrRandom => map_row::<TrRandom>(design, w.index, f),
+        WaveKind::Pattern => map_row::<Pattern>(design, w.index, f),
     }
 }

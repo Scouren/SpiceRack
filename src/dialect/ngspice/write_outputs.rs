@@ -186,7 +186,7 @@ fn spellable(d: &ir::Design, item: ir::ItemRef) -> bool {
     match item.kind {
         ir::ItemKind::Save => {
             let s: ir::Save = d.row(item.index);
-            s.every_analysis && save_words(d, s.probes).is_some()
+            s.analyses == ir::AnalysisKinds::ALL && save_words(d, s.probes).is_some()
         }
         ir::ItemKind::Print => {
             let p: ir::Print = d.row(item.index);
@@ -239,8 +239,19 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
                 && (copied(a) == copied(b) || !a.delay.is_none() && !b.delay.is_none()))
     };
     let at = |e: &Event| e.kind == EventKind::At && value(e.value);
-    let bound =
-        |e: &Event, to: bool| e.kind == EventKind::Bound || (at(e) && !(to && zero(d, e.value)));
+    let bound = |e: &Event, to: bool| {
+        e.kind == EventKind::Bound || (at(e) && !(to && !dc && zero(d, e.value)))
+    };
+    // dc swaps a window given in the other order (measure_parse_stdParams): only numbers, in order
+    let ordered = |a: &Event, b: &Event| {
+        let num = |e: &Event| match d.expr(e.value) {
+            ir::Expr::Num(n) => Some(d.literal_value(d.num(n))),
+            _ => None,
+        };
+        !dc || a.kind != EventKind::At
+            || b.kind != EventKind::At
+            || matches!((num(a), num(b)), (Some(x), Some(y)) if x <= y)
+    };
     let body = match m.kind {
         MeasureKind::TrigTarg => {
             let r: MeasureTrigTarg = d.detail(m.detail);
@@ -255,7 +266,10 @@ fn measure_spellable(d: &ir::Design, m: ir::Measure) -> bool {
         }
         MeasureKind::Stat => {
             let r: MeasureStat = d.detail(m.detail);
-            signal(&r.signal) && bound(&r.from, false) && bound(&r.to, true)
+            signal(&r.signal)
+                && bound(&r.from, false)
+                && bound(&r.to, true)
+                && ordered(&r.from, &r.to)
         }
         MeasureKind::Param => constant(d, d.detail::<MeasureParam>(m.detail).value),
         MeasureKind::Deriv => false,
@@ -304,7 +318,7 @@ fn threshold(d: &ir::Design, e: ir::ExprId) -> Option<String> {
 
 /// Whether `e` is the literal zero (`to=0` is "no limit" to ngspice).
 fn zero(d: &ir::Design, e: ir::ExprId) -> bool {
-    matches!(d.expr(e), ir::Expr::Num(n) if d.num(n).mantissa == 0)
+    matches!(d.expr(e), ir::Expr::Num(n) if d.literal_eq(d.num(n), ir::Literal::ZERO))
 }
 
 /// ` p …` for each probe of the list.

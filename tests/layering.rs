@@ -1,7 +1,8 @@
 //! The dependency rules of the rewrite (REWRITE-PLAN §2.2 rule 5, §2.3), over every `use`
 //! line under `src/`: a dialect (`src/dialect/<d>.rs` or `src/dialect/<d>/`) imports no other
 //! dialect but its declared parent, nor `syntax::render`, `passes` or the facade; a pass
-//! (`src/passes.rs`, `src/passes/`) imports only `ir` and `passes`; a shared helper directory
+//! (`src/passes/`) imports only `ir` and `passes`, and a file of one pass group
+//! (`src/passes/<group>.rs`, `src/passes/<group>/`) no other group; a shared helper directory
 //! (`src/dialect/spice/`, `src/dialect/named/`) names no dialect.
 //!
 //! Oracle: the rule table below, written from the plan, and a synthetic tree with one known
@@ -61,6 +62,20 @@ fn each_rule_catches_its_own_case() {
         ),
         tree("passes/mod.rs", "use crate::{ir, dialect};\n"),
     ];
+    let extra = [
+        tree(
+            "passes/expr.rs",
+            "use super::Pass;\nuse crate::passes::waves::sin;\n",
+        ),
+        tree("passes/waves.rs", "use super::{Pass, GROUPS};\n"),
+        tree(
+            "passes/structure/hoist.rs",
+            "use super::names;\nuse super::super::run::x;\n",
+        ),
+        tree("passes/structure/names.rs", "use crate::ir;\n"),
+        tree("passes/run.rs", "use crate::ir;\n"),
+    ];
+    let files = [&files[..], &extra[..]].concat();
     let found = violations(&files);
     let expected = [
         "dialect/ngspice/read.rs: dialect::xyce::lex",
@@ -70,6 +85,8 @@ fn each_rule_catches_its_own_case() {
         "dialect/spice/cards.rs: dialect::xyce",
         "passes/pulse.rs: syntax::lang::Lang",
         "passes/mod.rs: dialect",
+        "passes/expr.rs: passes::waves::sin",
+        "passes/structure/hoist.rs: passes::run::x",
     ];
     assert_eq!(found, expected);
 }
@@ -103,11 +120,12 @@ fn violations(files: &[(String, String)]) -> Vec<String> {
         .filter_map(|(p, _)| owner(p))
         .filter(|d| !SHARED.contains(&d.as_str()))
         .collect();
+    let groups: Vec<String> = files.iter().filter_map(|(p, _)| group(p)).collect();
     let mut out = Vec::new();
     for (path, text) in files {
         let module = module_path(path);
         for import in imports(text, &module) {
-            if forbidden(path, &import, &dialects) {
+            if forbidden(path, &import, &dialects, &groups) {
                 out.push(format!("{path}: {import}"));
             }
         }
@@ -123,11 +141,22 @@ fn owner(path: &str) -> Option<String> {
     (!SPINE.contains(&first)).then(|| first.to_string())
 }
 
+/// The pass group `path` belongs to (`passes/<group>.rs` or `passes/<group>/…`), if any.
+fn group(path: &str) -> Option<String> {
+    let rest = path.strip_prefix("passes/")?;
+    let first = rest.split('/').next()?.trim_end_matches(".rs");
+    (first != "mod").then(|| first.to_string())
+}
+
 /// Whether `import` (a crate path) is a forbidden edge from `path`.
-fn forbidden(path: &str, import: &str, dialects: &[String]) -> bool {
+fn forbidden(path: &str, import: &str, dialects: &[String], groups: &[String]) -> bool {
     let has = |prefix: &str| import == prefix || import.starts_with(&format!("{prefix}::"));
     if path == "passes.rs" || path.starts_with("passes/") {
-        return !PASSES_ALLOW.iter().any(|p| has(p));
+        let mine = group(path);
+        let other = groups
+            .iter()
+            .any(|g| Some(g) != mine.as_ref() && mine.is_some() && has(&format!("passes::{g}")));
+        return other || !PASSES_ALLOW.iter().any(|p| has(p));
     }
     let Some(me) = owner(path) else { return false };
     let parent = PARENTS.iter().find(|(d, _)| *d == me).map(|(_, p)| *p);
@@ -239,5 +268,10 @@ fn absolute(path: &str, module: &[String]) -> Option<String> {
         segs.remove(0);
     }
     base.extend(segs.iter().map(|s| s.to_string()));
+    // `use super::*` in an inline `mod tests` names the file's own module, which this walk
+    // (one module per file) resolves one level too high, to the crate root: not an edge.
+    if base == ["*"] {
+        return None;
+    }
     Some(base.join("::"))
 }

@@ -21,7 +21,7 @@
 use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
@@ -149,6 +149,9 @@ pub enum ModelFamily {
     Mesfet,
     /// Spectre `gaas` (DC as `Mesfet`, its own capacitances, 7.18).
     Gaas,
+    /// ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet` levels 2 to 4, `inpdomod.c`; the
+    /// level is a parameter of the device, not a family; AMEND-A12 A15 C3).
+    Mesa,
     /// HFET level 5 (ng `nhfet`/`phfet` level 5; D28).
     Hfet1,
     /// HFET level 6 (ng `nhfet`/`phfet` level 6; D28).
@@ -203,6 +206,11 @@ pub enum ModelFamily {
     Cccs,
     /// The built-in mutual inductance, no parameters (va `mutual`). Only a `Coupling` names it.
     Mutual,
+    /// The simulator's own ideal transmission line, no parameters (va `tline_ideal`, a loaded
+    /// OSDI module; AMEND-A12 A20, R39). Only a `LosslessLine` names it. Unlike the other
+    /// builtins a target may need a `DeviceLibrary` for it (VACASK does), so a model of it
+    /// without one sets `ModelWithoutLibrary`.
+    TlineIdeal,
     // ---- modules ----
     /// XSPICE code model; `Model::word` is the code model's name (`s_xfer`, `d_cosim`; D37,
     /// F20).
@@ -235,7 +243,8 @@ pub struct Model {
     pub name: NameId,
     /// Parameters, lowercase, the family's own names, in source order; `level`, `type` and
     /// `version` are never here (they are `family`, `polarity`, `version`), except under
-    /// `Other`.
+    /// `Other`, `Module` and `CodeModel` (their own parameters) and `level` on `Mesa` (a device
+    /// parameter there). No value reads the circuit (the kernel's `ProbeContext`). A19.
     pub params: ParamList,
     /// The base name of a bin (`nch` for `nch.1`; a Spectre model group is a run of bins of
     /// one base); `NONE` when not a bin (F7, 7.14).
@@ -246,9 +255,10 @@ pub struct Model {
     /// The loaded module a `Module` family model instantiates; `name` `NONE` for every other
     /// family. Expects `DefKind::Module` (7.15, 7.16).
     pub module: Ref,
-    /// The family version (`version="4.8"`, a number or a string; 7.04). `NONE` only when the
-    /// family has a single version; a reader whose card is silent writes its simulator's
-    /// default version.
+    /// The family version (`version="4.8"`, a number or a string; 7.04): only on a versioned
+    /// family (`circuit_check::versioned`: BSIM, SOI, HiSIM, PSP, VBIC, HICUM, MEXTRAM, EKV,
+    /// BSIM-BULK, JUNCAP, DIODE_CMC, and the open families), `NONE` on every other (A19). A
+    /// reader whose card is silent on a versioned family writes its simulator's default.
     pub version: ExprId,
     /// The code model's name for `CodeModel`, the type word for `Other`; `NONE` otherwise.
     pub word: NameId,
@@ -263,7 +273,7 @@ const _: () = assert!(size_of::<Model>() == 44);
 
 impl ModelFamily {
     /// Every member, in declaration order.
-    pub const ALL: [ModelFamily; 77] = [
+    pub const ALL: [ModelFamily; 79] = [
         ModelFamily::Resistor,
         ModelFamily::ResistorMultiplier,
         ModelFamily::Capacitor,
@@ -315,6 +325,7 @@ impl ModelFamily {
         ModelFamily::JfetHspice2,
         ModelFamily::Mesfet,
         ModelFamily::Gaas,
+        ModelFamily::Mesa,
         ModelFamily::Hfet1,
         ModelFamily::Hfet2,
         ModelFamily::Igbt,
@@ -338,6 +349,7 @@ impl ModelFamily {
         ModelFamily::Ccvs,
         ModelFamily::Cccs,
         ModelFamily::Mutual,
+        ModelFamily::TlineIdeal,
         ModelFamily::CodeModel,
         ModelFamily::Module,
         ModelFamily::Other,
@@ -368,6 +380,20 @@ impl RowFacts for Model {
             f(&mut row.module, DefKind::Module);
         }
         design.editor().set(at.index, row);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        crate::circuit_fields::model_map_exprs(design, at.index, f)
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order
+        if self.ako.name != NameId::NONE {
+            out.push((self.ako, DefKind::Model));
+        }
+        if self.module.name != NameId::NONE {
+            out.push((self.module, DefKind::Module));
+        }
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

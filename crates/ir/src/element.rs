@@ -24,7 +24,7 @@
 //!   `ElemKind::detail(self) -> DetailKind`, `ElemKind::has_detail(self) -> bool`,
 //!   `ElemKind::needs_model(self) -> bool`, `ElemKind::master_kind(self) -> Option<DefKind>`
 //! - `pub enum DetailKind` (`ALL`, `COUNT`)
-//! - `pub struct Element`, `pub const NO_ROW`
+//! - `pub struct Element`, `pub enum MultLaw` (`ALL`, `COUNT`), `pub const NO_ROW`
 //! - `pub struct CircuitDetails`; `DetailRow` (kernel, A6) for every row type it holds
 //! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
 //!   `pub(crate) fn design_check(&Design, &mut Diags)`
@@ -36,7 +36,7 @@ use crate::check::Violation;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
@@ -147,8 +147,9 @@ pub enum ElemKind {
     /// Current-controlled switch (D30). Terminals (p, n), exactly 2. `Model` master required.
     /// Detail `Switch` (`sense` the sensing element).
     ISwitch,
-    /// Lossless transmission line (D31, D84, D73). Terminals (a+, a−, b+, b−), exactly 4. No
-    /// master. Detail `Line`.
+    /// Lossless transmission line (D31, D84, D73). Terminals (a+, a−, b+, b−), exactly 4.
+    /// Optional `Model` master of `ModelFamily::TlineIdeal` (VACASK `tline_ideal`, A20). Detail
+    /// `Line`.
     LosslessLine,
     /// Lossy line, LTRA (D32, D72). Terminals (a+, a−, b+, b−), exactly 4. `Model` master
     /// required. Detail `Line`.
@@ -237,7 +238,9 @@ pub struct Element {
     /// Its model or subcircuit master; `def` `NONE` when the card names none or it is
     /// unresolved. Expected definition kind: `ElemKind::master_kind`.
     pub model: Ref,
-    /// Instance parameters with no typed field, by the master's own names, in source order.
+    /// Instance parameters with no typed field, by the master's own names, in source order. On a
+    /// kind with a detail row, no key names one of the row's own fields (its IR name, `m` or
+    /// `mult`, `temp` where the row has `temp_abs`; A19).
     pub params: ParamList,
     /// Multiplicity: the element stands for `mult` copies in parallel (INV-semantics 6.01–6.03,
     /// 5.16; B10, D7, D127). Composes multiplicatively down the hierarchy. A reader lowers
@@ -247,6 +250,24 @@ pub struct Element {
     pub mult: ExprId,
     /// Row in the kind's detail table, or [`NO_ROW`] when the kind has none.
     pub detail: u32,
+    /// How `mult` multiplies (AMEND-A12 A15 C1, R31); anything but `Parallel` only on an
+    /// `Instance` with a `mult`.
+    pub mult_law: MultLaw,
+}
+
+/// How an element's multiplicity acts (AMEND-A12 A15 C1, R31).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum MultLaw {
+    /// `mult` whole copies in parallel; through the hierarchy multiplicities compose by
+    /// multiplication (xy, hs, the Python API; INV-semantics 6.01).
+    Parallel,
+    /// ngspice's `m` on an X line (`inpcom.c:4124-4198`): the instance's `mult` is given to
+    /// every element of the subcircuit's body that takes a multiplier, replacing that
+    /// element's own, and passed on the same way to nested instances; an element of a kind
+    /// ngspice does not multiply is left as it is (IR-CIRCUIT §2 lists the kinds). Only on an
+    /// `Instance`.
+    NgspiceAppend,
 }
 
 /// The circuit owner's detail tables (the design's `circuit` field; no spans: a detail row's
@@ -282,6 +303,7 @@ pub struct CircuitDetails {
 
 const _: () = assert!(size_of::<ElemKind>() == 1);
 const _: () = assert!(size_of::<DetailKind>() == 1);
+const _: () = assert!(size_of::<MultLaw>() == 1);
 const _: () = assert!(size_of::<Element>() == 40);
 
 macro_rules! detail_rows {
@@ -528,7 +550,8 @@ impl ElemKind {
             | ElemKind::Vcvs
             | ElemKind::Vccs
             | ElemKind::Cccs
-            | ElemKind::Ccvs => Some(DefKind::Model),
+            | ElemKind::Ccvs
+            | ElemKind::LosslessLine => Some(DefKind::Model),
             ElemKind::ChargeCapacitor
             | ElemKind::FluxInductor
             | ElemKind::Port
@@ -538,10 +561,16 @@ impl ElemKind {
             | ElemKind::Laplace
             | ElemKind::FreqTable
             | ElemKind::Delay
-            | ElemKind::LosslessLine
             | ElemKind::Unresolved => None,
         }
     }
+}
+
+impl MultLaw {
+    /// Every member, in declaration order.
+    pub const ALL: [MultLaw; 2] = [MultLaw::Parallel, MultLaw::NgspiceAppend];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
 }
 
 impl DetailKind {
@@ -581,6 +610,19 @@ impl RowFacts for Element {
             f(&mut row.model, kind);
         }
         design.editor().set(at.index, row);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        crate::circuit_fields::element_map_exprs(design, at.index, f)
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order
+        if let Some(kind) = self.kind.master_kind()
+            && self.model.name != NameId::NONE
+        {
+            out.push((self.model, kind));
+        }
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

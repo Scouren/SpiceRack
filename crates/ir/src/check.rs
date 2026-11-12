@@ -13,13 +13,15 @@
 
 use std::collections::HashSet;
 
+use crate::class::ExprClass;
 use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
-use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
 use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
+use crate::literal;
 use crate::span::Span;
 
 /// One invariant of a well-formed design. Each has its `X` code (`diag::violation_code`); the
@@ -60,7 +62,10 @@ pub enum Violation {
     EmptyName,
     /// A `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt` appears in an expression a row lists as a
     /// [`Handle::Expr`] (a field that must be constant in time: a parameter, a model value, an
-    /// analysis argument). Under [`Handle::ExprDyn`] they are legal. `arg`: the expression.
+    /// analysis argument), or the expression is of class `Circuit` through a parameter or
+    /// function it reads (A15 K3; reported only on a design with no other violation, since the
+    /// class table reads definitions through their rows). Under [`Handle::ExprDyn`] they are
+    /// legal. `arg`: the expression (the probe's row, or the field's root when through a read).
     ProbeContext,
     /// Two definitions of one kind and name in one scope. `arg`: the second definition.
     DuplicateDef,
@@ -112,6 +117,7 @@ impl Violation {
 /// lists in `RowFacts::handles`; each row's own invariants are its `RowFacts::check` (one
 /// exhaustive dispatch over `ItemKind`).
 pub fn check(design: &Design, diags: &mut Diags) {
+    let before = diags.len();
     let mut out = Out { design, diags };
     files_and_scopes(&mut out);
     definitions(&mut out);
@@ -119,6 +125,11 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
     // the circuit owner's design-level invariants (A13: element names unique in a scope)
     crate::element::design_check(design, out.diags);
+    // the class table reads definitions through their rows, so it runs on a design whose
+    // handles hold (A15 K3)
+    if out.diags.len() == before {
+        probe_classes(&mut out);
+    }
 }
 
 /// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside
@@ -143,6 +154,47 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
 }
 
 // ---- private ----
+
+/// `ProbeContext` through reads (A15 K3): a constant-in-time field (`Handle::Expr`, a list or
+/// head default) whose expression is of class `Circuit` by a parameter or function it reads.
+/// A direct probe in it was reported by `expression`; this pass sees only valid designs.
+fn probe_classes(out: &mut Out<'_>) {
+    let d = out.design;
+    let table = crate::class::def_classes(d);
+    let mut handles = Vec::new();
+    // one stamped walk for the whole pass: no per-field table (O(design) in all)
+    let mut walk = ExprWalk::new(d);
+    for (item, _) in d.reachable() {
+        handles.clear();
+        for_kind!(item.kind, R => d.row::<R>(item.index).handles(d, &mut handles));
+        let mut roots = Vec::new();
+        for h in &handles {
+            match *h {
+                Handle::Expr(e) => roots.push(e),
+                Handle::Params(l) => roots.extend(d.params(l).iter().map(|p| p.1)),
+                Handle::Exprs(l) => roots.extend_from_slice(d.exprs(l)),
+                Handle::ExprDyn(_)
+                | Handle::Name(_)
+                | Handle::Ref(_)
+                | Handle::Names(_)
+                | Handle::Scope(_)
+                | Handle::Text(_)
+                | Handle::Branches(_) => {}
+            }
+        }
+        for e in roots {
+            let class = walk
+                .tree(d, e)
+                .iter()
+                .map(|&n| crate::class::node_class(d, n, table))
+                .max()
+                .unwrap_or(ExprClass::Constant);
+            if class == ExprClass::Circuit {
+                out.report(Violation::ProbeContext, d.span_of(item), e.0);
+            }
+        }
+    }
+}
 
 impl Out<'_> {
     fn report(&mut self, v: Violation, span: Span, arg: u32) {
@@ -276,6 +328,12 @@ fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
         let (range_ok, arity_ok) = match tag {
             ExprTag::Num => (
                 match x.nums.get(a as usize) {
+                    Some(l) if l.form == NumForm::Long => {
+                        if let Some(v) = literal::long_violation(&x.long, *l) {
+                            out.report(v, Span::NONE, i as u32);
+                        }
+                        true
+                    }
                     Some(l) => {
                         if !l.shape_ok() {
                             out.report(Violation::LiteralShape, Span::NONE, i as u32);
@@ -356,9 +414,6 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
     let d = out.design;
     let mut walk = ExprWalk::new(d);
     let mut handles = Vec::new();
-    // `map_refs` reaches a row's references through `&mut Design`, and `check` only reads: it
-    // reads them from one copy of the design (O(design), once per check; A9)
-    let mut scratch = d.clone();
     for (item, scope) in d.reachable() {
         if (item.index as usize) >= table_len(d, item.kind) {
             continue; // reported with the scope's list
@@ -368,7 +423,7 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
         for_kind!(item.kind, R => {
             let row: R = d.row(item.index);
             row.handles(d, &mut handles);
-            R::map_refs(&mut scratch, item, &mut |r, kind| refs.push((*r, kind)));
+            row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
         let span = d.span_of(item);

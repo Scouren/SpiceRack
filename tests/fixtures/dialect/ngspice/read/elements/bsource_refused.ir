@@ -1,0 +1,5 @@
+# codes: P1106
+file "bsource_refused.sp" deck
+  title "bsource_refused"
+  comment " oracle: ngspice-45 asrc.c (reciproctc, reciprocm: ngspice's own flags)"
+  opaque ngspice private "B3 c 0 I=1 reciproctc=1"

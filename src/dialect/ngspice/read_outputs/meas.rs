@@ -13,20 +13,21 @@
 //! Contents: `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No>`
 
 use super::probe::{Ctx, Want, build, probe_word};
-use super::{No, unwrap};
-use crate::dialect::ngspice::codes;
+use super::{No, unwrap, words};
 use crate::dialect::ngspice::declare::Class;
 use crate::dialect::ngspice::expr_read::{self, Tree};
+use crate::dialect::ngspice::name;
 use crate::dialect::ngspice::number;
 use crate::dialect::ngspice::read::{Lower, Stmt};
 use crate::dialect::ngspice::tables::Eval;
 use crate::ir::measure::{MeasureFind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen};
 use crate::ir::{self, AnalysisKind, Edge, Event, ProbeKind, Stat};
+use crate::syntax::ast::{Node, Tag};
 
 /// A value read but not yet appended.
 enum Val {
-    /// A number (and whether it was rounded).
-    Lit(ir::Literal, bool),
+    /// A number and how its digits fit (`number::Fit`).
+    Lit(ir::Literal, number::Fit),
     /// A numparam expression.
     Tree(Tree),
     /// A threshold that reads the circuit: `v(x)` or `i(x)`.
@@ -97,6 +98,7 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result
             return Err(No::Untyped);
         }
         let text = unwrap(&f[f.find('=').expect("a key=value word") + 1..]);
+        later_param(lw, st, text)?;
         Body::Param(numparam(lw, st, text, false)?)
     } else {
         match low.as_str() {
@@ -219,7 +221,7 @@ fn clause(
     }
     let value = match &p.val {
         Some(v) => value(lw, st, v)?,
-        None => Val::Lit(ir::Literal::ZERO, false),
+        None => Val::Lit(ir::Literal::ZERO, number::Fit::Exact),
     };
     if p.edge.is_none() {
         return Err(No::Invalid); // "at, rise, fall or cross must be given"
@@ -281,13 +283,14 @@ fn stat(lw: &mut Lower<'_, '_>, st: Stmt, f: &str, words: &[String], ctx: Ctx) -
         _ => Stat::Integ,
     };
     let signal = one(sig, ctx)?;
+    let dc = ctx == Ctx::Meas(AnalysisKind::Dc);
     let (mut from, mut to) = (Ev::Bound, Ev::Bound);
     for w in rest {
         let (k, v) = w.split_once('=').ok_or(No::Invalid)?;
         match k.to_ascii_lowercase().as_str() {
             "from" => from = Ev::At(value(lw, st, v)?),
-            // `to=0` is "no limit" (`m_to != 0.0e0`): not the position 0
-            "to" if number::card(v).is_some_and(|s| s.literal.mantissa == 0) => {
+            // off dc `to=0` is "no limit" (`m_to != 0.0e0`): not the position 0
+            "to" if !dc && number::card(v).is_some_and(|s| s.literal.mantissa == 0) => {
                 return Err(No::Untyped);
             }
             "to" => to = Ev::At(value(lw, st, v)?),
@@ -295,7 +298,68 @@ fn stat(lw: &mut Lower<'_, '_>, st: Stmt, f: &str, words: &[String], ctx: Ctx) -
             _ => return Err(No::Invalid), // "no such parameter"
         }
     }
+    // dc: "make m_from always less than m_to" (measure_parse_stdParams), a swap of the two
+    // values ngspice makes after substitution; the IR has no "either order" window
+    if dc && let (Ev::At(a), Ev::At(b)) = (&from, &to) {
+        match (a, b) {
+            (Val::Lit(x, _), Val::Lit(y, _)) if y.value() < x.value() => {
+                std::mem::swap(&mut from, &mut to);
+            }
+            (Val::Lit(..), Val::Lit(..)) => {}
+            _ => return Err(No::DcWindow),
+        }
+    }
     Ok(Body::Stat(stat, signal, from, to))
+}
+
+/// Fails a `param=` measure that reads a `param=` measure of a later card: ngspice evaluates
+/// them in card order (measure.c second pass), so the read is "Undefined parameter" (run: `p6`
+/// failed); with a `.param` of that name it reads the parameter instead (run: `p4` = 7), which
+/// this reader does not type, nor a deck whose includes may define one.
+fn later_param(lw: &Lower<'_, '_>, st: Stmt, text: &str) -> Result<(), No> {
+    let (mut later, mut params, mut includes) = (Vec::new(), Vec::new(), false);
+    let mut after = false;
+    for &n in lw.ast.fields(lw.ast.root()) {
+        let n = Node(n);
+        after |= n == st.node;
+        match lw.ast.tag(n) {
+            Tag::Measure if after && n != st.node => {
+                let w = words(&lw.rest(n));
+                let param = w.get(2).is_some_and(|f| {
+                    let f = f.to_ascii_lowercase();
+                    f.starts_with("param=") || f.starts_with("expr=")
+                });
+                if param {
+                    later.push(name::key(&w[1]));
+                }
+            }
+            Tag::Param => params.extend(
+                words(&lw.rest(n))
+                    .iter()
+                    .filter_map(|w| w.split_once('='))
+                    .map(|(k, _)| name::key(k)),
+            ),
+            Tag::Include | Tag::LibCall => includes = true,
+            _ => {}
+        }
+    }
+    for w in idents(text) {
+        let k = name::key(w);
+        if later.contains(&k) {
+            return Err(if includes || params.contains(&k) {
+                No::Untyped
+            } else {
+                No::Invalid
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The names an expression's text reads.
+fn idents(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .filter(|w| w.starts_with(|c: char| c.is_ascii_alphabetic()))
 }
 
 /// A crossing event. No edge given: ngspice's first crossing after the first interval
@@ -386,7 +450,7 @@ fn value(lw: &mut Lower<'_, '_>, st: Stmt, text: &str) -> Result<Val, No> {
         .starts_with(|c: char| c.is_ascii_digit() || c == '.');
     if numeric {
         let s = number::card(text).ok_or(No::Invalid)?;
-        return Ok(Val::Lit(s.literal, s.rounded));
+        return Ok(Val::Lit(s.literal, s.fit));
     }
     Ok(Val::Tree(numparam(lw, st, unwrap(text), true)?))
 }
@@ -408,8 +472,7 @@ fn numparam(lw: &mut Lower<'_, '_>, st: Stmt, text: &str, early: bool) -> Result
 
 /// Whether a name in `text` is a measure already defined in `st`'s scope.
 fn reads_measure(lw: &mut Lower<'_, '_>, st: Stmt, text: &str) -> bool {
-    let idents = text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'));
-    for w in idents.filter(|w| w.starts_with(|c: char| c.is_ascii_alphabetic())) {
+    for w in idents(text) {
         let id = lw.b.design().find_name(&lw.names.fold(w));
         if !id.is_none()
             && !lw
@@ -459,12 +522,7 @@ fn event(lw: &mut Lower<'_, '_>, st: Stmt, e: Ev) -> Event {
 /// A value appended.
 fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: Val) -> ir::ExprId {
     match v {
-        Val::Lit(lit, rounded) => {
-            if rounded {
-                lw.note(st, codes::ROUNDED);
-            }
-            lw.b.literal(lit)
-        }
+        Val::Lit(lit, fit) => lw.number(lit, &fit),
         Val::Tree(t) => lw.expr(st, &t, st.scope),
         Val::Probe(w) if w.kind == ProbeKind::I => {
             let e = lw.names.fold(&w.a[0]);

@@ -38,11 +38,12 @@ struct Head {
 }
 
 /// Line 1 of a deck: its text as the title, blank too (every ngspice deck has a title line,
-/// INV 14.12); a library's line 1 is the reader's own blank line, framing.
+/// INV 14.12); a library's line 1 is the reader's own blank line, and an empty text has no
+/// line 1: framing.
 pub(super) fn title(lw: &mut Lower<'_, '_>, st: Stmt) {
     let text = lw.toks.text(lw.ast.main_token(st.node));
     let text = text.trim_end_matches('\r');
-    if lw.role != ir::Role::Deck {
+    if lw.role != ir::Role::Deck || lw.toks.source().is_empty() {
         lw.framing();
         return;
     }
@@ -288,8 +289,8 @@ pub(super) fn global(lw: &mut Lower<'_, '_>, st: Stmt) {
 }
 
 /// Any other dot card: a stray closer (`.ends`, `.endl`, `.endif`, `.endc` with no block) is
-/// `InvalidInSource`; `.title` is `Unread` here; `.width` belongs to the output area, the rest
-/// to the run area (S3.3).
+/// `InvalidInSource`; `.title` is `Unread` here; `.width` and `.probe` belong to the output
+/// area, the rest to the run area (S3.3).
 pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     match lw.keyword(st.node).as_str() {
         ".ends" | ".eom" | ".endl" | ".endif" | ".endc" | ".enddata" | ".end_variation" => {
@@ -298,6 +299,8 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
         ".title" => lw.unread(st),
         // `.width` sets the print width of `.print` output: the output area's
         ".width" => read_outputs::card(lw, st),
+        // ngspice's lexicon has no `.probe` keyword (it parses as a card): the output area's
+        ".probe" => read_outputs::card(lw, st),
         _ => read_run::card(lw, st),
     }
 }

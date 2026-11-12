@@ -361,10 +361,11 @@ fn any_bytes_read_returns_and_checks_clean() {
 }
 
 #[test]
-fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
-    // R21 (`Write::admits`): never a literal (R28: respelled exactly), a head parameter with no default (manual
-    // §2.4.3), a multi-line comment, an `.if` reading the temperature (numparam decides it once),
-    // a string value (numparam has none).
+fn what_ngspice_cannot_spell_is_refused_by_a_feature_and_a_string_value_by_admits() {
+    // A15: a head parameter with no default is `FormalWithoutDefault`, an `.if` reading the
+    // temperature `IfConditionDynamic`, both outside FEATURES (U0001 at legalize); R28: literals
+    // in a form ngspice has no letter for are respelled, never refused; R21: what no feature
+    // states stays `admits`'s: a string value where numparam reads an expression (W1006).
     let mut d = ir::Design::new();
     {
         let mut b = d.builder();
@@ -376,15 +377,7 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
             form: ir::NumForm::Scale,
         });
         b.param(top, "a", centi, ir::Span::NONE);
-        let mil = b.literal(ir::Literal {
-            mantissa: 2,
-            frac: 0,
-            exp10: 0,
-            form: ir::NumForm::Mil,
-        });
-        b.param(top, "b", mil, ir::Span::NONE);
         b.subckt(top, "s", &["p"], &[("w", ir::ExprId::NONE)], ir::Span::NONE);
-        b.comment(top, "two\nlines", ir::Span::NONE);
         let t = b.temp();
         b.if_(top, &[t], ir::Span::NONE);
         let text = b.string("4.8.3");
@@ -393,20 +386,19 @@ fn what_ngspice_cannot_spell_and_no_feature_states_is_refused_by_admits() {
     let row = dialect::by_name("ngspice").expect("row");
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut d, row, &mut diags);
-    // the admits rows; `U0001` for `Expr(Str)` also comes until the model area's FEATURES add it
-    let mut got: Vec<ir::Code> = codes_of(&diags)
+    let feature = |f: ir::Feature| {
+        diags
+            .rows()
+            .iter()
+            .any(|r| r.code == ir::diag::UNSUPPORTED && r.arg == u32::from(f.index()))
+    };
+    assert!(feature(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)));
+    assert!(feature(ir::Feature::Extra(ir::Extra::IfConditionDynamic)));
+    let w: Vec<ir::Code> = codes_of(&diags)
         .into_iter()
         .filter(|c| c.letter == b'W')
         .collect();
-    got.sort();
-    let mut want = vec![
-        codes::NO_DEFAULT,
-        codes::LINE_BREAK,
-        codes::READS_RUN,
-        codes::TEXT_VALUE,
-    ];
-    want.sort();
-    assert_eq!(got, want);
+    assert_eq!(w, [codes::TEXT_VALUE]);
 }
 
 #[test]
@@ -488,4 +480,75 @@ fn a_blank_line_one_is_an_empty_title() {
     assert_eq!(d.items(top)[0].kind, ItemKind::Title);
     assert_eq!(d.text(t.text), "");
     assert_eq!(write(&d), "\n.param a=1\n.end\n");
+}
+
+#[test]
+fn a_source_whose_value_reads_the_circuit_is_refused_with_the_sources_code() {
+    // R21, the elements and sources areas' agreement: `write_elements::admits` forwards V, I
+    // and port elements to `write_sources::admits`; a V source's DC that reads the circuit has
+    // no ngspice source spelling (a source value is a constant), so legalize refuses it (W1150)
+    // instead of the writer's assertion firing.
+    let mut d = ir::Design::new();
+    {
+        let mut b = d.builder();
+        let (_, top) = b.file("d.sp", ir::Role::Deck);
+        b.title(top, "t", ir::Span::NONE);
+        let dc = b.v("b", None);
+        let head = b.head("v1", &["a", "0"], None, &[], ir::ExprId::NONE);
+        let row = ir::source::Source {
+            dc,
+            ac_mag: ir::ExprId::NONE,
+            ac_phase_deg: ir::ExprId::NONE,
+            tc1: ir::ExprId::NONE,
+            tc2: ir::ExprId::NONE,
+            pac_mag: ir::ExprId::NONE,
+            pac_phase_deg: ir::ExprId::NONE,
+            wave: ir::WaveRef::NONE,
+            noise_psd: ir::ExprList::EMPTY,
+            parasitics: ir::NO_ROW,
+            port: ir::NO_ROW,
+            distof: ir::NO_ROW,
+            dc_rule: ir::source::DcRule::Given,
+        };
+        b.source(top, ir::ElemKind::VSource, head, row, ir::Span::NONE);
+    }
+    let row = dialect::by_name("ngspice").expect("row");
+    let mut diags = ir::Diags::new();
+    dialect::legalize(&mut d, row, &mut diags);
+    let codes: Vec<String> = codes_of(&diags).iter().map(|c| c.to_string()).collect();
+    assert!(codes.contains(&"W1150".to_string()), "{codes:?}");
+}
+
+#[test]
+fn a_hash_line_is_a_script_statement_and_the_script_is_in_file_order() {
+    // inp.c inp_spsource (`commands || prefix("*#", dd->line)`): a `*#` line outside a block is
+    // a script command; ngspice joins it and every block in deck order (R49). Not a comment.
+    let text = "t\n*# echo first\n.op\n.subckt s a\n*#echo inner\n.ends\n.control\nrun\n*# in\n.endc\n* plain\n";
+    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
+    let toks = crate::syntax::tokenize(text, lex);
+    let ast = crate::syntax::parse(&toks, lex);
+    let s = super::declare::script(&ast, &toks);
+    assert_eq!(
+        s.text,
+        [
+            "*# echo first",
+            "*#echo inner",
+            ".control\nrun\n*# in\n.endc"
+        ]
+    );
+    assert!(s.card_analysis, ".op is a dot-card analysis");
+    let toks = crate::syntax::tokenize("t\n.control\nop\n.endc\n", lex);
+    let ast = crate::syntax::parse(&toks, lex);
+    assert!(
+        !super::declare::script(&ast, &toks).card_analysis,
+        "a script's op is no card"
+    );
+    let (d, _) = deck(text);
+    let top = d.file(d.entry()).top;
+    use ItemKind::{Analysis, Comment, Opaque, Subckt, Title};
+    assert_eq!(
+        kinds(&d, top),
+        [Title, Opaque, Analysis, Subckt, Opaque, Comment]
+    );
+    assert_eq!(opaque(&d, top, 1).1, "*# echo first");
 }

@@ -1,8 +1,8 @@
 //! Script items → ngspice's control script: a `Load` as `pre_osdi`, an `Alter` as `alter`,
 //! `altermod` or `alterparam` + `reset`, a KeepLast sweep `Loop` over a list as `foreach` (its
-//! name the variable), each a command of the script region (`script`: a command appended to
-//! the `.control` block the text ends with, else in a block of its own; blocks concatenate, so
-//! joining them is exact, `rewrite/S3-CONTROL.md` O1). `needs_script` is the spine's one choice
+//! name the variable), each a command of the spine's script region (`Out::script`: one
+//! `.control` block for adjacent commands; blocks concatenate, so the split is exact,
+//! `rewrite/S3-CONTROL.md` O1). `needs_script` is the spine's one choice
 //! per deck: a plan with an alter, a loop or a `FromHere` state item is written whole as a
 //! script, analyses as commands (R49 (3) (i), the reader's own image).
 //!
@@ -16,7 +16,7 @@
 //! `pub(super) const PARAM_RESET`, `LOOP_FORM`, `ALTER_VALUE`,
 //! `pub(super) fn needs_script(&ir::Design, ir::ScopeId) -> bool`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
-//! `pub(super) fn script(&mut Out, &str)`, `pub(super) fn load`, `loop_`, `alter`
+//! `pub(super) fn load`, `loop_`, `alter`
 
 use super::codes::Row;
 use super::expr_write;
@@ -104,21 +104,6 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     }
 }
 
-/// Appends `cmd` as a script line: into the `.control` block the text ends with, else in a
-/// block of its own.
-pub(super) fn script(w: &mut Out<'_>, cmd: &str) {
-    const CLOSE: &str = ".endc\n";
-    let open = w.out.ends_with(CLOSE) && w.out[..w.out.len() - CLOSE.len()].ends_with('\n');
-    if open {
-        w.out.truncate(w.out.len() - CLOSE.len());
-    } else {
-        w.out.push_str(".control\n");
-    }
-    w.out.push_str(cmd);
-    w.out.push('\n');
-    w.out.push_str(CLOSE);
-}
-
 /// A `Load`: `pre_osdi <path>` (an OSDI binary; FEATURES lacks a Verilog-A load).
 pub(super) fn load(w: &mut Out<'_>, item: ir::ItemRef) {
     let l: ir::item::Load = w.design.row(item.index);
@@ -127,7 +112,7 @@ pub(super) fn load(w: &mut Out<'_>, item: ir::ItemRef) {
         "ngspice write: only OSDI loads are in FEATURES"
     );
     let cmd = format!("pre_osdi {}", w.design.str(l.path));
-    script(w, &cmd);
+    w.script(&cmd);
 }
 
 /// A sweep `Loop`: `foreach <name> <values>`, the target set from the variable, the body, `end`.
@@ -145,13 +130,12 @@ pub(super) fn loop_(w: &mut Out<'_>, item: ir::ItemRef) {
         head.push(' ');
         expr_write::value(d, e, &mut head);
     }
-    script(w, &head.replace("  ", " "));
+    w.script(&head);
     let set = set_command(d, &s.target, &format!("${var}"));
     for line in set.lines() {
-        script(w, line);
+        w.script(line);
     }
-    // ponytail: the `end` is its own block until the scaffold's `open_script` writes it inside
-    w.open(l.body, ".control\nend\n.endc\n".to_string());
+    w.open_script(l.body, "end".to_string());
 }
 
 /// An `Alter`: `alter`, `altermod`, or `alterparam` + `reset`.
@@ -162,7 +146,7 @@ pub(super) fn alter(w: &mut Out<'_>, item: ir::ItemRef) {
     expr_write::value(d, a.value, &mut value);
     let value: String = value.split_whitespace().collect();
     for line in set_command(d, &a.target, &value).lines() {
-        script(w, line);
+        w.script(line);
     }
 }
 

@@ -1,0 +1,6 @@
+# codes:
+file "diode.sp" deck
+  title "diode"
+  comment " oracle: dio.c:49 (level a model parameter; diosetup.c:36 silent is 1, :301 level 3 geometry), dio.c:71 (a diode model's m is its grading coefficient), dio.c instance table (w is an instance default)"
+  model d1 diode params=(is=1e-14 n=1.05)
+  model d3 diode_level3 params=(is=1e-14 m=0.4 w=1u)

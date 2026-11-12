@@ -1,0 +1,21 @@
+# oracle: the forms of read_elements (ngspice-45 inp2*.c, inpcom.c inp_compat); written by hand
+file "cards.sp" deck
+  title "cards"
+  element resistor R1 (a b) model=rmod? params=(l=1u) mult=2 value=1k tc1=1m temp_abs=50 noisy=false
+  element capacitor C1 (a 0) value=1p ic=0.5 ic_mode=uic_only
+  element resistor R2 (a b) value=(v(a) * 1k) noisy=false
+  element charge_capacitor C2 (a b) expr=(1p * v(a)) output=charge
+  element coupling K1 () inductors=(L1 L2) k=0.5
+  element vcvs E1 (o 0 c 0) gain=2
+  element cccs F1 (o 0) mult=2 gain=2 sense=vx
+  element poly E3 (o 0) controls=(a 0 b 0) coeffs=[0, 1, 2] dimension=2
+  element behav B1 (b 0) mult=2 expr=(v(a) * 2) output=current
+  element behav E4 (o 0) expr=(v(c) * 4)
+  element table E6 (o 0) input=(v(c)) points=[0, 0, 1, 2] law=ngspice_rounded
+  element diode D1 (a k) model=dmod? area=2 ic=[0.6] ic_mode=uic_only initial=off
+  element mosfet M1 (d g s b) model=nmos? params=(w=1u) mult=2 ic=[1, 2, 3] ic_mode=uic_only
+  element iswitch W1 (a b) model=wmod? sense=vctl initial=off
+  element lossless_line T2 (a 0 b 0) z0=75 freq=1g nl=0.5
+  element rc_line U1 (a b 0) model=umod? length=1m lumps=5
+  element instance X1 (a b) model=sub? mult=2 mult_law=ngspice_append
+  element code_model A1 (in out) model=amod?

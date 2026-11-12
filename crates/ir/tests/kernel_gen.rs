@@ -15,7 +15,7 @@
 use spicerack_ir::r#gen::{Size, generate};
 use spicerack_ir::{
     BinOp, Design, Diags, Dist, DrawPer, DrawWhen, ExprTag, Extra, Feature, FeatureSet, Func,
-    ItemKind, UnOp, check, dump, features_used, parse,
+    ItemKind, ScopeKind, UnOp, check, dump, features_used, parse,
 };
 
 const SIZE: Size = Size {
@@ -202,7 +202,14 @@ fn the_full_set_runs_every_property() {
     }
     // a `ddt`/`idt` makes its tree read the circuit (class `Circuit`), so it only ever counts as
     // `FuncDyn`: no valid design holds these two
-    let unreachable = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)];
+    // and a title stands only in a deck's top, so no placement of one exists (A15 K1)
+    let titles = ScopeKind::ALL[1..]
+        .iter()
+        .map(|&s| Feature::Placed(s, ItemKind::Title));
+    let unreachable: Vec<Feature> = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)]
+        .into_iter()
+        .chain(titles)
+        .collect();
     // known gaps, a marker: none left (the run owner's generators reach `LoopOverOp`)
     let not_yet: [Feature; 0] = [];
     let goal = unreachable
@@ -253,5 +260,42 @@ fn check_legal_agrees_with_features_used() {
             let want: Vec<u32> = used.minus(legal).iter().map(|f| f.index() as u32).collect();
             assert_eq!(got, want, "seed {seed}, subset {k}");
         }
+    }
+}
+
+#[test]
+fn refs_and_map_refs_list_the_same_references_in_the_same_order() {
+    // M5: the read-only twin drifts from the visitor by no reference, kind or position, for
+    // every item of every kind (FeatureSet::ALL reaches all; oracle: map_refs itself)
+    let mut kinds_seen = FeatureSet::EMPTY;
+    for seed in 0..300u64 {
+        let d = generate(seed, &FeatureSet::ALL, SIZE);
+        let items: Vec<_> = d.reachable().into_iter().map(|(item, _)| item).collect();
+        let mut scratch = d.clone();
+        for item in items {
+            let mut read = Vec::new();
+            d.item_refs(item, &mut read);
+            let mut visited = Vec::new();
+            scratch
+                .editor()
+                .map_refs(item, &mut |r, kind| visited.push((*r, kind)));
+            assert_eq!(read, visited, "seed {seed}, {item:?}");
+            if !read.is_empty() {
+                kinds_seen = kinds_seen.with(Feature::Item(item.kind));
+            }
+        }
+    }
+    // the kinds that hold references were exercised with some
+    for kind in [
+        ItemKind::Element,
+        ItemKind::Model,
+        ItemKind::Alter,
+        ItemKind::Loop,
+        ItemKind::Elaborate,
+    ] {
+        assert!(
+            kinds_seen.contains(Feature::Item(kind)),
+            "{kind:?} with a reference"
+        );
     }
 }

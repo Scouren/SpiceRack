@@ -1,9 +1,14 @@
-# codes:
+# codes: P1351 P1350
 file "meas_param.sp" deck
   title "meas_param"
-  comment " oracle: ngspice-45 measure.c do_measure (every other measure first, its result a numparam parameter; then param= by nupa_eval); runs: p1 = 2*tr, p3 reads the later measure 'later'"
+  comment " oracle: ngspice-45 measure.c do_measure (every other measure first, its result a numparam parameter; then param= by nupa_eval); runs: p1 = 2*tr, p3 reads the later measure 'later'; a param measure reading a later param measure fails ('Undefined parameter', run p6 failed) unless a .param of the name exists, which it reads (run p4 = 7: not typed)"
   param k = 2
   measure tr tran when (cross cross skip_initial (v (a)) value=0.5)
   measure p1 tran param value=(tr * k)
   measure p2 tran param value=(later + 1)
   measure later tran stat max (v (a)) (bound) (bound)
+  opaque ngspice invalid ".meas tran p3 param='p4*2'"
+  opaque ngspice unread ".meas tran p5 param='k*p6'"
+  measure p4 tran param value=3
+  measure p6 tran param value=1
+  param p6 = 5

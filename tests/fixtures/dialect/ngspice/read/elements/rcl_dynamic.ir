@@ -1,0 +1,14 @@
+# codes:
+file "rcl_dynamic.sp" deck
+  title "rcl_dynamic"
+  comment " oracle: ngspice-45 inpcom.c inp_compat (an R/C/L reading v( i( temper hertz time runs as a B source: value, m, noisy, tc1, tc2 kept; reciproctc=1 on the C and on the charge form, A17: run qtc at 77 C, C q={1u*v(a)} tc1=0.01 charged by 1 uA reaches 1.5 mV at 1 ms, 1.0 mV without tc: the charge divided by 1.5), b_transformation_wanted, asrcload.c:41 (tc from 300.15 K: run tc, tnom=50 at 77 C, R1 {1k+0*v(a)} tc1=0.01 is 1500 ohm, the plain R2 1270 ohm); INV-semantics 6.14; R7 is gf180mcuD smbb000149.ngspice:287"
+  element resistor R1 (a b) value=(v(a) * 1k) noisy=false
+  element resistor R2 (a b) mult=2 value=(1k + v(a))
+  element inductor L1 (a b) value=(1u * (1 + i(vx))) noisy=false
+  element capacitor C1 (a b) value=(1p * (1 + v(a))) noisy=false
+  element charge_capacitor C2 (a b) expr=(1p * v(a)) output=charge
+  element resistor R3 (a b) value=($temp * 10) noisy=false
+  element resistor R4 (a b) value=(v(a) * 1k) tc1=1m noisy=false tc_base=fixed27
+  element capacitor C3 (a b) value=(1p * v(a)) tc1=1m tc2=1u noisy=false tc_base=fixed27 tc_law=reciprocal
+  element resistor rd2 (d2 d1) mult=nf value=(max(1e-2, (rd * nfet_10v0_asym_drdsw * (1 + trth1 * ($temp + dtemp - 25) + trth2 * ($temp + dtemp - 25) * ($temp + dtemp - 25))) / (w / nf - wb) * (tanh(ra * (v(d, s) - rb * (l - lb) / (0.6e-6 - lb)))))) noisy=false
+  element charge_capacitor C4 (a b) expr=(1p * v(a)) tc1=1m output=charge tc_base=fixed27 tc_law=reciprocal

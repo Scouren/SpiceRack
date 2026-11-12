@@ -1,0 +1,10 @@
+file "a.sp" deck
+  title ""
+  param p = 1
+  subckt s (x y)
+    param q = 2
+file "b.lib" library
+  param r = 3
+file "c.sp" deck
+  title "kept"
+  param t = 4

@@ -1,0 +1,10 @@
+# codes:
+file "resistor.sp" deck
+  title "resistor"
+  comment " oracle: ngspice-45 inp2r.c (value, model, unlabeled number, tc=a b), res.c (keys), restemp.c:79 (no value: 1 mOhm); run f1 (R4 c 0 rmod 2k reads 2k, R2 l=1u is 1 mOhm)"
+  element resistor R1 (a b) value=1k
+  element resistor R2 (a b) mult=2 value=2k tc1=1m tc2=2u
+  element resistor R3 (a b) model=rmod? params=(l=1u w=2u) value=3k
+  element resistor R4 (a b) model=rmod? value=2k
+  element resistor R5 (a b) value=4k tc1=1m tc2=2u tce=0.5 temp_abs=50 dtemp=2 ac=5k scale=2 noisy=false
+  element resistor R6 (a b) params=(l=1u) value=1m

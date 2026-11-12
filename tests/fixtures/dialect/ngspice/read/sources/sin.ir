@@ -1,0 +1,8 @@
+# codes: P1158 P1001
+file "sin.sp" deck
+  title "sin"
+  comment " oracle: vsrcload.c SINE (before TD: VO + VA*sin(PHASE), so HoldDelayValue; freq zero or omitted is 1/TSTOP); run `sin(0.5 1 1k 1m 0 30)` op 1.0; run `sin(0 1 0)` peaks at tstop/4; extra values ignored (run)"
+  element vsource V1 (a 0) wave=sin(offset=0.5 amplitude=1 freq=1k delay=1m damping=0 phase_deg=30 pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V2 (b 0) wave=sin(offset=0 amplitude=1 freq=0 pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V3 (c 0) wave=sin(offset=0 amplitude=1 freq=1k delay=0 damping=0 phase_deg=0 pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero
+  opaque ngspice unread ".control\nop\nprint v(a) v(b) v(c)\ntran 1u 10u\nprint v(b)[10] v(c)[10]\n.endc"

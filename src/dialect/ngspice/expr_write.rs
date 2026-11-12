@@ -32,6 +32,8 @@ use crate::ir::{self, BinOp, Dist, DrawPer, DrawWhen, ExprTag, Feature, Func, Un
 /// source is `PowAbs`; `LnAbs`, `SqrtAbs`, `ExpLin14` are not ngspice-45's, `ptfuncs.c`).
 pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Expr(ExprTag::Num),
+    // A18, R37: ngspice reads a long number's digits as written (`number::spell` spells them)
+    Feature::Extra(ir::Extra::LongLiteral),
     Feature::Expr(ExprTag::Param),
     Feature::Expr(ExprTag::Call),
     Feature::Expr(ExprTag::UserCall),
@@ -317,7 +319,7 @@ fn node(
     }
     let numparam = eval == Eval::Numparam;
     match d.expr(x) {
-        ir::Expr::Num(n) => number::spell(d.num(n), eval.grammar(), out),
+        ir::Expr::Num(n) => number::spell(d, d.num(n), eval.grammar(), out),
         ir::Expr::Param(r) => out.push_str(d.str(r.name)),
         ir::Expr::V(n, m) => {
             out.push_str("v(");
@@ -407,7 +409,10 @@ fn wraps(d: &ir::Design, eval: Eval, x: ir::ExprId, role: Role, pos: Pos) -> boo
     let numparam = eval == Eval::Numparam;
     let e = d.expr(x);
     if let ir::Expr::Num(n) = e {
-        let negative = d.num(n).mantissa < 0;
+        let negative = match d.long_digits(d.num(n)) {
+            Some((significand, _)) => significand.starts_with('-'),
+            None => d.num(n).mantissa < 0,
+        };
         return match role {
             // `-(2)` is the negation of 2; `-2` would read as the literal
             Role::Operand(_) => true,

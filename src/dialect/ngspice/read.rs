@@ -22,14 +22,15 @@
 //! `pub(super) fn bind_reads`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
-//! `Lower::{open, opaque, unread, note, framing, span, raw, text, rest, keyword, expr, wins,
+//! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
 //! class, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use super::codes;
 use super::cst::{body, extent, joined, line, next, rest, unquote};
-use super::declare::{Class, Declared, declare};
+use super::declare::{self, Class, Declared, Script, declare};
 use super::expr_read::Tree;
 use super::name::{self, Folder};
+use super::number;
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, read_structure,
 };
@@ -64,6 +65,7 @@ pub(super) struct Lower<'a, 'd> {
     rows: &'a mut Vec<RowRef>,
     measured: &'a mut Vec<(usize, usize)>,
     declared: &'a Declared,
+    script: &'a Script,
     /// Bytes read before the file's own text (1 for a library file).
     shift: u32,
     frames: Vec<Frame<'a>>,
@@ -156,6 +158,8 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
     for (k, (path, _)) in src.files().iter().enumerate() {
         let (file, top) = out.file(path, roles[k]);
         let declared = declare(&asts[k], &toks[k]);
+        // ponytail: one file's script; a deck's includes inlined when a fixture needs them
+        let script = declare::script(&asts[k], &toks[k]);
         let mut lw = Lower {
             b: &mut *out,
             diags: &mut *diags,
@@ -170,6 +174,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             rows: &mut rows,
             measured: &mut measured,
             declared: &declared,
+            script: &script,
             shift: u32::from(roles[k] == ir::Role::Library),
             frames: Vec::new(),
             framed: false,
@@ -177,6 +182,8 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
         lower(&mut lw, top);
     }
     bind(out, &pending, &measured, &rows);
+    // checks that need each element's bound model
+    super::read_elements::bound(out.design(), diags);
 }
 
 /// The files `text` names, in text order: each `.include` path and `.lib` call's file.
@@ -275,6 +282,43 @@ impl<'a, 'd> Lower<'a, 'd> {
         });
     }
 
+    /// Pushes `text` at `span` into `scope` as an `Opaque` of `class`, with the note `code`: a
+    /// statement with no CST node (a `*#` line).
+    pub(super) fn opaque_text(
+        &mut self,
+        scope: ir::ScopeId,
+        text: &str,
+        span: ir::Span,
+        class: ir::OpaqueClass,
+        code: ir::Code,
+    ) {
+        self.b.opaque(scope, "ngspice", class, text, span);
+        self.diags.push(code, span, 0);
+    }
+
+    /// The file's script statements in file order (R49): each `.control` … `.endc` block as
+    /// [`Lower::raw`] gives it, each `*#` line outside one as written.
+    pub(super) fn deck_script(&self) -> &[String] {
+        &self.script.text
+    }
+
+    /// The position of `st` (a `.control` block) in [`Lower::deck_script`].
+    #[allow(dead_code, reason = "the control area calls it (S3.4)")]
+    pub(super) fn script_index(&self, st: Stmt) -> usize {
+        let at = self.toks.start(self.ast.main_token(st.node));
+        self.script
+            .at
+            .binary_search(&at)
+            .expect("ngspice read: a .control block is a script statement")
+    }
+
+    /// Whether a dot card of the file runs an analysis (`.op`, `.dc`, `.ac`, `.tran`, `.noise`,
+    /// `.tf`, `.sens`, `.pz`, `.disto`, `.sp`, `.pss`), in any body, outside the blocks.
+    #[allow(dead_code, reason = "the control area calls it (S3.4)")]
+    pub(super) fn deck_has_card_analysis(&self) -> bool {
+        self.script.card_analysis
+    }
+
     /// Pushes `st` as an `Opaque` of `class`, its whole text, with the note `code`.
     pub(super) fn opaque(&mut self, st: Stmt, class: ir::OpaqueClass, code: ir::Code) {
         let text = self.raw(st.node);
@@ -341,6 +385,12 @@ impl<'a, 'd> Lower<'a, 'd> {
             self.note(st, code);
         }
         tree.emit(self.b, self.names, scope, self.pending)
+    }
+
+    /// Appends a card number (`number::Scan`'s literal and fit) and returns its root: a long one
+    /// as its digits (A18).
+    pub(super) fn number(&mut self, lit: ir::Literal, fit: &number::Fit) -> ir::ExprId {
+        fit.build(self.b, lit)
     }
 
     /// Whether the definition `(def, name)` of field `k` of `st` is the one ngspice keeps in
@@ -582,6 +632,21 @@ fn comments(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, from: u32, to: u32) {
             start: (start as u32).saturating_sub(shift),
             len: body.len() as u32,
         };
+        if text.starts_with('#') {
+            // a `*#` line is a script command (R49): the control area's
+            let index = lw
+                .script
+                .at
+                .binary_search(&(start as u32))
+                .expect("ngspice read: a *# line is a script statement");
+            let before = lw.b.design().items(scope).len();
+            read_control::script_line(lw, scope, index, span);
+            assert!(
+                lw.b.design().items(scope).len() > before,
+                "L1: a *# line left no item"
+            );
+            continue;
+        }
         lw.b.comment(scope, text, span);
     }
 }

@@ -1,0 +1,9 @@
+# codes: P1001
+file "noise.sp" deck
+  title "noise"
+  comment " oracle: vsrcpar.c TRNOISE, TRRANDOM (type (int) of the value; td 0, p1 1, p2 0 when omitted), 1-f-code.c:239 (before the first draw the value is p2); runs: `trrandom(1 1m 0 1 0.5)` op 0.5, `1 trnoise(1 1u 0 0 1 1u 1u)` op 1, `trnoise(1 1u)` op 0"
+  element vsource V1 (a 0) wave=trrandom(ts=1m td=0 p1=1 p2=0.5 kind=uniform given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V2 (b 0) dc=1 wave=trnoise(na=1 nt=1u nalpha=0 namp=0 rts_amp=1 rts_capture=1u rts_emission=1u)
+  element vsource V3 (c 0) wave=trnoise(na=1 nt=1u) dc_rule=wave_at_zero
+  element vsource V4 (d 0) wave=trrandom(ts=1u kind=gauss given_zero=spice_default) dc_rule=wave_at_zero
+  opaque ngspice unread ".control\nop\nprint v(a) v(b) v(c) v(d)\n.endc"

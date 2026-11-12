@@ -17,8 +17,8 @@
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
 //! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
-//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::fresh(&mut self) -> String`,
-//! `Gen::word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
+//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `pub(crate) fn placeable(&Design, ScopeId, ItemKind, &FeatureSet) -> bool`, `Gen::fresh(&mut self) -> String`,
+//! `Gen::word(&mut self) -> &'static str`, `Gen::line_word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
 //! `Gen::note(&mut self, DefId, ExprClass)`
 
 use crate::build::Builder;
@@ -75,14 +75,22 @@ pub struct Gen {
     /// Whether `literal` may make an `Int` literal (the set has `Extra::IntLiteral`; set by
     /// `expr` from its feature set).
     pub(crate) int_literals: bool,
+    /// Whether a literal may be `Long` (the set has `Extra::LongLiteral`; set by `expr`).
+    pub(crate) long_literals: bool,
     /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
     /// `Extra::EnclosingRef`), and whether the expression being built may read a parameter
-    /// (cleared around a head default when the set lacks `Extra::FormalReadsParam`).
+    /// (cleared around a head default when the set lacks `Extra::FormalNotConstant`).
     pub(crate) enclosing_ok: bool,
     pub(crate) param_reads: bool,
     /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
     /// `Extra::CaseSensitiveNames`).
     pub(crate) case_ok: bool,
+    /// Whether the expression being built must be of class `Constant` (cleared around an `If`
+    /// condition when the set lacks `Extra::IfConditionDynamic`).
+    pub(crate) constant_only: bool,
+    /// Whether the expression being built lies in a `Handle::ExprDyn` field generated with
+    /// `Reads::Constant` (a measure's threshold): its operators take the dynamic form (A19).
+    pub(crate) dyn_form: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -131,9 +139,12 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         dynamic: false,
         reads: Reads::Constant,
         int_literals: false,
+        long_literals: false,
         enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
         param_reads: true,
         case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
+        constant_only: false,
+        dyn_form: false,
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
@@ -290,11 +301,27 @@ impl Gen {
         WORDS[self.below(WORDS.len() as u32) as usize]
     }
 
+    /// A word with no line break, for a title or a comment (A15 K3).
+    pub(crate) fn line_word(&mut self) -> &'static str {
+        let lines: Vec<&'static str> = WORDS.into_iter().filter(|w| !w.contains('\n')).collect();
+        lines[self.below(lines.len() as u32) as usize]
+    }
+
     /// Items still allowed; a row generator that opens a scope fills its body only while this is
     /// positive.
     pub fn budget(&self) -> u32 {
         self.items_left
     }
+}
+
+/// Whether an item of `kind` may be listed in `scope` under `features`: `Placed(S, kind)` is in
+/// the set for every scope kind S on `scope`'s chain but a file's top (A15 K1). For a row's own
+/// generator that pushes into a body it opened.
+pub(crate) fn placeable(d: &Design, scope: ScopeId, kind: ItemKind, features: &FeatureSet) -> bool {
+    let chain = crate::feature::chain_kinds(d, scope);
+    ScopeKind::ALL.into_iter().all(|s| {
+        s == ScopeKind::File || !chain[s as usize] || features.contains(Feature::Placed(s, kind))
+    })
 }
 
 // ---- private ----
@@ -307,7 +334,7 @@ fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
     let titled = features.contains(Feature::Item(ItemKind::Title))
         && (!untitled_ok || (g.items_left > 0 && g.chance(2)));
     if deck && titled {
-        let text = g.word();
+        let text = g.line_word();
         b.title(top, text, crate::span::Span::NONE);
         g.items_left = g.items_left.saturating_sub(1); // a required title may pass the budget
     }
@@ -346,7 +373,7 @@ fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
     }
 }
 
-/// The kinds a row in `scope` may have: in the set, allowed where it sits (placement `Extra`s,
+/// The kinds a row in `scope` may have: in the set, allowed where it sits (`placeable`,
 /// sections only in a file's top, scopes only below the depth cap), and with what its fields
 /// need (literals for any expression). Never `Title` (`fill` places it first in a deck).
 fn candidates(
@@ -356,34 +383,23 @@ fn candidates(
     cap: usize,
     features: &FeatureSet,
 ) -> Vec<ItemKind> {
-    let (mut in_subckt, mut in_branch, mut at) = (false, false, scope);
-    for _ in 0..=d.scopes.len() {
-        if at.is_none() {
-            break;
-        }
-        let s = d.scope(at);
-        in_subckt |= s.kind == ScopeKind::Subckt;
-        in_branch |= s.kind == ScopeKind::Branch;
-        at = s.parent;
-    }
     let has = |f| features.contains(f);
-    let file_top = d.scope(scope).kind == ScopeKind::File;
     let exprs = has(Feature::Expr(ExprTag::Num));
     let opens = depth < cap;
     ItemKind::ALL
         .into_iter()
-        .filter(|&k| has(Feature::Item(k)))
+        .filter(|&k| has(Feature::Item(k)) && placeable(d, scope, k, features))
         .filter(|&k| match k {
             ItemKind::Title => false,
-            ItemKind::Subckt => opens && (!in_subckt || has(Feature::Extra(Extra::NestedSubckt))),
-            ItemKind::Section => opens && file_top,
+            ItemKind::Subckt => opens,
+            ItemKind::Section => opens,
             ItemKind::If => opens && exprs,
             ItemKind::Loop => opens,
-            ItemKind::Func => exprs && (!in_subckt || has(Feature::Extra(Extra::LocalFunc))),
-            ItemKind::Param => exprs && (!in_branch || has(Feature::Extra(Extra::ParamInBranch))),
-            ItemKind::Load => !in_branch || has(Feature::Extra(Extra::LoadInBranch)),
-            ItemKind::Model => !in_subckt || has(Feature::Extra(Extra::LocalModel)),
+            ItemKind::Func => exprs,
+            ItemKind::Param => exprs,
             ItemKind::Comment
+            | ItemKind::Load
+            | ItemKind::Model
             | ItemKind::Include
             | ItemKind::Global
             | ItemKind::Opaque

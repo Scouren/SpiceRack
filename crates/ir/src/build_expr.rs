@@ -6,14 +6,16 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7, C7, C9, Addenda A1–A3.
 //!
-//! Contents: `Builder::literal`, `Builder::num`, `Builder::string`, `Builder::param_ref`,
+//! Contents: `Builder::literal`, `Builder::long_literal`, `Builder::num`, `Builder::string`, `Builder::param_ref`,
 //! `Builder::call`, `Builder::user_call`, `Builder::unary`, `Builder::binary`,
 //! `Builder::ternary`, `Builder::v`, `Builder::i`, `Builder::time`, `Builder::temp`,
 //! `Builder::freq`, `Builder::tstep`, `Builder::tstop`, `Builder::tnom`, `Builder::draw`,
-//! `Builder::list` (each `-> ExprId`); crate: `Builder::expr_row`, `Builder::assert_expr`
+//! `Builder::list` (each `-> ExprId`); crate: `Builder::rebuild`, `Builder::expr_row`, `Builder::assert_expr`
 
 use crate::build::Builder;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, Literal, UnOp, UserCall};
+use crate::expr::{
+    BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, Literal, NumForm, UnOp, UserCall,
+};
 use crate::id::{DefId, EXPRS_MAX, ExprId, NameId, Ref};
 
 impl Builder<'_> {
@@ -26,6 +28,30 @@ impl Builder<'_> {
         assert!(nums.len() < EXPRS_MAX, "at most EXPRS_MAX literals");
         nums.push(literal);
         let id = (nums.len() - 1) as u32;
+        self.expr_row(ExprTag::Num, 0, id, 0)
+    }
+
+    /// A literal whose significand has more significant digits than the mantissa holds (A18):
+    /// `significand` as written (`[-]digits[.digits]`), `exp10` the power written or implied by
+    /// a scale letter, `written` the form it was written in (`Plain` with `exp10 == 0`,
+    /// `Exponent`, or `Scale` with a letter's power). Asserts the significand is that long
+    /// (`literal::exceeds_mantissa`; a shorter one is built with `literal`) and well formed.
+    pub fn long_literal(&mut self, significand: &str, exp10: i16, written: NumForm) -> ExprId {
+        assert!(
+            crate::literal::long_ok(significand, exp10, written),
+            "a long literal meets its invariants (and does not fit the mantissa)"
+        );
+        let x = &mut self.design.exprs;
+        assert!(x.nums.len() < EXPRS_MAX, "at most EXPRS_MAX literals");
+        x.long.push(significand.into());
+        let literal = Literal {
+            mantissa: (x.long.len() - 1) as i64,
+            frac: written as u8,
+            exp10,
+            form: NumForm::Long,
+        };
+        x.nums.push(literal);
+        let id = (x.nums.len() - 1) as u32;
         self.expr_row(ExprTag::Num, 0, id, 0)
     }
 
@@ -152,6 +178,49 @@ impl Builder<'_> {
     pub fn list(&mut self, elements: &[ExprId]) -> ExprId {
         let list = self.exprs(elements);
         self.expr_row(ExprTag::List, 0, list.start, list.len)
+    }
+
+    /// Appends a copy of `e` with `kids` for its children, in `Design::children`'s order (A23:
+    /// a changed spine is appended again, so children stay below parents). A leaf is returned
+    /// as is. Asserts `kids` has `e`'s child count.
+    pub(crate) fn rebuild(&mut self, e: ExprId, kids: &[ExprId]) -> ExprId {
+        let x = &self.design.exprs;
+        let i = e.index();
+        let (tag, sub, a, b) = (x.tags[i], x.subs[i], x.a[i], x.b[i]);
+        let mut old = Vec::new();
+        self.design.children(e, &mut old);
+        assert!(old.len() == kids.len(), "a rebuild keeps the child count");
+        match tag {
+            ExprTag::Call | ExprTag::Draw | ExprTag::List => {
+                let list = self.exprs(kids);
+                self.expr_row(tag, sub, list.start, list.len)
+            }
+            ExprTag::UserCall => {
+                let func = self.design.exprs.calls[a as usize].func;
+                let args = self.exprs(kids);
+                let calls = &mut self.design.exprs.calls;
+                calls.push(UserCall { func, args });
+                let index = (calls.len() - 1) as u32;
+                self.expr_row(tag, sub, index, b)
+            }
+            ExprTag::Unary => self.expr_row(tag, sub, kids[0].0, b),
+            ExprTag::Binary => self.expr_row(tag, sub, kids[0].0, kids[1].0),
+            ExprTag::Ternary => {
+                let pair = self.exprs(&kids[1..]);
+                self.expr_row(tag, sub, kids[0].0, pair.start)
+            }
+            ExprTag::Num
+            | ExprTag::Str
+            | ExprTag::Param
+            | ExprTag::V
+            | ExprTag::I
+            | ExprTag::Time
+            | ExprTag::Temp
+            | ExprTag::Freq
+            | ExprTag::TStep
+            | ExprTag::TStop
+            | ExprTag::Tnom => e,
+        }
     }
 
     /// Appends one expression row. Asserts `EXPRS_MAX` and that the columns stay parallel.

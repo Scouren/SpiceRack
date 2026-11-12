@@ -33,21 +33,22 @@ use crate::diag::Diags;
 use crate::expr::Expr;
 #[cfg(any(test, feature = "gen"))]
 use crate::expr::ExprTag;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::NameId;
-use crate::id::{ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
     TargetUse, dump_target, parse_target, target_features, target_handles, target_refs,
-    target_valid,
+    target_refs_into, target_valid,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::{gen_ref, gen_target, target_kinds};
+use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
 use crate::run_words::{
     get, loop_depth, pool, put_expr, put_flag, put_name, take_enum, take_expr, take_name,
@@ -75,6 +76,11 @@ impl RowFacts for Loop {
         by_loop!(self.kind, handles_of(design, self.detail, out));
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let row: Loop = design.row(at.index);
+        by_loop!(row.kind, exprs_of(design, row.detail, f));
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // A sweep's target, or a table's columns in order; a Monte Carlo loop holds none.
         let row: Loop = design.row(at.index);
@@ -100,6 +106,30 @@ impl RowFacts for Loop {
         }
     }
 
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order
+        match self.kind {
+            LoopKind::Sweep => {
+                if let Some(d) =
+                    <SweepLoop as crate::design::DetailRow>::rows(design).get(self.detail as usize)
+                {
+                    target_refs_into(&d.target, out);
+                }
+            }
+            LoopKind::Table => {
+                let Some(t) = detail_get::<TableLoop>(design, self.detail) else {
+                    return;
+                };
+                let start = t.columns.start as usize;
+                let end = (start + t.columns.len as usize).min(design.run.targets.len());
+                for target in &design.run.targets[start.min(end)..end] {
+                    target_refs_into(target, out);
+                }
+            }
+            LoopKind::MonteCarlo => {}
+        }
+    }
+
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         let mut add = |x: RunExtra| *set = set.with(Feature::Run(x));
         match self.kind {
@@ -111,9 +141,6 @@ impl RowFacts for Loop {
             LoopEnd::Restore => RunExtra::LoopRestore,
             LoopEnd::KeepLast => RunExtra::LoopKeepLast,
         });
-        if loop_depth(design, self.body) > 1 {
-            add(RunExtra::LoopNested);
-        }
         // `LoopScoped` is a fact of the whole design: `analysis::design_features`.
         let body = design.items(self.body);
         let over_op = self.kind == LoopKind::Sweep
@@ -122,6 +149,12 @@ impl RowFacts for Loop {
             && Analysis::table(design).get(body[0].index).kind == AnalysisKind::Op;
         if over_op {
             add(RunExtra::LoopOverOp);
+        }
+        if !self.name.is_none() {
+            add(RunExtra::LoopNamed);
+        }
+        if self.kind == LoopKind::Sweep && !one_run(design, self.body) {
+            add(RunExtra::SweepBodyNotOne);
         }
         by_loop!(self.kind, features_of(design, self.detail, set));
     }
@@ -178,13 +211,16 @@ impl RowFacts for Loop {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let has = |x: RunExtra| features.contains(Feature::Run(x));
         let design = b.design();
         let outer = loop_depth(design, scope);
-        if (outer > 0 && !has(RunExtra::LoopNested)) || outer >= LOOP_DEPTH_MAX {
+        if outer >= LOOP_DEPTH_MAX {
             return ItemRef::NONE;
         }
         if !has(RunExtra::LoopScoped) && !design.analyses.is_empty() {
@@ -203,8 +239,9 @@ impl RowFacts for Loop {
         }
         let after = ends[g.below(ends.len() as u32) as usize];
         let targets = !target_kinds(features, TargetUse::Loop).is_empty();
+        // the kernel fills the body: without `SweepBodyNotOne` no sweep loop is safe to open
         let kinds: Vec<LoopKind> = [
-            (LoopKind::Sweep, targets),
+            (LoopKind::Sweep, targets && has(RunExtra::SweepBodyNotOne)),
             (LoopKind::Table, targets && has(RunExtra::LoopTable)),
             (LoopKind::MonteCarlo, has(RunExtra::LoopMonteCarlo)),
         ]
@@ -217,7 +254,7 @@ impl RowFacts for Loop {
         }
         let kind = kinds[g.below(kinds.len() as u32) as usize];
         // The name first: the text interns it before the detail's names.
-        let name = if g.chance(4) {
+        let name = if has(RunExtra::LoopNamed) && g.chance(4) {
             g.fresh_name(b)
         } else {
             NameId::NONE
@@ -239,8 +276,8 @@ impl RowFacts for Loop {
         let op_ok = features.contains(Feature::Item(ItemKind::Analysis))
             && features.contains(Feature::Analysis(AnalysisKind::Op))
             && (d.analyses.is_empty() || has(RunExtra::SeveralAnalyses))
-            && (!crate::state_order::nested(d, body) || has(RunExtra::RunItemNested))
-            // the guard Analysis::generate keeps: without `LoopScoped`, inside every loop
+            && crate::r#gen::placeable(d, body, ItemKind::Analysis, features)
+            // as `Analysis::generate`: without `LoopScoped` an analysis is inside every loop
             && (has(RunExtra::LoopScoped) || loop_depth(d, body) == d.loops.len());
         if kind == LoopKind::Sweep
             && has(RunExtra::LoopOverOp)
@@ -266,10 +303,20 @@ impl RowFacts for Alter {
         out.push(Handle::Expr(self.value));
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: Alter = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let mut row: Alter = design.row(at.index);
         target_refs(&mut row.target, f);
         design.editor().set(at.index, row);
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        target_refs_into(&self.target, out);
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
@@ -312,6 +359,9 @@ impl RowFacts for Alter {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -347,6 +397,14 @@ impl RowFacts for Elaborate {
         let end = (start + row.circuits.len as usize).min(design.run.refs.len());
         for r in &mut design.run.refs[start.min(end)..end] {
             f(r, DefKind::Subckt);
+        }
+    }
+
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        let start = self.circuits.start as usize;
+        let end = (start + self.circuits.len as usize).min(design.run.refs.len());
+        for r in &design.run.refs[start.min(end)..end] {
+            out.push((*r, DefKind::Subckt));
         }
     }
 
@@ -396,8 +454,11 @@ impl RowFacts for Elaborate {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        _features: &FeatureSet,
+        features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         let n = 1 + g.below(2) as usize;
         let refs: Vec<Ref> = (0..n)
             .map(|_| gen_ref(g, b, Some(DefKind::Subckt)))
@@ -408,3 +469,21 @@ impl RowFacts for Elaborate {
 }
 
 // ---- private ----
+
+/// Whether `body` holds, comments aside, exactly one analysis or one sweep loop (VACASK's
+/// one analysis per sweep, A22).
+fn one_run(design: &Design, body: ScopeId) -> bool {
+    let mut runs = design
+        .items(body)
+        .iter()
+        .filter(|i| i.kind != ItemKind::Comment);
+    let one = match (runs.next(), runs.next()) {
+        (Some(only), None) => Some(*only),
+        _ => None,
+    };
+    one.is_some_and(|i| {
+        i.kind == ItemKind::Analysis
+            || (i.kind == ItemKind::Loop
+                && Loop::table(design).get(i.index).kind == LoopKind::Sweep)
+    })
+}

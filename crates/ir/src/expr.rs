@@ -308,6 +308,9 @@ pub enum Func {
     /// addendum: VACASK's `sgn`, DIALECT-VACASK Appendix A runs e1, f4). `Sgn` is −1, 0, 1 and
     /// Real.
     SgnZeroPos,
+    /// The value of `x`, of Real type (A21, R40: VACASK's behavioural source reads every free
+    /// identifier as a real Verilog-A parameter). The mirror of `ToInt`.
+    ToReal,
 }
 
 /// A statistical distribution of a draw. Outside sampling a draw's value is a simulator rule;
@@ -367,6 +370,8 @@ pub(crate) struct Exprs {
     pub(crate) calls: Vec<UserCall>,
     /// The literal side table (`NumId`).
     pub(crate) nums: Vec<Literal>,
+    /// The significands of `Long` literals as written (A18), by a `Long` literal's `mantissa`.
+    pub(crate) long: Vec<Box<str>>,
 }
 
 /// A user-function call's payload (two words do not hold a reference and a list).
@@ -470,7 +475,7 @@ impl UnOp {
 
 impl Func {
     /// Every function, in declaration order.
-    pub const ALL: [Func; Func::SgnZeroPos as usize + 1] = [
+    pub const ALL: [Func; Func::ToReal as usize + 1] = [
         Func::Abs,
         Func::Sqrt,
         Func::SqrtAbs,
@@ -516,6 +521,7 @@ impl Func {
         Func::Pwl,
         Func::ToInt,
         Func::SgnZeroPos,
+        Func::ToReal,
     ];
     /// Function count.
     pub const COUNT: usize = Self::ALL.len();
@@ -557,7 +563,8 @@ impl Func {
             | Func::Ddt
             | Func::Idt
             | Func::ToInt
-            | Func::SgnZeroPos => (1, 1),
+            | Func::SgnZeroPos
+            | Func::ToReal => (1, 1),
             Func::Pow
             | Func::PowAbs
             | Func::PowRe

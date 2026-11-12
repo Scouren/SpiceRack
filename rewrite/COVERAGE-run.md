@@ -86,7 +86,7 @@ result-side fact (backend, harness), outside the netlist IR.
 
 ## INV-constructs §H (outputs)
 
-- H1 → `output::Save { analysis, every_analysis, probes }`; HSPICE `.probe kind …` → `every_analysis: false`; `.option post` → the save set (reader rule); Xyce `.SAVE`: Private (state file).
+- H1 → `output::Save { analyses: AnalysisKinds, probes }`; HSPICE `.probe kind …` → one kind; VACASK `save` → op, dc and tran (A22); `.option post` → the save set (reader rule); Xyce `.SAVE`: Private (state file).
 - H2 → `output::Print { analysis, view, probes }`; Xyce-only kinds `homotopy es pce mpde* ac_ic tranadjoint hb_ic hb_startup`: Private; `PRECISION=`/formats: gap G-PRINTFMT.
 - H3 → `probe::Probe` kinds `V, Vdiff, I, Param, Power, Expr, AllV, AllI, …`; `V(*)` → `AllV`; Xyce `n(…)` → `Param`; lead currents → `ITerminal`; Spectre `dev:p`/`inst:index` → `ITerminal`; VACASK `default`/`full` → categories (reader rule).
 - H4 → `output::Measure` + `measure::{MeasureTrigTarg, MeasureWhen, MeasureFind, MeasureDeriv, MeasureStat, MeasureParam}`; Xyce FFT measures: Private.

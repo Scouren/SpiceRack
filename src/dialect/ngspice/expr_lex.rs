@@ -21,7 +21,7 @@ use crate::ir;
 /// A token of an expression.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum Tok {
-    Num(ir::Literal, bool),
+    Num(ir::Literal, number::Fit),
     Ident(String),
     V(String, Option<String>),
     I(String),
@@ -121,7 +121,7 @@ pub(super) fn lex(text: &str, eval: Eval) -> Result<Vec<Tok>, Fail> {
             }
             b'0'..=b'9' | b'.' => {
                 let s = number::scan(&text[k..], eval.grammar()).ok_or_else(Fail::invalid)?;
-                (Tok::Num(s.literal, s.rounded), s.len)
+                (Tok::Num(s.literal, s.fit), s.len)
             }
             c if c.is_ascii_alphabetic() || c == b'_' => ident_or_probe(text, k)?,
             b'(' => (Tok::Open, 1),

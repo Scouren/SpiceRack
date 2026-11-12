@@ -34,11 +34,11 @@
 //! Cites: `REWRITE-PLAN.md` §2.1–§2.4, §3.4, §4.1; `rewrite/SPINE.md` §2–§3.
 //!
 //! Contents:
-//! - `pub trait Read` (`Read::references`, `Read::read`), `pub trait Write` (`Write::features`,
-//!   `Write::write`)
+//! - `pub trait Read` (`Read::references`, `Read::read`),
+//!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`)
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
-//!   `pub const INERT_DROPPED: ir::Code`
+//!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
 //!   `pub mod ngspice`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
@@ -67,8 +67,9 @@ pub trait Read: Sync {
 
     /// Every statement of every file of `src` becomes IR items, or an `Opaque` item with a
     /// coded diagnostic. Total: never panics on input, never drops a statement, never learns a
-    /// target. A reader of a SPICE-family dialect creates the design's files in `src`'s order
-    /// (the facade anchors diagnostics by it).
+    /// target. A reader creates a file for every text of `src`, in `src`'s order, the entry
+    /// first, even when the text is empty (the facade anchors diagnostics by that order, and
+    /// `transpile` writes the entry).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags);
 }
 
@@ -149,6 +150,10 @@ pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
 /// `arg` 0.
 pub const INERT_DROPPED: ir::Code = ir::Code::new(b'S', 102);
 
+/// The note [`legalize`] adds where it drops a solver hint of another dialect (`Hint`, R19):
+/// `S0103`, `arg` 0.
+pub const HINT_DROPPED: ir::Code = ir::Code::new(b'S', 103);
+
 /// The spine's catalogue rows, in code order.
 const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
     (
@@ -166,6 +171,15 @@ const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
             title: "an inert statement of another dialect was dropped",
             cite: "rewrite/RULINGS.md R11; REWRITE-PLAN.md §3.4 (`Inert` changes no number)",
             explain: "The statement is another dialect's text that its own simulator runs to the same numbers without; the target cannot spell it, so it is left out. The deck is still written.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        HINT_DROPPED,
+        ir::Info {
+            title: "a solver hint of another dialect was dropped",
+            cite: "rewrite/RULINGS.md R19, R11; AMEND-A12 (`OpaqueClass::Hint`)",
+            explain: "The statement tunes another simulator's solver (tolerances, iteration limits, a method); it changes no meaning of the circuit, so it is left out. The numbers may move within the target solver's own tolerance. The deck is still written.",
             kind: ir::Kind::Note,
         },
     ),
@@ -216,7 +230,8 @@ pub fn read(
 /// `design` made legal for `to`, once per (design, target), in place (clone first to keep the
 /// neutral design or to write a second target). Every `Opaque` of another text family is
 /// dropped from its scope with an [`INERT_DROPPED`] note when its class is `Inert` (it moves no
-/// number) and refused otherwise (`U0001`, `arg` = `Feature::Item(Opaque)`, at the item); a
+/// number), with a [`HINT_DROPPED`] note when it is `Hint` (solver tuning: numbers may move
+/// within the solver's tolerance), and refused otherwise (`U0001`, `arg` = `Feature::Item(Opaque)`, at the item); a
 /// writer of [`ANY_FAMILY`] skips that step. Then `passes::legalize` with the writer's features,
 /// whose `ir::check_legal` reports what no pass removed. Last, always, the writer's own
 /// [`Write::admits`], so the caller sees every refusal at once. Legality is of the whole design.
@@ -237,9 +252,8 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
                 diags.push(INERT_DROPPED, span, 0);
                 dropped.push((item, scope));
             }
-            // a solver hint (A12 K3): another family leaves it out with the class's own note
             ir::OpaqueClass::Hint => {
-                diags.push(ir::diag::opaque_code(ir::OpaqueClass::Hint), span, 0);
+                diags.push(HINT_DROPPED, span, 0);
                 dropped.push((item, scope));
             }
             ir::OpaqueClass::Unread
@@ -317,18 +331,25 @@ pub fn transpile(
     if refused(&diags) {
         return Err(diags);
     }
-    let text = write(&design, design.entry(), to, &mut diags);
+    let entry = design.entry();
+    assert!(
+        entry != ir::FileId::NONE,
+        "transpile: the {} reader made no file",
+        from.name
+    );
+    let text = write(&design, entry, to, &mut diags);
     Ok(Written { text, notes: diags })
 }
 
-/// The catalogue row of `code`: the spine's own, else the IR crate's, else a dialect's
-/// (`ngspice::info`); `None` for a code no catalogue holds.
+/// The catalogue row of `code`: the spine's own, the passes' (`passes::info`), else the IR
+/// crate's, else a dialect's (`ngspice::info`); `None` for a code no catalogue holds.
 pub fn info(code: ir::Code) -> Option<ir::Info> {
     let spine = SPINE_CODES
         .iter()
         .find(|(c, _)| *c == code)
         .map(|(_, i)| *i);
     spine
+        .or_else(|| passes::info(code))
         .or_else(|| ir::diag::info(code))
         .or_else(|| ngspice::info(code))
 }
@@ -352,49 +373,11 @@ fn foreign(design: &ir::Design, to: &DialectRow) -> Vec<(ir::ItemRef, ir::ScopeI
     if to.text_family == ANY_FAMILY {
         return Vec::new();
     }
-    let mut out = reachable(design);
+    let mut out = design.reachable();
     out.retain(|(item, _)| {
         item.kind == ir::ItemKind::Opaque
             && design.str(design.row::<ir::item::Opaque>(item.index).dialect) != to.text_family
     });
-    out
-}
-
-/// Every reachable item with its listing scope, files in id order, each scope's items in
-/// order, nested bodies after their scope's items.
-// ponytail: a stand-in for the kernel's `Design::reachable()` (ruling 5); swap when it is public.
-fn reachable(design: &ir::Design) -> Vec<(ir::ItemRef, ir::ScopeId)> {
-    let mut out = Vec::new();
-    let mut todo = Vec::new();
-    let mut scopes = 0;
-    for file in design.files() {
-        todo.push(design.file(file).top);
-        // Bounded: each scope is pushed once, by its owner (checked by `ir::check`).
-        while let Some(scope) = todo.pop() {
-            scopes += 1;
-            assert!(
-                scopes <= ir::id::SCOPES_MAX,
-                "reachable: a scope listed twice"
-            );
-            for &item in design.items(scope) {
-                out.push((item, scope));
-                match item.kind {
-                    ir::ItemKind::Subckt => {
-                        todo.push(design.row::<ir::item::Subckt>(item.index).body)
-                    }
-                    ir::ItemKind::Section => {
-                        todo.push(design.row::<ir::item::Section>(item.index).body)
-                    }
-                    ir::ItemKind::Loop => todo.push(design.row::<ir::Loop>(item.index).body),
-                    ir::ItemKind::If => {
-                        let row: ir::item::If = design.row(item.index);
-                        todo.extend(design.branches(row.branches).iter().map(|b| b.body));
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
     out
 }
 

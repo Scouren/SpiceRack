@@ -1,0 +1,10 @@
+# codes: P1206 P1206 P1206 P1206
+file "polarity_default.sp" deck
+  title "polarity_default"
+  comment " oracle: inpgmod.c create_model (the type word is read as a parameter: psoi, phfet on MES, pmf on HFET1, pmos on SOI3 (its flags are nsoi psoi, soi3.c:177) are none, unrecognized, and the device runs its default n type), runs: psoi level=10 gives the nmos level=10 current -9.97549e-09, pmos level=60 the nsoi level=60 current -2.00010e-12 (six terminals, tb tof tob given)"
+  model s1 b4_soi polarity=n version="4.4"
+  model s2 b3_soi_pd polarity=n version="2.0"
+  model h1 mesfet polarity=n
+  model f5 hfet1 polarity=n
+  model s3 soi3 polarity=n
+  model s4 soi3 polarity=p

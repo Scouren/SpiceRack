@@ -4,7 +4,7 @@
 //! IR text (after `analysis <kind> [name=n]`; fields in declaration order):
 //!
 //! ```text
-//! dc       <target> <sweep> { <target> <sweep> } [restart]
+//! dc       <target> <sweep> [name=n] { <target> <sweep> [name=n] } [restart]
 //! ac       <sweep>
 //! noise    <probe> source=n <sweep> [points_per_summary=v] [ac_sweep] [source_ac]
 //! tf       <probe> source=n          dc_xf <probe>          xf <probe> <sweep>
@@ -32,9 +32,9 @@ use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
-#[cfg(any(test, feature = "gen"))]
-use crate::id::ExprId;
 use crate::id::ScopeId;
+#[cfg(any(test, feature = "gen"))]
+use crate::id::{ExprId, NameId};
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::gen_target;
 use crate::plan::{
@@ -45,6 +45,7 @@ use crate::probe::gen_probe;
 use crate::probe::{
     Probe, ProbeKind, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
 };
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -68,7 +69,12 @@ impl DetailFacts for Dc {
         for axis in get(&design.run.dc_axes, self.axes).unwrap_or(&[]) {
             target_handles(&axis.target, out);
             sweep_handles(&axis.sweep, out);
+            out.push(Handle::Name(axis.name));
         }
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.dc_axes(self.axes);
     }
 
     fn features(&self, design: &Design, set: &mut FeatureSet) {
@@ -76,6 +82,7 @@ impl DetailFacts for Dc {
         flag(set, axes.len() > 1, RunExtra::DcNested);
         flag(set, self.restart, RunExtra::DcRestart);
         for axis in axes {
+            flag(set, !axis.name.is_none(), RunExtra::DcAxisNamed);
             target_features(&axis.target, TargetUse::Dc, set);
             sweep_features(&axis.sweep, set);
         }
@@ -96,6 +103,7 @@ impl DetailFacts for Dc {
         for axis in design.dc_axes(self.axes) {
             dump_target(design, ctx, &axis.target, out);
             dump_sweep(design, ctx, &axis.sweep, out);
+            put_name(out, design, "name", axis.name);
         }
         put_flag(out, self.restart, "restart");
     }
@@ -110,7 +118,12 @@ impl DetailFacts for Dc {
         while words.peek() == Some("(") {
             let target = parse_target(words, b, diags)?;
             let sweep = parse_sweep(words, scope, b, diags)?;
-            axes.push(DcAxis { target, sweep });
+            let name = take_name(words, "name", b, diags);
+            axes.push(DcAxis {
+                target,
+                sweep,
+                name,
+            });
         }
         let restart = take_word(words, "restart");
         Some(Dc {
@@ -134,9 +147,17 @@ impl DetailFacts for Dc {
         let mut axes = Vec::with_capacity(n);
         for _ in 0..n {
             let target = gen_target(g, b, features, TargetUse::Dc)?;
+            let sweep = gen_sweep(g, b, features);
+            // after the sweep: the text interns the name after the sweep's values
+            let name = if has(features, RunExtra::DcAxisNamed) && g.chance(3) {
+                g.fresh_name(b)
+            } else {
+                NameId::NONE
+            };
             axes.push(DcAxis {
                 target,
-                sweep: gen_sweep(g, b, features),
+                sweep,
+                name,
             });
         }
         let restart = has(features, RunExtra::DcRestart) && g.chance(2);
@@ -150,6 +171,10 @@ impl DetailFacts for Dc {
 impl DetailFacts for Ac {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         sweep_handles(&self.sweep, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, set);
@@ -189,6 +214,12 @@ impl DetailFacts for Noise {
         out.push(Handle::Name(self.source));
         sweep_handles(&self.sweep, out);
         out.push(Handle::Expr(self.points_per_summary));
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
+        r.expr(&mut self.points_per_summary);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -295,6 +326,10 @@ impl DetailFacts for Tf {
         probe_handles(&self.output, out);
         out.push(Handle::Name(self.source));
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -336,6 +371,10 @@ impl DetailFacts for DcXf {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
@@ -371,6 +410,10 @@ impl DetailFacts for DcXf {
 impl DetailFacts for Sens {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -408,6 +451,11 @@ impl DetailFacts for Xf {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
         sweep_handles(&self.sweep, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -451,6 +499,11 @@ impl DetailFacts for SensAc {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         probe_handles(&self.output, out);
         sweep_handles(&self.sweep, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);

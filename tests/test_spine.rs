@@ -4,14 +4,10 @@
 //! format and code map, the route override, and `Sources::load`'s walk.
 //!
 //! Oracles: canonical IR text read and written back is the same text (a fixpoint): the
-//! kernel's kinds today (`KERNEL`), the grammar's worked example (`crates/ir/src/text.rs`) when
-//! the circuit and run rows land; hand-computed line and column of a byte offset; the old
+//! kernel's kinds (`KERNEL`) and the grammar's worked example (`crates/ir/src/text.rs`); hand-computed line and column of a byte offset; the old
 //! catalogue's own titles; the route rules of `rewrite/SPINE.md` §5 written out as a table; a
 //! hand-built include graph with its expected breadth-first order.
-//!
-//! A test that reaches an IR stub carries the marker
-//! `#[should_panic(expected = "not yet implemented")]`: it fails (an unexpected pass) the day
-//! the rows land, until the marker goes.
+
 //!
 //! Contents: tests only.
 
@@ -20,8 +16,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use spicerack::dialect::facade::{self, IR_NOTE, IR_REFUSAL, Pipeline, ROUTES};
 use spicerack::dialect::{
-    self, BUILTIN, DialectRow, INERT_DROPPED, Policy, Reference, STRICT_UNREAD, Sources, Write,
-    irtext::IrText,
+    self, BUILTIN, DialectRow, HINT_DROPPED, INERT_DROPPED, Policy, Reference, STRICT_UNREAD,
+    Sources, Write, irtext::IrText,
 };
 use spicerack::ir;
 use spicerack::syntax::diag::{Code, info};
@@ -79,37 +75,12 @@ static NO_SUBCKT: DialectRow = DialectRow {
 /// states), and counts its write calls.
 struct Picky(AtomicUsize);
 
-static PICKY: Picky = Picky(AtomicUsize::new(0));
-
-static PICKY_ROW: DialectRow = DialectRow {
-    name: "picky",
-    text_family: dialect::ANY_FAMILY,
-    read: None,
-    write: Some(&PICKY),
-};
-
 /// The picky writer's refusal: a code of its own (no catalogue holds it, so it refuses).
 const PICKY_CODE: ir::Code = ir::Code::new(b'W', 9001);
 
-/// A Spectre-family writer that counts its calls and spells everything.
+/// A writer of one text family that counts its calls and spells everything. Each test makes its
+/// own ([`counting`]), so tests running in parallel never share a counter.
 struct Counting(AtomicUsize);
-
-static SPECTRE_STUB: Counting = Counting(AtomicUsize::new(0));
-static NGSPICE_STUB: Counting = Counting(AtomicUsize::new(0));
-
-static SPECTRE_ROW: DialectRow = DialectRow {
-    name: "spectre-stub",
-    text_family: "spectre",
-    read: None,
-    write: Some(&SPECTRE_STUB),
-};
-
-static NGSPICE_ROW: DialectRow = DialectRow {
-    name: "ngspice-stub",
-    text_family: "ngspice",
-    read: None,
-    write: Some(&NGSPICE_STUB),
-};
 
 /// Two files: an inert ngspice statement in the deck, a private one in the library.
 const TWO_FILES: &str = "\
@@ -166,6 +137,30 @@ impl Write for Picky {
 }
 
 // ---- private ----
+
+/// A fresh counting writer of `family` and its row (leaked: a row holds `&'static dyn Write`).
+fn counting(family: &'static str) -> (&'static DialectRow, &'static Counting) {
+    let stub: &'static Counting = Box::leak(Box::new(Counting(AtomicUsize::new(0))));
+    let row = Box::leak(Box::new(DialectRow {
+        name: "counting-stub",
+        text_family: family,
+        read: None,
+        write: Some(stub),
+    }));
+    (row, stub)
+}
+
+/// A fresh picky writer and its row, as [`counting`].
+fn picky() -> (&'static DialectRow, &'static Picky) {
+    let stub: &'static Picky = Box::leak(Box::new(Picky(AtomicUsize::new(0))));
+    let row = Box::leak(Box::new(DialectRow {
+        name: "picky",
+        text_family: dialect::ANY_FAMILY,
+        read: None,
+        write: Some(stub),
+    }));
+    (row, stub)
+}
 
 fn ir_row() -> &'static DialectRow {
     dialect::by_name("ir").expect("the ir row is built in")
@@ -265,7 +260,7 @@ fn legalize_drops_a_foreign_inert_and_refuses_a_foreign_private_once() {
         &mut diags,
     );
     let read_rows = diags.len();
-    dialect::legalize(&mut design, &SPECTRE_ROW, &mut diags);
+    dialect::legalize(&mut design, counting("spectre").0, &mut diags);
     let opaque = u32::from(ir::Feature::Item(ir::ItemKind::Opaque).index());
     let rows: Vec<(ir::Code, u32)> = diags.rows()[read_rows..]
         .iter()
@@ -292,20 +287,16 @@ fn after_one_clean_legalize_each_file_is_written_once() {
         &mut diags,
     );
     let read_rows = diags.len();
-    dialect::legalize(&mut design, &NGSPICE_ROW, &mut diags);
+    let (ngspice, stub) = counting("ngspice");
+    dialect::legalize(&mut design, ngspice, &mut diags);
     let added = &diags.rows()[read_rows..];
     assert!(added.is_empty(), "the ngspice family keeps both: {added:?}");
     let texts: Vec<String> = design
         .files()
-        .map(|f| dialect::write(&design, f, &NGSPICE_ROW, &mut diags))
+        .map(|f| dialect::write(&design, f, ngspice, &mut diags))
         .collect();
     assert_eq!(texts.concat(), TWO_FILES);
-    assert_eq!(NGSPICE_STUB.0.load(Ordering::Relaxed), 2);
-    assert_eq!(
-        SPECTRE_STUB.0.load(Ordering::Relaxed),
-        0,
-        "a refused design is never written"
-    );
+    assert_eq!(stub.0.load(Ordering::Relaxed), 2, "once per file");
 }
 
 #[test]
@@ -315,7 +306,8 @@ fn a_writer_admits_refusal_comes_last_from_legalize_and_stops_transpile() {
     let mut diags = ir::Diags::new();
     dialect::read(&src, ir_row(), Policy::Lenient, &mut design, &mut diags);
     let read_rows = diags.len();
-    dialect::legalize(&mut design, &PICKY_ROW, &mut diags);
+    let (row, stub) = picky();
+    dialect::legalize(&mut design, row, &mut diags);
     let added: Vec<ir::Code> = diags.rows()[read_rows..].iter().map(|d| d.code).collect();
     assert_eq!(added, [PICKY_CODE]);
     let at = diags.rows()[read_rows].span;
@@ -324,7 +316,7 @@ fn a_writer_admits_refusal_comes_last_from_legalize_and_stops_transpile() {
         "comment",
         "the row is at the comment"
     );
-    let refused = dialect::transpile(&src, ir_row(), &PICKY_ROW, Policy::Lenient);
+    let refused = dialect::transpile(&src, ir_row(), row, Policy::Lenient);
     let codes: Vec<ir::Code> = refused
         .expect_err("admits refused")
         .rows()
@@ -333,7 +325,7 @@ fn a_writer_admits_refusal_comes_last_from_legalize_and_stops_transpile() {
         .collect();
     assert_eq!(codes, [PICKY_CODE]);
     assert_eq!(
-        PICKY.0.load(Ordering::Relaxed),
+        stub.0.load(Ordering::Relaxed),
         0,
         "a refused design is never written"
     );
@@ -342,7 +334,7 @@ fn a_writer_admits_refusal_comes_last_from_legalize_and_stops_transpile() {
 #[test]
 fn a_writer_that_admits_everything_writes_as_before() {
     let src = Sources::one("kit.ir", KERNEL);
-    let out = dialect::transpile(&src, ir_row(), &NGSPICE_ROW, Policy::Lenient)
+    let out = dialect::transpile(&src, ir_row(), counting("ngspice").0, Policy::Lenient)
         .unwrap_or_else(|d| panic!("refused: {:?}", d.rows()));
     assert_eq!(
         out.text,
@@ -350,6 +342,64 @@ fn a_writer_that_admits_everything_writes_as_before() {
             .split("file \"models.lib\"")
             .next()
             .expect("the deck")
+    );
+}
+
+#[test]
+fn a_routed_ir_text_diagnostic_names_its_line() {
+    let text = "file \"d.sp\" deck\n  title \"t\"\n  bogus line\n";
+    let refused = facade::render_text(text, "d", ir_row(), ir_row()).expect_err("P9001 refuses");
+    let line = refused.messages.lines().next().unwrap_or("");
+    assert!(
+        line.starts_with("d:3:"),
+        "a routed diagnostic names its line: {line}"
+    );
+}
+
+#[test]
+fn legalize_drops_a_foreign_hint_with_its_own_note_and_the_family_keeps_it() {
+    let text =
+        "file \"h.sp\" deck\n  title \"h\"\n  opaque ngspice hint \".options reltol=1e-4\"\n";
+    let read = |design: &mut ir::Design, diags: &mut ir::Diags| {
+        dialect::read(
+            &Sources::one("h.ir", text),
+            ir_row(),
+            Policy::Lenient,
+            design,
+            diags,
+        );
+    };
+    let (mut design, mut diags) = (ir::Design::new(), ir::Diags::new());
+    read(&mut design, &mut diags);
+    let at = diags.len();
+    dialect::legalize(&mut design, counting("spectre").0, &mut diags);
+    let rows: Vec<(ir::Code, u32)> = diags.rows()[at..].iter().map(|d| (d.code, d.arg)).collect();
+    assert_eq!(rows, [(HINT_DROPPED, 0)]);
+    let kinds: Vec<ir::ItemKind> = design.reachable().iter().map(|(i, _)| i.kind).collect();
+    assert_eq!(kinds, [ir::ItemKind::Title], "the hint is gone");
+    let (mut design, mut diags) = (ir::Design::new(), ir::Diags::new());
+    read(&mut design, &mut diags);
+    let at = diags.len();
+    dialect::legalize(&mut design, counting("ngspice").0, &mut diags);
+    assert!(diags.rows()[at..].is_empty(), "its own family keeps it");
+    assert_eq!(design.reachable().len(), 2);
+    assert!(dialect::info(HINT_DROPPED).is_some_and(|i| i.kind == ir::Kind::Note));
+}
+
+#[test]
+fn a_kit_whose_entry_is_a_library_writes_the_library() {
+    let text = "file \"m.lib\" library\n  param vth = 0.4\nfile \"d.sp\" deck\n  title \"d\"\n";
+    let out = dialect::transpile(
+        &Sources::one("m.ir", text),
+        ir_row(),
+        ir_row(),
+        Policy::Lenient,
+    )
+    .unwrap_or_else(|d| panic!("refused: {:?}", d.rows()));
+    assert!(
+        out.text.starts_with("file \"m.lib\""),
+        "transpile writes the library: {}",
+        out.text
     );
 }
 

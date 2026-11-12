@@ -215,6 +215,7 @@ above could not say, so its final shape is (as implemented in `facts.rs`):
 ```rust
 fn handles(&self, design: &Design, out: &mut Vec<Handle>);
 fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
+fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>); // M5: read twin
 fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
 fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags);
 fn dump(&self, design: &Design, ctx: &text::Ctx, out: &mut String);
@@ -272,8 +273,9 @@ number; `Bindings::param_value` passes a typed parameter, defaulting to `param` 
 `Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
 `Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
 chosen branch's; `ToInt` Int; `SgnZeroPos` (−1 for `x < 0`, +1 otherwise, −0.0 included:
-VACASK's `sgn`, runs e1, f4) its operand's; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
-domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`. An Int
+VACASK's `sgn`, runs e1, f4) its operand's; `ToReal` (A21, R40: the value of `x`, VACASK run
+b1) Real; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`, `ToReal` is `to_real`. An Int
 and a real literal of one value are not `eq_value` (they mean different things).
 
 **A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
@@ -281,9 +283,9 @@ resolved `Ref` (a row reference, or a `Param`/`UserCall` in one of its expressio
 definition that lives in the body of a subcircuit enclosing the item's own subcircuit: on the
 item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still at or past it
 (so neither the own subcircuit nor a file's top). An item in no subcircuit never has it.
-`Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
+`Extra::FormalNotConstant` (was `FormalReadsParam`; widened by A15): a `Subckt` head default that is not a constant, holding a `Param` read anywhere in its tree or of class `Temp`. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
-leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+leaf or a `$temp` in a head default only when it has `FormalNotConstant` (VACASK runs n1, m1, c1, t2).
 `Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose
 top scope lists no `Title`. The generator titles every deck when the set lacks it, and makes
 only libraries when the set has neither it nor `Item(Title)`.
@@ -294,6 +296,96 @@ its code is `S0006` and no earlier code moves; IR text word `hint`. Its note say
 copies it and another family leaves it out, the numbers moving at most within the solver's
 tolerance (not `Inert`'s note: an `Inert` statement moves no number). Dropping it is the spine's
 `legalize`, not the kernel's.
+
+**A15 K2 (2026-11-12): two more extras.** `Extra::FormalWithoutDefault`: a `Subckt` head
+parameter with no default (an instance must pass it). `Extra::IfConditionDynamic`: an `If`
+condition of class `Temp` or `Circuit` (transitive, as the `*Dyn` features are). The generator
+gives every formal a default and makes every condition `Constant` unless the set has the
+feature.
+
+**A15 K3 (2026-11-12): two invariants.** A `Title`'s or `Comment`'s text holds no line break
+(`\n` or `\r`): `FieldDomain`. `ProbeContext` follows the class: a constant-in-time field
+(`Handle::Expr`, a list of them, a head default) whose expression is of class `Circuit` through a
+parameter or function it reads is a violation, as a direct probe is. That pass runs last and only
+on a design with no other violation (the class table reads definitions through their rows).
+The generator writes one-line titles and comments, and a tree under `Reads::Constant` reads no
+`Circuit`-class definition.
+
+**A15 K4 (2026-11-12): literal equality (R28).** `Design::eq_meaning` compares two real
+literals by exact value whatever their forms (`1k` = `1e3` = `1000` = `1000.0`); an `Int` literal
+equals only an `Int` of the same value. `Design::eq_ignoring_spans` stays exact: forms are
+compared. Both were already so; `kernel_literal` pins it.
+
+**A15 K1 (2026-11-12): placement is a feature class (R27, ruled "enclosed").**
+`Feature::Placed(ScopeKind, ItemKind)`: an item of that kind with a scope of that kind on its
+scope chain, at any depth; `File` is never the scope kind (every target has a file's top), so the
+group is 4 × `ItemKind::COUNT`. A subcircuit in an `If` branch in a subcircuit sets
+`Placed(Branch, Subckt)` and `Placed(Subckt, Subckt)`. The kernel sets it for every item in
+`item_features`; no owner sets a placement member. `FeatureSet::placed(scope, &[kinds])` builds a
+writer's set. It replaces, with this mapping:
+
+| Was | Now |
+|---|---|
+| `Extra::NestedSubckt` | `Placed(Subckt, Subckt)` |
+| `Extra::LocalModel` | `Placed(Subckt, Model)` |
+| `Extra::LocalFunc` | `Placed(Subckt, Func)` |
+| `Extra::ParamInBranch` | `Placed(Branch, Param)` |
+| `Extra::LoadInBranch` | `Placed(Branch, Load)` |
+| `RunExtra::NodeSetInSubckt` | `Placed(Subckt, NodeSet)` |
+| `RunExtra::LoopNested` | `Placed(Loop, Loop)` |
+| `RunExtra::RunItemNested` | `Placed(Subckt, K)` and `Placed(Section, K)` for the run kind `K` |
+
+The generator's `fill` admits a kind in a scope only when every placement it would make is in
+the set (`gen::placeable`, also for a row's own generator that pushes into a body it opened);
+sections may now be nested where the set allows. `Placed(_, Title)` never occurs: a title stands
+only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
+text refuses it, so only a pass moving the item reaches the check).
+
+**A19 (2026-11-12): a field that may read the circuit counts the dynamic form (R38).** An
+expression a row lists as `Handle::ExprDyn` counts its functions and operators as `FuncDyn`,
+`BinaryDyn` and `UnaryDyn` whatever its class; elsewhere the form follows the class as before
+(dynamic when `Temp` or `Circuit`). A constant in a B source's expression is the dynamic form,
+because its simulator reads that field with the behavioural parser (`B1 a 0 V={2**3}`). The
+generator picks operators from the dynamic features for every tree under `Reads::Circuit`, and
+for a `Handle::ExprDyn` field it builds with constant reads (`Gen::dyn_form`, a measure's
+threshold).
+
+**A23 (2026-11-12): the passes' door for expressions.** A fourth row fact beside `handles`,
+`map_refs` and `refs`:
+
+```rust
+pub enum ExprUse { Constant, Circuit }
+fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)); // default: no root
+```
+
+It calls `f` on exactly the roots `handles` lists, in its order (`NONE` included): a single
+`Expr` (`Constant`) or `ExprDyn` (`Circuit`) field, each `Exprs` element and each `Params` value
+(`Constant`), and stores back what `f` changed. `Editor::map_exprs` dispatches it;
+`Design::item_handles` dispatches `handles` for readers. `rewrite_exprs(design, rule) -> u32`
+(`rewrite.rs`) rewrites every root of every listed item bottom-up: `rule(b, node)` sees a node
+whose children are rewritten and returns `Some(new)`; a node whose child changed is appended
+again (`Builder::rebuild`), an unchanged tree keeps its ids, a shared subtree is rewritten once
+(a memo by old id), the walk is an explicit stack, and only rows that existed before the pass are
+visited. Properties (`tests/kernel_rewrite.rs`): `map_exprs` against `handles` for every
+generated item (every kind of all three owners, since round 4), an identity
+rule changes no id, a wrapping rule changes every visited root and no `eval` value, and `check`
+finds nothing after either.
+
+**A18 (2026-11-12): a literal keeps digits its mantissa cannot hold (R37).** `NumForm::Long`: the
+significand as written (`[-]digits[.digits]`) lives in the design's long-literal pool beside the
+literal table; the row (still 16 bytes) holds its pool index in `mantissa`, the power in `exp10`,
+and the form that power was written in (`Plain`, `Exponent`, `Scale`) in `frac`. One bound
+decides long against short, `literal::exceeds_mantissa(significant_digits(..))`: more than 18
+significant digits, leading zeros not counted and trailing zeros as written counted (`0.000123`
+is 3 digits, `1.2300` is 5), the count a short mantissa holds; the lexer, `Builder::long_literal`
+and `check` call it, so no value has two rows. Value: the correctly rounded double of the digits
+(`Design::literal_value`). Equality: exact decimal equality, digits and power after stripping
+zeros, never the doubles (`Design::literal_eq`, and `eq_meaning` through it); an `Int` equals
+only an `Int`; `eq_ignoring_spans` compares the digits as written. The bare row's
+`Literal::value`, `eq_value` and `text::write_literal` assert "not Long", and `is_valid` is
+false for it; every generic caller goes through the design (`literal_value`, `literal_eq`,
+`long_digits`, `text::write_num`). IR text spells the digits as written, then the power in its
+form. `Extra::LongLiteral` marks one; the generator makes them only when the set has it.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
@@ -351,8 +443,8 @@ Unary(UnOp), UnaryDyn(UnOp), Dist(Dist), DrawWhen(DrawWhen), DrawPer(DrawPer), E
 Circuit(CircuitExtra), Run(RunExtra), Option(OptionKey) }` with a `const fn index(self) -> u16`
 (496 features at the freeze). The features that are fields, not kinds, are three closed enums,
 one per owner and each in its owner's file, so adding one never touches a kernel file: `Extra`
-(kernel, `feature.rs`: `NestedSubckt`, `LocalModel`, `LocalFunc`, `ParamInBranch`,
-`CaseSensitiveNames`, …), `CircuitExtra` (`circuit_extra.rs`: pulse cycle counts, PWL repeat
+(kernel, `feature.rs`: `IncludeSection`, `CaseSensitiveNames`, …; placement is
+`Feature::Placed` since A15 K1), `CircuitExtra` (`circuit_extra.rs`: pulse cycle counts, PWL repeat
 forms, each law variant, IC modes, parasitics, multiplicity per kind class, …), `RunExtra`
 (`run_extra.rs`: a simulator-chosen step, start-up, list and table sweeps, sweep ends, loop
 targets, measure and probe kinds, …). `FeatureSet` is a fixed bitset with `const` constructors

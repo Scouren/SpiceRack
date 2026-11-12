@@ -187,6 +187,12 @@ const FIXTURES: [(&str, Dialect); 7] = [
     ("net", Dialect::Ltspice),
 ];
 
+/// Directories under `tests/` whose files are not golden inputs: the new pipeline's
+/// per-dialect and per-pass fixtures (`tests/fixtures/dialect/<name>/`,
+/// `tests/fixtures/passes/<group>/<pass>/`), which their own tests read
+/// and the old pipeline never did; the gate's input set is what it was at the baseline.
+const FIXTURES_EXCLUDED: [&str; 2] = ["fixtures/dialect", "fixtures/passes"];
+
 impl Input {
     /// Its kit and its file in it: the PDK kit it shares, or its own,
     /// loaded by this call (the caller keeps it; a second call loads it
@@ -247,15 +253,8 @@ pub(super) fn inputs(repo: &Path, manifest: &mut Vec<String>) -> Vec<Input> {
     files(&repo.join("tests"), &mut found);
     let before = all.len();
     all.extend(found.into_iter().filter_map(|path| {
-        let ext = path.extension()?.to_str()?;
-        let &(_, by_ext) = FIXTURES.iter().find(|f| f.0 == ext)?;
         let tests = repo.join("tests");
-        // `tests/ltspice/` holds LTspice decks under `.cir` (stream F's
-        // pending-run decks), which the extension would read as Xyce.
-        let dialect = match path.starts_with(tests.join("ltspice")) {
-            true => Dialect::Ltspice,
-            false => by_ext,
-        };
+        let dialect = fixture(&tests, &path)?;
         Some(Input {
             set: "fixtures",
             rel: rel(repo, &path),
@@ -316,6 +315,26 @@ fn files(dir: &Path, out: &mut Vec<PathBuf>) {
         } else {
             out.push(p);
         }
+    }
+}
+
+/// The dialect a file under `tests` is read in as a fixture input, by its extension, or `None`
+/// when it is not one: another extension, or a directory of [`FIXTURES_EXCLUDED`].
+fn fixture(tests: &Path, path: &Path) -> Option<Dialect> {
+    let under = rel(tests, path);
+    if FIXTURES_EXCLUDED
+        .iter()
+        .any(|d| under.starts_with(&format!("{d}/")))
+    {
+        return None;
+    }
+    let ext = path.extension()?.to_str()?;
+    let &(_, by_ext) = FIXTURES.iter().find(|f| f.0 == ext)?;
+    // `tests/ltspice/` holds LTspice decks under `.cir` (stream F's
+    // pending-run decks), which the extension would read as Xyce.
+    match path.starts_with(tests.join("ltspice")) {
+        true => Some(Dialect::Ltspice),
+        false => Some(by_ext),
     }
 }
 
@@ -476,4 +495,29 @@ fn normalize(p: &Path) -> PathBuf {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_dialect_fixture_is_not_an_input_and_a_neighbour_still_is() {
+        let tests = std::path::Path::new("/r/tests");
+        let at = |p: &str| super::fixture(tests, &tests.join(p));
+        assert_eq!(at("fixtures/dialect/ngspice/read/a.sp"), None);
+        assert_eq!(at("fixtures/dialect/vacask/b.sim"), None);
+        assert_eq!(at("fixtures/passes/waves/pulse/a.sp"), None);
+        assert_eq!(
+            at("fixtures/dialectx/a.sp"),
+            Some(spicerack::syntax::Dialect::Ngspice)
+        );
+        assert_eq!(
+            at("fixtures/transpiler/a.scs"),
+            Some(spicerack::syntax::Dialect::Spectre)
+        );
+        assert_eq!(
+            at("ltspice/p.cir"),
+            Some(spicerack::syntax::Dialect::Ltspice)
+        );
+        assert_eq!(at("fixtures/notes.txt"), None);
+    }
 }

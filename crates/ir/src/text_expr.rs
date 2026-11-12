@@ -11,7 +11,7 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9 (text), §7.2 (A4: references), §7.3 (A3: literals).
 //!
 //! Contents: `pub struct Ctx` (`Ctx::detached`), `pub fn write_expr`, `pub fn write_value`,
-//! `pub fn write_literal`, `pub fn write_name`, `pub fn write_string`, `pub fn write_ref`,
+//! `pub fn write_literal`, `pub fn write_num`, `pub fn write_name`, `pub fn write_string`, `pub fn write_ref`,
 //! `pub fn write_names`, `pub fn write_exprs`, `pub fn write_params`;
 //! crate: `pub(crate) fn binary_prec(BinOp) -> u8`, `pub(crate) fn func_text(Func) -> &'static str`
 
@@ -114,7 +114,7 @@ pub fn write_expr(design: &Design, e: ExprId, ctx: &Ctx, out: &mut String) {
             })
         };
         match design.expr(e) {
-            Expr::Num(n) => write_literal(design.num(n), out),
+            Expr::Num(n) => write_num(design, design.num(n), out),
             Expr::Str(s) => write_string(design.str(s), out),
             Expr::Param(r) => {
                 scratch.clear();
@@ -214,9 +214,17 @@ pub fn write_value(design: &Design, e: ExprId, ctx: &Ctx, out: &mut String) {
     }
 }
 
-/// Appends a literal: its digits with `frac` of them after the point, then `e<exp10>`, a scale
-/// letter, `mil`, or nothing (A3).
+/// Appends a short literal: its digits with `frac` of them after the point, then `e<exp10>`, a
+/// scale letter, `mil`, `i`, or nothing (A3). A `Long` literal's digits are the design's: the
+/// expression writers spell it through `write_num`.
+///
+/// # Panics
+/// On a `Long` literal.
 pub fn write_literal(l: Literal, out: &mut String) {
+    assert!(
+        l.form != NumForm::Long,
+        "a Long literal is spelled from the design"
+    );
     if l.mantissa < 0 {
         out.push('-');
     }
@@ -231,18 +239,18 @@ pub fn write_literal(l: Literal, out: &mut String) {
         out.push('.');
         out.push_str(dec);
     }
-    match l.form {
-        NumForm::Plain => {}
-        NumForm::Exponent => out.push_str(&format!("e{}", l.exp10)),
-        NumForm::Scale => {
-            let letter = SCALES
-                .iter()
-                .find(|s| s.1 == l.exp10)
-                .expect("a Scale literal's exp10 has a letter");
-            out.push_str(letter.0);
+    write_power(l.form, l.exp10, out);
+}
+
+/// Appends any literal of `design`: a short one as `write_literal`, a `Long` one as its
+/// significand as written, then its power in the form it was written in (A18).
+pub fn write_num(design: &Design, l: Literal, out: &mut String) {
+    match design.long_digits(l) {
+        Some((significand, written)) => {
+            out.push_str(significand);
+            write_power(written, l.exp10, out);
         }
-        NumForm::Mil => out.push_str("mil"),
-        NumForm::Int => out.push('i'),
+        None => write_literal(l, out),
     }
 }
 
@@ -378,10 +386,29 @@ pub(crate) fn func_text(f: Func) -> &'static str {
         Func::Pwl => "pwl",
         Func::ToInt => "to_int",
         Func::SgnZeroPos => "sgn_zero_pos",
+        Func::ToReal => "to_real",
     }
 }
 
 // ---- private ----
+
+/// Appends a power of ten in its written form: `e<exp10>`, a scale letter, `mil`, `i`, or nothing.
+fn write_power(form: NumForm, exp10: i16, out: &mut String) {
+    match form {
+        NumForm::Plain => {}
+        NumForm::Exponent => out.push_str(&format!("e{exp10}")),
+        NumForm::Scale => {
+            let letter = SCALES
+                .iter()
+                .find(|s| s.1 == exp10)
+                .expect("a Scale literal's exp10 has a letter");
+            out.push_str(letter.0);
+        }
+        NumForm::Mil => out.push_str("mil"),
+        NumForm::Int => out.push('i'),
+        NumForm::Long => unreachable!("a power is written in a short form"),
+    }
+}
 
 /// The binding power of an expression as an operand (atoms bind tightest).
 fn prec(design: &Design, e: ExprId) -> u8 {

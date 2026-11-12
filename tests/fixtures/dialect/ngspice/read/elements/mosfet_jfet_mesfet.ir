@@ -1,0 +1,8 @@
+# codes:
+file "mosfet_jfet_mesfet.sp" deck
+  title "mosfet_jfet_mesfet"
+  comment " oracle: ngspice-45 inp2m.c (3 to 7 nodes, no unlabeled number), inp2j.c, inp2z.c (model 4th), mos1.c (temp is the instance temperature: run mm, MOS1 temp=50 runs; on BSIM4, b4.c, it is unknown parameter, a fact of the bound model), jfet.c, mes.c"
+  element mosfet M1 (d g s b) model=nmos? params=(w=1u l=100n) mult=2 ic=[1, 2, 3] temp_abs=30 ic_mode=uic_only initial=off
+  element mosfet M2 (d g s) model=nvd?
+  element jfet J1 (d g s) model=jmod? area=2 ic=[1, 2] ic_mode=uic_only initial=off
+  element mesfet Z1 (d g s) model=zmod? area=2

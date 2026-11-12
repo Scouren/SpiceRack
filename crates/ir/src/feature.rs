@@ -3,7 +3,7 @@
 //! out (`features_used`, one scan); legalization compares that set with the target's.
 //!
 //! Every kind is a feature (`Item`, `Elem`, `Wave`, `Analysis`, `Expr`, `Func`, `Binary`,
-//! `Unary`, `Dist`, a draw's `DrawWhen` and `DrawPer`, and each portable `Option` key, A7); a
+//! `Unary`, `Dist`, a draw's `DrawWhen` and `DrawPer`, each portable `Option` key, A7, and each model `Family`, A15 K5); a
 //! function or operator used inside an expression that holds a `V`, `I`, `Time` or `Freq` leaf is its `*Dyn` feature instead (Addendum A1: legality is per context);
 //! `Extra` (kernel), `CircuitExtra` (`circuit_extra.rs`) and `RunExtra` (`run_extra.rs`) list
 //! the features that are fields, not kinds, each in its owner's file (A7). Feature indices are dense, in that
@@ -15,14 +15,15 @@
 //! - `pub enum Feature`, `Feature::COUNT`, `Feature::index(self) -> u16`,
 //!   `Feature::from_index(u16) -> Feature`
 //! - `pub enum Extra`, `Extra::ALL`, `Extra::COUNT`
-//! - `pub struct FeatureSet`, `FeatureSet::EMPTY`, `FeatureSet::ALL`, `FeatureSet::with(self, Feature) -> FeatureSet`,
+//! - `pub struct FeatureSet`, `FeatureSet::EMPTY`, `FeatureSet::ALL`,
+//!   `FeatureSet::placed(ScopeKind, &[ItemKind]) -> FeatureSet`, `FeatureSet::with(self, Feature) -> FeatureSet`,
 //!   `FeatureSet::union(self, FeatureSet) -> FeatureSet`,
 //!   `FeatureSet::minus(self, FeatureSet) -> FeatureSet`,
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
 //! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
-//!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
+//!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`
 
 use crate::analysis::AnalysisKind;
@@ -34,6 +35,7 @@ use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, 
 use crate::facts::{Handle, RowFacts};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{ItemKind, Role, ScopeKind};
+use crate::model::ModelFamily;
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 use crate::wave::WaveKind;
@@ -79,6 +81,15 @@ pub enum Feature {
     /// only its own dialect's private options, and that dialect check is the writer's, not the
     /// feature set's.
     Option(OptionKey),
+    /// A model of an equation family (AMEND-A12 A15 K5, R32): "this simulator has no such
+    /// model" is a feature a target lacks, as `Elem`, `Wave` and `Analysis` are. Set by the
+    /// circuit owner's `Model` row.
+    Family(ModelFamily),
+    /// An item of the kind inside a scope of the kind at any depth: some scope of that kind is
+    /// on the item's scope chain (A15 K1, R27). A subcircuit in an `If` branch in a subcircuit
+    /// is `Placed(Branch, Subckt)` and `Placed(Subckt, Subckt)`. `File` is never the scope kind:
+    /// every target lets an item stand in a file's top.
+    Placed(ScopeKind, ItemKind),
 }
 
 /// The kernel's features that are fields or placements, not kinds. The circuit and run owners'
@@ -86,16 +97,6 @@ pub enum Feature {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Extra {
-    /// A `Subckt` inside a subcircuit body.
-    NestedSubckt,
-    /// A `Model` inside a subcircuit body.
-    LocalModel,
-    /// A `Func` inside a subcircuit body.
-    LocalFunc,
-    /// A `Param` inside an `If` branch.
-    ParamInBranch,
-    /// A `Load` inside an `If` branch.
-    LoadInBranch,
     /// An `Include` of one section (`section != NONE`): a library call.
     IncludeSection,
     /// A `Section` wrapped in a library (`library != NONE`).
@@ -109,13 +110,23 @@ pub enum Extra {
     /// the item's own subcircuit: neither its own subcircuit nor a file's top (A12 K2: VACASK
     /// resolves in the own scope, then the top, never an enclosing subcircuit).
     EnclosingRef,
-    /// A `Subckt` head default holds a `Param` read (A12 K2: VACASK lets an instance override
-    /// only a formal whose default folds to a constant).
-    FormalReadsParam,
+    /// A `Subckt` head default that is not a constant: it holds a `Param` read, or its class is
+    /// `Temp` (A12 K2, widened by A15: VACASK lets an instance override only a formal whose
+    /// default folds to a constant; it was `FormalReadsParam`).
+    FormalNotConstant,
     /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
     /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
     /// empty one are the same text there).
     DeckWithoutTitle,
+    /// A `Subckt` head parameter with no default (A15 K2: an instance must pass it).
+    FormalWithoutDefault,
+    /// An `If` condition of class `Temp` or `Circuit` (A15 K2: a netlist chosen by a value no
+    /// constant fold decides).
+    IfConditionDynamic,
+    /// A literal of form `Long` anywhere in the design (A18, R37): its digits outlive the
+    /// mantissa. A writer that spells them verbatim lists it; another target gets the pass that
+    /// writes the correctly rounded shortest double.
+    LongLiteral,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -138,7 +149,7 @@ pub(crate) struct ExprWalk {
 
 const WORDS: usize = (Feature::COUNT as usize).div_ceil(64);
 /// The member count of each `Feature` group, in declaration order.
-const COUNTS: [usize; 18] = [
+const COUNTS: [usize; 20] = [
     ItemKind::COUNT,
     ElemKind::COUNT,
     WaveKind::COUNT,
@@ -157,7 +168,11 @@ const COUNTS: [usize; 18] = [
     CircuitExtra::COUNT,
     RunExtra::COUNT,
     OptionKey::COUNT,
+    ModelFamily::COUNT,
+    PLACED,
 ];
+/// The `Placed` group: every scope kind but `File`, by every item kind.
+const PLACED: usize = (ScopeKind::COUNT - 1) * ItemKind::COUNT;
 
 impl Feature {
     /// Feature count; indices are `0..COUNT`.
@@ -175,7 +190,9 @@ impl Feature {
         + Extra::COUNT
         + CircuitExtra::COUNT
         + RunExtra::COUNT
-        + OptionKey::COUNT) as u16;
+        + OptionKey::COUNT
+        + ModelFamily::COUNT
+        + PLACED) as u16;
 
     /// The dense index: the variant's offset (the counts of the variants before it, in
     /// declaration order) plus the member's position in its `ALL`.
@@ -199,6 +216,14 @@ impl Feature {
             Feature::Circuit(m) => (15, m as usize),
             Feature::Run(m) => (16, m as usize),
             Feature::Option(m) => (17, m as usize),
+            Feature::Family(m) => (18, m as usize),
+            Feature::Placed(s, k) => {
+                assert!(
+                    !matches!(s, ScopeKind::File),
+                    "a file's top is no placement"
+                );
+                (19, (s as usize - 1) * ItemKind::COUNT + k as usize)
+            }
         };
         assert!(
             member < COUNTS[group],
@@ -237,6 +262,11 @@ impl Feature {
             15 => Feature::Circuit(CircuitExtra::ALL[i]),
             16 => Feature::Run(RunExtra::ALL[i]),
             17 => Feature::Option(OptionKey::ALL[i]),
+            18 => Feature::Family(ModelFamily::ALL[i]),
+            19 => Feature::Placed(
+                ScopeKind::ALL[1 + i / ItemKind::COUNT],
+                ItemKind::ALL[i % ItemKind::COUNT],
+            ),
             _ => unreachable!(),
         }
     }
@@ -244,19 +274,17 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::DeckWithoutTitle as usize + 1] = [
-        Extra::NestedSubckt,
-        Extra::LocalModel,
-        Extra::LocalFunc,
-        Extra::ParamInBranch,
-        Extra::LoadInBranch,
+    pub const ALL: [Extra; Extra::LongLiteral as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
         Extra::IntLiteral,
         Extra::EnclosingRef,
-        Extra::FormalReadsParam,
+        Extra::FormalNotConstant,
         Extra::DeckWithoutTitle,
+        Extra::FormalWithoutDefault,
+        Extra::IfConditionDynamic,
+        Extra::LongLiteral,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -279,6 +307,18 @@ impl FeatureSet {
             i += 1;
         }
         FeatureSet { words }
+    }
+
+    /// The placements of each of `kinds` inside a scope of kind `scope`: `Placed(scope, k)` for
+    /// every `k`. Asserts `scope` is not `File` (a file's top is no placement).
+    pub const fn placed(scope: ScopeKind, kinds: &[ItemKind]) -> FeatureSet {
+        let mut set = FeatureSet::EMPTY;
+        let mut i = 0;
+        while i < kinds.len() {
+            set = set.with(Feature::Placed(scope, kinds[i]));
+            i += 1;
+        }
+        set
     }
 
     /// This set and `f`.
@@ -380,7 +420,7 @@ pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
 }
 
 /// The features of one reachable item in `scope`: its kind, its row's own (`RowFacts::features`),
-/// its placement (`Extra`s that depend on the enclosing scopes), and its expressions'.
+/// its placement (`Placed`, A15 K1), and its expressions'.
 pub(crate) fn item_features(
     design: &Design,
     item: ItemRef,
@@ -395,41 +435,12 @@ pub(crate) fn item_features(
         row.features(design, item, scope, set);
         row.handles(design, &mut handles);
     });
-    let (in_subckt, in_branch) = enclosing(design, scope);
-    let placed = match item.kind {
-        ItemKind::Subckt if in_subckt => Some(Extra::NestedSubckt),
-        ItemKind::Model if in_subckt => Some(Extra::LocalModel),
-        ItemKind::Func if in_subckt => Some(Extra::LocalFunc),
-        ItemKind::Param if in_branch => Some(Extra::ParamInBranch),
-        ItemKind::Load if in_branch => Some(Extra::LoadInBranch),
-        ItemKind::Title
-        | ItemKind::Comment
-        | ItemKind::Include
-        | ItemKind::Global
-        | ItemKind::Load
-        | ItemKind::Opaque
-        | ItemKind::Subckt
-        | ItemKind::Section
-        | ItemKind::If
-        | ItemKind::Param
-        | ItemKind::Func
-        | ItemKind::Model
-        | ItemKind::DeviceLibrary
-        | ItemKind::Statistics
-        | ItemKind::Element
-        | ItemKind::Analysis
-        | ItemKind::Loop
-        | ItemKind::Alter
-        | ItemKind::Option
-        | ItemKind::Env
-        | ItemKind::NodeSet
-        | ItemKind::Save
-        | ItemKind::Print
-        | ItemKind::Measure
-        | ItemKind::Elaborate => None,
-    };
-    if let Some(extra) = placed {
-        *set = set.with(Feature::Extra(extra));
+    // A15 K1: every scope kind on the chain but a file's top
+    let chain = chain_kinds(design, scope);
+    for s in ScopeKind::ALL {
+        if s != ScopeKind::File && chain[s as usize] {
+            *set = set.with(Feature::Placed(s, item.kind));
+        }
     }
     // A12 K2: a resolved reference (in the row or in its expressions) into an enclosing
     // subcircuit's body
@@ -454,19 +465,30 @@ pub(crate) fn item_features(
     if enclosing {
         *set = set.with(Feature::Extra(Extra::EnclosingRef));
     }
+    // A19 (R38): a field that may read the circuit counts the dynamic form whatever its class
+    let circuit_fields: Vec<ExprId> = handles
+        .iter()
+        .filter_map(|h| match h {
+            Handle::ExprDyn(e) => Some(*e),
+            _ => None,
+        })
+        .collect();
     for root in expr_roots(design, &handles) {
         let nodes = walk.tree(design, root);
         // the Dyn features are class >= Temp (R14, A11): transitive through reads
         let table = def_classes(design);
-        let dynamic = nodes
-            .iter()
-            .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
+        let dynamic = circuit_fields.contains(&root)
+            || nodes
+                .iter()
+                .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
-            if let Expr::Num(n) = design.expr(e)
-                && design.num(n).form == NumForm::Int
-            {
-                *set = set.with(Feature::Extra(Extra::IntLiteral));
+            if let Expr::Num(n) = design.expr(e) {
+                match design.num(n).form {
+                    NumForm::Int => *set = set.with(Feature::Extra(Extra::IntLiteral)),
+                    NumForm::Long => *set = set.with(Feature::Extra(Extra::LongLiteral)),
+                    NumForm::Plain | NumForm::Exponent | NumForm::Scale | NumForm::Mil => {}
+                }
             }
             let f = match design.expr(e) {
                 Expr::Call(func, _) if dynamic => Feature::FuncDyn(func),
@@ -571,6 +593,22 @@ pub(crate) fn expr_roots(design: &Design, handles: &[Handle]) -> Vec<ExprId> {
     roots
 }
 
+/// The scope kinds on `scope`'s chain (it and every ancestor), by `ScopeKind` index. Bounded by
+/// the scope count (`check` reports a cycle); an out-of-range scope ends the chain.
+pub(crate) fn chain_kinds(design: &Design, scope: ScopeId) -> [bool; ScopeKind::COUNT] {
+    let mut kinds = [false; ScopeKind::COUNT];
+    let mut at = scope;
+    for _ in 0..=design.scopes.len() {
+        if at.is_none() || at.index() >= design.scopes.len() {
+            break;
+        }
+        let s = design.scopes[at.index()];
+        kinds[s.kind as usize] = true;
+        at = s.parent;
+    }
+    kinds
+}
+
 // ---- private ----
 
 /// The index of a group's first feature: the member counts of the groups before it.
@@ -581,20 +619,4 @@ const fn offset(group: usize) -> usize {
         g += 1;
     }
     sum
-}
-
-/// Whether `scope` lies inside a subcircuit body, and inside an `If` branch (any ancestor).
-fn enclosing(design: &Design, scope: ScopeId) -> (bool, bool) {
-    let (mut sub, mut branch, mut at) = (false, false, scope);
-    // bounded by the scope count; `check` reports a cycle
-    for _ in 0..=design.scopes.len() {
-        if at.is_none() || at.index() >= design.scopes.len() {
-            break;
-        }
-        let s = design.scopes[at.index()];
-        sub |= s.kind == ScopeKind::Subckt;
-        branch |= s.kind == ScopeKind::Branch;
-        at = s.parent;
-    }
-    (sub, branch)
 }

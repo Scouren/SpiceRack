@@ -22,13 +22,13 @@ mod tests {
         TableSource,
     };
     use spicerack_ir::diag::violation_code;
-    use spicerack_ir::passive::{Coupling, IcMode, Passive};
+    use spicerack_ir::passive::{Coupling, IcMode, Passive, TcBase, TcLaw};
     use spicerack_ir::semi::{InitialState, Switch};
     use spicerack_ir::source::DcRule;
     use spicerack_ir::wave::{PulseLaw, Pwl, PwlJoin, PwlRepeat};
     use spicerack_ir::{
-        Builder, Code, DefId, Design, Diags, ElemKind, Element, ExprId, List, ModelFamily, NO_ROW,
-        NameId, Polarity, Ref, ScopeId, Span, Violation, WaveRef, check,
+        Builder, Code, DefId, Design, Diags, ElemKind, Element, ExprId, List, ModelFamily, MultLaw,
+        NO_ROW, NameId, Polarity, Ref, ScopeId, Span, Violation, WaveRef, check,
     };
 
     /// Builds a design with `f` and returns `check`'s codes.
@@ -64,6 +64,7 @@ mod tests {
             params: List::EMPTY,
             mult: ExprId::NONE,
             detail,
+            mult_law: MultLaw::Parallel,
         };
         b.push(top, row, Span::NONE);
     }
@@ -71,7 +72,7 @@ mod tests {
     /// Pushes a model of `family` named `name` and returns a reference bound to it.
     fn bound(b: &mut Builder<'_>, top: ScopeId, name: &str, family: ModelFamily) -> Ref {
         let n = b.name(name);
-        let polarity = if family == ModelFamily::Bsim4 {
+        let polarity = if matches!(family, ModelFamily::Bsim4 | ModelFamily::Mesa) {
             Polarity::N
         } else {
             Polarity::None
@@ -104,6 +105,7 @@ mod tests {
             params: List::EMPTY,
             mult: ExprId::NONE,
             detail,
+            mult_law: MultLaw::Parallel,
         };
         b.push(top, row, Span::NONE);
     }
@@ -161,6 +163,20 @@ mod tests {
                 ..source(ExprId::NONE)
             });
             push(b, top, ElemKind::VSource, &["a", "0"], None, w);
+            // under ngspice's zero rule an omitted rise, fall, width and period are legal (A17)
+            let omitted = b.wave(spicerack_ir::wave::Pulse {
+                rise: ExprId::NONE,
+                fall: ExprId::NONE,
+                width: ExprId::NONE,
+                period: ExprId::NONE,
+                given_zero: spicerack_ir::wave::GivenZero::SpiceDefault,
+                ..pulse(one)
+            });
+            let o = b.detail(spicerack_ir::source::Source {
+                wave: omitted,
+                ..source(one)
+            });
+            push(b, top, ElemKind::VSource, &["a", "0"], None, o);
             let name = b.name("nch");
             b.push(
                 top,
@@ -226,7 +242,7 @@ mod tests {
     #[test]
     fn every_field_domain_rule_is_reported_alone() {
         type Case = fn(&mut Builder<'_>, ScopeId);
-        let cases: [(&str, Case); 33] = [
+        let cases: [(&str, Case); 39] = [
             ("diode without a model", |b, top| {
                 let s = b.detail(semi());
                 push(b, top, ElemKind::Diode, &["a", "0"], None, s);
@@ -251,6 +267,7 @@ mod tests {
                     params: List::EMPTY,
                     mult: ExprId::NONE,
                     detail: NO_ROW,
+                    mult_law: MultLaw::Parallel,
                 };
                 b.push(top, row, Span::NONE);
             }),
@@ -538,6 +555,98 @@ mod tests {
                     Span::NONE,
                 );
             }),
+            ("a constant resistor measured from 27 degrees", |b, top| {
+                let one = n(b, 1);
+                let r = b.detail(Passive {
+                    value: one,
+                    tc1: one,
+                    tc_base: TcBase::Fixed27,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            }),
+            ("a reciprocal temperature law on a resistor", |b, top| {
+                let value = b.v("a", None);
+                let one = n(b, 1);
+                let r = b.detail(Passive {
+                    value,
+                    tc1: one,
+                    tc_law: TcLaw::Reciprocal,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            }),
+            ("a behavioural base with no coefficient", |b, top| {
+                let one = n(b, 1);
+                let row = spicerack_ir::controlled::Behav {
+                    tc_base: TcBase::Fixed27,
+                    ..behav(one, spicerack_ir::controlled::OutKind::Voltage)
+                };
+                let v = b.detail(row);
+                push(b, top, ElemKind::Behav, &["a", "0"], None, v);
+            }),
+            ("ngspice's multiplier law on a resistor", |b, top| {
+                let one = n(b, 1);
+                let detail = b.detail(Passive {
+                    value: one,
+                    ..Passive::PLAIN
+                });
+                let name = unique(b, top);
+                let terminals = b.names(&["a", "b"]);
+                let row = Element {
+                    kind: ElemKind::Resistor,
+                    name,
+                    terminals,
+                    model: Ref {
+                        name: NameId::NONE,
+                        def: DefId::NONE,
+                    },
+                    params: List::EMPTY,
+                    mult: one,
+                    detail,
+                    mult_law: MultLaw::NgspiceAppend,
+                };
+                b.push(top, row, Span::NONE);
+            }),
+            ("ngspice's multiplier law with no multiplier", |b, top| {
+                let name = unique(b, top);
+                let model = Ref {
+                    name: b.name("sub"),
+                    def: DefId::NONE,
+                };
+                let row = Element {
+                    kind: ElemKind::Instance,
+                    name,
+                    terminals: List::EMPTY,
+                    model,
+                    params: List::EMPTY,
+                    mult: ExprId::NONE,
+                    detail: NO_ROW,
+                    mult_law: MultLaw::NgspiceAppend,
+                };
+                b.push(top, row, Span::NONE);
+            }),
+            (
+                "an omitted exponential delay under the as-given rule",
+                |b, top| {
+                    let one = n(b, 1);
+                    let wave = b.wave(spicerack_ir::wave::Exp {
+                        v1: one,
+                        v2: one,
+                        td1: ExprId::NONE,
+                        tau1: one,
+                        td2: one,
+                        tau2: one,
+                        td2_from: spicerack_ir::wave::TdFrom::Zero,
+                        given_zero: spicerack_ir::wave::GivenZero::AsGiven,
+                    });
+                    let v = b.detail(spicerack_ir::source::Source {
+                        wave,
+                        ..source(one)
+                    });
+                    push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+                },
+            ),
         ];
         for (what, case) in cases {
             assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");
@@ -567,6 +676,7 @@ mod tests {
             params: List::EMPTY,
             mult: ExprId::NONE,
             detail,
+            mult_law: MultLaw::Parallel,
         };
         b.push(scope, row, Span::NONE);
     }
@@ -592,5 +702,370 @@ mod tests {
             named(b, body, ElemKind::VSource, "x1");
         });
         assert_eq!(got, Vec::<Code>::new());
+    }
+
+    /// A17 (ng-sources' table): under `SpiceDefault` the omit-only fields of SIN, SFFM, AM and
+    /// TRRANDOM may be absent; under `AsGiven` they may not.
+    #[test]
+    fn omitted_fields_under_the_spice_rule() {
+        use spicerack_ir::wave::{
+            Am, AmModTime, GivenZero, PreDelay, Sffm, SffmLaw, TrRandom, TrRandomKind,
+        };
+        let source_of = |b: &mut Builder<'_>, top: ScopeId, wave: spicerack_ir::WaveRef| {
+            let one = n(b, 1);
+            let v = b.detail(spicerack_ir::source::Source {
+                wave,
+                ..source(one)
+            });
+            push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+        };
+        let am = |b: &mut Builder<'_>, rule: GivenZero| {
+            let one = n(b, 1);
+            let none = ExprId::NONE;
+            b.wave(Am {
+                offset: one,
+                amplitude: one,
+                mod_offset: one,
+                mod_index: none,
+                mod_freq: none,
+                carrier_freq: none,
+                delay: none,
+                phase_m_deg: none,
+                phase_c_deg: none,
+                mod_time: AmModTime::Delay,
+                pre: PreDelay::Zero,
+                given_zero: rule,
+            })
+        };
+        let valid = checked(|b, top| {
+            let one = n(b, 1);
+            let none = ExprId::NONE;
+            let w = b.wave(spicerack_ir::wave::Sin {
+                delay: none,
+                damping: none,
+                phase_deg: none,
+                given_zero: GivenZero::SpiceDefault,
+                ..sin(one)
+            });
+            source_of(b, top, w);
+            let w = b.wave(Sffm {
+                offset: one,
+                amplitude: one,
+                carrier_freq: none,
+                mod_index: none,
+                signal_freq: none,
+                delay: none,
+                phase_c_deg: none,
+                phase_m_deg: none,
+                law: SffmLaw::Ngspice,
+                pre: PreDelay::Zero,
+                given_zero: GivenZero::SpiceDefault,
+            });
+            source_of(b, top, w);
+            let w = am(b, GivenZero::SpiceDefault);
+            source_of(b, top, w);
+            let w = b.wave(TrRandom {
+                ts: one,
+                td: none,
+                p1: none,
+                p2: none,
+                kind: TrRandomKind::Gauss,
+                given_zero: GivenZero::SpiceDefault,
+            });
+            source_of(b, top, w);
+        });
+        assert_eq!(valid, Vec::<Code>::new());
+        let as_given = checked(|b, top| {
+            let w = am(b, GivenZero::AsGiven);
+            source_of(b, top, w);
+        });
+        assert_eq!(as_given, only(Violation::FieldDomain));
+    }
+
+    /// A17: a charge-defined capacitor's coefficient may divide the charge (`Reciprocal`);
+    /// any other behavioural row may not, nor one with no coefficient.
+    #[test]
+    fn the_reciprocal_law_on_a_behavioural_row() {
+        use spicerack_ir::controlled::{Behav, OutKind};
+        let row = |b: &mut Builder<'_>, output: OutKind, tc: bool| {
+            let one = n(b, 1);
+            let tc1 = if tc { n(b, 1) } else { ExprId::NONE };
+            Behav {
+                tc1,
+                tc_law: TcLaw::Reciprocal,
+                ..behav(one, output)
+            }
+        };
+        let ok = checked(|b, top| {
+            let r = row(b, OutKind::Charge, true);
+            let q = b.detail(r);
+            push(b, top, ElemKind::ChargeCapacitor, &["a", "0"], None, q);
+        });
+        assert_eq!(ok, Vec::<Code>::new());
+        let plain = checked(|b, top| {
+            let r = row(b, OutKind::Voltage, true);
+            let v = b.detail(r);
+            push(b, top, ElemKind::Behav, &["a", "0"], None, v);
+        });
+        assert_eq!(plain, only(Violation::FieldDomain));
+        let no_tc = checked(|b, top| {
+            let r = row(b, OutKind::Charge, false);
+            let q = b.detail(r);
+            push(b, top, ElemKind::ChargeCapacitor, &["a", "0"], None, q);
+        });
+        assert_eq!(no_tc, only(Violation::FieldDomain));
+    }
+
+    /// A19 (R38): invariants every simulator holds, each broken alone; the neighbours are legal.
+    #[test]
+    fn a19_invariants_broken_alone() {
+        type Case = fn(&mut Builder<'_>, ScopeId);
+        fn semi_with(b: &mut Builder<'_>, top: ScopeId, key: &str) {
+            let one = n(b, 1);
+            let s = b.detail(semi());
+            let name = unique(b, top);
+            let terminals = b.names(&["a", "0"]);
+            let params = b.params(&[(key, one)]);
+            let model = Ref {
+                name: b.name("dm"),
+                def: DefId::NONE,
+            };
+            let row = Element {
+                kind: ElemKind::Diode,
+                name,
+                terminals,
+                model,
+                params,
+                mult: ExprId::NONE,
+                detail: s,
+                mult_law: MultLaw::Parallel,
+            };
+            b.push(top, row, Span::NONE);
+        }
+        fn model_with(b: &mut Builder<'_>, top: ScopeId, family: ModelFamily, key: &str) {
+            let name = unique(b, top);
+            let one = n(b, 1);
+            let params = b.params(&[(key, one)]);
+            let polarity = if matches!(family, ModelFamily::Bsim4 | ModelFamily::Mesa) {
+                Polarity::N
+            } else {
+                Polarity::None
+            };
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    ..model(name, family, polarity)
+                },
+                Span::NONE,
+            );
+        }
+        let cases: [(&str, Case); 9] = [
+            ("a resistor with no value and no model", |b, top| {
+                let r = b.detail(Passive::PLAIN);
+                push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            }),
+            ("an AC resistance on a capacitor", |b, top| {
+                let one = n(b, 1);
+                let c = b.detail(Passive {
+                    value: one,
+                    ac: one,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            }),
+            ("a noiseless constant inductor", |b, top| {
+                let one = n(b, 1);
+                let l = b.detail(Passive {
+                    value: one,
+                    noisy: false,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Inductor, &["a", "0"], None, l);
+            }),
+            ("a diode parameter named as its area field", |b, top| {
+                semi_with(b, top, "area")
+            }),
+            ("a diode parameter m (its multiplicity)", |b, top| {
+                semi_with(b, top, "m")
+            }),
+            ("a diode parameter temp (its temperature)", |b, top| {
+                semi_with(b, top, "temp")
+            }),
+            ("a level parameter on a family that fixes it", |b, top| {
+                model_with(b, top, ModelFamily::Bsim4, "level")
+            }),
+            ("a lossless line with neither form", |b, top| {
+                let one = n(b, 1);
+                let l = b.detail(spicerack_ir::line::Line { z0: one, ..line() });
+                push(
+                    b,
+                    top,
+                    ElemKind::LosslessLine,
+                    &["a", "0", "b", "0"],
+                    None,
+                    l,
+                );
+            }),
+            ("a version on a family with one version", |b, top| {
+                let name = unique(b, top);
+                let version = b.string("2");
+                b.push(
+                    top,
+                    spicerack_ir::Model {
+                        version,
+                        ..model(name, ModelFamily::Mos1, Polarity::N)
+                    },
+                    Span::NONE,
+                );
+            }),
+        ];
+        for (what, case) in cases {
+            assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");
+        }
+        // a model value that reads the circuit: the kernel's `ProbeContext` (a model value is a
+        // field constant in time), not a second report of ours
+        let probe = checked(|b, top| {
+            let name = unique(b, top);
+            let va = b.v("a", None);
+            let params = b.params(&[("is", va)]);
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    ..model(name, ModelFamily::Diode, Polarity::None)
+                },
+                Span::NONE,
+            );
+        });
+        assert_eq!(probe, only(Violation::ProbeContext));
+        let legal = checked(|b, top| {
+            let one = n(b, 1);
+            // a value given by the model alone, a noiseless resistor, a noiseless circuit-valued
+            // capacitor, a parameter m on a subcircuit instance (a declared m, A15), a level on
+            // MESA and on an unknown family, a version on BSIM4, a lossless line by frequency
+            let r = b.detail(Passive::PLAIN);
+            push(b, top, ElemKind::Resistor, &["a", "b"], Some("rm"), r);
+            let r = b.detail(Passive {
+                value: one,
+                noisy: false,
+                ..Passive::PLAIN
+            });
+            push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            let va = b.v("a", None);
+            let c = b.detail(Passive {
+                value: va,
+                noisy: false,
+                ..Passive::PLAIN
+            });
+            push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            let name = unique(b, top);
+            let terminals = b.names(&["a"]);
+            let params = b.params(&[("m", one)]);
+            let model_ref = Ref {
+                name: b.name("sub"),
+                def: DefId::NONE,
+            };
+            let x = Element {
+                kind: ElemKind::Instance,
+                name,
+                terminals,
+                model: model_ref,
+                params,
+                mult: ExprId::NONE,
+                detail: NO_ROW,
+                mult_law: MultLaw::Parallel,
+            };
+            b.push(top, x, Span::NONE);
+            model_with(b, top, ModelFamily::Mesa, "level");
+            let name = unique(b, top);
+            let word = b.name("hvmos");
+            let params = b.params(&[("level", one)]);
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    word,
+                    ..model(name, ModelFamily::Other, Polarity::None)
+                },
+                Span::NONE,
+            );
+            let name = unique(b, top);
+            let version = b.string("4.8");
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    version,
+                    ..model(name, ModelFamily::Bsim4, Polarity::N)
+                },
+                Span::NONE,
+            );
+            let l = b.detail(spicerack_ir::line::Line {
+                z0: one,
+                freq: one,
+                nl: one,
+                ..line()
+            });
+            push(
+                b,
+                top,
+                ElemKind::LosslessLine,
+                &["a", "0", "b", "0"],
+                None,
+                l,
+            );
+        });
+        assert_eq!(legal, Vec::<Code>::new());
+    }
+
+    /// A20 (R39): a lossless line may name the simulator's own ideal line, and only that; the
+    /// model has no parameters and no polarity.
+    #[test]
+    fn a_lossless_line_through_its_ideal_line_model() {
+        fn tline(b: &mut Builder<'_>, top: ScopeId, master: Ref) {
+            let one = n(b, 1);
+            let detail = b.detail(spicerack_ir::line::Line {
+                z0: one,
+                td: one,
+                ..line()
+            });
+            let name = unique(b, top);
+            let terminals = b.names(&["a", "0", "b", "0"]);
+            let row = Element {
+                kind: ElemKind::LosslessLine,
+                name,
+                terminals,
+                model: master,
+                params: List::EMPTY,
+                mult: ExprId::NONE,
+                detail,
+                mult_law: MultLaw::Parallel,
+            };
+            b.push(top, row, Span::NONE);
+        }
+        let ok = checked(|b, top| {
+            let m = bound(b, top, "tl", ModelFamily::TlineIdeal);
+            tline(b, top, m);
+        });
+        assert_eq!(ok, Vec::<Code>::new());
+        let wrong = checked(|b, top| {
+            let m = bound(b, top, "nch", ModelFamily::Bsim4);
+            tline(b, top, m);
+        });
+        assert_eq!(wrong, only(Violation::FieldDomain));
+        let params = checked(|b, top| {
+            let name = b.name("tl");
+            let one = n(b, 1);
+            let params = b.params(&[("z0", one)]);
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    ..model(name, ModelFamily::TlineIdeal, Polarity::None)
+                },
+                Span::NONE,
+            );
+        });
+        assert_eq!(params, only(Violation::FieldDomain));
     }
 }

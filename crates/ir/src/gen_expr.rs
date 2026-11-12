@@ -13,7 +13,7 @@
 
 use crate::build::Builder;
 use crate::class::ExprClass;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, NumForm, UnOp};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{DefId, ExprId};
@@ -62,9 +62,10 @@ impl Gen {
             dyn_leaves.push(ExprTag::Temp);
         }
         let probes = dyn_leaves;
-        let dynamic = !probes.is_empty() && self.chance(2);
+        let dynamic = !self.constant_only && !probes.is_empty() && self.chance(2);
         (self.dynamic, self.reads, self.class) = (dynamic, reads, ExprClass::Constant);
         self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
+        self.long_literals = features.contains(Feature::Extra(crate::feature::Extra::LongLiteral));
         let mut need_probe = dynamic;
         let mut stack: Vec<Frame> = Vec::new();
         // depth-first, building each row after its children, left to right: a caller's order
@@ -143,6 +144,22 @@ impl Gen {
         };
         self.class = self.class.max(own);
         match tag {
+            ExprTag::Num if self.long_literals && self.chance(16) => {
+                // A18: 19 to 24 significant digits, in one of the three written forms
+                let n = 19 + self.below(6);
+                let digits: String = (0..n)
+                    .map(|k| char::from(b'0' + (self.below(9) + u32::from(k == 0)) as u8))
+                    .collect();
+                let (int, dec) = digits.split_at(self.below(4) as usize);
+                let sign = if self.chance(4) { "-" } else { "" };
+                let significand = format!("{sign}{}.{dec}", if int.is_empty() { "0" } else { int });
+                let (exp10, form) = match self.below(3) {
+                    0 => (0, NumForm::Plain),
+                    1 => (self.below(41) as i16 - 20, NumForm::Exponent),
+                    _ => (-6, NumForm::Scale),
+                };
+                b.long_literal(&significand, exp10, form)
+            }
             ExprTag::Num => {
                 let l = self.literal();
                 b.literal(l)
@@ -176,12 +193,23 @@ impl Gen {
         }
     }
 
+    /// Whether a read of `def` keeps the tree within its class: a constant tree reads only
+    /// constant definitions, a dynamic one under `Reads::Constant` none of class `Circuit`
+    /// (A15 K3: `ProbeContext` follows the class).
+    fn may_read(&self, def: DefId) -> bool {
+        let class = self.class_of(def);
+        match (self.dynamic, self.reads) {
+            (false, _) => class == ExprClass::Constant,
+            (true, Reads::Constant) => class <= ExprClass::Temp,
+            (true, Reads::Circuit) => true,
+        }
+    }
+
     /// A parameter read: a visible definition, a formal of the function being generated, or a
     /// fresh name no definition has.
     fn param_read(&mut self, b: &mut Builder<'_>) -> ExprId {
         let def = self.pick_def(b.design(), self.scope, DefKind::Param);
-        let readable =
-            !def.is_none() && (self.dynamic || self.class_of(def) == ExprClass::Constant);
+        let readable = !def.is_none() && self.may_read(def);
         match self.below(3) {
             0 if readable => {
                 self.class = self.class.max(self.class_of(def));
@@ -210,10 +238,12 @@ impl Gen {
         dynamic: bool,
     ) -> Option<(Node, usize)> {
         let has = |f| features.contains(f);
+        // A19: a field that may read the circuit counts the dynamic form whatever the class
+        let form = dynamic || self.reads == Reads::Circuit || self.dyn_form;
         let mut nodes: Vec<(Node, usize)> = Vec::new();
         if has(Feature::Expr(ExprTag::Unary)) {
             for op in UnOp::ALL {
-                if has(if dynamic {
+                if has(if form {
                     Feature::UnaryDyn(op)
                 } else {
                     Feature::Unary(op)
@@ -224,7 +254,7 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::Binary)) {
             for op in BinOp::ALL {
-                if has(if dynamic {
+                if has(if form {
                     Feature::BinaryDyn(op)
                 } else {
                     Feature::Binary(op)
@@ -238,7 +268,7 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::Call)) {
             for f in Func::ALL {
-                let member = if dynamic {
+                let member = if form {
                     Feature::FuncDyn(f)
                 } else {
                     Feature::Func(f)
@@ -251,12 +281,11 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::UserCall)) {
             let def = self.pick_def(b.design(), self.scope, DefKind::Func);
-            let def =
-                if !def.is_none() && (self.dynamic || self.class_of(def) == ExprClass::Constant) {
-                    def
-                } else {
-                    DefId::NONE
-                };
+            let def = if !def.is_none() && self.may_read(def) {
+                def
+            } else {
+                DefId::NONE
+            };
             let name = if def.is_none() {
                 self.fresh()
             } else {

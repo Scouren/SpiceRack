@@ -1,0 +1,7 @@
+# codes: P1159 P1160 P1158
+file "notes.sp" deck
+  title "notes"
+  comment " oracle: vsrcload.c (values past each wave's arity ignored; td and r only for PWL), inpdpar.c (the later keyword holds); runs: `sin(0 1 1k) pulse(5 6)` is the pulse"
+  element vsource V1 (a 0) wave=pulse(v1=5 v2=6 given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V2 (b 0) wave=sin(offset=0 amplitude=1 freq=1k pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V3 (c 0) wave=exp(v1=0 v2=1 td1=1u tau1=1u td2=2u tau2=1u given_zero=spice_default) dc_rule=wave_at_zero

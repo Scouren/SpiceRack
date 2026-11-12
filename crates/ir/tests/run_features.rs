@@ -66,7 +66,6 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::LoopMonteCarlo, M, L),
     (RunExtra::LoopKeepLast, "  loop sweep keep_last (temp) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopRestore, L, "  loop sweep keep_last (temp) (list values=[1])\n    analysis op"),
-    (RunExtra::LoopNested, "  loop sweep (temp) (list values=[1])\n    loop sweep (temp) (list values=[1])\n      analysis op", L),
     (RunExtra::LoopScoped, "  loop sweep (temp) (list values=[1])\n    analysis op\n  analysis op", L),
     (RunExtra::LoopTemp, L, "  loop sweep (param p) (list values=[1])\n    analysis op"),
     (RunExtra::LoopParam, "  loop sweep (param p) (list values=[1])\n    analysis op", L),
@@ -96,7 +95,6 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::IcNextOnly, "  nodeset ic transient next_only node=(a) value=1", S),
     (RunExtra::IcDifferential, "  nodeset ic transient node=(a) reference=(b) value=1", S),
     (RunExtra::NodesetAll, "  nodeset nodeset every_op value=1", "  nodeset nodeset every_op node=(a) value=1"),
-    (RunExtra::NodeSetInSubckt, "  subckt s (a)\n    nodeset ic transient node=(a) value=1", "  subckt s (a)\n  nodeset ic transient node=(a) value=1"),
     (RunExtra::NodeSetHierarchical, "  nodeset ic transient node=(x1 a) value=1", S),
     (RunExtra::IcDevice, "  nodeset device every_op node=(c1) value=1", S),
     (RunExtra::ProbeVdiff, "  save (vdiff (a) (b))", P),
@@ -139,7 +137,6 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::EnvMidRun, "  analysis op\n  env temp=1", "  env temp=1\n  analysis op"),
     (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),
     (RunExtra::WholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
-    (RunExtra::RunItemNested, "  subckt s ()\n    analysis op", "  if (1)\n    analysis op"),
     (RunExtra::ProbeAllBranchI, "  save (all_branch_i)", P),
     (RunExtra::MeasStatAt, "  measure m tran stat min_at (v (a)) (bound) (bound)", "  measure m tran stat min (v (a)) (bound) (bound)"),
     (RunExtra::MeasUntil, "  measure m tran when (cross rise (v (a)) value=1 count=1 until=1u)", MW),
@@ -150,6 +147,12 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::FourHarmonicsOption, "  option n_freqs value=10\n  analysis four fundamental=1k periods=1 (v (out))", "  option n_freqs value=10\n  analysis four fundamental=1k harmonics=9 periods=1 (v (out))"),
     (RunExtra::StateFromHere, "  env temp=1", "  env temp=1 whole_run"),
     (RunExtra::StateWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
+    (RunExtra::DcAxisNamed, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1", D),
+    (RunExtra::LoopNamed, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op", L),
+    (RunExtra::SweepBodyNotOne, "  loop sweep (temp) (list values=[1])\n    option klu\n    analysis op", "  loop sweep (temp) (list values=[1])\n    comment \"c\"\n    loop sweep (param p) (list values=[1])\n      analysis op"),
+    (RunExtra::RunInterleaved, "  analysis op\n  param p = 1\n  save (v (out))", "  analysis op\n  comment \"c\"\n  opaque ngspice private \".x\"\n  save (v (out))\n  param p = 1"),
+    (RunExtra::IcBeyondNext, S, "  nodeset ic transient next_only node=(a) value=1"),
+    (RunExtra::SaveAnalysisSet, "  save analysis=(op dc tran) (v (out))", "  save analysis=tran (v (out))"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";

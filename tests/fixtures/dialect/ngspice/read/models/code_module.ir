@@ -1,0 +1,7 @@
+# codes: P1204
+file "code_module.sp" deck
+  title "code_module"
+  comment " oracle: inpdomod.c default branch (INPtypelook: an XSPICE code model, devhelp lists d_and; any other word an OSDI module loaded by pre_osdi), CIDER numd (inp_cider_models: ngspice's own numerical device)"
+  model g1 code_model params=(rise_delay=1n fall_delay=2n) word=d_and
+  model va1 module params=(a=1) module=mymod
+  opaque ngspice private ".model c1 numd level=1"

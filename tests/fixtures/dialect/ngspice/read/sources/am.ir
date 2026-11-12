@@ -1,0 +1,7 @@
+# codes: P1001
+file "am.sp" deck
+  title "am"
+  comment " oracle: vsrcload.c AM (VO VMO VMA FM FC TD PHM PHC; 0 for t - TD <= 0, op too); run am(0.5 1 0.5 1k 10k 0 0 90) op 0"
+  element vsource V1 (a 0) wave=am(offset=0.5 amplitude=1 mod_offset=1 mod_index=0.5 mod_freq=1k carrier_freq=10k delay=0 phase_m_deg=0 phase_c_deg=90 pre=zero given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V2 (b 0) wave=am(offset=0 amplitude=1 mod_offset=1 pre=zero given_zero=spice_default) dc_rule=wave_at_zero
+  opaque ngspice unread ".control\nop\nprint v(a) v(b)\ntran 1u 100u\nprint v(a)[30] v(b)[30]\n.endc"

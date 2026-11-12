@@ -12,11 +12,12 @@
 //! 3.06; IR-KERNEL A10 (a head default is read from the subcircuit's body).
 //!
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
-//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::formals`, `Declared::class`
+//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::formals`, `Declared::class`,
+//! `pub(super) struct Script`, `pub(super) fn script(&Ast, &Tokens) -> Script`
 
 use std::collections::HashMap;
 
-use super::cst::{body, joined, next, rest};
+use super::cst::{self, body, joined, next, rest};
 use super::expr_lex;
 use super::name;
 use super::read::Def;
@@ -35,6 +36,20 @@ pub(super) struct Declared {
     classes: HashMap<(u32, Def, String), Class>,
     /// `(block, folded subcircuit name)` → its head parameters, folded (the first definition).
     formals: HashMap<(u32, String), Vec<String>>,
+}
+
+/// A file's script facts (R49): its script statements in file order, and whether a dot card
+/// runs an analysis. ngspice runs every `.control` block and every `*#` line outside one as one
+/// script, in deck order (`inp.c` `inp_spsource`: `commands || prefix("*#", dd->line)`).
+#[derive(Debug, Default)]
+pub(super) struct Script {
+    /// Each statement's first byte, ascending.
+    pub(super) at: Vec<u32>,
+    /// Its text as written: a `.control` … `.endc` block, or one `*#` line.
+    pub(super) text: Vec<String>,
+    /// Whether a dot card outside the blocks (in any body: subcircuit, section, branch) runs an
+    /// analysis.
+    pub(super) card_analysis: bool,
 }
 
 /// How much of a run an expression reads (R14), ordered.
@@ -136,6 +151,49 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
     }
     d.settle(&texts);
     d
+}
+
+/// The script facts of one file. A `*#` line is a whole line whose text after its leading
+/// blanks starts with `*#`, outside every block.
+pub(super) fn script(ast: &Ast<'_>, toks: &Tokens<'_>) -> Script {
+    const ANALYSES: &[&str] = &[
+        ".op", ".dc", ".ac", ".tran", ".noise", ".tf", ".sens", ".pz", ".disto", ".sp", ".pss",
+    ];
+    let src = toks.source();
+    let mut s = Script::default();
+    let mut found: Vec<(u32, String)> = Vec::new();
+    let mut blocks: Vec<(u32, u32)> = Vec::new();
+    let mut stack: Vec<Node> = ast.fields(ast.root()).iter().map(|&n| Node(n)).collect();
+    // Bounded: each statement is pushed once, by its container or its chain's previous branch.
+    for _ in 0..=ast.len() {
+        let Some(n) = stack.pop() else { break };
+        if ast.tag(n) == Tag::Control {
+            let (a, b) = cst::extent(ast, toks, n);
+            let (start, end) = (toks.start(a), toks.end(b));
+            blocks.push((start, end));
+            found.push((start, src[start as usize..end as usize].to_string()));
+            continue;
+        }
+        let keyword = toks.text(ast.main_token(n)).to_ascii_lowercase();
+        s.card_analysis |= ANALYSES.contains(&keyword.as_str());
+        stack.extend(body(ast, n).iter().map(|&b| Node(b)));
+        stack.extend(next(ast, n));
+    }
+    assert!(stack.is_empty(), "the script walk visits every statement");
+    let mut at = 0usize;
+    for line in src.split_inclusive('\n') {
+        let start = at as u32;
+        at += line.len();
+        let body = line.trim_end_matches(['\n', '\r']);
+        let inside = blocks.iter().any(|&(a, b)| (a..b).contains(&start));
+        if body.trim_start().starts_with("*#") && !inside {
+            found.push((start, body.to_string()));
+        }
+    }
+    found.sort_by_key(|f| f.0);
+    (s.at, s.text) = found.into_iter().unzip();
+    debug_assert!(s.at.is_sorted(), "script statements in file order");
+    s
 }
 
 impl Declared {

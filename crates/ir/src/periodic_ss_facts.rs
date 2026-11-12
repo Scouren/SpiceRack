@@ -24,6 +24,7 @@ use crate::periodic::{FreqAxis, Pac, Pnoise, Pstb, Pxf, Stb};
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
 use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -40,6 +41,12 @@ impl DetailFacts for Pac {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         sweep_handles(&self.sweep, out);
         out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
+        r.expr(&mut self.sidebands);
+        r.expr(&mut self.relharm);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, set);
@@ -96,6 +103,13 @@ impl DetailFacts for Pnoise {
         out.push(Handle::Name(self.source));
         sweep_handles(&self.sweep, out);
         out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
+        r.expr(&mut self.sidebands);
+        r.expr(&mut self.relharm);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
@@ -164,6 +178,13 @@ impl DetailFacts for Pxf {
         sweep_handles(&self.sweep, out);
         out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.probe(&mut self.output);
+        r.sweep(&mut self.sweep);
+        r.expr(&mut self.sidebands);
+        r.expr(&mut self.relharm);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, set);
@@ -226,6 +247,12 @@ impl DetailFacts for Pstb {
         sweep_handles(&self.sweep, out);
         out.extend([Handle::Expr(self.sidebands), Handle::Expr(self.relharm)]);
     }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
+        r.expr(&mut self.sidebands);
+        r.expr(&mut self.relharm);
+    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, set);
         flag(
@@ -285,6 +312,10 @@ impl DetailFacts for Stb {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Name(self.probe));
         sweep_handles(&self.sweep, out);
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        r.sweep(&mut self.sweep);
     }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, set);

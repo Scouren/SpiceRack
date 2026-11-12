@@ -12,9 +12,9 @@
 //! ```
 //! use spicerack_ir::passive::Passive;
 //! use spicerack_ir::source::{DcRule, Source};
-//! use spicerack_ir::wave::{Pulse, PulseLaw};
+//! use spicerack_ir::wave::{GivenZero, Pulse, PulseLaw};
 //! use spicerack_ir::{
-//!     check, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, NameId,
+//!     check, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, MultLaw, NameId,
 //!     NumForm, Polarity, Ref, Role, Span, NO_ROW,
 //! };
 //!
@@ -33,7 +33,7 @@
 //! let (edge, width, period) = (b.num(1e-9), b.num(5e-6), b.num(10e-6));
 //! let wave = b.wave(Pulse {
 //!     v1: zero, v2: one, delay: zero, rise: edge, fall: edge, width, period,
-//!     cycles: ExprId::NONE, law: PulseLaw::Spice,
+//!     cycles: ExprId::NONE, law: PulseLaw::Spice, given_zero: GivenZero::AsGiven,
 //! });
 //! let head = b.head("v1", &["in", "0"], None, &[], ExprId::NONE);
 //! let source = Source {
@@ -51,7 +51,9 @@
 //! let terminals = b.names(&["in", "out"]);
 //! let name = b.name("x1");
 //! let master = Ref { name: div_def.name, def: spicerack_ir::DefId(0) };
-//! let head = ElemHead { name, terminals, model: master, params: List::EMPTY, mult: two };
+//! let head = ElemHead {
+//!     name, terminals, model: master, params: List::EMPTY, mult: two, mult_law: MultLaw::Parallel,
+//! };
 //! b.instance(top, ElemKind::Instance, head, span);
 //!
 //! // `.model dmod d (is=1e-14 n=1.05)`: (type word, level) → family by the reader's table
@@ -81,12 +83,13 @@
 //!   `Builder::source`, `Builder::controlled`, `Builder::poly`, `Builder::table_source`,
 //!   `Builder::behav`, `Builder::laplace`, `Builder::freq_table`, `Builder::delay`,
 //!   `Builder::semi`, `Builder::switch`, `Builder::line`, `Builder::instance`
-//! - `Builder::model(&mut self, ScopeId, Model, Span) -> ItemRef`
+//! - `Builder::model(&mut self, ScopeId, Model, Span) -> ItemRef`; crate:
+//!   `Builder::define_model`
 
 use crate::build::Builder;
 use crate::circuit_check::{model_ok, verdict};
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, OutKind, Poly, TableSource};
-use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
+use crate::element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
 use crate::id::{ExprId, ItemRef, List, NameId, NameList, ParamList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::line::Line;
@@ -112,9 +115,11 @@ pub struct ElemHead {
     pub params: ParamList,
     /// Multiplicity; `NONE` = 1.
     pub mult: ExprId,
+    /// How `mult` multiplies (A15 C1): `Parallel` unless an `Instance` states ngspice's law.
+    pub mult_law: MultLaw,
 }
 
-const _: () = assert!(size_of::<ElemHead>() == 32);
+const _: () = assert!(size_of::<ElemHead>() == 36);
 
 impl Builder<'_> {
     /// Interns a header's name, terminals and parameters; `master` becomes an unresolved
@@ -146,6 +151,7 @@ impl Builder<'_> {
             model,
             params,
             mult,
+            mult_law: MultLaw::Parallel,
         }
     }
 
@@ -191,6 +197,7 @@ impl Builder<'_> {
             params: head.params,
             mult: head.mult,
             detail,
+            mult_law: head.mult_law,
         };
         let v = verdict(self.design(), &row);
         assert!(
@@ -416,7 +423,8 @@ impl Builder<'_> {
         self.element(scope, kind, head, NO_ROW, span)
     }
 
-    /// A model; defines `DefKind::Model` `row.name` in `scope`. Asserts `word` is set exactly
+    /// A model; defines `DefKind::Model` `row.name` in `scope`, and for the first bin of a group
+    /// (`bin_of` not yet defined there) the group's name too, bound to this bin (A15 C4). Asserts `word` is set exactly
     /// for `CodeModel` and `Other`, `module` named exactly for `Module`.
     pub fn model(&mut self, scope: ScopeId, row: Model, span: Span) -> ItemRef {
         let code = matches!(row.family, ModelFamily::CodeModel | ModelFamily::Other);
@@ -431,12 +439,32 @@ impl Builder<'_> {
             row.family
         );
         assert!(
-            model_ok(&row),
+            model_ok(self.design(), &row),
             "{:?}: polarity outside its domain",
             row.family
         );
         let item = self.push(scope, row, span);
-        self.define(DefKind::Model, row.name, scope, item);
+        self.define_model(scope, item, row.name, row.bin_of);
         item
+    }
+
+    /// Defines a pushed model's name and, for the first bin of a group in `scope`, the group's
+    /// name bound to that bin (A15 C4, R33). Shared by `model` and the IR-text reader.
+    pub(crate) fn define_model(
+        &mut self,
+        scope: ScopeId,
+        item: ItemRef,
+        name: NameId,
+        bin_of: NameId,
+    ) {
+        self.define(DefKind::Model, name, scope, item);
+        if bin_of != NameId::NONE
+            && !self
+                .design
+                .def_index
+                .contains_key(&(scope, DefKind::Model, bin_of))
+        {
+            self.define(DefKind::Model, bin_of, scope, item);
+        }
     }
 }

@@ -8,7 +8,7 @@
 //!
 //! Contents: none (tests only).
 
-use spicerack_ir::{Literal, NumForm};
+use spicerack_ir::{Design, Literal, NumForm, Role, Span};
 
 // ---- private ----
 
@@ -183,5 +183,45 @@ fn every_invariant_has_a_breaking_literal() {
     ];
     for l in legal {
         assert!(l.is_valid(), "{l:?} is legal");
+    }
+}
+
+#[test]
+fn meaning_compares_reals_by_value_and_ints_by_form() {
+    // A15 K4 (R28): `eq_meaning` equates two real literals of one value whatever their forms,
+    // an Int only with an Int; `eq_ignoring_spans` compares the forms too
+    let deck = |l: Literal| {
+        let mut d = Design::new();
+        {
+            let mut b = d.builder();
+            let (_, top) = b.file("t.sp", Role::Deck);
+            let v = b.literal(l);
+            b.param(top, "p", v, Span::NONE);
+        }
+        d
+    };
+    let reals = [
+        lit(1, 0, 3, NumForm::Scale),
+        lit(1, 0, 3, NumForm::Exponent),
+        lit(1000, 0, 0, NumForm::Plain),
+        lit(10000, 1, 0, NumForm::Plain),
+    ];
+    for a in reals {
+        for b in reals {
+            assert!(deck(a).eq_meaning(&deck(b)), "{a:?} means {b:?}");
+            assert_eq!(
+                deck(a).eq_ignoring_spans(&deck(b)),
+                a == b,
+                "{a:?} vs {b:?}"
+            );
+        }
+    }
+    let int = lit(1000, 0, 0, NumForm::Int);
+    assert!(deck(int).eq_meaning(&deck(int)));
+    for r in reals {
+        assert!(
+            !deck(int).eq_meaning(&deck(r)),
+            "an Int is not the real {r:?}"
+        );
     }
 }

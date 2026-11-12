@@ -2,7 +2,7 @@
 //! cards no other area claims) → `Analysis`; `.options`, `.temp`, `.ic`, `.nodeset` → `Option`,
 //! `Env`, `NodeSet` of `holds: WholeRun` (AMEND-A12 A14); the other dot cards ngspice ignores →
 //! `Inert`, those it rejects (`.step`, `.hb`, an unknown card) → `InvalidInSource`. A run card in
-//! a subcircuit body stays there and is the deck's (R26, `RunItemNested`).
+//! a subcircuit body stays there and is the deck's (R26, `Placed(Subckt, …)`).
 //!
 //! Each card is one item (or one per key or node) at its own place, in card order (R25): ngspice
 //! runs analyses by type rank, reverse card order inside a type (`cktdojob.c:208-216`,
@@ -39,7 +39,7 @@ pub(super) use words::split as split_words;
 use super::codes::Row;
 use super::read::{Lower, Stmt};
 use super::tables;
-use crate::ir::{self, AnalysisKind, Feature, ItemKind, OptionKey, RunExtra};
+use crate::ir::{self, AnalysisKind, Feature, ItemKind, OptionKey, RunExtra, ScopeKind};
 
 /// What the run area's reader produces (and `write_run` spells): the analyses ngspice-45 has,
 /// their fields as its cards give them, and the state items.
@@ -128,11 +128,20 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::NodeSet),
     Feature::Run(RunExtra::NodesetAll),
     Feature::Run(RunExtra::NodeSetHierarchical),
-    Feature::Run(RunExtra::NodeSetInSubckt),
+    Feature::Run(RunExtra::IcBeyondNext),
     Feature::Item(ItemKind::Env),
     Feature::Run(RunExtra::WholeRunMidRun),
     Feature::Run(RunExtra::StateWholeRun),
-    Feature::Run(RunExtra::RunItemNested),
+    // a run card in a `.subckt` body is the deck's (R26, run sub.cir); a `.ic` there holds each
+    // instance's node (run icsub.cir); a `.lib` section's cards are its includer's
+    Feature::Placed(ScopeKind::Subckt, ItemKind::Analysis),
+    Feature::Placed(ScopeKind::Subckt, ItemKind::Option),
+    Feature::Placed(ScopeKind::Subckt, ItemKind::Env),
+    Feature::Placed(ScopeKind::Subckt, ItemKind::NodeSet),
+    Feature::Placed(ScopeKind::Section, ItemKind::Analysis),
+    Feature::Placed(ScopeKind::Section, ItemKind::Option),
+    Feature::Placed(ScopeKind::Section, ItemKind::Env),
+    Feature::Placed(ScopeKind::Section, ItemKind::NodeSet),
 ]);
 
 /// This area's reading codes, `P1300–P1349`.

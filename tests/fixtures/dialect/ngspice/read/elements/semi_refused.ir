@@ -1,0 +1,9 @@
+# codes: P1100 P1101 P1100 P1100 P1100
+file "semi_refused.sp" deck
+  title "semi_refused"
+  comment " oracle: ngspice-45 inp2m.c (no unlabeled parameter permitted on mosfet), inp2z.c (the unlabeled number depends on the model type); runs mm: area and mult on an M, initial on a D are unknown parameter (no ngspice device has the key)"
+  opaque ngspice invalid "M1 d g s b nmos 2"
+  opaque ngspice unread "Z1 d g s zmod 2"
+  opaque ngspice invalid "M2 d g s b nmos area=2"
+  opaque ngspice invalid "M3 d g s b nmos mult=2"
+  opaque ngspice invalid "D1 a k dmod initial=1"

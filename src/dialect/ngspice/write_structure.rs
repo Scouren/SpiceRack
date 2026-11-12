@@ -17,7 +17,7 @@ use super::codes;
 use super::expr_write;
 use super::tables;
 use super::write::Out;
-use crate::ir::{self, Extra, Feature, FeatureSet, ItemKind};
+use crate::ir::{self, Extra, Feature, FeatureSet, ItemKind, ScopeKind};
 
 /// The structure items and placements ngspice spells (A13: `CircuitExtra::NameWithoutLetter`
 /// stays out of the union when the circuit owner adds it): the kernel items but `Load` (an OSDI
@@ -36,14 +36,46 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::If),
     Feature::Item(ItemKind::Param),
     Feature::Item(ItemKind::Func),
-    Feature::Extra(Extra::NestedSubckt),
-    Feature::Extra(Extra::LocalFunc),
     Feature::Extra(Extra::IncludeSection),
     // ngspice resolves a name through every enclosing subcircuit (numparam's nested levels), and
     // a head default may read a parameter (A12 K2)
     Feature::Extra(Extra::EnclosingRef),
-    Feature::Extra(Extra::FormalReadsParam),
-]);
+    Feature::Extra(Extra::FormalNotConstant),
+])
+// where ngspice reads each structure item (runs under the S3.0 report's `runs/` decks): a
+// subcircuit holds everything but a `.lib` section (`.func`, `.include`, `.global`, `.param`,
+// nested `.subckt` and `.if` all run inside one); a section holds definitions, includes and
+// conditionals (its `.func`, `.include`, `.subckt`, `.if` run) but no section (P0009); an `.if`
+// branch holds comments, conditionals and kept text only (manual §2.15: instances and models).
+.union(FeatureSet::placed(
+    ScopeKind::Subckt,
+    &[
+        ItemKind::Comment,
+        ItemKind::Include,
+        ItemKind::Global,
+        ItemKind::Opaque,
+        ItemKind::Subckt,
+        ItemKind::If,
+        ItemKind::Param,
+        ItemKind::Func,
+    ],
+))
+.union(FeatureSet::placed(
+    ScopeKind::Section,
+    &[
+        ItemKind::Comment,
+        ItemKind::Include,
+        ItemKind::Opaque,
+        ItemKind::Subckt,
+        ItemKind::If,
+        ItemKind::Param,
+        ItemKind::Func,
+    ],
+))
+.union(FeatureSet::placed(
+    ScopeKind::Branch,
+    &[ItemKind::Comment, ItemKind::Opaque, ItemKind::If],
+));
 
 /// A `Title` past the first item: the IR puts it first, and the spine writes line 1, so a
 /// title here is a check violation that never reaches a writer.
@@ -94,7 +126,16 @@ pub(super) fn opaque(w: &mut Out<'_>, item: ir::ItemRef) {
         "ngspice write: another family's opaque (dialect::write refuses it)"
     );
     let text = w.design.text(o.text).to_string();
-    w.line(&text);
+    // a `.control` pair is a script region's commands (R49): adjacent pairs join
+    let pair = text.strip_prefix(".control\n").and_then(|t| {
+        let t = t.strip_suffix('\n').unwrap_or(t);
+        t.strip_suffix(".endc")
+            .map(|b| b.strip_suffix('\n').unwrap_or(b))
+    });
+    match pair {
+        Some(body) => body.lines().for_each(|cmd| w.script(cmd)),
+        None => w.line(&text),
+    }
 }
 
 /// `.subckt name ports params: k=v …`, the body, `.ends`.
@@ -182,71 +223,37 @@ pub(super) fn func(w: &mut Out<'_>, item: ir::ItemRef) {
 }
 
 /// Appends a refusal for a structure item ngspice cannot spell for a reason no feature states
-/// (R21): a head parameter with no default (`W1001`), a multi-line title or comment (`W1002`), a
-/// section in a section or a definition or include in an `.if` branch (`W1004`), an `.if`
-/// condition that reads the run or a value that reads the circuit (`W1005`), a string or list
-/// value (`W1006`).
-pub(super) fn admits(d: &ir::Design, item: ir::ItemRef, scope: ir::ScopeId, diags: &mut ir::Diags) {
-    let span = d.span_of(item);
-    let mut refuse = |code| diags.push(code, span, 0);
-    let in_kind = |k: ir::ScopeKind| d.scope(scope).kind == k;
-    let broken = |t: &str| t.contains(['\n', '\r']);
-    let mut values: Vec<(ir::ExprId, ir::ExprClass)> = Vec::new();
-    match item.kind {
-        ItemKind::Title => {
-            let t: ir::item::Title = d.row(item.index);
-            let text = d.text(t.text);
-            if broken(text) {
-                refuse(codes::LINE_BREAK);
-            }
-        }
-        ItemKind::Comment => {
-            let c: ir::item::Comment = d.row(item.index);
-            if broken(d.text(c.text)) {
-                refuse(codes::LINE_BREAK);
-            }
-        }
+/// (R21): a string or list value where numparam reads an expression (`W1006`). Placements,
+/// formals without a default, dynamic `.if` conditions and line breaks are features or
+/// invariants now (A15), not refusals.
+pub(super) fn admits(
+    d: &ir::Design,
+    item: ir::ItemRef,
+    _scope: ir::ScopeId,
+    diags: &mut ir::Diags,
+) {
+    let value = match item.kind {
+        ItemKind::Param => vec![d.row::<ir::item::Param>(item.index).value],
+        ItemKind::Func => vec![d.row::<ir::item::Func>(item.index).body],
         ItemKind::Subckt => {
             let s: ir::item::Subckt = d.row(item.index);
-            for &(_, v) in d.params(s.params) {
-                if v.is_none() {
-                    refuse(codes::NO_DEFAULT);
-                } else {
-                    values.push((v, ir::ExprClass::Circuit));
-                }
-            }
+            d.params(s.params)
+                .iter()
+                .map(|&(_, v)| v)
+                .filter(|v| !v.is_none())
+                .collect()
         }
         ItemKind::If => {
             let i: ir::item::If = d.row(item.index);
-            for b in d.branches(i.branches).iter().filter(|b| !b.cond.is_none()) {
-                values.push((b.cond, ir::ExprClass::Temp));
-            }
+            d.branches(i.branches)
+                .iter()
+                .map(|b| b.cond)
+                .filter(|c| !c.is_none())
+                .collect()
         }
-        ItemKind::Param => {
-            let p: ir::item::Param = d.row(item.index);
-            values.push((p.value, ir::ExprClass::Circuit));
-        }
-        ItemKind::Func => {
-            let f: ir::item::Func = d.row(item.index);
-            values.push((f.body, ir::ExprClass::Circuit));
-        }
-        _ => {}
-    }
-    let placed = match item.kind {
-        ItemKind::Section => in_kind(ir::ScopeKind::Section) || in_kind(ir::ScopeKind::Branch),
-        ItemKind::Subckt | ItemKind::Func | ItemKind::Include => in_kind(ir::ScopeKind::Branch),
-        _ => false,
+        _ => Vec::new(),
     };
-    if placed {
-        refuse(codes::PLACEMENT);
-    }
-    for (e, limit) in values {
-        let class = ir::expr_class(d, e);
-        if item.kind != ItemKind::Func && class >= limit {
-            refuse(codes::READS_RUN);
-        }
-        if expr_write::holds_text(d, e) {
-            refuse(codes::TEXT_VALUE);
-        }
+    if value.iter().any(|&e| expr_write::holds_text(d, e)) {
+        diags.push(codes::TEXT_VALUE, d.span_of(item), 0);
     }
 }

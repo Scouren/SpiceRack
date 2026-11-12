@@ -12,7 +12,7 @@
 
 use spicerack_ir::controlled::Behav;
 use spicerack_ir::line::Line;
-use spicerack_ir::passive::IcMode;
+use spicerack_ir::passive::{IcMode, TcBase};
 use spicerack_ir::semi::{InitialState, Semi};
 use spicerack_ir::source::{DcRule, PortSpec, Source};
 use spicerack_ir::wave::{PreDelay, Pulse, PulseLaw, Sin};
@@ -88,6 +88,7 @@ pub fn pulse(v: ExprId) -> Pulse {
         period: v,
         cycles: ExprId::NONE,
         law: PulseLaw::Spice,
+        given_zero: spicerack_ir::wave::GivenZero::AsGiven,
     }
 }
 
@@ -104,6 +105,7 @@ pub fn sin(v: ExprId) -> Sin {
         amplitude2: ExprId::NONE,
         freq2: ExprId::NONE,
         pre: PreDelay::Offset,
+        given_zero: spicerack_ir::wave::GivenZero::AsGiven,
     }
 }
 
@@ -142,6 +144,8 @@ pub fn behav(expr: ExprId, output: spicerack_ir::controlled::OutKind) -> Behav {
         dtemp: ExprId::NONE,
         rpar: ExprId::NONE,
         output,
+        tc_base: TcBase::Tnom,
+        tc_law: spicerack_ir::passive::TcLaw::Direct,
     }
 }
 
