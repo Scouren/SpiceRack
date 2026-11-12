@@ -23,10 +23,12 @@ use crate::controlled::{DelayLaw, OutKind, Quantity, TableLaw};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
+use crate::expr::Expr;
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::IcMode;
-use crate::wave::{PwlJoin, PwlRepeat, WaveKind, WaveRef};
+use crate::source::DcRule;
+use crate::wave::{PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
 
 /// What is wrong with an element beyond its terminal count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -247,7 +249,8 @@ fn detail_verdict(design: &Design, e: &Element, v: &mut Verdict) {
             let par = side::<crate::passive::Parasitics>(design, s.parasitics, v);
             let port = side::<crate::source::PortSpec>(design, s.port, v);
             let dis = side::<crate::source::Distof>(design, s.distof, v);
-            some(s.dc)
+            (s.dc_rule == DcRule::Given) == some(s.dc)
+                && (s.dc_rule == DcRule::Given || s.wave != WaveRef::NONE)
                 && paired(s.ac_mag, s.ac_phase_deg)
                 && paired(s.pac_mag, s.pac_phase_deg)
                 && (s.port != NO_ROW) == (e.kind == ElemKind::Port)
@@ -370,8 +373,10 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
     }
     let all = |e: &[ExprId]| e.iter().all(|&x| some(x));
     match w.kind {
-        WaveKind::Pulse => side::<Pulse>(design, w.index, v)
-            .is_none_or(|p| all(&[p.v1, p.v2, p.delay, p.rise, p.fall, p.width, p.period])),
+        WaveKind::Pulse => side::<Pulse>(design, w.index, v).is_none_or(|p| {
+            all(&[p.v1, p.v2, p.delay, p.rise, p.fall, p.width, p.period])
+                && !(p.law == PulseLaw::Vacask && nonpositive_literal(design, p.rise))
+        }),
         WaveKind::Sin => side::<Sin>(design, w.index, v).is_none_or(|s| {
             all(&[
                 s.offset,
@@ -432,5 +437,14 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
                 p.repeat_start,
             ]) && p.bits != NameId::NONE
         }),
+    }
+}
+
+/// Whether `e` is a literal at or below zero (VACASK's pulse needs `rise > 0`; an expression's
+/// sign is not known before evaluation, so only a literal is judged here).
+fn nonpositive_literal(design: &Design, e: ExprId) -> bool {
+    match design.expr(e) {
+        Expr::Num(k) => design.num(k).value() <= 0.0,
+        _ => false,
     }
 }

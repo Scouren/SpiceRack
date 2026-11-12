@@ -610,6 +610,6 @@ impl RowFacts for Element {
 /// The circuit owner's features of the whole design, which no single row carries (A9). Called
 /// once by `features_used` and by `check_legal`. Empty until the circuit owner fills it.
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
-    // Every circuit feature is a field of one row (`RowFacts::features`); none is positional.
-    let _ = (design, set);
+    // one design-level circuit feature: a model with no library of its family (A12 C5)
+    crate::circuit_features::library_features(design, set);
 }

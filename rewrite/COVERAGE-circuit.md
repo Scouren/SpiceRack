@@ -326,6 +326,14 @@ conversion); "pass" means a conversion outside this crate. The gaps and proposal
 - 9.02 → run owner (probes); the element side supplies role order (`ElemKind`) and the sign rule
 - 9.06 → run owner (operating-point quantities); depends on `ModelFamily`
 
+## AMEND-A12 (VACASK)
+
+- A12 C1 → `Pulse.law: PulseLaw::{Spice, Vacask}`; `CircuitExtra::{PulseSpice, PulseVacask}`; `check`: a literal `rise <= 0` under `Vacask` is `FieldDomain`
+- A12 C2 → `Exp.td2_from: TdFrom::{Zero, Td1}`; `CircuitExtra::{ExpTd2FromZero, ExpTd2FromTd1}` (E5, 5.08: the reader no longer adds)
+- A12 C3 → `Sffm.pre: PreDelay`; `CircuitExtra::{SffmPreOffset, SffmPreHold, SffmPreZero}`
+- A12 C4 → `Source.dc_rule: DcRule::{Given, WaveAtZero}` (`dc` `NONE` exactly under `WaveAtZero`, which needs a wave); `CircuitExtra::DcGivenWithWave` and `DcAtZero{Pulse, Sin, Exp, Pwl, Sffm, Am, TrNoise, TrRandom, Pattern}` (5.13, E1, E38)
+- A12 C5 → `ItemKind::DeviceLibrary`, `library::DeviceLibrary { family, path }`; `CircuitExtra::ElementWithoutModel` (item), `CircuitExtra::ModelWithoutLibrary` (design-level); naming of parameterless models: IR-CIRCUIT §4a, pending
+
 ## Gaps and proposals
 
 | Gap | Rows | Proposal |

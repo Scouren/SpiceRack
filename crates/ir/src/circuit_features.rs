@@ -8,7 +8,8 @@
 //! (a field reads the circuit when it holds `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt`).
 //!
 //! Contents (crate-private): `pub(crate) fn element_features`, `pub(crate) fn model_features`,
-//! `pub(crate) fn reads_circuit`
+//! `pub(crate) fn reads_circuit`, `pub(crate) fn dc_at_zero`, `pub(crate) fn library_features`,
+//! `pub(crate) fn mult_class`
 
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_text::get_row;
@@ -20,13 +21,16 @@ use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::expr::Expr;
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{ExprId, NameId};
+use crate::item::ItemKind;
+use crate::library::DeviceLibrary;
 use crate::line::Line;
-use crate::model::Model;
+use crate::model::{Model, ModelFamily};
 use crate::passive::{Coupling, IcMode, Passive};
 use crate::semi::{InitialState, Semi, Switch};
-use crate::source::{PortSpec, Source};
+use crate::source::{DcRule, PortSpec, Source};
 use crate::wave::{
-    Am, AmModTime, PreDelay, Pulse, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw, Sin, WaveKind, WaveRef,
+    Am, AmModTime, Exp, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw, Sin,
+    TdFrom, WaveKind, WaveRef,
 };
 
 /// Adds the element's kind, its waveform's kind and its circuit extras.
@@ -35,6 +39,9 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     let mut add = |x: X| got = got.with(Feature::Circuit(x));
     let some = |x: ExprId| x != ExprId::NONE;
     let mut wave_kind = None;
+    if e.model.name == NameId::NONE {
+        add(X::ElementWithoutModel);
+    }
     if some(e.mult) {
         add(mult_class(e.kind));
     }
@@ -57,6 +64,11 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
         DetailKind::Source => {
             if let Some(s) = get_row::<Source>(design, e.detail) {
                 source(design, s, &mut add);
+                match s.dc_rule {
+                    DcRule::Given if s.wave != WaveRef::NONE => add(X::DcGivenWithWave),
+                    DcRule::Given => {}
+                    DcRule::WaveAtZero => add(dc_at_zero(s.wave.kind)),
+                }
                 if s.wave != WaveRef::NONE {
                     wave_kind = Some(s.wave.kind);
                     wave(design, s.wave, &mut add);
@@ -202,10 +214,42 @@ pub(crate) fn reads_circuit(design: &Design, root: ExprId) -> bool {
     false
 }
 
-// ---- private ----
+/// The `DcRule::WaveAtZero` member of a wave kind.
+pub(crate) fn dc_at_zero(kind: WaveKind) -> X {
+    match kind {
+        WaveKind::Pulse => X::DcAtZeroPulse,
+        WaveKind::Sin => X::DcAtZeroSin,
+        WaveKind::Exp => X::DcAtZeroExp,
+        WaveKind::Pwl => X::DcAtZeroPwl,
+        WaveKind::Sffm => X::DcAtZeroSffm,
+        WaveKind::Am => X::DcAtZeroAm,
+        WaveKind::TrNoise => X::DcAtZeroTrNoise,
+        WaveKind::TrRandom => X::DcAtZeroTrRandom,
+        WaveKind::Pattern => X::DcAtZeroPattern,
+    }
+}
+
+/// Adds `ModelWithoutLibrary` when a reachable model's family has no reachable
+/// `DeviceLibrary` of that family (A12 C5). One pass over the reachable items.
+pub(crate) fn library_features(design: &Design, set: &mut FeatureSet) {
+    let reachable = design.reachable();
+    let mut has_library = [false; ModelFamily::COUNT];
+    for &(item, _) in &reachable {
+        if item.kind == ItemKind::DeviceLibrary {
+            has_library[design.row::<DeviceLibrary>(item.index).family as usize] = true;
+        }
+    }
+    let missing = reachable.iter().any(|&(item, _)| {
+        item.kind == ItemKind::Model
+            && !has_library[design.row::<Model>(item.index).family as usize]
+    });
+    if missing {
+        *set = set.with(Feature::Circuit(X::ModelWithoutLibrary));
+    }
+}
 
 /// The multiplicity member of a kind's class.
-fn mult_class(kind: ElemKind) -> X {
+pub(crate) fn mult_class(kind: ElemKind) -> X {
     use ElemKind as E;
     match kind {
         E::Resistor => X::MultResistor,
@@ -240,6 +284,8 @@ fn mult_class(kind: ElemKind) -> X {
         | E::Unresolved => X::MultOther,
     }
 }
+
+// ---- private ----
 
 fn ic_mode(mode: IcMode, add: &mut impl FnMut(X)) {
     match mode {
@@ -330,8 +376,22 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
     let some = |x: ExprId| x != ExprId::NONE;
     match w.kind {
         WaveKind::Pulse => {
-            if get_row::<Pulse>(design, w.index).is_some_and(|p| some(p.cycles)) {
-                add(X::PulseCycles);
+            if let Some(p) = get_row::<Pulse>(design, w.index) {
+                add(match p.law {
+                    PulseLaw::Spice => X::PulseSpice,
+                    PulseLaw::Vacask => X::PulseVacask,
+                });
+                if some(p.cycles) {
+                    add(X::PulseCycles);
+                }
+            }
+        }
+        WaveKind::Exp => {
+            if let Some(x) = get_row::<Exp>(design, w.index) {
+                add(match x.td2_from {
+                    TdFrom::Zero => X::ExpTd2FromZero,
+                    TdFrom::Td1 => X::ExpTd2FromTd1,
+                });
             }
         }
         WaveKind::Sin => {
@@ -356,6 +416,7 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
                     SffmLaw::Spice3 => X::SffmSpice3,
                     SffmLaw::Ngspice => X::SffmNgspice,
                 });
+                add(pre(s.pre, X::SffmPreOffset, X::SffmPreHold, X::SffmPreZero));
             }
         }
         WaveKind::Am => {
@@ -366,7 +427,7 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
                 }
             }
         }
-        WaveKind::Exp | WaveKind::TrNoise | WaveKind::TrRandom | WaveKind::Pattern => {}
+        WaveKind::TrNoise | WaveKind::TrRandom | WaveKind::Pattern => {}
     }
 }
 

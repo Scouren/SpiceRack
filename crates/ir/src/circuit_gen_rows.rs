@@ -5,22 +5,37 @@
 //!
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator, round trip); `circuit_gen.rs`.
 //!
-//! Contents: `R::passive`, `R::source`, `R::behav`, `R::line`, `R::wave` (`pub(super)`)
+//! Contents: `R::passive`, `R::source`, `R::behav`, `R::line` (`pub(super)`),
+//! `pub(crate) fn generate_library` (re-exported by `circuit_gen`)
 
 use super::{N, R};
+use crate::build::Builder;
 use crate::circuit_extra::CircuitExtra as X;
+use crate::circuit_features::dc_at_zero;
 use crate::controlled::{Behav, OutKind};
 use crate::element::{ElemKind, NO_ROW};
-use crate::feature::Feature;
+use crate::r#gen::Gen;
 use crate::r#gen::Reads;
-use crate::id::{ExprId, List, NameId};
+use crate::id::{ItemRef, ScopeId};
+use crate::id::{List, NameId};
+use crate::library::DeviceLibrary;
 use crate::line::Line;
+use crate::model::ModelFamily;
 use crate::passive::{IcMode, Parasitics, Passive};
 use crate::source::{DcRule, Distof, PortSpec, Source};
-use crate::wave::{
-    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
-    Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveKind, WaveRef,
-};
+use crate::span::Span;
+use crate::wave::WaveRef;
+
+/// Pushes one random device library into `scope` (always possible).
+pub(crate) fn generate_library(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>) -> ItemRef {
+    let family = ModelFamily::ALL[g.below(ModelFamily::COUNT as u32) as usize];
+    let path = if g.chance(2) {
+        NameId::NONE
+    } else {
+        b.name(&format!("{}.osdi", g.fresh()))
+    };
+    b.device_library(scope, DeviceLibrary { path, family }, Span::NONE)
+}
 
 impl R<'_, '_> {
     pub(super) fn passive(&mut self, kind: ElemKind) -> Passive {
@@ -95,7 +110,22 @@ impl R<'_, '_> {
     }
 
     pub(super) fn source(&mut self, kind: ElemKind) -> Source {
-        let dc = self.ex();
+        // the wave kind and the DC rule decide whether `dc` exists, so both come first
+        let wave_kind = self.wave_kind();
+        let dc_rule = match wave_kind {
+            Some(k)
+                if self.has(dc_at_zero(k))
+                    && (!self.has(X::DcGivenWithWave) || self.g.chance(2)) =>
+            {
+                DcRule::WaveAtZero
+            }
+            _ => DcRule::Given,
+        };
+        let dc = if dc_rule == DcRule::Given {
+            self.ex()
+        } else {
+            N
+        };
         let ac = self.g.chance(2);
         let ac_mag = if ac { self.ex() } else { N };
         let ac_phase_deg = if ac { self.ex() } else { N };
@@ -105,7 +135,10 @@ impl R<'_, '_> {
         let pac = self.maybe(X::SourcePac);
         let pac_mag = if pac { self.ex() } else { N };
         let pac_phase_deg = if pac { self.ex() } else { N };
-        let wave = self.wave();
+        let wave = match wave_kind {
+            Some(k) => self.wave_of(k),
+            None => WaveRef::NONE,
+        };
         let noise_psd = if self.maybe(X::SourceNoisePsd) {
             let n = 2 + 2 * self.g.below(2);
             self.exprs(n)
@@ -166,7 +199,7 @@ impl R<'_, '_> {
             parasitics,
             port,
             distof,
-            dc_rule: DcRule::Given,
+            dc_rule,
         }
     }
 
@@ -243,253 +276,5 @@ impl R<'_, '_> {
             }
         }
         l
-    }
-
-    /// A waveform of a kind in the set, or `WaveRef::NONE`.
-    pub(super) fn wave(&mut self) -> WaveRef {
-        let kinds: Vec<WaveKind> = WaveKind::ALL
-            .into_iter()
-            .filter(|&k| {
-                self.f.contains(Feature::Wave(k))
-                    && match k {
-                        WaveKind::Sin => {
-                            self.has(X::SinPreOffset)
-                                || self.has(X::SinPreHold)
-                                || self.has(X::SinPreZero)
-                        }
-                        WaveKind::Sffm => self.has(X::SffmSpice3) || self.has(X::SffmNgspice),
-                        WaveKind::Am => {
-                            self.has(X::AmPreOffset)
-                                || self.has(X::AmPreHold)
-                                || self.has(X::AmPreZero)
-                        }
-                        _ => true,
-                    }
-            })
-            .collect();
-        if kinds.is_empty() || self.g.chance(3) {
-            return WaveRef::NONE;
-        }
-        match kinds[self.g.below(kinds.len() as u32) as usize] {
-            WaveKind::Pulse => {
-                let v: [ExprId; 7] = std::array::from_fn(|_| self.ex());
-                let cycles = self.opt(X::PulseCycles);
-                let [v1, v2, delay, rise, fall, width, period] = v;
-                self.b.wave(Pulse {
-                    v1,
-                    v2,
-                    delay,
-                    rise,
-                    fall,
-                    width,
-                    period,
-                    cycles,
-                    law: PulseLaw::Spice,
-                })
-            }
-            WaveKind::Sin => {
-                let pre = self.pre(X::SinPreOffset, X::SinPreHold, X::SinPreZero);
-                let [offset, amplitude, freq, delay, damping, phase_deg]: [ExprId; 6] =
-                    std::array::from_fn(|_| self.ex());
-                let cycles = self.opt(X::SinCycles);
-                let tone = self.maybe(X::SinSecondTone);
-                let amplitude2 = if tone { self.ex() } else { N };
-                let freq2 = if tone { self.ex() } else { N };
-                self.b.wave(Sin {
-                    offset,
-                    amplitude,
-                    freq,
-                    delay,
-                    damping,
-                    phase_deg,
-                    cycles,
-                    amplitude2,
-                    freq2,
-                    pre,
-                })
-            }
-            WaveKind::Exp => {
-                let [v1, v2, td1, tau1, td2, tau2]: [ExprId; 6] =
-                    std::array::from_fn(|_| self.ex());
-                self.b.wave(Exp {
-                    v1,
-                    v2,
-                    td1,
-                    tau1,
-                    td2,
-                    tau2,
-                    td2_from: TdFrom::Zero,
-                })
-            }
-            WaveKind::Pwl => {
-                let row = self.pwl();
-                self.b.wave(row)
-            }
-            WaveKind::Sffm => {
-                let law = self.pick(&[
-                    (SffmLaw::Spice3, Some(X::SffmSpice3)),
-                    (SffmLaw::Ngspice, Some(X::SffmNgspice)),
-                ]);
-                let [
-                    offset,
-                    amplitude,
-                    carrier_freq,
-                    mod_index,
-                    signal_freq,
-                    delay,
-                    phase_c_deg,
-                    phase_m_deg,
-                ]: [ExprId; 8] = std::array::from_fn(|_| self.ex());
-                self.b.wave(Sffm {
-                    offset,
-                    amplitude,
-                    carrier_freq,
-                    mod_index,
-                    signal_freq,
-                    delay,
-                    phase_c_deg,
-                    phase_m_deg,
-                    law,
-                    pre: PreDelay::Offset,
-                })
-            }
-            WaveKind::Am => {
-                let pre = self.pre(X::AmPreOffset, X::AmPreHold, X::AmPreZero);
-                let mod_time = if self.maybe(X::AmModCarrierPhase) {
-                    AmModTime::CarrierPhase
-                } else {
-                    AmModTime::Delay
-                };
-                let [
-                    offset,
-                    amplitude,
-                    mod_offset,
-                    mod_index,
-                    mod_freq,
-                    carrier_freq,
-                    delay,
-                    phase_m_deg,
-                    phase_c_deg,
-                ]: [ExprId; 9] = std::array::from_fn(|_| self.ex());
-                self.b.wave(Am {
-                    offset,
-                    amplitude,
-                    mod_offset,
-                    mod_index,
-                    mod_freq,
-                    carrier_freq,
-                    delay,
-                    phase_m_deg,
-                    phase_c_deg,
-                    mod_time,
-                    pre,
-                })
-            }
-            WaveKind::TrNoise => {
-                let [na, nt]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
-                let [nalpha, namp, rts_amp, rts_capture, rts_emission]: [ExprId; 5] =
-                    std::array::from_fn(|_| if self.g.chance(2) { self.ex() } else { N });
-                self.b.wave(TrNoise {
-                    na,
-                    nt,
-                    nalpha,
-                    namp,
-                    rts_amp,
-                    rts_capture,
-                    rts_emission,
-                })
-            }
-            WaveKind::TrRandom => {
-                let [ts, td, p1, p2]: [ExprId; 4] = std::array::from_fn(|_| self.ex());
-                let kind = TrRandomKind::ALL[self.g.below(4) as usize];
-                self.b.wave(TrRandom {
-                    ts,
-                    td,
-                    p1,
-                    p2,
-                    kind,
-                })
-            }
-            WaveKind::Pattern => {
-                let [high, low, delay, rise, fall, sample]: [ExprId; 6] =
-                    std::array::from_fn(|_| self.ex());
-                let text: String = (0..1 + self.g.below(6))
-                    .map(|_| ['0', '1', 'm'][self.g.below(3) as usize])
-                    .collect();
-                let bits = self.b.name(&text);
-                let repeats = if self.g.chance(2) { self.ex() } else { N };
-                let repeat_start = self.ex();
-                self.b.wave(Pattern {
-                    high,
-                    low,
-                    delay,
-                    rise,
-                    fall,
-                    sample,
-                    bits,
-                    repeats,
-                    repeat_start,
-                })
-            }
-        }
-    }
-
-    fn pre(&mut self, offset: X, hold: X, zero: X) -> PreDelay {
-        self.pick(&[
-            (PreDelay::Offset, Some(offset)),
-            (PreDelay::HoldDelayValue, Some(hold)),
-            (PreDelay::Zero, Some(zero)),
-        ])
-    }
-
-    fn pwl(&mut self) -> Pwl {
-        let repeat = self.pick(&[
-            (PwlRepeat::Never, None),
-            (PwlRepeat::From, Some(X::PwlRepeatFrom)),
-            (PwlRepeat::Period, Some(X::PwlRepeatPeriod)),
-        ]);
-        let join = if repeat == PwlRepeat::Never {
-            PwlJoin::Jump
-        } else {
-            self.pick(&[
-                (PwlJoin::Jump, None),
-                (PwlJoin::Ramp, Some(X::PwlJoinRamp)),
-                (PwlJoin::RampWidth, Some(X::PwlJoinRampWidth)),
-                (PwlJoin::Extrapolate, Some(X::PwlJoinExtrapolate)),
-            ])
-        };
-        let n = 2 + 2 * self.g.below(2);
-        let points = self.exprs(n);
-        let delay = self.opt(X::PwlDelay);
-        let repeat_at = if repeat == PwlRepeat::Never {
-            N
-        } else {
-            self.ex()
-        };
-        let repeat_count = if repeat == PwlRepeat::Never {
-            N
-        } else {
-            self.opt(X::PwlRepeatCount)
-        };
-        let join_width = if join == PwlJoin::RampWidth {
-            self.ex()
-        } else {
-            N
-        };
-        let file = if self.maybe(X::PwlFile) {
-            self.g.fresh_name(self.b)
-        } else {
-            NameId::NONE
-        };
-        Pwl {
-            points,
-            delay,
-            repeat_at,
-            repeat_count,
-            join_width,
-            file,
-            repeat,
-            join,
-        }
     }
 }

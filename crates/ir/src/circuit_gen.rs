@@ -28,7 +28,6 @@ use crate::element::{DetailKind, ElemKind, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
-use crate::library::DeviceLibrary;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, IcMode};
 use crate::semi::{InitialState, Semi, Switch};
@@ -36,6 +35,10 @@ use crate::span::Span;
 
 #[path = "circuit_gen_rows.rs"]
 mod rows;
+#[path = "circuit_gen_waves.rs"]
+mod waves;
+
+pub(crate) use rows::generate_library;
 
 const N: ExprId = ExprId::NONE;
 const NONE_REF: Ref = Ref {
@@ -79,7 +82,7 @@ pub(crate) fn generate_element(
     let name = r.g.fresh_name(r.b);
     let terminals = r.terminals(kind, two_terminal);
     let model = r.master(kind);
-    let mult = if r.maybe(mult_extra(kind)) {
+    let mult = if r.maybe(crate::circuit_features::mult_class(kind)) {
         r.ex()
     } else {
         ExprId::NONE
@@ -108,8 +111,23 @@ pub(crate) fn generate_model(
         f: features,
         scope,
     };
+    // without `ModelWithoutLibrary`, only a family some library of the design implements;
+    // decided before anything is interned, so a refusal leaves no orphan name
+    let families: Vec<ModelFamily> = if r.has(X::ModelWithoutLibrary) {
+        ModelFamily::ALL.to_vec()
+    } else {
+        r.b.design()
+            .device_libraries
+            .rows
+            .iter()
+            .map(|l| l.family)
+            .collect()
+    };
+    if families.is_empty() {
+        return ItemRef::NONE;
+    }
+    let family = families[r.g.below(families.len() as u32) as usize];
     let name = r.g.fresh_name(r.b);
-    let family = ModelFamily::ALL[r.g.below(ModelFamily::COUNT as u32) as usize];
     let polarity = if has_polarity(family) {
         if r.g.chance(2) {
             Polarity::N
@@ -169,55 +187,7 @@ pub(crate) fn generate_model(
     r.b.model(scope, row, Span::NONE)
 }
 
-/// Pushes one random device library into `scope` (always possible).
-pub(crate) fn generate_library(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>) -> ItemRef {
-    let family = ModelFamily::ALL[g.below(ModelFamily::COUNT as u32) as usize];
-    let path = if g.chance(2) {
-        NameId::NONE
-    } else {
-        b.name(&format!("{}.osdi", g.fresh()))
-    };
-    b.device_library(scope, DeviceLibrary { path, family }, Span::NONE)
-}
-
 // ---- private ----
-
-/// The multiplicity member of a kind's class (as `circuit_features`).
-fn mult_extra(kind: ElemKind) -> X {
-    use ElemKind as E;
-    match kind {
-        E::Resistor => X::MultResistor,
-        E::Capacitor => X::MultCapacitor,
-        E::Inductor => X::MultInductor,
-        E::VSource => X::MultVSource,
-        E::ISource => X::MultISource,
-        E::Vcvs
-        | E::Vccs
-        | E::Cccs
-        | E::Ccvs
-        | E::Poly
-        | E::Table
-        | E::Behav
-        | E::Laplace
-        | E::FreqTable
-        | E::Delay => X::MultControlled,
-        E::Diode | E::Bjt | E::Mosfet | E::Jfet | E::Mesfet | E::Igbt => X::MultSemi,
-        E::Instance => X::MultInstance,
-        E::CodeModel | E::ModuleModel | E::Module => X::MultModule,
-        E::ChargeCapacitor
-        | E::FluxInductor
-        | E::Coupling
-        | E::Port
-        | E::VSwitch
-        | E::ISwitch
-        | E::LosslessLine
-        | E::LossyLine
-        | E::RcLine
-        | E::SingleLossyLine
-        | E::CoupledLines
-        | E::Unresolved => X::MultOther,
-    }
-}
 
 impl R<'_, '_> {
     fn has(&self, x: X) -> bool {
@@ -241,6 +211,13 @@ impl R<'_, '_> {
                 ElemKind::FreqTable => self.has(X::FreqComplexLinear) || self.has(X::FreqDbLogFreq),
                 _ => true,
             }
+            && (self.has(X::ElementWithoutModel)
+                || kind == ElemKind::Unresolved
+                || match kind.master_kind() {
+                    Some(_) if kind == ElemKind::Coupling => self.has(X::CouplingCore),
+                    Some(_) => true,
+                    None => false,
+                })
     }
 
     fn ex(&mut self) -> ExprId {
@@ -331,8 +308,12 @@ impl R<'_, '_> {
 
     fn master(&mut self, kind: ElemKind) -> Ref {
         let optional = match kind {
-            ElemKind::Coupling => self.maybe(X::CouplingCore),
-            ElemKind::Resistor | ElemKind::Capacitor | ElemKind::Inductor => self.g.chance(4),
+            ElemKind::Coupling => {
+                self.has(X::CouplingCore) && (!self.has(X::ElementWithoutModel) || self.g.chance(2))
+            }
+            ElemKind::Resistor | ElemKind::Capacitor | ElemKind::Inductor => {
+                !self.has(X::ElementWithoutModel) || self.g.chance(4)
+            }
             _ => false,
         };
         match kind.master_kind() {
