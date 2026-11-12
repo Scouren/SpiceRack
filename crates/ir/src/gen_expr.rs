@@ -64,6 +64,7 @@ impl Gen {
         let probes = dyn_leaves;
         let dynamic = !probes.is_empty() && self.chance(2);
         (self.dynamic, self.reads, self.class) = (dynamic, reads, ExprClass::Constant);
+        self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
         let mut need_probe = dynamic;
         let mut stack: Vec<Frame> = Vec::new();
         // depth-first, building each row after its children, left to right: a caller's order
@@ -130,6 +131,7 @@ impl Gen {
             let leaves: Vec<ExprTag> = CONSTANT
                 .into_iter()
                 .filter(|t| features.contains(Feature::Expr(*t)))
+                .filter(|t| *t != ExprTag::Param || self.param_reads)
                 .chain(probes.iter().copied().filter(|_| dynamic))
                 .collect();
             leaves[self.below(leaves.len() as u32) as usize]

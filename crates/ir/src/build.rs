@@ -16,7 +16,10 @@
 //! expression, a resolved [`Ref`] in the row it pushes. A builder that has no such rule leaves
 //! them unresolved and calls `link` (the neutral rule, A4) when it is done.
 //!
-//! ```ignore
+//! ```
+//! use spicerack_ir::{BinOp, Design, Diags, ExprId, Role, Span, check, link};
+//!
+//! let mut design = Design::new();
 //! let mut b = design.builder();
 //! let (_, top) = b.file("rc.sp", Role::Deck);
 //! b.title(top, "rc divider", Span::NONE);
@@ -27,7 +30,13 @@
 //! let half = { let two = b.num(2.0); let r = b.param_ref("r"); b.binary(BinOp::Div, r, two) };
 //! let ok = { let t = b.temp(); let lim = b.num(125.0); b.binary(BinOp::Lt, t, lim) };
 //! let (_, branches) = b.if_(body, &[ok, ExprId::NONE], Span::NONE);
+//! b.param(body, "w", half, Span::NONE);
 //! // circuit and run methods (`build_circuit.rs`, `build_run.rs`) push elements and analyses.
+//! let mut diags = Diags::new();
+//! link(&mut design, &mut diags); // the neutral rule binds `rval` and `r`
+//! check(&design, &mut diags);
+//! assert!(diags.is_empty());
+//! # let _ = branches;
 //! ```
 //!
 //! Cites: `rewrite/IR-KERNEL.md` C2, C6–C10, C13; `REWRITE-PLAN.md` §2.4 (caller code first).

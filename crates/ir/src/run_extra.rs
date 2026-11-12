@@ -255,11 +255,14 @@ pub enum RunExtra {
     VaryPercent,
     /// A variation around another centre than the parameter's value.
     VaryMean,
+    /// A sweep loop whose body is exactly one operating point (VACASK's spelling of a DC
+    /// sweep; R20: a `Dc` is another meaning, one result over the grid, each point continued).
+    LoopOverOp,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 119] = [
+    pub const ALL: [RunExtra; 120] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -379,6 +382,7 @@ impl RunExtra {
         RunExtra::VaryLogNormal,
         RunExtra::VaryPercent,
         RunExtra::VaryMean,
+        RunExtra::LoopOverOp,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

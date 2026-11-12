@@ -21,11 +21,14 @@ mod tests {
     };
     use spicerack_ir::passive::{Coupling, IcMode, Parasitics, Passive};
     use spicerack_ir::semi::{InitialState, Switch};
-    use spicerack_ir::source::{Distof, Source};
-    use spicerack_ir::wave::{Am, AmModTime, PreDelay, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw};
+    use spicerack_ir::source::{DcRule, Distof, Source};
+    use spicerack_ir::wave::{
+        Am, AmModTime, Exp, Pattern, PreDelay, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
+        TdFrom, TrNoise, TrRandom, TrRandomKind,
+    };
     use spicerack_ir::{
-        Builder, CircuitExtra as X, Design, ElemKind, ExprId, Feature, FeatureSet, ModelFamily,
-        NO_ROW, NameId, Polarity, Ref, ScopeId, Span, WaveKind, features_used,
+        Builder, CircuitExtra as X, Design, DeviceLibrary, ElemKind, ExprId, Feature, FeatureSet,
+        ModelFamily, NO_ROW, NameId, Polarity, Ref, ScopeId, Span, WaveKind, features_used,
     };
 
     type Case = fn(&mut Builder<'_>, ScopeId, bool);
@@ -98,6 +101,7 @@ mod tests {
             phase_c_deg: v,
             phase_m_deg: v,
             law,
+            pre: PreDelay::Zero,
         }
     }
 
@@ -249,6 +253,113 @@ mod tests {
         }
         let h = b.head("e1", &["a", "0", "b", "0"], None, &[], ExprId::NONE);
         b.line(top, ElemKind::LosslessLine, h, row, Span::NONE);
+    }
+
+    fn pulse_law(b: &mut Builder<'_>, top: ScopeId, law: PulseLaw) {
+        let one = n(b, 1);
+        let w = b.wave(spicerack_ir::wave::Pulse { law, ..pulse(one) });
+        with_wave(b, top, w);
+    }
+
+    fn exp_from(b: &mut Builder<'_>, top: ScopeId, td2_from: TdFrom) {
+        let v = n(b, 1);
+        let w = b.wave(Exp {
+            v1: v,
+            v2: v,
+            td1: v,
+            tau1: v,
+            td2: v,
+            tau2: v,
+            td2_from,
+        });
+        with_wave(b, top, w);
+    }
+
+    fn sffm_pre(b: &mut Builder<'_>, top: ScopeId, pre: PreDelay) {
+        let r = sffm(b, SffmLaw::Spice3);
+        let w = b.wave(Sffm { pre, ..r });
+        with_wave(b, top, w);
+    }
+
+    /// A valid waveform of `kind`.
+    fn wave_of(b: &mut Builder<'_>, kind: WaveKind) -> spicerack_ir::WaveRef {
+        let v = n(b, 1);
+        match kind {
+            WaveKind::Pulse => b.wave(pulse(v)),
+            WaveKind::Sin => b.wave(sin(v)),
+            WaveKind::Exp => b.wave(Exp {
+                v1: v,
+                v2: v,
+                td1: v,
+                tau1: v,
+                td2: v,
+                tau2: v,
+                td2_from: TdFrom::Zero,
+            }),
+            WaveKind::Pwl => {
+                let r = pwl(b);
+                b.wave(r)
+            }
+            WaveKind::Sffm => {
+                let r = sffm(b, SffmLaw::Spice3);
+                b.wave(r)
+            }
+            WaveKind::Am => {
+                let r = am(b, AmModTime::Delay, PreDelay::Offset);
+                b.wave(r)
+            }
+            WaveKind::TrNoise => b.wave(TrNoise {
+                na: v,
+                nt: v,
+                nalpha: ExprId::NONE,
+                namp: ExprId::NONE,
+                rts_amp: ExprId::NONE,
+                rts_capture: ExprId::NONE,
+                rts_emission: ExprId::NONE,
+            }),
+            WaveKind::TrRandom => b.wave(TrRandom {
+                ts: v,
+                td: v,
+                p1: v,
+                p2: v,
+                kind: TrRandomKind::Gauss,
+            }),
+            WaveKind::Pattern => {
+                let bits = b.name("10");
+                b.wave(Pattern {
+                    high: v,
+                    low: v,
+                    delay: v,
+                    rise: v,
+                    fall: v,
+                    sample: v,
+                    bits,
+                    repeats: ExprId::NONE,
+                    repeat_start: v,
+                })
+            }
+        }
+    }
+
+    /// A source of wave `kind` whose DC is the wave at t = 0 (`on`) or given (neighbour).
+    fn at_zero(b: &mut Builder<'_>, top: ScopeId, kind: WaveKind, on: bool) {
+        let (dc, dc_rule) = if on {
+            (ExprId::NONE, DcRule::WaveAtZero)
+        } else {
+            (n(b, 0), DcRule::Given)
+        };
+        let wave = wave_of(b, kind);
+        vsrc(
+            b,
+            top,
+            ElemKind::VSource,
+            ExprId::NONE,
+            Source {
+                wave,
+                dc_rule,
+                ..source(dc)
+            },
+        );
     }
 
     fn model_el(b: &mut Builder<'_>, top: ScopeId, bin: bool, ako: bool) {
@@ -1064,6 +1175,151 @@ mod tests {
         }),
         (X::ModelBin, |b, t, on| model_el(b, t, on, false)),
         (X::ModelAko, |b, t, on| model_el(b, t, false, on)),
+        (X::PulseSpice, |b, t, on| {
+            pulse_law(
+                b,
+                t,
+                if on {
+                    PulseLaw::Spice
+                } else {
+                    PulseLaw::Vacask
+                },
+            )
+        }),
+        (X::PulseVacask, |b, t, on| {
+            pulse_law(
+                b,
+                t,
+                if on {
+                    PulseLaw::Vacask
+                } else {
+                    PulseLaw::Spice
+                },
+            )
+        }),
+        (X::ExpTd2FromZero, |b, t, on| {
+            exp_from(b, t, if on { TdFrom::Zero } else { TdFrom::Td1 })
+        }),
+        (X::ExpTd2FromTd1, |b, t, on| {
+            exp_from(b, t, if on { TdFrom::Td1 } else { TdFrom::Zero })
+        }),
+        (X::SffmPreOffset, |b, t, on| {
+            sffm_pre(b, t, if on { PreDelay::Offset } else { PreDelay::Zero })
+        }),
+        (X::SffmPreHold, |b, t, on| {
+            sffm_pre(
+                b,
+                t,
+                if on {
+                    PreDelay::HoldDelayValue
+                } else {
+                    PreDelay::Zero
+                },
+            )
+        }),
+        (X::SffmPreZero, |b, t, on| {
+            sffm_pre(b, t, if on { PreDelay::Zero } else { PreDelay::Offset })
+        }),
+        (X::DcGivenWithWave, |b, t, on| {
+            let dc = n(b, 0);
+            let wave = if on {
+                wave_of(b, WaveKind::Pulse)
+            } else {
+                spicerack_ir::WaveRef::NONE
+            };
+            vsrc(
+                b,
+                t,
+                ElemKind::VSource,
+                ExprId::NONE,
+                Source { wave, ..source(dc) },
+            );
+        }),
+        (X::DcAtZeroPulse, |b, t, on| {
+            at_zero(b, t, WaveKind::Pulse, on)
+        }),
+        (X::DcAtZeroSin, |b, t, on| at_zero(b, t, WaveKind::Sin, on)),
+        (X::DcAtZeroExp, |b, t, on| at_zero(b, t, WaveKind::Exp, on)),
+        (X::DcAtZeroPwl, |b, t, on| at_zero(b, t, WaveKind::Pwl, on)),
+        (X::DcAtZeroSffm, |b, t, on| {
+            at_zero(b, t, WaveKind::Sffm, on)
+        }),
+        (X::DcAtZeroAm, |b, t, on| at_zero(b, t, WaveKind::Am, on)),
+        (X::DcAtZeroTrNoise, |b, t, on| {
+            at_zero(b, t, WaveKind::TrNoise, on)
+        }),
+        (X::DcAtZeroTrRandom, |b, t, on| {
+            at_zero(b, t, WaveKind::TrRandom, on)
+        }),
+        (X::DcAtZeroPattern, |b, t, on| {
+            at_zero(b, t, WaveKind::Pattern, on)
+        }),
+        (X::ElementWithoutModel, |b, t, on| {
+            let one = n(b, 1);
+            let h = b.head(
+                "r1",
+                &["a", "b"],
+                if on { None } else { Some("rm") },
+                &[],
+                ExprId::NONE,
+            );
+            b.passive(
+                t,
+                ElemKind::Resistor,
+                h,
+                Passive {
+                    value: one,
+                    ..Passive::PLAIN
+                },
+                Span::NONE,
+            );
+        }),
+        (X::ModelWithoutLibrary, |b, t, on| {
+            if !on {
+                let lib = DeviceLibrary {
+                    path: NameId::NONE,
+                    family: ModelFamily::Resistor,
+                };
+                b.device_library(t, lib, Span::NONE);
+            }
+            let name = b.name("rm");
+            b.model(
+                t,
+                model(name, ModelFamily::Resistor, Polarity::None),
+                Span::NONE,
+            );
+        }),
+        (X::BuiltinMaster, |b, t, on| {
+            let dc = n(b, 0);
+            let h = b.head(
+                "v1",
+                &["a", "0"],
+                if on { Some("v") } else { None },
+                &[],
+                ExprId::NONE,
+            );
+            b.source(t, ElemKind::VSource, h, source(dc), Span::NONE);
+        }),
+        (X::NameWithoutLetter, |b, t, on| {
+            let one = n(b, 1);
+            let h = b.head(
+                if on { "load" } else { "R1" },
+                &["a", "b"],
+                None,
+                &[],
+                ExprId::NONE,
+            );
+            b.passive(
+                t,
+                ElemKind::Resistor,
+                h,
+                Passive {
+                    value: one,
+                    ..Passive::PLAIN
+                },
+                Span::NONE,
+            );
+        }),
     ];
 
     #[test]
@@ -1085,6 +1341,22 @@ mod tests {
                 "{extra:?} set by its neighbour"
             );
         }
+    }
+
+    #[test]
+    fn a_builtin_model_needs_no_library() {
+        let set = used(
+            |b, t, _| {
+                let name = b.name("v");
+                b.model(
+                    t,
+                    model(name, ModelFamily::SourceV, Polarity::None),
+                    Span::NONE,
+                );
+            },
+            true,
+        );
+        assert!(!set.contains(Feature::Circuit(X::ModelWithoutLibrary)));
     }
 
     #[test]

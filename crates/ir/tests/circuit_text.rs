@@ -132,6 +132,7 @@ mod tests {
                 width,
                 period,
                 cycles,
+                law: spicerack_ir::wave::PulseLaw::Spice,
             });
             let row = spicerack_ir::source::Source {
                 ac_mag,
@@ -302,5 +303,125 @@ mod tests {
         let top = deck(&mut want);
         build(&mut want.builder(), top);
         assert!(parsed.eq_ignoring_spans(&want));
+    }
+
+    #[test]
+    fn vacask_pulse_whose_dc_is_the_wave_at_zero() {
+        let text = "file \"t.sp\" deck\n  element vsource v1 (in 0) wave=pulse(v1=0 v2=1 delay=0 \
+                    rise=1n fall=0 width=5u period=0 law=vacask) dc_rule=wave_at_zero\n";
+        same(text, |b, top| {
+            let h = head(b, "v1", &["in", "0"]);
+            let v1 = n(b, 0);
+            let v2 = n(b, 1);
+            let delay = n(b, 0);
+            let rise = k(b, 1, -9);
+            let fall = n(b, 0);
+            let width = k(b, 5, -6);
+            let period = n(b, 0);
+            let wave = b.wave(spicerack_ir::wave::Pulse {
+                v1,
+                v2,
+                delay,
+                rise,
+                fall,
+                width,
+                period,
+                cycles: ExprId::NONE,
+                law: spicerack_ir::wave::PulseLaw::Vacask,
+            });
+            let row = spicerack_ir::source::Source {
+                wave,
+                dc_rule: spicerack_ir::source::DcRule::WaveAtZero,
+                ..source(ExprId::NONE)
+            };
+            b.source(top, ElemKind::VSource, h, row, Span::NONE);
+        });
+    }
+
+    #[test]
+    fn exp_counted_from_td1_and_sffm_zero_before_its_delay() {
+        let text = "file \"t.sp\" deck\n  element isource i1 (a 0) dc=0 wave=exp(v1=0 v2=1 td1=1 \
+                    tau1=1 td2=2 tau2=1 td2_from=td1)\n  element vsource v2 (b 0) dc=0 \
+                    wave=sffm(offset=0 amplitude=1 carrier_freq=1 mod_index=1 signal_freq=1 \
+                    delay=1 phase_c_deg=0 phase_m_deg=0 law=ngspice pre=zero)\n";
+        same(text, |b, top| {
+            let h = head(b, "i1", &["a", "0"]);
+            let dc = n(b, 0);
+            let [v1, v2, td1, tau1, td2, tau2] = [0, 1, 1, 1, 2, 1].map(|x| n(b, x));
+            let td2_from = spicerack_ir::wave::TdFrom::Td1;
+            let wave = b.wave(spicerack_ir::wave::Exp {
+                v1,
+                v2,
+                td1,
+                tau1,
+                td2,
+                tau2,
+                td2_from,
+            });
+            let row = spicerack_ir::source::Source { wave, ..source(dc) };
+            b.source(top, ElemKind::ISource, h, row, Span::NONE);
+            let h = head(b, "v2", &["b", "0"]);
+            let dc = n(b, 0);
+            let [
+                offset,
+                amplitude,
+                carrier_freq,
+                mod_index,
+                signal_freq,
+                delay,
+                phase_c_deg,
+                phase_m_deg,
+            ] = [0, 1, 1, 1, 1, 1, 0, 0].map(|x| n(b, x));
+            let wave = b.wave(spicerack_ir::wave::Sffm {
+                offset,
+                amplitude,
+                carrier_freq,
+                mod_index,
+                signal_freq,
+                delay,
+                phase_c_deg,
+                phase_m_deg,
+                law: spicerack_ir::wave::SffmLaw::Ngspice,
+                pre: spicerack_ir::wave::PreDelay::Zero,
+            });
+            let row = spicerack_ir::source::Source { wave, ..source(dc) };
+            b.source(top, ElemKind::VSource, h, row, Span::NONE);
+        });
+    }
+
+    #[test]
+    fn voltage_source_through_its_builtin_model() {
+        let text =
+            "file \"t.sp\" deck\n  model v source_v\n  element vsource v1 (a 0) model=v dc=1\n";
+        same(text, |b, top| {
+            let name = b.name("v");
+            b.model(
+                top,
+                model(name, ModelFamily::SourceV, Polarity::None),
+                Span::NONE,
+            );
+            let h = b.head("v1", &["a", "0"], Some("v"), &[], ExprId::NONE);
+            let dc = n(b, 1);
+            b.source(top, ElemKind::VSource, h, source(dc), Span::NONE);
+        });
+    }
+
+    #[test]
+    fn device_libraries_with_and_without_a_path() {
+        let text = "file \"t.sp\" deck\n  device_library resistor\n  \
+                    device_library bsim4 path=\"spice/sn/bsim4.osdi\"\n";
+        same(text, |b, top| {
+            let lib = spicerack_ir::DeviceLibrary {
+                path: spicerack_ir::NameId::NONE,
+                family: ModelFamily::Resistor,
+            };
+            b.device_library(top, lib, Span::NONE);
+            let path = b.name("spice/sn/bsim4.osdi");
+            let lib = spicerack_ir::DeviceLibrary {
+                path,
+                family: ModelFamily::Bsim4,
+            };
+            b.device_library(top, lib, Span::NONE);
+        });
     }
 }
