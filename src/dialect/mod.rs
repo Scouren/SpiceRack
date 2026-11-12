@@ -255,7 +255,7 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
     if !dropped.is_empty() {
         let mut editor = design.editor();
         for (item, scope) in &dropped {
-            editor.items_mut(*scope).retain(|i| i != item);
+            editor.remove_item(*scope, *item);
         }
     }
     passes::legalize(design, writer.features(), diags);
