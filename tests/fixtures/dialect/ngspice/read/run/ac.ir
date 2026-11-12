@@ -1,0 +1,7 @@
+# codes:
+file "ac.sp" deck
+  title "ac"
+  comment " oracle: ngspice-45 inp2dot.c dot_ac (DEC|OCT|LIN np fstart fstop; lin np is the point count), acan.c"
+  analysis ac (dec start=1 stop=1meg points=10)
+  analysis ac (oct start=100 stop=1k points=4)
+  analysis ac (lin start=0 stop=1k points=11)

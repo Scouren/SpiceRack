@@ -1,0 +1,7 @@
+# codes: P1306 P1306 P1306
+file "cards_inert.sp" deck
+  title "cards_inert"
+  comment " oracle: ngspice-45 inp2dot.c:955-959 (.prot, .unprot ignored), frontend .csparam (a control-script vector); runs: .csparam runs on"
+  opaque ngspice inert ".csparam x=1"
+  opaque ngspice inert ".prot"
+  opaque ngspice inert ".unprot"

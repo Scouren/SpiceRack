@@ -1,0 +1,7 @@
+# codes:
+file "tf.sp" deck
+  title "tf"
+  comment " oracle: ngspice-45 inp2dot.c dot_tf (v(n[,m]) or i(src), then the input source)"
+  analysis tf (v (b)) source=v1
+  analysis tf (vdiff (a) (b)) source=v1
+  analysis tf (i (vx)) source=vin

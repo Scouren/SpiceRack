@@ -1,0 +1,6 @@
+# codes:
+file "disto.sp" deck
+  title "disto"
+  comment " oracle: ngspice-45 inp2dot.c dot_disto (DEC|OCT|LIN np fstart fstop [f2overf1])"
+  analysis disto (dec start=1k stop=10k points=5)
+  analysis disto (lin start=1k stop=2k points=3) f2_over_f1=0.9

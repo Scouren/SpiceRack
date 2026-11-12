@@ -1,0 +1,6 @@
+# codes:
+file "four.sp" deck
+  title "four"
+  comment " oracle: ngspice-45 fourier.c:69-70 (nfreqs default 10: DC and 9 harmonics), inp2dot.c:870 (.four, .fourier)"
+  analysis four fundamental=1k harmonics=9 periods=1 (v (out)) (i (v1))
+  analysis four fundamental=50 harmonics=9 periods=1 (vdiff (a) (b))

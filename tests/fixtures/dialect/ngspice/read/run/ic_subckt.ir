@@ -1,0 +1,6 @@
+# codes:
+file "ic_subckt.sp" deck
+  title "ic_subckt"
+  comment " oracle: run icsub.cir (a .ic in a .subckt body holds each instance's own node: v(x1.x) = v(x2.x) = 0.5, the top x untouched)"
+  subckt s1 (in)
+    nodeset ic transient node=(x) value=0.5 whole_run

@@ -1,0 +1,6 @@
+# codes:
+file "tnom.sp" deck
+  title "tnom"
+  comment " oracle: ngspice-45 cktsopt.c:268-269 (temp, tnom options; no .temp card in the deck: temp= holds)"
+  env temp=60 tnom=50 whole_run
+  env tnom=40 whole_run

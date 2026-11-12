@@ -78,12 +78,24 @@ Rules the reader must get right, each with a fixture (the list is `INV-semantics
 | R/C/L whose value reads the circuit | ngspice runs it as a B source: keeps `tc1`, `tc2`, `m`, drops `dtemp` and thermal noise (6.14) | the kind and flags that state exactly that |
 | model levels | ngspice's own table; above 99 it silently runs level 1 (7.01, 7.02) | `ModelFamily` by (type word, level); a level ngspice would not run as written is `InvalidInSource` |
 | SOI3 `M` card (`nsoi`/`psoi` level 60) | six terminals d, fg, s, bg, bulk, thermal (`soi3.c:30`); the node count is `get_number_terminals`'s (items before the first `k=v`/`off` from the fifth), so all six are read. With four or five nodes the pinned build aborts in `spbuild.c:267` (`spGetElement` assertion, exit 134; run) instead of an error | the card as written: the node count needs the model's family, known only at bind time (fixture `elements/mosfet_soi3`) |
-| analyses in one deck | run in reverse card order in batch mode (8.04) | run items in the order ngspice runs them |
-| `.temp` list | ngspice runs 27 °C and says so (4.02) | `Env` 27 with a note |
+| analyses in one deck | run by type rank (AC, DC, OP, TRAN, PZ, TF, DISTO, NOISE, SENS, PSS, SP), reverse card order only inside one type: the order of the results (corrected: `cktdojob.c:208-216` loops `analInfo` in `analysis.c:36-58` order over `task->jobs`, which `cktnewan.c:34` prepends; runs: `.tran .ac .dc .op` gives AC, DC, OP, Tran; two `.ac`, the later first; INV 8.04's "reverse card order" is wrong) | run items in card order (R25); the result order is a run fact (S12) |
+| state cards | `.options`, `.temp`, `.ic`, `.nodeset` hold for the whole deck wherever they stand; a repeated key or node, the last wins; `.temp` beats `.options temp=` in either order (runs late.cir, icdup.cir, optdup2.cir, temp1/2/5.cir; `inp.c:1159-1186`) | `applies: WholeRun` (R24); the losing `.options temp=` is `Inert` |
+| a run card in a `.subckt` body | the deck's (run sub.cir); a `.ic` there holds each instance's own node (run icsub.cir) | in its scope, `RunExtra::RunItemNested` (R26); `NodeSetInSubckt` |
+| `.temp` list | ngspice runs 27 °C and says so (4.02); so does a value `strtod` does not read whole (`.temp 0.1k`: run temp4.cir, `inp.c:1173-1182`) | `Env` 27 with a note |
 | `.control` | `alterparam` needs `reset`; a dot-card analysis runs after the script and at each `run` (13.01) | run items in run order; display commands `Inert` |
 | save set | no `.save`, `.save all` and `.save allv` keep the same vectors: every node voltage at every depth and every branch current (V, E, L; no device current) (run: `a b c x1.n e1#branch l1#branch v1#branch`; `outitf.c` `cieq(name, "all") \|\| cieq(name, "allv")`); `.save v(a,b)` keeps `a` and `b` (`dotcards.c` `gettoks`) | `all` → `Save { AllV, AllBranchI }`; no `.save`: no item, the target's default (R29) |
 | implied saves (batch) | with no `.save`, `ngspice -b` without `.control` saves only what `.print`, `.plot`, `.four`, `.meas` name (`dotcards.c` `ft_savedotargs`, `measure_extract_variables`); a measure's `vm( vdb( vp( vr(` saves nothing (`gettok_iv` takes the head as the vector: run "can't parse 'vr'", the analysis does not run) unless another card saves the node | open, with the default save set (R29): the run side decides; the writer spells a measure's real part `v(…)` |
 | `.meas` | a measure's `v(x)` in ac is the real part, `vp` radians unless `set units=degrees` (`com_measure2.c` `get_value`, run: `ph` = −0.5610 at 100 Hz); no RISE/FALL/CROSS is the first crossing after the first interval (576–579); FROM= skips below as TD= does in tran and is copied TRIG↔TARG when the other has none (runs); DERIV and ERR are "not supported"; `td=<measure>` is fatal; `vr(x)` in a measure saves nothing in batch mode (run) | `Measure` rows; `skip_initial` (R30), `until`, `Stat::MinAt`/`MaxAt` (A15) |
+
+### Options by class (R19, A16; `read_run/state.rs`)
+
+From `cktsopt.c:246-330` and the frontend's option variables, key by key:
+
+| Class | Keys |
+|---|---|
+| typed (`OptionKey`) | `reltol abstol vntol chgtol trtol pivtol pivrel maxord method=trap, method=gear, itl1 itl2 itl4 gminsteps srcsteps itl6 noopiter gmin rshunt gshunt cshunt rseries scale defl defw defad defas klu sparse seed autostop interp acct noacct list nomod nopage node opts warn maxwarns norefvalue keepopinfo noinit nfreqs fourgridsize`; `temp`, `tnom` are `Env` |
+| `Hint` (tunes the solver, names no accuracy target) | `gminfactor bypass oldlimit nodedamping absdv reldv noopac copynodesets klu_memgrow_factor noopalter maxopalter maxevtiter convlimit convstep convabsstep autopartial` |
+| `Private` (names an accuracy target, changes the equations, or not established) | every other key: `xmu minbreak epsmin ramptime defm badmos3 trytocompact indverbosity`, the SPICE2 keys (`numdgt cptime limtim limpts lvlcod lvltim`), the frontend's (`ngbehavior savecurrents` …), a flag given a value, a `method=` other than trap or gear |
 
 A construct with no row in the IR is an `Opaque`, classed honestly: `Unread` is work to do,
 `Private` is ngspice's alone (XSPICE code models beyond the typed ones, `external` sources),

@@ -1,0 +1,6 @@
+# codes: P1302 P1302
+file "ac_defaults.sp" deck
+  title "ac_defaults"
+  comment " oracle: ngspice-45 inp2dot.c:205-231 (np < 1 is 10, fstop < fstart is 1000 fstart: ngspice runs other numbers)"
+  opaque ngspice unread ".ac dec 0 1 1k"
+  opaque ngspice unread ".ac dec 10 1k 1"

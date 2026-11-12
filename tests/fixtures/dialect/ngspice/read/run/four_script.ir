@@ -1,0 +1,6 @@
+# codes: P1303 P1001
+file "four_script.sp" deck
+  title "four_script"
+  comment " oracle: ngspice-45 fourier.c:69 (cp_getvar nfreqs: a script's set gives the count, and no item names it)"
+  opaque ngspice unread ".four 1k v(out)"
+  opaque ngspice unread ".control\nset nfreqs=4\n.endc"
