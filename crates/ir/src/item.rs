@@ -51,6 +51,9 @@ pub enum ItemKind {
     // ---- definitions (circuit, run) ----
     /// A device model. Row `model::Model` (circuit).
     Model,
+    /// A simulator's own implementation of an equation family, made available. Row
+    /// `library::DeviceLibrary` (circuit; AMEND-A12 C5, delegated to the circuit owner).
+    DeviceLibrary,
     /// A statistics block (process and mismatch variations). Row `stats::Statistics` (run).
     Statistics,
     // ---- circuit ----
@@ -76,6 +79,9 @@ pub enum ItemKind {
     Print,
     /// A measurement. Row `output::Measure` (run).
     Measure,
+    /// The named subcircuits' bodies become the top circuit from here on (A12 R1). Row
+    /// `plan::Elaborate` (run).
+    Elaborate,
 }
 
 /// What a scope is; it fixes which item kind owns it (checked).
@@ -297,7 +303,7 @@ const _: () = assert!(size_of::<Func>() == 16);
 
 impl ItemKind {
     /// Every kind, in declaration order (the order of `Feature::Item` indices).
-    pub const ALL: [ItemKind; 23] = [
+    pub const ALL: [ItemKind; ItemKind::Elaborate as usize + 1] = [
         ItemKind::Title,
         ItemKind::Comment,
         ItemKind::Include,
@@ -310,6 +316,7 @@ impl ItemKind {
         ItemKind::Param,
         ItemKind::Func,
         ItemKind::Model,
+        ItemKind::DeviceLibrary,
         ItemKind::Statistics,
         ItemKind::Element,
         ItemKind::Analysis,
@@ -321,6 +328,7 @@ impl ItemKind {
         ItemKind::Save,
         ItemKind::Print,
         ItemKind::Measure,
+        ItemKind::Elaborate,
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();

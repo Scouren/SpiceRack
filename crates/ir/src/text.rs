@@ -158,6 +158,7 @@ pub(crate) fn keyword(kind: ItemKind) -> &'static str {
         ItemKind::Param => "param",
         ItemKind::Func => "func",
         ItemKind::Model => "model",
+        ItemKind::DeviceLibrary => "device_library",
         ItemKind::Statistics => "statistics",
         ItemKind::Element => "element",
         ItemKind::Analysis => "analysis",
@@ -169,6 +170,7 @@ pub(crate) fn keyword(kind: ItemKind) -> &'static str {
         ItemKind::Save => "save",
         ItemKind::Print => "print",
         ItemKind::Measure => "measure",
+        ItemKind::Elaborate => "elaborate",
     }
 }
 
@@ -544,6 +546,7 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &
         ItemKind::Param => item_text::dump_param(&d.row(i), d, item, ctx, out),
         ItemKind::Func => item_text::dump_func(&d.row(i), d, item, ctx, out),
         ItemKind::Model => owner::<crate::model::Model>(d, ctx, out),
+        ItemKind::DeviceLibrary => owner::<crate::library::DeviceLibrary>(d, ctx, out),
         ItemKind::Statistics => owner::<crate::stats::Statistics>(d, ctx, out),
         ItemKind::Element => owner::<crate::element::Element>(d, ctx, out),
         ItemKind::Analysis => owner::<crate::analysis::Analysis>(d, ctx, out),
@@ -555,6 +558,7 @@ fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &
         ItemKind::Save => owner::<crate::output::Save>(d, ctx, out),
         ItemKind::Print => owner::<crate::output::Print>(d, ctx, out),
         ItemKind::Measure => owner::<crate::output::Measure>(d, ctx, out),
+        ItemKind::Elaborate => owner::<crate::plan::Elaborate>(d, ctx, out),
     }
 }
 

@@ -71,6 +71,10 @@ pub enum Violation {
     /// master named where the kind takes none). Reported by the row's own `RowFacts::check`.
     /// `arg`: the row's index in its kind's table (the span names the item).
     FieldDomain,
+    /// Two elements of one name in one scope, of any kinds (A13, R23: a by-name reference
+    /// names one element). Reported by the circuit owner's `element::design_check`. `arg`: the
+    /// second element's row in the `Element` table.
+    DuplicateElement,
 }
 
 /// The design under check and where its rows go.
@@ -81,7 +85,7 @@ struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; 15] = [
+    pub const ALL: [Violation; 16] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -97,6 +101,7 @@ impl Violation {
         Violation::DuplicateDef,
         Violation::OpaqueEmpty,
         Violation::FieldDomain,
+        Violation::DuplicateElement,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -112,6 +117,8 @@ pub fn check(design: &Design, diags: &mut Diags) {
     definitions(&mut out);
     let bad = expression_rows(&mut out);
     items(&mut out, &bad);
+    // the circuit owner's design-level invariants (A13: element names unique in a scope)
+    crate::element::design_check(design, out.diags);
 }
 
 /// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside

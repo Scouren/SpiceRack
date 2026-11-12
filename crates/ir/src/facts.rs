@@ -12,7 +12,6 @@
 //! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
 //! `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum Handle`,
-//! `macro todo_facts` (crate-internal: the definition phase's placeholder impl),
 //! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
 //! type)
 
@@ -108,70 +107,6 @@ pub enum Handle {
     Branches(BranchList),
 }
 
-/// The definition phase's `RowFacts` for a row: every method `todo!()`. The implementation
-/// phase replaces each `todo_facts!(Row);` line with the row's own `impl RowFacts`.
-#[allow(unused_macros)] // its last users are the owners' placeholder rows; removed at M5
-macro_rules! todo_facts {
-    ($row:ty) => {
-        impl $crate::facts::RowFacts for $row {
-            fn handles(&self, design: &$crate::Design, out: &mut Vec<$crate::facts::Handle>) {
-                todo!()
-            }
-            fn map_refs(
-                design: &mut $crate::Design,
-                at: $crate::ItemRef,
-                f: &mut dyn FnMut(&mut $crate::Ref, $crate::DefKind),
-            ) {
-                todo!()
-            }
-            fn features(
-                &self,
-                design: &$crate::Design,
-                at: $crate::ItemRef,
-                scope: $crate::ScopeId,
-                set: &mut $crate::FeatureSet,
-            ) {
-                todo!()
-            }
-            fn check(
-                &self,
-                design: &$crate::Design,
-                at: $crate::ItemRef,
-                scope: $crate::ScopeId,
-                out: &mut $crate::Diags,
-            ) {
-                todo!()
-            }
-            #[allow(clippy::ptr_arg)] // definition phase: the body will push to `out`
-            fn dump(
-                &self,
-                design: &$crate::Design,
-                ctx: &$crate::text_expr::Ctx,
-                out: &mut String,
-            ) {
-                todo!()
-            }
-            fn parse(
-                words: &mut $crate::text::Words<'_>,
-                scope: $crate::ScopeId,
-                b: &mut $crate::Builder<'_>,
-                diags: &mut $crate::Diags,
-            ) -> $crate::ItemRef {
-                todo!()
-            }
-            #[cfg(any(test, feature = "gen"))]
-            fn generate(
-                g: &mut $crate::r#gen::Gen,
-                scope: $crate::ScopeId,
-                b: &mut $crate::Builder<'_>,
-                features: &$crate::FeatureSet,
-            ) -> $crate::ItemRef {
-                todo!()
-            }
-        }
-    };
-}
-
 /// The one exhaustive dispatch from an `ItemKind` to its row type: `for_kind!(kind, R => body)`
 /// evaluates `body` with `R` naming the kind's row type (`ItemRow + RowFacts`). Every generic
 /// walk of the kernel (`span_of`, `map_refs`, `check`, `features_used`, `dump`, `parse`,
@@ -227,6 +162,10 @@ macro_rules! for_kind {
                 type $R = $crate::model::Model;
                 $body
             }
+            $crate::ItemKind::DeviceLibrary => {
+                type $R = $crate::library::DeviceLibrary;
+                $body
+            }
             $crate::ItemKind::Statistics => {
                 type $R = $crate::stats::Statistics;
                 $body
@@ -269,6 +208,10 @@ macro_rules! for_kind {
             }
             $crate::ItemKind::Measure => {
                 type $R = $crate::output::Measure;
+                $body
+            }
+            $crate::ItemKind::Elaborate => {
+                type $R = $crate::plan::Elaborate;
                 $body
             }
         }

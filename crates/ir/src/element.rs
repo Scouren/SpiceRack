@@ -26,18 +26,22 @@
 //! - `pub enum DetailKind` (`ALL`, `COUNT`)
 //! - `pub struct Element`, `pub const NO_ROW`
 //! - `pub struct CircuitDetails`; `DetailRow` (kernel, A6) for every row type it holds
-//! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`
+//! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
+//!   `pub(crate) fn design_check(&Design, &mut Diags)`
+
+use std::collections::HashSet;
 
 use crate::build::Builder;
+use crate::check::Violation;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
 use crate::design::{Design, DetailRow};
-use crate::diag::Diags;
+use crate::diag::{Diags, violation_code};
 use crate::facts::{Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
 use crate::id::{ExprId, ItemRef, NameId, NameList, ParamList, Ref, ScopeId};
-use crate::item::DefKind;
+use crate::item::{DefKind, ItemKind};
 use crate::line::Line;
 use crate::passive::{Coupling, Parasitics, Passive};
 use crate::semi::{Semi, Switch};
@@ -74,25 +78,27 @@ pub enum ElemKind {
     /// `Model` master (a nonlinear core, xy `K … model`). Detail `Coupling`.
     Coupling,
     /// Independent voltage source (D12, E1–E38). Terminals (p, n), exactly 2; positive branch
-    /// current flows into `p`. No master. Detail `Source`.
+    /// current flows into `p`. Optional `Model` master of its builtin family (A12 C5). Detail `Source`.
     VSource,
     /// Independent current source (D13). Terminals (p, n), exactly 2; positive current flows
-    /// from `p` through the source to `n`. No master. Detail `Source`.
+    /// from `p` through the source to `n`. Optional `Model` master of its builtin family (A12 C5). Detail `Source`.
     ISource,
     /// RF port: a source behind a reference impedance (D15, D97, D111). Terminals (p, n),
     /// exactly 2. No master. Detail `Source` with a `PortSpec` row.
     Port,
     /// Voltage-controlled voltage source (D16, D60, D78). Terminals (out+, out−, ctl+, ctl−),
-    /// exactly 4. No master. Detail `Controlled` (`sense` `NONE`).
+    /// exactly 4. Optional `Model` master of its builtin family (A12 C5). Detail `Controlled`
+    /// (`sense` `NONE`).
     Vcvs,
     /// Voltage-controlled current source (D17). Terminals (out+, out−, ctl+, ctl−), exactly
-    /// 4. No master. Detail `Controlled` (`sense` `NONE`).
+    /// 4. Optional `Model` master of its builtin family (A12 C5). Detail `Controlled` (`sense`
+    /// `NONE`).
     Vccs,
-    /// Current-controlled current source (D18). Terminals (out+, out−), exactly 2. No master.
-    /// Detail `Controlled` (`sense` the sensing element).
+    /// Current-controlled current source (D18). Terminals (out+, out−), exactly 2. Optional `Model`
+    /// master of its builtin family (A12 C5). Detail `Controlled` (`sense` the sensing element).
     Cccs,
-    /// Current-controlled voltage source (D18). Terminals (out+, out−), exactly 2. No master.
-    /// Detail `Controlled` (`sense` the sensing element).
+    /// Current-controlled voltage source (D18). Terminals (out+, out−), exactly 2. Optional `Model`
+    /// master of its builtin family (A12 C5). Detail `Controlled` (`sense` the sensing element).
     Ccvs,
     /// Polynomial controlled source (D19, D106). Terminals (out+, out−), exactly 2; the
     /// controls are in the detail. No master. Detail `Poly`.
@@ -221,8 +227,10 @@ pub const NO_ROW: u32 = u32::MAX;
 pub struct Element {
     /// What it is.
     pub kind: ElemKind,
-    /// Its name, without any type letter (B16: `Vin1` and `in1 (a 0) vsource` are both `in1`
-    /// when the reader strips the letter, by its dialect's naming table).
+    /// Its whole name as its dialect spells it (A13, R23: ngspice `r1`, `vdd`, `x1`, the letter
+    /// included, folded; Spectre `in1`), unique in its scope across kinds, so a by-name
+    /// reference (`Expr::I`, a coupling's inductors, a sensing element) names one element. A
+    /// name that does not begin with `letter::spice_letter` is `NameWithoutLetter`.
     pub name: NameId,
     /// Its terminals, in the kind's role order.
     pub terminals: NameList,
@@ -514,16 +522,16 @@ impl ElemKind {
             | ElemKind::SingleLossyLine
             | ElemKind::CoupledLines
             | ElemKind::CodeModel
-            | ElemKind::ModuleModel => Some(DefKind::Model),
-            ElemKind::ChargeCapacitor
-            | ElemKind::FluxInductor
+            | ElemKind::ModuleModel
             | ElemKind::VSource
             | ElemKind::ISource
-            | ElemKind::Port
             | ElemKind::Vcvs
             | ElemKind::Vccs
             | ElemKind::Cccs
-            | ElemKind::Ccvs
+            | ElemKind::Ccvs => Some(DefKind::Model),
+            ElemKind::ChargeCapacitor
+            | ElemKind::FluxInductor
+            | ElemKind::Port
             | ElemKind::Poly
             | ElemKind::Table
             | ElemKind::Behav
@@ -610,6 +618,31 @@ impl RowFacts for Element {
 /// The circuit owner's features of the whole design, which no single row carries (A9). Called
 /// once by `features_used` and by `check_legal`. Empty until the circuit owner fills it.
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
-    // Every circuit feature is a field of one row (`RowFacts::features`); none is positional.
-    let _ = (design, set);
+    // one design-level circuit feature: a model with no library of its family (A12 C5)
+    crate::circuit_features::library_features(design, set);
+}
+
+/// The circuit owner's design-level invariants, which no single row can see (A13): appends one
+/// `Violation::DuplicateElement` per element whose name an earlier element of the same scope
+/// already has (`arg`: the later element's row). Called once by `check`. One pass per scope;
+/// the map is lookup only, so the rows come in item order.
+pub(crate) fn design_check(design: &Design, out: &mut Diags) {
+    let mut seen: HashSet<NameId> = HashSet::new();
+    // bounded: every scope once, every item of its list once
+    for scope in 0..design.scopes.len() {
+        seen.clear();
+        for &item in &design.scope_items[scope] {
+            if item.kind != ItemKind::Element {
+                continue;
+            }
+            let element: Element = design.row(item.index);
+            if !seen.insert(element.name) {
+                out.push(
+                    violation_code(Violation::DuplicateElement),
+                    design.span_of(item),
+                    item.index,
+                );
+            }
+        }
+    }
 }

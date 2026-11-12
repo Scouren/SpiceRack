@@ -398,6 +398,7 @@ pub(crate) fn item_features(
         | ItemKind::Param
         | ItemKind::Func
         | ItemKind::Model
+        | ItemKind::DeviceLibrary
         | ItemKind::Statistics
         | ItemKind::Element
         | ItemKind::Analysis
@@ -408,7 +409,8 @@ pub(crate) fn item_features(
         | ItemKind::NodeSet
         | ItemKind::Save
         | ItemKind::Print
-        | ItemKind::Measure => None,
+        | ItemKind::Measure
+        | ItemKind::Elaborate => None,
     };
     if let Some(extra) = placed {
         *set = set.with(Feature::Extra(extra));

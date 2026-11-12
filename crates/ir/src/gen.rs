@@ -80,6 +80,9 @@ pub struct Gen {
     /// (cleared around a head default when the set lacks `Extra::FormalReadsParam`).
     pub(crate) enclosing_ok: bool,
     pub(crate) param_reads: bool,
+    /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
+    /// `Extra::CaseSensitiveNames`).
+    pub(crate) case_ok: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -130,6 +133,7 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         int_literals: false,
         enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
         param_reads: true,
+        case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
@@ -249,6 +253,11 @@ impl Gen {
     /// interns it in a builder caller's order).
     pub(crate) fn fresh(&mut self) -> String {
         self.fresh += 1;
+        // the case twin of the previous call's index: each index has at most one, so the name
+        // is still unique as written
+        if self.case_ok && self.fresh > 1 && self.chance(16) {
+            return format!("G{}", self.fresh - 2);
+        }
         format!("g{}", self.fresh - 1)
     }
 
@@ -368,6 +377,7 @@ fn candidates(
             | ItemKind::Include
             | ItemKind::Global
             | ItemKind::Opaque
+            | ItemKind::DeviceLibrary
             | ItemKind::Statistics
             | ItemKind::Element
             | ItemKind::Analysis
@@ -377,7 +387,8 @@ fn candidates(
             | ItemKind::NodeSet
             | ItemKind::Save
             | ItemKind::Print
-            | ItemKind::Measure => true,
+            | ItemKind::Measure
+            | ItemKind::Elaborate => true,
         })
         .collect()
 }

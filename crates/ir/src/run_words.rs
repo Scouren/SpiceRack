@@ -38,7 +38,9 @@ use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::ItemRef;
 use crate::id::{ExprId, ExprList, List, NameId, NameList, POOL_MAX, Ref, ScopeId};
-use crate::item::{DefKind, ItemKind, ScopeKind};
+#[cfg(any(test, feature = "gen"))]
+use crate::item::ItemKind;
+use crate::item::{DefKind, ScopeKind};
 use crate::run_extra::RunExtra;
 use crate::text::Words;
 use crate::text_expr::{self, Ctx};
@@ -302,6 +304,7 @@ pub(crate) fn flag(set: &mut FeatureSet, on: bool, x: RunExtra) {
 }
 
 /// Whether `features` holds `Feature::Run(x)`.
+#[cfg(any(test, feature = "gen"))]
 pub(crate) fn has(features: &FeatureSet, x: RunExtra) -> bool {
     features.contains(Feature::Run(x))
 }
@@ -411,6 +414,7 @@ pub(crate) fn loop_depth(design: &Design, scope: ScopeId) -> usize {
 
 /// How many items of `kind` the scopes reachable from `scope` hold (bodies of scoped items
 /// included). Explicit stack (C11); O(scopes + items).
+#[cfg(any(test, feature = "gen"))]
 pub(crate) fn reachable(design: &Design, scope: ScopeId, kind: ItemKind) -> usize {
     let mut children = vec![Vec::new(); design.scopes.len()];
     for (child, row) in design.scopes.iter().enumerate() {

@@ -9,7 +9,8 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9, §7.2 (A4: references are bound by `link` after the text);
 //! `text.rs` (`Words`).
 //!
-//! Contents (crate-private): `pub(crate) fn parse_element`, `pub(crate) fn parse_model`
+//! Contents (crate-private): `pub(crate) fn parse_element`, `pub(crate) fn parse_model`,
+//! `pub(crate) fn parse_library`
 
 use crate::build::Builder;
 use crate::circuit_fields::{Field, Fields, Side};
@@ -20,6 +21,7 @@ use crate::diag::Diags;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::id::{ExprId, ItemRef, List, NameId, Ref, ScopeId};
 use crate::item::DefKind;
+use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, Parasitics, Passive};
@@ -60,7 +62,7 @@ pub(crate) fn parse_element(
     if name == NameId::NONE {
         return ItemRef::NONE;
     }
-    let terminals = canonical(words.names(b, diags));
+    let terminals = words.names(b, diags);
     let mut head = Element {
         kind,
         name,
@@ -148,7 +150,7 @@ pub(crate) fn parse_model(
                 Some("p") => m.polarity = Polarity::P,
                 _ => words.error(diags),
             },
-            "params" => m.params = canonical(words.params(scope, b, diags)),
+            "params" => m.params = words.params(scope, b, diags),
             "bin_of" => m.bin_of = words.name(b, diags),
             "ako" => m.ako = words.reference(b, diags),
             "module" => m.module = words.reference(b, diags),
@@ -170,6 +172,40 @@ pub(crate) fn parse_model(
     let item = b.push(scope, m, span);
     b.define(DefKind::Model, name, scope, item);
     item
+}
+
+/// Reads a device library's fields after its keyword and pushes it into `scope`. Returns
+/// `ItemRef::NONE`, having pushed nothing, when the family word is missing.
+pub(crate) fn parse_library(
+    words: &mut Words<'_>,
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    diags: &mut Diags,
+) -> ItemRef {
+    let span = words.span();
+    let Some(family) = words
+        .next()
+        .and_then(|w| FAMILY_WORDS.iter().position(|&k| k == w))
+        .map(|i| ModelFamily::ALL[i])
+    else {
+        words.error(diags);
+        return ItemRef::NONE;
+    };
+    let mut path = NameId::NONE;
+    // bounded: each pass consumes at least one word of the line
+    while !words.at_end() {
+        match words.key() {
+            Some("path") => match words.string(diags) {
+                Some(p) => path = b.name(&p),
+                None => return ItemRef::NONE,
+            },
+            _ => {
+                words.error(diags);
+                words.next();
+            }
+        }
+    }
+    b.device_library(scope, DeviceLibrary { path, family }, span)
 }
 
 impl Fields for NoDetail {
@@ -221,7 +257,7 @@ impl Cx<'_, '_, '_> {
                         continue;
                     }
                     "params" => {
-                        h.params = canonical(self.words.params(self.scope, self.b, self.diags));
+                        h.params = self.words.params(self.scope, self.b, self.diags);
                         continue;
                     }
                     "mult" => {
@@ -250,8 +286,8 @@ impl Cx<'_, '_, '_> {
         match field {
             Field::Expr(e) | Field::Dyn(e) => *e = self.words.value(self.scope, self.b, self.diags),
             Field::Name(n) => *n = self.words.name(self.b, self.diags),
-            Field::Names(l) => *l = canonical(self.words.names(self.b, self.diags)),
-            Field::Exprs(l) => *l = canonical(self.words.exprs(self.scope, self.b, self.diags)),
+            Field::Names(l) => *l = self.words.names(self.b, self.diags),
+            Field::Exprs(l) => *l = self.words.exprs(self.scope, self.b, self.diags),
             Field::Count(c) => match self.words.next().and_then(|w| w.parse::<u8>().ok()) {
                 Some(v) => *c = v,
                 None => self.words.error(self.diags),
@@ -309,10 +345,4 @@ impl Cx<'_, '_, '_> {
             }
         }
     }
-}
-
-/// An empty list as `List::EMPTY`, whatever start the builder gave it: every circuit producer
-/// writes an empty list that way, so `parse(dump(d))` keeps it equal.
-fn canonical<T>(list: List<T>) -> List<T> {
-    if list.len == 0 { List::EMPTY } else { list }
 }
