@@ -13,7 +13,7 @@
 
 use crate::build::Builder;
 use crate::class::ExprClass;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, NumForm, UnOp};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{DefId, ExprId};
@@ -65,6 +65,7 @@ impl Gen {
         let dynamic = !self.constant_only && !probes.is_empty() && self.chance(2);
         (self.dynamic, self.reads, self.class) = (dynamic, reads, ExprClass::Constant);
         self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
+        self.long_literals = features.contains(Feature::Extra(crate::feature::Extra::LongLiteral));
         let mut need_probe = dynamic;
         let mut stack: Vec<Frame> = Vec::new();
         // depth-first, building each row after its children, left to right: a caller's order
@@ -143,6 +144,22 @@ impl Gen {
         };
         self.class = self.class.max(own);
         match tag {
+            ExprTag::Num if self.long_literals && self.chance(16) => {
+                // A18: 19 to 24 significant digits, in one of the three written forms
+                let n = 19 + self.below(6);
+                let digits: String = (0..n)
+                    .map(|k| char::from(b'0' + (self.below(9) + u32::from(k == 0)) as u8))
+                    .collect();
+                let (int, dec) = digits.split_at(self.below(4) as usize);
+                let sign = if self.chance(4) { "-" } else { "" };
+                let significand = format!("{sign}{}.{dec}", if int.is_empty() { "0" } else { int });
+                let (exp10, form) = match self.below(3) {
+                    0 => (0, NumForm::Plain),
+                    1 => (self.below(41) as i16 - 20, NumForm::Exponent),
+                    _ => (-6, NumForm::Scale),
+                };
+                b.long_literal(&significand, exp10, form)
+            }
             ExprTag::Num => {
                 let l = self.literal();
                 b.literal(l)

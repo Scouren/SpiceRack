@@ -75,6 +75,8 @@ pub struct Gen {
     /// Whether `literal` may make an `Int` literal (the set has `Extra::IntLiteral`; set by
     /// `expr` from its feature set).
     pub(crate) int_literals: bool,
+    /// Whether a literal may be `Long` (the set has `Extra::LongLiteral`; set by `expr`).
+    pub(crate) long_literals: bool,
     /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
     /// `Extra::EnclosingRef`), and whether the expression being built may read a parameter
     /// (cleared around a head default when the set lacks `Extra::FormalNotConstant`).
@@ -137,6 +139,7 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         dynamic: false,
         reads: Reads::Constant,
         int_literals: false,
+        long_literals: false,
         enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
         param_reads: true,
         case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
