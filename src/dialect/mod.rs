@@ -38,6 +38,7 @@
 //!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`)
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
+//!   `pub const STRICT_UNBOUND: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
 //!   `pub mod ngspice`, `pub mod vacask`
@@ -153,6 +154,11 @@ pub struct Written {
 /// the policy, so it owns the code: its catalogue is `S0101..=S0199` ([`info`]).
 pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
 
+/// The refusal a strict read adds at each item holding a parameter read no definition is bound
+/// to (`ir::unbound_reads`, a held formal-default read aside): `S0104`, `arg` the read's
+/// `NameId` (R63, A38).
+pub const STRICT_UNBOUND: ir::Code = ir::Code::new(b'S', 104);
+
 /// The note [`legalize`] adds where it drops an `Inert` statement of another dialect: `S0102`,
 /// `arg` 0.
 pub const INERT_DROPPED: ir::Code = ir::Code::new(b'S', 102);
@@ -190,6 +196,15 @@ const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
             kind: ir::Kind::Note,
         },
     ),
+    (
+        STRICT_UNBOUND,
+        ir::Info {
+            title: "a parameter read no definition binds, under a strict read",
+            cite: "rewrite/RULINGS.md R63; rewrite/AMEND-A12.md A38 (VACASK run which3)",
+            explain: "A strict read is a complete program, and its simulator rejects a name it cannot find (VACASK: \"Variable or constant 'u' not defined.\"); written to another dialect the name could find another definition, a wrong number. The argument is the name. Read leniently for a library read alone, where unresolved names are the normal case.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
 ];
 
 /// The row named `name`, or `None`.
@@ -199,7 +214,8 @@ pub fn by_name(name: &str) -> Option<&'static DialectRow> {
 
 /// `src` read by `from` into `design`, then checked. A check violation is a bug in the
 /// reader: an `X` row, and a debug assertion. Under [`Policy::Strict`] each `Unread` item
-/// gets a [`STRICT_UNREAD`] row.
+/// gets a [`STRICT_UNREAD`] row, and each item holding a parameter read no definition binds
+/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38).
 ///
 /// # Panics
 /// When `from` has no reader (the caller checks the row) or `src` holds no file.
@@ -231,6 +247,10 @@ pub fn read(
                 let item = ir::ItemRef::new(ir::ItemKind::Opaque, index(i));
                 diags.push_at(STRICT_UNREAD, design, item, 0);
             }
+        }
+        // a complete program: a read no definition binds is one its simulator rejects (R63)
+        for read in ir::unbound_reads(design).into_iter().filter(|r| !r.held) {
+            diags.push_at(STRICT_UNBOUND, design, read.item, read.name.0);
         }
     }
 }

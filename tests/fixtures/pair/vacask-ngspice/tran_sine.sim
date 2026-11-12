@@ -1,0 +1,12 @@
+tran_sine: the transient of an RC low-pass (tau 100 ns) under a sine source of 1 MHz with an offset
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource type="sine" sinedc=0.5 ampl=1.0 freq=1meg
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=100p
+control
+  analysis tran1 tran stop=5u step=10n maxstep=10n
+endc

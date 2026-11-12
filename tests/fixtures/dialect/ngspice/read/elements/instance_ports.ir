@@ -1,0 +1,11 @@
+# codes: P1108 P1108 P1108
+file "instance_ports.sp" deck
+  title "instance_ports"
+  comment " oracle: settle/instance_ports_short.sp ('Too few parameters for subcircuit type'), settle/instance_ports_long.sp ('Too many parameters'; its neighbour runs): R61, A36; a master no file defines is not checked"
+  subckt sub (a b)
+  opaque ngspice invalid "X1 n1 sub"
+  opaque ngspice invalid "X2 n1 n2 n3 sub"
+  element instance X3 (n1 n2) model=sub
+  element instance X4 (n1 n2 n3) model=nowhere
+  opaque ngspice invalid "X5 n1 later"
+  subckt later (a b) w=1

@@ -24,14 +24,20 @@
 //! this run's band (`end_holds`), since a run that lags by less than the
 //! tube has not reached the value yet.
 //!
+//! A caller may tighten each of the four (`Tol::tighten`: RELTOL, VNTOL,
+//! ABSTOL, the tube), never loosen one: a value above the default is refused.
+//! Shared by `test_cross_sim` and `test_pair` (`#[path]`; each crate root
+//! also holds `tube` and `vacask`).
+//!
 //! Cites: ngspice manual §11.1.1 (`.options` RELTOL, VNTOL, ABSTOL, TRTOL
 //! defaults); Xyce Reference Guide 7.10 §2.1.20 (`.options device`/`timeint`
 //! RELTOL, ABSTOL defaults).
 //!
 //! Contents:
 //! - `pub struct Tol`, `Tol::of(decks: &[&str]) -> Tol` (an autonomous deck's transient by period
-//!   and peak-to-peak)
+//!   and peak-to-peak), `Tol::tighten(&mut self, key: &str, value: f64) -> Result<(), String>`
 //! - `pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String>`
+//! - `pub fn kind(p: &RawData) -> &'static str`, `pub fn normal(name: &str) -> String`
 
 use std::collections::HashMap;
 
@@ -59,6 +65,8 @@ pub struct Tol {
     /// divided by it in Xyce, not in ngspice (G-NOISE-INPUT-REF), so it is
     /// not compared.
     ac_scaled: bool,
+    /// The transient time tube's half-width, a fraction of the stop time.
+    tube: f64,
 }
 
 /// RELTOL, VNTOL, ABSTOL and GMIN, the defaults both simulators share.
@@ -146,6 +154,7 @@ impl Tol {
             autonomous: true,
             noted_drops: false,
             ac_scaled: false,
+            tube: tube(),
         };
         for line in decks.iter().flat_map(|d| d.lines()) {
             let l = line.trim_start().to_ascii_lowercase();
@@ -170,15 +179,33 @@ impl Tol {
         }
         t
     }
-}
 
-// ---- private ----
+    /// `key` (`reltol`, `vntol`, `abstol`, `tube`) set to `value`, which
+    /// may only tighten: `Err` for an unknown key, a negative value, or one
+    /// above the default (RELTOL 1e-3, VNTOL 1e-6 V, ABSTOL 1e-12 A, tube
+    /// 0.01), which would loosen the simulators' own accuracy.
+    #[allow(dead_code)] // `test_cross_sim` tightens nothing; `test_pair` does
+    pub fn tighten(&mut self, key: &str, value: f64) -> Result<(), String> {
+        let (slot, default) = match key {
+            "reltol" => (&mut self.reltol, RELTOL),
+            "vntol" => (&mut self.vntol, VNTOL),
+            "abstol" => (&mut self.abstol, ABSTOL),
+            "tube" => (&mut self.tube, 0.01),
+            _ => return Err(format!("{key}: not a tolerance")),
+        };
+        if !(0.0..=default).contains(&value) {
+            return Err(format!("{key} = {value:e} loosens the default {default:e}"));
+        }
+        *slot = value;
+        Ok(())
+    }
+}
 
 /// The analysis a plot holds: noise by its plot name (ngspice's noise
 /// spectrum has a frequency scale too), else read off its scale, by its type
 /// or its name where the type word is not ngspice's (VACASK types `time`
 /// `notype`).
-fn kind(p: &RawData) -> &'static str {
+pub fn kind(p: &RawData) -> &'static str {
     let scale = p.variables.first();
     let named = |n: &str| scale.is_some_and(|v| v.name.eq_ignore_ascii_case(n));
     let name = p.plot_name.to_ascii_lowercase();
@@ -213,6 +240,26 @@ fn kind(p: &RawData) -> &'static str {
     }
 }
 
+/// A vector's name as every simulator here spells it: lower case, `v(x)`
+/// as `x`, a branch current as `<device>#branch`, hierarchy joined by `.`.
+pub fn normal(name: &str) -> String {
+    let n = name.trim().to_ascii_lowercase().replace(':', ".");
+    if let Some(dev) = n.strip_suffix(".flow(br)") {
+        return format!("{dev}#branch");
+    }
+    if let Some(inner) = n.strip_prefix("v(").and_then(|s| s.strip_suffix(')'))
+        && !inner.contains(',')
+    {
+        return inner.to_string();
+    }
+    if let Some(inner) = n.strip_prefix("i(").and_then(|s| s.strip_suffix(')')) {
+        return format!("{inner}#branch");
+    }
+    n
+}
+
+// ---- private ----
+
 /// The vector a plot's points run along: VACASK writes a nested sweep's
 /// vectors outer first, and the deck written for it names the inner one
 /// `vsweep` (`render/named/vacask_bench.rs`), which is among the first four
@@ -232,24 +279,6 @@ fn tube() -> f64 {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(0.01)
-}
-
-/// A vector's name as every simulator here spells it: lower case, `v(x)`
-/// as `x`, a branch current as `<device>#branch`, hierarchy joined by `.`.
-fn normal(name: &str) -> String {
-    let n = name.trim().to_ascii_lowercase().replace(':', ".");
-    if let Some(dev) = n.strip_suffix(".flow(br)") {
-        return format!("{dev}#branch");
-    }
-    if let Some(inner) = n.strip_prefix("v(").and_then(|s| s.strip_suffix(')'))
-        && !inner.contains(',')
-    {
-        return inner.to_string();
-    }
-    if let Some(inner) = n.strip_prefix("i(").and_then(|s| s.strip_suffix(')')) {
-        return format!("{inner}#branch");
-    }
-    n
 }
 
 fn column(r: &RawData, i: usize) -> Vec<Complex64> {
@@ -321,7 +350,7 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
         if k == "tran" {
             let tol = TRAN * t.reltol / RELTOL * swing + 2.0 * floor;
             let (ra, rb) = (a.re(i), b.re(j));
-            let dx = tube() * xa.last().copied().unwrap_or(0.0);
+            let dx = t.tube * xa.last().copied().unwrap_or(0.0);
             // Only the time both runs cover is compared: a TSTART that one
             // simulator prints from and the other does not (ISSUE_160).
             let lo = xa

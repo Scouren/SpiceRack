@@ -6,7 +6,7 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7, C7, C9, Addenda A1–A3.
 //!
-//! Contents: `Builder::literal`, `Builder::long_literal`, `Builder::num`, `Builder::string`, `Builder::param_ref`,
+//! Contents: `Builder::literal`, `Builder::long_literal`, `Builder::decimal` (`-> Option<ExprId>`), `Builder::num`, `Builder::string`, `Builder::param_ref`,
 //! `Builder::param_ref_to`, `Builder::call`, `Builder::user_call`, `Builder::unary`, `Builder::binary`,
 //! `Builder::ternary`, `Builder::v`, `Builder::i`, `Builder::time`, `Builder::temp`,
 //! `Builder::freq`, `Builder::tstep`, `Builder::tstop`, `Builder::tnom`, `Builder::draw`,
@@ -53,6 +53,28 @@ impl Builder<'_> {
         x.nums.push(literal);
         let id = (x.nums.len() - 1) as u32;
         self.expr_row(ExprTag::Num, 0, id, 0)
+    }
+
+    /// The literal a reader's number token states (`literal::decimal`: the significand as
+    /// written, the power of its exponent and scale letter, the form), short or `Long`, pushed;
+    /// `None`, pushing nothing, when no literal states it. A dialect's number reader is this
+    /// call after splitting its token.
+    ///
+    /// ```
+    /// use spicerack_ir::{Design, NumForm};
+    /// let mut d = Design::new();
+    /// let mut b = d.builder();
+    /// let k = b.decimal("4.7", 3, NumForm::Scale).expect("4.7k is a literal");
+    /// assert_eq!(d.literal_value(match d.expr(k) {
+    ///     spicerack_ir::Expr::Num(n) => d.num(n),
+    ///     _ => unreachable!(),
+    /// }), 4700.0);
+    /// ```
+    pub fn decimal(&mut self, significand: &str, exp10: i32, form: NumForm) -> Option<ExprId> {
+        Some(match crate::literal::decimal(significand, exp10, form)? {
+            crate::literal::Decimal::Short(l) => self.literal(l),
+            crate::literal::Decimal::Long(digits, e, f) => self.long_literal(digits, e, f),
+        })
     }
 
     /// A built number (Python, Schemify, passes), stored as `Literal::from_f64(value)`. Asserts

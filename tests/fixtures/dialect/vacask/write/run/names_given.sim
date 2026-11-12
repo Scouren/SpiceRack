@@ -1,0 +1,14 @@
+names given
+load "spice/resistor.osdi"
+model res sp_resistor
+r1 (a 0) res r=1k
+r2 (a 0) res r=1k
+control
+  analysis op1 op
+  analysis tran1 tran stop=1m
+  sweep loop1 option="temp" values=[0]
+    analysis ac1 ac values=[1k]
+  sweep axis2 instance="r1" parameter="r" from=1k to=3k step=500
+  sweep axis1 instance="r2" parameter="r" values=[1k, 2k]
+    analysis dc1 op
+endc

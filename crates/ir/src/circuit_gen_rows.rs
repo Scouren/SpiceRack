@@ -252,8 +252,10 @@ impl R<'_, '_> {
         // A33: without `BehavUntypedParam` a behavioural source's parameter reads are typed
         // (`ToReal`/`ToInt` built at the leaf, or none when the set has neither)
         self.g.typed_params = kind == ElemKind::Behav && !self.has(X::BehavUntypedParam);
+        // R66: the behavioural evaluator's expression counts dynamic whatever its class
+        self.g.dyn_form = true;
         let expr = self.dy();
-        self.g.typed_params = false;
+        (self.g.typed_params, self.g.dyn_form) = (false, false);
         // a charge-defined capacitor's coefficient also needs a law the set has (A17)
         let charge = kind == ElemKind::ChargeCapacitor;
         let law_ok = self.has(X::TcLawDirect) || self.has(X::TcLawReciprocal);

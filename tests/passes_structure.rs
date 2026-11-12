@@ -11,6 +11,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
 #[path = "passes_structure/r53.rs"]
@@ -18,16 +21,13 @@ mod r53;
 #[path = "passes_structure/reads.rs"]
 mod reads;
 
-use std::path::Path;
-
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
 use spicerack::passes;
 
-use bindings::ByDefinition;
 use reads::{
-    added_library, elements, feature, instances_pass, model_row, param_reads, proven_by_pair_decks,
-    refs,
+    Run, added_library, elements, feature, instance_actual, instances_pass, model_row, param_reads,
+    proven_by_pair_decks, refs,
 };
 
 /// The structure passes whose simulator proof (a pair deck naming it in `proves =`,
@@ -44,6 +44,8 @@ const PENDING_PAIRS: &[&str] = &[
     "hoist_enclosing_refs_default",
     "formal_defaults_to_instances",
     "formal_defaults_to_instances_default",
+    "formal_defaults_to_instances_outer",
+    "formal_defaults_to_instances_unbound",
     "splice_elaborate",
     "constant_param_to_formal",
     "name_with_letter",
@@ -336,41 +338,39 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
     eprintln!("hoist_nested_subckts: {ran} generated designs, {refused} left with U0303");
 }
 
-/// R53's runs (ng-scaffold, ngspice-45, `tests/fixtures/passes/structure/
-/// formal_defaults_to_instances/which*.ir`): after the pass, the actual the instance `xs`
-/// passes, evaluated by the reference evaluator with every read bound by its definition, is
-/// the resistance ngspice measured (v(n1) at 1 mA): which 3k, which2 3k, which3 6k (`l`).
+/// The runs of each rule a formal's default states (`tests/fixtures/passes/structure/<row>/
+/// <case>.ir`): after the row, the actual the instance passes, evaluated by the reference
+/// evaluator with every read bound by its definition, is the value the simulator printed.
+/// R53 (ng-scaffold, ngspice-45, v(n1) at 1 mA): which1 3k, which2 3k, which3 6k (`l`); R62's
+/// rows (A37): `outer/which1` 2000 (VACASK run which1, `settle/which1.sim`: the read bound
+/// where the definition stands, the wrapper's 8k not seen), `unbound/which2` 3k (ngspice-45
+/// run which2: the instance's scope).
 #[test]
-fn formal_defaults_to_instances_gives_the_values_ngspice_measured() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/passes/structure/formal_defaults_to_instances");
-    for (case, formal, ohms) in [
-        ("which1", "t", 3e3),
-        ("which2", "t", 3e3),
-        ("which3", "l", 6e3),
-    ] {
-        let text = std::fs::read_to_string(root.join(format!("{case}.ir"))).expect(case);
-        let mut design = ir::Design::new();
-        let mut diags = ir::Diags::new();
-        ir::parse(&text, &mut design.builder(), &mut diags);
-        passes::structure::formal_defaults_to_instances::formal_defaults_to_instances(
-            &mut design,
-            &mut diags,
-        );
-        let xs = elements(&design)
-            .map(|i| design.row::<ir::Element>(i.index))
-            .find(|e| design.str(e.name) == "xs")
-            .expect("the instance xs");
-        let actual = design
-            .params(xs.params)
-            .iter()
-            .find(|p| design.str(p.0) == formal)
-            .map(|p| p.1);
-        let Some(actual) = actual else {
-            panic!("{case}: xs passes no {formal}");
-        };
-        let got = ir::eval(&design, actual, &ByDefinition(&design));
-        assert_eq!(got, Ok(ohms), "{case}: {formal}");
+fn formal_default_rows_give_the_values_each_simulator_printed() {
+    use passes::structure::formal_defaults_to_instances as f;
+    let base: Run = f::formal_defaults_to_instances;
+    let rows: [(&str, Run, &str, &str, f64); 5] = [
+        ("formal_defaults_to_instances/which1", base, "xs", "t", 3e3),
+        ("formal_defaults_to_instances/which2", base, "xs", "t", 3e3),
+        ("formal_defaults_to_instances/which3", base, "xs", "l", 6e3),
+        (
+            "formal_defaults_to_instances_outer/which1",
+            f::formal_defaults_to_instances_outer,
+            "x1",
+            "r",
+            2e3,
+        ),
+        (
+            "formal_defaults_to_instances_unbound/which2",
+            f::formal_defaults_to_instances_unbound,
+            "xs",
+            "t",
+            3e3,
+        ),
+    ];
+    for (case, run, inst, formal, value) in rows {
+        let got = instance_actual(case, run, inst, formal);
+        assert_eq!(got, Ok(value), "{case}: {inst}'s {formal}");
     }
 }
 
@@ -490,7 +490,16 @@ fn splice_and_constant_params_keep_what_every_read_binds() {
 /// r53.rs`, ngspice's rule as bindings) is the same, bit for bit, before and after the pass.
 #[test]
 fn formal_defaults_keep_every_instances_values() {
-    r53::keeps_every_instances_values();
+    use passes::structure::formal_defaults_to_instances as f;
+    r53::keeps_every_instances_values(
+        "formal_defaults_to_instances",
+        f::formal_defaults_to_instances,
+    );
+    // every seeded default reads unbound (or a sibling): the unbound row converts the same designs
+    r53::keeps_every_instances_values(
+        "formal_defaults_to_instances_unbound",
+        f::formal_defaults_to_instances_unbound,
+    );
 }
 
 #[test]

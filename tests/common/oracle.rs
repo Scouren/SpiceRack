@@ -18,7 +18,7 @@
 //! and never a skip (`tests/test_import_suite/main.rs` and
 //! `tests/fixtures/spice_bench_known_failures.txt` are the pattern).
 //!
-//! Simulators run through the cross-sim harness (`tests/test_cross_sim/sim.rs`,
+//! Simulators run through the cross-sim harness (`tests/common/sim.rs`,
 //! the implementer's Phase 1 file, included read-only), not
 //! `spicerack::backend`, so the oracle shares no code with what it checks.
 //! Only the private `harness` below calls into it (`sim::run`), so a change
@@ -64,7 +64,7 @@
 
 #![allow(dead_code)]
 
-#[path = "../test_cross_sim/sim.rs"]
+#[path = "sim.rs"]
 mod sim;
 #[path = "../test_cross_sim/vacask.rs"]
 mod vacask;
@@ -497,7 +497,7 @@ pub fn spec_refusal(cite: &str, text: &str, from: Dialect, to: Dialect, want: &[
 // ---- private ----
 
 /// `text` on the cross-sim harness's `sim`: every plot. The one call into
-/// `tests/test_cross_sim/sim.rs` (the implementer's file): a change to
+/// `tests/common/sim.rs` (the implementer's file): a change to
 /// `sim::run` breaks here only.
 fn harness(sim: sim::Sim, text: &str) -> Vec<RawData> {
     match sim::run(sim, Path::new("/nonexistent/t.cir"), text, &[], SECS) {

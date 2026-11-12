@@ -1,0 +1,3 @@
+file "a.sp" deck
+  analysis op name=OP1
+  analysis op

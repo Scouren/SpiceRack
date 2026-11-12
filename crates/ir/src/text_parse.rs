@@ -21,8 +21,8 @@ use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Func, UnOp};
 use crate::id::ExprId;
 use crate::text_expr::{binary_prec, func_text};
 use crate::text_lex::{
-    Lexed, Mark, apply_mark, ident_or_quoted, lex_mark, lex_name, lex_number, name_byte,
-    number_end, unquote,
+    Mark, apply_mark, ident_or_quoted, lex_mark, lex_name, name_byte, number_end, number_parts,
+    unquote,
 };
 
 /// An entry of the operator stack.
@@ -282,10 +282,8 @@ pub(crate) fn parse_expr(
 
 /// Pushes a number word as its literal, short or `Long` (A18); `None` when it is no number.
 fn push_number(b: &mut Builder<'_>, word: &str) -> Option<ExprId> {
-    Some(match lex_number(word)? {
-        Lexed::Short(l) => b.literal(l),
-        Lexed::Long(significand, exp10, form) => b.long_literal(significand, exp10, form),
-    })
+    let (significand, exp10, form) = number_parts(word)?;
+    b.decimal(significand, exp10, form)
 }
 
 /// Opens `word(`: a probe (read whole), a built-in function's argument list, or an error.

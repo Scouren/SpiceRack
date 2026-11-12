@@ -1,0 +1,4 @@
+# The operating point of a divider: both simulators solve it to well under RELTOL.
+owner = pair
+proves = the ngspice reader and the VACASK writer on an op, at a tenth of the default RELTOL
+reltol = 1e-4

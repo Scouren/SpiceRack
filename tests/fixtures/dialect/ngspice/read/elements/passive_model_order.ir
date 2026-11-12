@@ -1,0 +1,14 @@
+# codes: P1109 P1109 P1109 P1109 P1109 P1109
+file "passive_model_order.sp" deck
+  title "passive_model_order"
+  comment " oracle: settle/passive_model_order_*.sp (each rejected: 'unknown parameter (<model>)', an L's 'unknown parameter (l)'); settle/passive_model_order_ok.sp (the neighbours run)"
+  opaque ngspice invalid "R1 n 0 {1k*3} rmod"
+  opaque ngspice invalid "R2 n 0 '1k*3' rmod"
+  opaque ngspice invalid "C1 n 0 3n cmod"
+  opaque ngspice invalid "C2 n 0 {1n*3} cmod"
+  opaque ngspice invalid "L1 n 0 3m lmod"
+  opaque ngspice invalid "L2 n 0 lmod l=3m"
+  element resistor R3 (n 0) model=rmod value=3k
+  element resistor R4 (n 0) model=rmod value=(1k * 3)
+  element capacitor C3 (n 0) model=cmod value=3n
+  element inductor L3 (n 0) model=lmod value=3m

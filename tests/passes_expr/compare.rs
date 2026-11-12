@@ -2,7 +2,8 @@
 //! each root it changed evaluated before and after (`ir::eval_typed`) under the same bindings.
 //!
 //! Contents: `pub const ANY`, `pub const fn code`, `pub fn pass`, `pub fn keeps_generated_values`, `pub fn keeps_values_over`,
-//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`, `pub fn pairs`, `pub fn paths`, `pub fn keeps_folded`
+//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`, `pub fn pairs`, `pub fn paths`, `pub fn keeps_folded`,
+//! `pub fn keeps_every_root_value`
 
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
@@ -31,6 +32,10 @@ const DROPS: &[&str] = &["sampling_draws_to_nominal"];
 /// The rules after which an operand is evaluated only where it is read (`inline_funcs`: ngspice's
 /// textual rule), so an error the original raised need not be raised (R12).
 const LAZY: &[&str] = &["inline_funcs"];
+
+/// The rules that drop a tag no operator reads (their doc states which nodes read one): their
+/// changed roots are compared by value only.
+const VALUE_ONLY: &[&str] = &["int_literal_to_plain"];
 
 /// Bindings per generated design.
 const TRIALS: u64 = 8;
@@ -89,7 +94,8 @@ pub fn keeps_values_over(
                 if LAZY.contains(&name) && was.is_err() {
                     continue;
                 }
-                let got = differ(&design, was, ir::eval_typed(&design, new, &env));
+                let now = ir::eval_typed(&design, new, &env);
+                let got = differ(&design, was, now, !VALUE_ONLY.contains(&name));
                 assert!(got.is_none(), "{name} seed {seed} trial {trial}: {got:?}");
             }
         }
@@ -133,6 +139,7 @@ pub fn keeps_boundary_values(name: &str, text: &str, tags: &[u8]) -> usize {
                         &design,
                         ir::eval_typed(&design, old, &env),
                         ir::eval_typed(&design, new, &env),
+                        !VALUE_ONLY.contains(&name),
                     );
                     assert!(got.is_none(), "{name} x={x:e} y={y:e} tags {tags}: {got:?}");
                 }
@@ -234,6 +241,55 @@ pub fn keeps_folded(name: &str, text: &str) -> usize {
     }
 }
 
+/// Runs `name` on generated designs and compares every root, changed or not, by value: the
+/// old root evaluated in a copy of the design before the pass, the new one in the design after
+/// (a pass that rewrites a definition's value changes what an unchanged root reads), under the
+/// same [`TRIALS`] bindings, parameters bound to their definitions. Tags are not compared (a
+/// rule that drops a tag no operator reads); an Int result out of range before may be a value
+/// after (R12). Returns how many roots changed.
+pub fn keeps_every_root_value(name: &str) -> usize {
+    let p = pass(name);
+    let mut changed = 0;
+    for seed in SEEDS {
+        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        let before = design.clone();
+        let mut diags = ir::Diags::new();
+        (p.run)(&mut design, &mut diags);
+        for (old, new) in pairs(&roots(&before), &roots(&design)) {
+            assert_eq!(
+                old.is_none(),
+                new.is_none(),
+                "{name}: a field kept given or absent"
+            );
+            if old.is_none() {
+                continue;
+            }
+            changed += usize::from(old != new);
+            for trial in 0..TRIALS {
+                let at = |d| Point {
+                    design: d,
+                    trial: seed * TRIALS + trial,
+                    follow: true,
+                    depth: std::cell::Cell::new(0),
+                };
+                let was = ir::eval_typed(&before, old, &at(&before));
+                let now = ir::eval_typed(&design, new, &at(&design));
+                let same = match (was, now) {
+                    (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits(),
+                    (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
+                    (Err(ir::Domain::OutOfDomain(e)), Ok(_)) => int_capable(before.expr(e)),
+                    _ => false,
+                };
+                assert!(
+                    same,
+                    "{name} seed {seed} trial {trial}: {was:?} before, {now:?} after"
+                );
+            }
+        }
+    }
+    changed
+}
+
 // ---- private ----
 
 /// The operands of `e`.
@@ -333,9 +389,10 @@ fn differ(
     after: &ir::Design,
     a: Result<ir::Value, ir::Domain>,
     b: Result<ir::Value, ir::Domain>,
+    tags: bool,
 ) -> Option<String> {
     let used = ir::features_used(after);
-    let typed = used.contains(ir::Feature::Binary(ir::BinOp::DivTyped))
+    let typed = tags && used.contains(ir::Feature::Binary(ir::BinOp::DivTyped))
         || used.contains(ir::Feature::BinaryDyn(ir::BinOp::DivTyped));
     let same = match (a, b) {
         (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits() && (!typed || x.int == y.int),

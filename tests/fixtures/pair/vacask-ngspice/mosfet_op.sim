@@ -1,0 +1,16 @@
+mosfet_op: the operating point of an NMOS and a PMOS (sp_mos1, SPICE level 1) with resistor loads: the model family converts without a sweep
+load "spice/resistor.osdi"
+load "spice/mos1.osdi"
+model vsource vsource
+model resistor sp_resistor
+model nmod sp_mos1 vto=0.7 kp=100u lambda=0.02
+model pmod sp_mos1 type=-1.0 vto=-0.7 kp=50u lambda=0.02
+vdd (vdd 0) vsource dc=3.0
+vg (g 0) vsource dc=1.5
+rn (vdd dn) resistor r=10k
+m1 (dn g 0 0) nmod w=10u l=2u
+rp (dp 0) resistor r=10k
+m2 (dp g vdd vdd) pmod w=20u l=2u
+control
+  analysis op1 op
+endc

@@ -18,7 +18,9 @@
 //! Contents: `pub fn analysis_name_dropped(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn dc_axis_name_dropped(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn loop_name_dropped(&mut ir::Design, &mut ir::Diags)`,
-//! `pub const NAME_DROPPED: ir::Code`, `pub const LOOP_NAME_READ: ir::Code`
+//! `pub const NAME_DROPPED: ir::Code`, `pub const LOOP_NAME_READ: ir::Code`,
+//! `pub(super) fn of_kind(&ir::Design, ir::ItemKind) -> Vec<ir::ItemRef>`,
+//! `pub(super) fn inside(&ir::Design, ir::ScopeId, ir::ScopeId) -> bool`
 
 use crate::ir;
 
@@ -83,9 +85,8 @@ pub fn loop_name_dropped(design: &mut ir::Design, diags: &mut ir::Diags) {
     }
 }
 
-// ---- private ----
-
-fn of_kind(design: &ir::Design, kind: ir::ItemKind) -> Vec<ir::ItemRef> {
+/// The reachable items of `kind`, in listed order.
+pub(super) fn of_kind(design: &ir::Design, kind: ir::ItemKind) -> Vec<ir::ItemRef> {
     let reachable = design.reachable().into_iter();
     reachable
         .map(|(i, _)| i)
@@ -94,7 +95,7 @@ fn of_kind(design: &ir::Design, kind: ir::ItemKind) -> Vec<ir::ItemRef> {
 }
 
 /// Whether `scope` is `body` or lies inside it.
-fn inside(design: &ir::Design, scope: ir::ScopeId, body: ir::ScopeId) -> bool {
+pub(super) fn inside(design: &ir::Design, scope: ir::ScopeId, body: ir::ScopeId) -> bool {
     let mut at = scope;
     // bounded by the scope tree's depth
     while !at.is_none() {
