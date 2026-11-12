@@ -1,0 +1,10 @@
+# codes:
+file "rcl_dynamic_quoted.sp" deck
+  title "rcl_dynamic_quoted"
+  comment " oracle: ngspice-45 examples/Monte_Carlo/OpWien.sp lines 26, 31, 39 (R = '...' and C = '...' with a probe: the B-source rewrite of inp_compat); the corpus gate's legalize; ngspice lowercases first (inp_casefix), so V( is v(; the element names fold with the nets r2, c2 seen first"
+  param res = 10k
+  param cn = 1n
+  element vsource VR2 (r2 0) dc=0
+  element resistor r2 (4 6) value=(res + 0.033 * res * v(r2)) noisy=false
+  element vsource VC2 (c2 0) dc=0
+  element capacitor c2 (6 3) value=(cn + 0.033 * cn * v(c2)) noisy=false

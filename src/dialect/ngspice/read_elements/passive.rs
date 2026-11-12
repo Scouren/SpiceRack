@@ -72,8 +72,10 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     }
     card.nodes = vec![items[0].text.clone(), items[1].text.clone()];
-    let charge = letter == b'c' && text.contains("q=");
-    if charge || wanted(&text[items[2].at..]) {
+    // ngspice lowercases the deck before it looks (inp_casefix): `V(r2)` and `Q=` count
+    let lower = text.to_ascii_lowercase();
+    let charge = letter == b'c' && lower.contains("q=");
+    if charge || wanted(&lower[items[2].at..]) {
         return dynamic(lw, st, card, letter, &items[2..], charge);
     }
     let mut f = Fields {
@@ -287,7 +289,7 @@ fn wanted(text: &str) -> bool {
 /// Whether a value text reads the circuit (`v(`, `i(`, `time`, `hertz`): what
 /// `TcBase::Fixed27` needs (a value of the temperature alone is no circuit read).
 fn reads_circuit(text: &str) -> bool {
-    wanted(&text.replace("temper", "_"))
+    wanted(&text.to_ascii_lowercase().replace("temper", "_"))
 }
 
 /// Whether `eval_tc`'s `%15.8e` changes a number (more than 9 significant digits).
