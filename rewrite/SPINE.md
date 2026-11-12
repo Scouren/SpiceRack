@@ -214,6 +214,45 @@ laws run on.
   writer lacks; `Policy::Strict` refusing an `Unread`; the facade's message format; the route
   override.
 
+## 8a. The pair test (`tests/test_pair.rs`, from the trunk merge)
+
+One binary, one cell per (source, target) pair it lists (`ngspice→vacask`, `vacask→ngspice`
+first). A listed cell whose two rows are not both in `BUILTIN` with the sides it needs fails: it
+never skips, so the binary lands with the trunk. The harness is the spine's (`dialect::read`
+strict for authored decks, lenient for corpus decks; one `dialect::legalize`; `dialect::write`
+per file); `tests/test_cross_sim/sim.rs` and `cmp.rs` move to `tests/common/` and are shared.
+
+**Oracles, per deck, in this order; the first failure names the component** (REWRITE-PLAN
+§7.4): 1 read (no refusal, `ir::check` clean, no `Unread` under strict) → the source reader;
+2 legalize (no refusal, unless the cell's list expects it with its code) → a pass or a
+`FEATURES`; 3 the target text read back by the target's reader `eq_meaning` the legalized design
+→ the target dialect; 4 numbers: the source simulator on the source deck and the target simulator
+on the written text, every vector of every plot at the tolerances of `tests/common/cmp.rs` →
+the target writer, or the simulators; 5 names: every source vector has its counterpart under
+the run's rename map; 6 the written bytes equal under 1 and 8 jobs.
+
+**Tolerances** are stated once, in `cmp.rs`, each with the arithmetic that derives it from the
+simulators' own (RELTOL, VNTOL, ABSTOL, the transient's step control): op/dc/ac within
+2·(RELTOL·swing + floor), RELTOL 1e-3, floor VNTOL 1e-6 V or ABSTOL + GMIN·Vmax; a transient
+within 1e-2 of the swing + 2·VNTOL in a 1 % time tube. A deck may tighten them, never loosen.
+
+**A deck, added without touching the harness** (the owners of the facts add them: each pass's
+simulator proof is a pair deck; each dialect area adds one deck for its statements):
+- `tests/fixtures/pair/<cell>/<deck>.<ext>`: the source deck in the source dialect's own
+  extension (`.sp`, `.sim`), with its analyses; nothing else is needed for the defaults.
+- optional `tests/fixtures/pair/<cell>/<deck>.pair`: one `key = value` a line, `#` comments:
+  `owner = <agent or area>`, `proves = <pass or statement>`, and tightenings only:
+  `reltol = <≤ 1e-3>`, `vntol = <≤ 1e-6>`, `abstol = <≤ the default>`, `tube = <≤ 0.01>`,
+  `vectors = <name> …` (compare these only; default: every vector). A key that would loosen a
+  tolerance fails the deck.
+- expected failures in `tests/fixtures/pair/<cell>.txt`, one a line:
+  `<deck> <step 1..6> <class> <proof>` (the classes and proof forms of the cross-sim lists),
+  compared by name both ways: a listed deck that passes, or fails at another step, fails.
+
+The merge tier runs every deck in `tests/fixtures/pair/`; under `--features corpus` the cells
+add the corpora the old cross-sim cells run (spice-bench for ngspice→vacask, the VACASK corpus
+for vacask→ngspice). `tests/fixtures/pair/` is no golden input.
+
 ## 9. Gate to leave the slice
 
 The whole existing gate is green and `golden diff` against the current baseline is byte-identical
