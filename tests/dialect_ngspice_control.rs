@@ -110,7 +110,7 @@ const DECKS: &[(&str, &str)] = &[
 /// raw file is the cards' run after the script, which every script state change reaches.
 const CARD_DECKS: &[(&str, &str)] = &[(
     "save_card",
-    "save card\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.op\n.control\nsave v(b)\nrun\nprint v(b)\n.endc\n.end\n",
+    "save card\nV1 a 0 1\nR1 a b 1k\nR2 b 0 1k\n.op\n.control\nsave v(b)\nrun\n.endc\n.end\n",
 )];
 
 // ---- private ----

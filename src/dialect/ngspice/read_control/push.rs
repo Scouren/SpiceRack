@@ -108,7 +108,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
                 // the outputs area validates before it pushes; a refusal is this command's opaque
                 let inner = Stmt { scope, ..st };
                 let done = match save {
-                    Some(holds) => read_outputs::save_command(lw, inner, words, *holds),
+                    Some(holds) => read_outputs::script_save(lw, inner, words, *holds),
                     None => read_outputs::meas_command(lw, inner, words),
                 };
                 if let Err(no) = done {
@@ -182,9 +182,7 @@ fn one(
         Op::Save { rest, holds, cmd } => {
             Ready::Output(Some(*holds), read_outputs::words(rest), cmd.opaque_text())
         }
-        Op::Meas { rest, cmd } => {
-            Ready::Output(None, read_outputs::words(rest), cmd.opaque_text())
-        }
+        Op::Meas { rest, cmd } => Ready::Output(None, read_outputs::words(rest), cmd.opaque_text()),
         Op::Opaque { class, code, cmd } => Ready::Opaque(*class, *code, cmd.opaque_text()),
         Op::Pending { .. } => unreachable!("plan settles every pending alterparam"),
         Op::Reset { .. } => Ready::Reset,
