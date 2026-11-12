@@ -121,6 +121,14 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     write_structure::admits(design, diags);
     // an alter, loop or DC axis of a device the design does not hold (R70): one walk
     write_control::missing_targets(design, diags);
+    // the deck files written in the script form (R49): their analyses are commands
+    let scripted: Vec<ir::FileId> = design
+        .files()
+        .filter(|&f| {
+            let file = design.file(f);
+            file.role == ir::Role::Deck && write_control::needs_script(design, file.top)
+        })
+        .collect();
     // each item's place in its scope: `reachable` lists a scope's items in order (O(items))
     let mut at: std::collections::HashMap<ir::ScopeId, usize> = std::collections::HashMap::new();
     for (item, scope) in design.reachable() {
@@ -150,7 +158,10 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             | ir::ItemKind::Analysis
             | ir::ItemKind::Option
             | ir::ItemKind::Env
-            | ir::ItemKind::NodeSet => write_run::admits(design, item, diags),
+            | ir::ItemKind::NodeSet => {
+                let script = scripted.contains(&design.scope(scope).file);
+                write_run::admits(design, item, script, diags);
+            }
             ir::ItemKind::Save | ir::ItemKind::Print | ir::ItemKind::Measure => {
                 write_outputs::admits(design, item, diags);
             }

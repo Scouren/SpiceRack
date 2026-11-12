@@ -12,7 +12,7 @@
 //! `rewrite/DIALECT-NGSPICE.md` §4; `rewrite/RULINGS.md` R21, R24–R26.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
+//! `pub(super) fn admits(&ir::Design, ir::ItemRef, bool, &mut ir::Diags)` (the bool: the deck is written in the script form),
 //! `pub(super) fn analysis`, `option`, `env`, `node_set`, `statistics`
 
 use super::codes::Row;
@@ -50,6 +50,12 @@ pub(super) const CODES: &[Row] = &[
         "a script option's value is the frontend's number, never a numparam expression; refused.",
     ),
     refusal(
+        SCRIPT_FIELD,
+        "a script analysis command whose field is no number",
+        "ngspice-45 runs (settle script_tran_brace.sp: 'unknown parameter on .tran - ignored'; script_ac_brace.sp, script_noise_brace.sp: misread with a warning)",
+        "a command drops a field's braces and reads the text; only a number (or a $var, which the writer has none of) is read as written; refused.",
+    ),
+    refusal(
         CARD_FORM,
         "an analysis field ngspice's card has no position for",
         "ngspice-45 dctrcurv.c:89-149, inp2dot.c dot_pss",
@@ -71,12 +77,18 @@ const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
 /// An option or temperature that holds from its place on (a script `option`) whose value is no
 /// number literal: the frontend reads a number, never a numparam expression.
 const SCRIPT_VALUE: ir::Code = ir::Code::new(b'W', 1304);
+/// An analysis written as a script command (the deck's plan needs a script, R49) with a field
+/// that is no number literal: a command's braces are dropped, not evaluated ("unknown parameter
+/// on .tran", or another field read with a warning: settle `script_tran_brace.sp`,
+/// `script_ac_brace.sp`, `script_noise_brace.sp`; F12). The card form evaluates them
+/// (`card_tran_brace.sp`).
+const SCRIPT_FIELD: ir::Code = ir::Code::new(b'W', 1305);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
 /// (R21): a card form (`W1300`, `W1301`), a value that reads the temperature (`W1302`), a script
 /// option's value that is no number (`W1304`). A node set that holds from its place on is
 /// `NodeSetFromHere`, which `FEATURES` lack (`commands.c` has no command that sets one).
-pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
+pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, script: bool, diags: &mut ir::Diags) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     let mut values = Vec::new();
     // a script `option`'s value is the frontend's number, never a numparam `{…}` (ng-control's
@@ -182,6 +194,10 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     form_ok &= outs.iter().all(|p| write_outputs::probe_admits(design, p));
     if !form_ok {
         refuse(CARD_FORM);
+    }
+    let number = |e: &ir::ExprId| e.is_none() || matches!(design.expr(*e), ir::Expr::Num(_));
+    if script && !values.iter().all(number) {
+        refuse(SCRIPT_FIELD);
     }
     check_values(design, &values, &mut refuse);
 }

@@ -27,7 +27,15 @@ use spicerack::dialect::{self, DialectRow, Sources};
 use spicerack::ir;
 
 /// The decks that fail today: (deck relative to `examples/`, step, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[];
+#[rustfmt::skip] // a table: one row per line
+const KNOWN: &[(&str, &str, &str)] = &[
+    ("osdi/bsimbulk/bsimbulk_inverter.sp", "legalize", "W1305: `.dc V1 0 'vcc' 'vcc/100'` in a deck the writer writes as a script (R49), where a command drops the braces (settle script_tran_brace.sp); waits for a ruling on keeping card analyses in a scripted deck"),
+    ("osdi/bsimbulk-local/bsimbulk_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
+    ("osdi/mixed-models/bsimbulk_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
+    ("osdi/mixed-models/psp_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
+    ("osdi/psp103/psp_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
+    ("various/bjt_ac_par.sp", "legalize", "W1350: `save @q1[pi] @q1[go]`, names the bjt has no output for (outputs.txt; ngspice keeps an empty vector, settle device_outputs.sp); waits for the reader to read such a probe as what ngspice saves (nothing), R49"),
+];
 
 /// The step names, in order.
 const STEPS: [&str; 4] = ["read", "check", "legalize", "round_trip"];
