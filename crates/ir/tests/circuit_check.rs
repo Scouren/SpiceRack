@@ -703,4 +703,116 @@ mod tests {
         });
         assert_eq!(got, Vec::<Code>::new());
     }
+
+    /// A17 (ng-sources' table): under `SpiceDefault` the omit-only fields of SIN, SFFM, AM and
+    /// TRRANDOM may be absent; under `AsGiven` they may not.
+    #[test]
+    fn omitted_fields_under_the_spice_rule() {
+        use spicerack_ir::wave::{
+            Am, AmModTime, GivenZero, PreDelay, Sffm, SffmLaw, TrRandom, TrRandomKind,
+        };
+        let source_of = |b: &mut Builder<'_>, top: ScopeId, wave: spicerack_ir::WaveRef| {
+            let one = n(b, 1);
+            let v = b.detail(spicerack_ir::source::Source {
+                wave,
+                ..source(one)
+            });
+            push(b, top, ElemKind::VSource, &["a", "0"], None, v);
+        };
+        let am = |b: &mut Builder<'_>, rule: GivenZero| {
+            let one = n(b, 1);
+            let none = ExprId::NONE;
+            b.wave(Am {
+                offset: one,
+                amplitude: one,
+                mod_offset: one,
+                mod_index: none,
+                mod_freq: none,
+                carrier_freq: none,
+                delay: none,
+                phase_m_deg: none,
+                phase_c_deg: none,
+                mod_time: AmModTime::Delay,
+                pre: PreDelay::Zero,
+                given_zero: rule,
+            })
+        };
+        let valid = checked(|b, top| {
+            let one = n(b, 1);
+            let none = ExprId::NONE;
+            let w = b.wave(spicerack_ir::wave::Sin {
+                delay: none,
+                damping: none,
+                phase_deg: none,
+                given_zero: GivenZero::SpiceDefault,
+                ..sin(one)
+            });
+            source_of(b, top, w);
+            let w = b.wave(Sffm {
+                offset: one,
+                amplitude: one,
+                carrier_freq: none,
+                mod_index: none,
+                signal_freq: none,
+                delay: none,
+                phase_c_deg: none,
+                phase_m_deg: none,
+                law: SffmLaw::Ngspice,
+                pre: PreDelay::Zero,
+                given_zero: GivenZero::SpiceDefault,
+            });
+            source_of(b, top, w);
+            let w = am(b, GivenZero::SpiceDefault);
+            source_of(b, top, w);
+            let w = b.wave(TrRandom {
+                ts: one,
+                td: none,
+                p1: none,
+                p2: none,
+                kind: TrRandomKind::Gauss,
+                given_zero: GivenZero::SpiceDefault,
+            });
+            source_of(b, top, w);
+        });
+        assert_eq!(valid, Vec::<Code>::new());
+        let as_given = checked(|b, top| {
+            let w = am(b, GivenZero::AsGiven);
+            source_of(b, top, w);
+        });
+        assert_eq!(as_given, only(Violation::FieldDomain));
+    }
+
+    /// A17: a charge-defined capacitor's coefficient may divide the charge (`Reciprocal`);
+    /// any other behavioural row may not, nor one with no coefficient.
+    #[test]
+    fn the_reciprocal_law_on_a_behavioural_row() {
+        use spicerack_ir::controlled::{Behav, OutKind};
+        let row = |b: &mut Builder<'_>, output: OutKind, tc: bool| {
+            let one = n(b, 1);
+            let tc1 = if tc { n(b, 1) } else { ExprId::NONE };
+            Behav {
+                tc1,
+                tc_law: TcLaw::Reciprocal,
+                ..behav(one, output)
+            }
+        };
+        let ok = checked(|b, top| {
+            let r = row(b, OutKind::Charge, true);
+            let q = b.detail(r);
+            push(b, top, ElemKind::ChargeCapacitor, &["a", "0"], None, q);
+        });
+        assert_eq!(ok, Vec::<Code>::new());
+        let plain = checked(|b, top| {
+            let r = row(b, OutKind::Voltage, true);
+            let v = b.detail(r);
+            push(b, top, ElemKind::Behav, &["a", "0"], None, v);
+        });
+        assert_eq!(plain, only(Violation::FieldDomain));
+        let no_tc = checked(|b, top| {
+            let r = row(b, OutKind::Charge, false);
+            let q = b.detail(r);
+            push(b, top, ElemKind::ChargeCapacitor, &["a", "0"], None, q);
+        });
+        assert_eq!(no_tc, only(Violation::FieldDomain));
+    }
 }
