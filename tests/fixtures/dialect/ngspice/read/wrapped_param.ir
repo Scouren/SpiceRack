@@ -1,0 +1,10 @@
+# codes: P1014 P1014 P1014 P1014
+file "wrapped_param.sp" deck
+  title "wrapped_param"
+  comment " oracle: settle/wrap_param_{1,2,3,4}.sp ({a}+{b} and 'a'+'b': '; sign expected.', fatal; 'a+{b}' and {a+'b'}: 'Syntax error: letter [{]', 'Formula() error.', fatal)"
+  param a = 1
+  param b = 2
+  opaque ngspice invalid ".param p1={a}+{b}"
+  opaque ngspice invalid ".param p2='a'+'b'"
+  opaque ngspice invalid ".param p3='a+{b}'"
+  opaque ngspice invalid ".param p4={a+'b'}"

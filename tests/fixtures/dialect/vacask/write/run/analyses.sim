@@ -7,7 +7,7 @@ control
   analysis a2 ac from=1k to=2k step=100
   analysis a3 ac from=1 to=1G mode="dec" points=10
   analysis a4 ac values=[1k, 2k]
-  analysis a5 ac from=1 to=2 mode="lin" points=n
+  analysis a5 ac from=1 to=2 mode="lin" points=2 * 2
   analysis d1 dcinc
   analysis x1 dcxf out=["o", "p"]
   analysis x2 acxf out="o" from=1 to=1k mode="oct" points=3

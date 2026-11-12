@@ -2,6 +2,7 @@
 file "foreach_long.sp" deck
   title "foreach_long"
   comment " oracle: settle/loop_long.sp (a script number word is its digits as written: 0.12345678901234567890123 and its 18-digit rounding run as different values); R37, A18; L5 seed 11"
+  element vsource v1 (a 0) dc=1
   loop sweep keep_last name=v (source_dc v1) (list values=[0.12345678901234567890123, -73.384558234620672336478e-8, 1k])
     analysis op
   alter (source_dc v1) value=0.12345678901234567890123

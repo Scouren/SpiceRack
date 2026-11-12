@@ -1,6 +1,7 @@
 # oracle: S3-CONTROL S1, S2: a parameter alter is alterparam where it stands; the Reset right after it is reset, which applies it (inp.c:1735-1857, runcoms2.c:172-240); written by hand
 file "script_reset.sp" deck
   title "script_reset"
+  element resistor r1 (a 0) value=1k
   param p = 1k
   alter (element_value r1) value=2k
   analysis op

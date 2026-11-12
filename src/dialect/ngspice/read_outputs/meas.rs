@@ -12,12 +12,13 @@
 //!
 //! Contents: `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No>`
 
+use super::No;
 use super::probe::{Ctx, Want, build, probe_word};
 use super::values::{Val, emit, numparam, param_reads, threshold, value};
-use super::{No, unwrap};
 use crate::dialect::ngspice::expr_read::Tree;
 use crate::dialect::ngspice::number;
 use crate::dialect::ngspice::read::{Lower, Stmt};
+use crate::dialect::ngspice::value::{Val as V, unwrap};
 use crate::ir::measure::{MeasureFind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen};
 use crate::ir::{self, AnalysisKind, Edge, Event, ProbeKind, Stat};
 
@@ -84,7 +85,8 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result
         if !rest.is_empty() {
             return Err(No::Untyped);
         }
-        let text = unwrap(&f[f.find('=').expect("a key=value word") + 1..]);
+        let value = &f[f.find('=').expect("a key=value word") + 1..];
+        let text = unwrap(value).plain().unwrap_or(value.trim());
         param_reads(lw, st, text)?;
         Body::Param(numparam(lw, st, text, false)?)
     } else {
@@ -208,7 +210,7 @@ fn clause(
     }
     let value = match &p.val {
         Some(v) => value(lw, st, v)?,
-        None => Val::Lit(ir::Literal::ZERO, number::Fit::Exact),
+        None => Val::Plain(V::Lit(ir::Literal::ZERO, number::Fit::Exact)),
     };
     if p.edge.is_none() {
         return Err(No::Invalid); // "at, rise, fall or cross must be given"
@@ -293,10 +295,10 @@ fn stat(lw: &mut Lower<'_, '_>, st: Stmt, f: &str, words: &[String], ctx: Ctx) -
     // values ngspice makes after substitution; the IR has no "either order" window
     if dc && let (Ev::At(a), Ev::At(b)) = (&from, &to) {
         match (a, b) {
-            (Val::Lit(x, _), Val::Lit(y, _)) if y.value() < x.value() => {
+            (Val::Plain(V::Lit(x, _)), Val::Plain(V::Lit(y, _))) if y.value() < x.value() => {
                 std::mem::swap(&mut from, &mut to);
             }
-            (Val::Lit(..), Val::Lit(..)) => {}
+            (Val::Plain(V::Lit(..)), Val::Plain(V::Lit(..))) => {}
             _ => return Err(No::DcWindow),
         }
     }

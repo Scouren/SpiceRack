@@ -1,5 +1,5 @@
 //! The meaning of the run passes (`src/passes/run/`), on the IR alone, until the trunk's pair
-//! decks prove them on the simulators (`PENDING_PAIRS`).
+//! decks prove them on the simulators (`passes_run/pairs.rs`, `PENDING_PAIRS`).
 //!
 //! Oracle: the state in force at each analysis (`passes_run/state.rs`, a model written from
 //! the IR's docs, never from a pass): for every analysis, the same options, temperatures, node
@@ -13,18 +13,36 @@ mod memcap;
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_run/continuation.rs"]
+mod continuation;
+#[path = "passes_run/dc_loops.rs"]
+mod dc_loops;
 #[path = "passes_run/first_step.rs"]
 mod first_step;
+#[allow(dead_code)] // `sources_only` is the laws'
+#[path = "passes_run/gen_sets.rs"]
+mod gen_sets;
 #[path = "passes_run/loops.rs"]
 mod loops;
 #[path = "passes_run/names.rs"]
 mod names;
+#[path = "passes_run/pairs.rs"]
+mod pairs;
 #[path = "passes_run/params.rs"]
 mod params;
 #[path = "passes_run/print_step.rs"]
 mod print_step;
+#[allow(dead_code)]
+#[path = "common/sim.rs"]
+mod sim;
 #[path = "passes_run/state.rs"]
 mod state;
+#[allow(dead_code)]
+#[path = "test_import_suite/tube.rs"]
+mod tube;
+#[allow(dead_code)]
+#[path = "test_cross_sim/vacask.rs"]
+mod vacask;
 #[path = "passes_run/walk.rs"]
 mod walk;
 
@@ -33,37 +51,6 @@ use std::path::Path;
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
 use spicerack::passes;
-
-/// The run passes whose simulator proof (a pair deck naming it in `proves =`) is to come:
-/// compared by name with the decks, both ways.
-const PENDING_PAIRS: &[&str] = &[
-    "whole_run_option_first",
-    "whole_run_env_first",
-    "whole_run_node_set_first",
-    "whole_run_save_first",
-    "whole_run_option_to_from_here",
-    "whole_run_env_to_from_here",
-    "whole_run_node_set_to_from_here",
-    "whole_run_save_to_from_here",
-    "run_items_together",
-    "tran_cap_ngspice_to_given",
-    "tran_cap_span50_to_given",
-    "tran_cap_span10_to_given",
-    "tran_cap_none_to_given",
-    "ic_beyond_next_to_next_only",
-    "ic_next_only_to_beyond",
-    "analysis_name_dropped",
-    "dc_axis_name_dropped",
-    "loop_name_dropped",
-    "analysis_name_given",
-    "dc_axis_name_given",
-    "loop_name_given",
-    "tran_print_step_to_simulator",
-    "tran_simulator_step_to_print",
-    "tran_first_step_to_print",
-    "loop_restore_to_keep_last",
-    "loop_keep_last_to_restore",
-];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
 
@@ -108,6 +95,26 @@ fn whole_run_save_to_from_here_keeps_the_saves_at_every_analysis() {
 #[test]
 fn save_set_to_all_keeps_the_saves_at_every_analysis() {
     keeps_state("save_set_to_all", ir::RunExtra::SaveAnalysisSet);
+}
+
+#[test]
+fn dc_axes_to_loops_convert_generated_designs() {
+    dc_loops::dc_axes_to_loops_convert_generated_designs(SEEDS, SIZE);
+}
+
+#[test]
+fn continuation_is_a_fact_of_each_sweep_level() {
+    continuation::continuation_is_a_fact_of_each_sweep_level();
+}
+
+#[test]
+fn a_loop_of_ops_is_no_continued_sweep() {
+    dc_loops::a_loop_of_ops_is_no_continued_sweep();
+}
+
+#[test]
+fn dc_loops_give_the_points_vacask_gives() {
+    dc_loops::dc_loops_give_the_points_vacask_gives();
 }
 
 #[test]
@@ -452,45 +459,7 @@ fn legalize_makes_whole_run_state_positional() {
 
 #[test]
 fn every_run_pass_has_its_pair_deck_or_a_pending_marker_and_not_both() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pair");
-    let mut proven = Vec::new();
-    for cell in std::fs::read_dir(root).into_iter().flatten().flatten() {
-        for deck in std::fs::read_dir(cell.path())
-            .into_iter()
-            .flatten()
-            .flatten()
-        {
-            if deck.path().extension().is_some_and(|e| e == "pair") {
-                let text = std::fs::read_to_string(deck.path()).unwrap_or_default();
-                for line in text.lines() {
-                    if let Some((k, v)) = line.split('#').next().unwrap_or("").split_once('=')
-                        && k.trim() == "proves"
-                    {
-                        proven.push(v.trim().to_string());
-                    }
-                }
-            }
-        }
-    }
-    let group = passes::GROUPS
-        .iter()
-        .find(|g| g.name == "run")
-        .expect("the group");
-    let mut wrong = Vec::new();
-    for pass in group.passes {
-        if PENDING_PAIRS.contains(&pass.name) == proven.iter().any(|p| p == pass.name) {
-            wrong.push(pass.name);
-        }
-    }
-    wrong.extend(
-        PENDING_PAIRS
-            .iter()
-            .filter(|p| !group.passes.iter().any(|q| q.name == **p)),
-    );
-    assert!(
-        wrong.is_empty(),
-        "pair deck against PENDING_PAIRS: {wrong:?}"
-    );
+    pairs::every_run_pass_has_its_pair_deck_or_a_pending_marker_and_not_both();
 }
 
 /// The pass `name` over every generated design using `feature`: `ir::check` clean, every

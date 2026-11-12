@@ -377,3 +377,42 @@ fn corpus_forms_this_vacask_rejects() {
         r.out
     );
 }
+
+#[test]
+fn ac_and_mc_arguments_see_variables_and_constants_not_parameters() {
+    // R68, A42: `ac from=f0` with `parameters f0=1k` fails its analysis (exit 0); `mc
+    // samples=n` with `parameters n=2` stops the run; a `var` and `M_PI` run.
+    let r = settle("ac_param.sim");
+    assert!(
+        r.out.contains("Variable or constant 'f0' not defined."),
+        "{}",
+        r.out
+    );
+    let r = settle("mc_param.sim");
+    assert!(
+        r.out.contains("Variable or constant 'n' not defined."),
+        "{}",
+        r.out
+    );
+    for deck in ["ac_var.sim", "mc_var.sim"] {
+        let r = settle(deck);
+        assert!(!r.out.contains("not defined"), "{deck}: {}", r.out);
+    }
+}
+
+#[test]
+fn elab_targets_kind_through_the_epochs_elaboration() {
+    // R64b: after `elaborate circuit("pa")`, `vin`'s `dc` sweeps the source (g 1 2 V), `r1`'s
+    // `r` the resistor (h 0.5, 0.25 V), and the alters move them (o1: g 4 V, h 1 V); after
+    // `elaborate circuit("pb")`, `vin` is pb's resistor and its `r` sweeps (vs:flow 2, 1 mA).
+    let r = settle("elab_targets.sim");
+    let at = |f: &str, v: &str, k| value(&raw(&r, f), v, k);
+    assert!(close(at("d1.raw", "g", 1), 2.0, 1e-12), "{}", r.out);
+    assert!(close(at("d2.raw", "h", 1), 0.25, 1e-12), "{}", r.out);
+    assert!(close(at("o1.raw", "g", 0), 4.0, 1e-12) && close(at("o1.raw", "h", 0), 1.0, 1e-12));
+    assert!(
+        close(at("d3.raw", "vs:flow(br)", 1), -1e-3, 1e-12),
+        "{}",
+        r.out
+    );
+}

@@ -9,22 +9,21 @@
 
 use super::No;
 use super::probe::Want;
-use super::{unwrap, words};
+use super::words;
 use crate::dialect::ngspice::declare::Class;
 use crate::dialect::ngspice::expr_read::{self, Tree};
 use crate::dialect::ngspice::name;
 use crate::dialect::ngspice::number;
 use crate::dialect::ngspice::read::{Lower, Stmt};
 use crate::dialect::ngspice::tables::Eval;
+use crate::dialect::ngspice::value::{self, unwrap};
 use crate::ir::{self, ProbeKind};
 use crate::syntax::ast::{Node, Tag};
 
-/// A value read but not yet appended.
+/// A measure value read but not yet appended.
 pub(super) enum Val {
-    /// A number and how its digits fit (`number::Fit`).
-    Lit(ir::Literal, number::Fit),
-    /// A numparam expression.
-    Tree(Tree),
+    /// A card value (the reader's one [`value::Val`]).
+    Plain(value::Val),
     /// A threshold that reads the circuit: `v(x)` or `i(x)`.
     Probe(Want),
 }
@@ -36,9 +35,10 @@ pub(super) fn value(lw: &mut Lower<'_, '_>, st: Stmt, text: &str) -> Result<Val,
         .starts_with(|c: char| c.is_ascii_digit() || c == '.');
     if numeric {
         let s = number::card(text).ok_or(No::Invalid)?;
-        return Ok(Val::Lit(s.literal, s.fit));
+        return Ok(Val::Plain(value::Val::of(s)));
     }
-    Ok(Val::Tree(numparam(lw, st, unwrap(text), true)?))
+    let inner = unwrap(text).plain().unwrap_or(text.trim());
+    Ok(Val::Plain(value::Val::Tree(numparam(lw, st, inner, true)?)))
 }
 
 /// A numparam expression; `early` (a card value, substituted when the deck is read) may not
@@ -157,8 +157,7 @@ pub(super) fn param_reads(lw: &Lower<'_, '_>, st: Stmt, text: &str) -> Result<()
 /// A value appended.
 pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: Val) -> ir::ExprId {
     match v {
-        Val::Lit(lit, fit) => lw.number(lit, &fit),
-        Val::Tree(t) => lw.expr(st, &t, st.scope),
+        Val::Plain(v) => value::emit(lw, st, &v),
         Val::Probe(w) if w.kind == ProbeKind::I => {
             let e = lw.names.fold(&w.a[0]);
             lw.b.i(&e)

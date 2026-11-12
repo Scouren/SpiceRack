@@ -19,16 +19,20 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod dc_axes_to_loops`, `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
-//! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
+//! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
+//! `codes.rs`)
 
+mod codes;
+pub mod dc_axes_to_loops;
 pub mod ic_next_only;
 pub mod loop_end;
 pub mod names_dropped;
 pub mod names_given;
 pub mod run_items_together;
 pub mod save_set_to_all;
+pub mod sweep_forms;
 pub mod tran_ceiling_given;
 pub mod tran_first_step_to_print;
 pub mod tran_print_step;
@@ -40,6 +44,8 @@ use crate::ir::RunExtra;
 use tran_ceiling_given as tc;
 use tran_first_step_to_print as fs;
 use whole_run_state_first as wr;
+
+pub(super) use codes::CODES;
 
 /// The group's passes, in the order `legalize` tries them.
 pub(super) const PASSES: &[Pass] = &[
@@ -227,6 +233,39 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[save_set_to_all::SAVE_SET_KEPT],
         run: save_set_to_all::save_set_to_all,
     },
+    sweep(
+        "sweep_dc_lin_points_to_step",
+        (RunExtra::SweepDcLinPoints, RunExtra::SweepDcLinStep),
+        &[sweep_forms::SWEEP_KEPT],
+        sweep_forms::sweep_dc_lin_points_to_step,
+    ),
+    sweep(
+        "sweep_dc_list_to_step",
+        (RunExtra::SweepDcList, RunExtra::SweepDcLinStep),
+        &[sweep_forms::SWEEP_KEPT],
+        sweep_forms::sweep_dc_list_to_step,
+    ),
+    sweep(
+        "sweep_freq_list_to_lin_points",
+        (RunExtra::SweepFreqList, RunExtra::SweepFreqLinPoints),
+        &[sweep_forms::FREQ_LIST_KEPT],
+        sweep_forms::sweep_freq_list_to_lin_points,
+    ),
+    // after the sweep rows: a loop's values are listed from the forms they leave
+    Pass {
+        name: "dc_axis_device_param_to_loop",
+        removes: ir::Feature::Run(RunExtra::DcAxisDeviceParam),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_axis_device_param_to_loop,
+    },
+    Pass {
+        name: "dc_axis_model_param_to_loop",
+        removes: ir::Feature::Run(RunExtra::DcAxisModelParam),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_axis_model_param_to_loop,
+    },
     // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",
@@ -237,171 +276,27 @@ pub(super) const PASSES: &[Pass] = &[
     },
 ];
 
-/// The group's catalogue rows (`U0400..=U0499`).
-pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
-    (
-        wr::STATE_ELSEWHERE,
-        ir::Info {
-            title: "a whole-run state item after a run item that cannot move before it",
-            cite: "rewrite/AMEND-A12.md A14; R24",
-            explain: "The target's state is positional, so a state item that holds for the whole run must stand before the first analysis. This one, or that analysis, is listed in an included file or a body, and moving it there would change what the include or the body holds, so it is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        wr::MID_RUN,
-        ir::Info {
-            title: "a whole-run state item after a run item",
-            cite: "rewrite/AMEND-A12.md A14; R24",
-            explain: "The target holds state from where it stands. This whole-run item stands after an analysis, loop or alter, where holding from here would miss the run items before it, so it is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        wr::RESET_RESTORES,
-        ir::Info {
-            title: "a whole-run state item whose class a reset restores",
-            cite: "rewrite/AMEND-A12.md A27, A28",
-            explain: "The target holds state from where it stands, and a reset in the deck restores this class: it would drop the item once positional, where the whole-run item outlives it, so the item is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        wr::FROM_HERE_SAME,
-        ir::Info {
-            title: "a whole-run state item a positional one sets the same thing as",
-            cite: "rewrite/AMEND-A12.md A14",
-            explain: "The deck sets this quantity both for the whole run and from a point on; which of the two holds after that point is not stated, so the item keeps its mode and is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        tc::NO_PRINT_STEP,
-        ir::Info {
-            title: "a transient under ngspice's step ceiling with no print step",
-            cite: "rewrite/AMEND-A12.md A24; R47",
-            explain: "ngspice's default ceiling is the smaller of the print step and a fiftieth of the span; this transient leaves the print step to the simulator, so the ceiling has no value to state and the analysis is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        tran_print_step::PRINT_STEP_DROPPED,
-        ir::Info {
-            title: "a transient's print step the target has no field for, dropped",
-            cite: "rewrite/RULINGS.md R67; rewrite/AMEND-A12.md A41",
-            explain: "The target has no output interval: it records the steps it takes. Once nothing reads the interval it only resamples the output, so it was dropped; the note's argument is its expression, and the results are given back on that grid.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        tran_print_step::PRINT_STEP_READ,
-        ir::Info {
-            title: "a transient's print step something still reads",
-            cite: "rewrite/RULINGS.md R67; rewrite/AMEND-A12.md A24, A41",
-            explain: "The target has no output interval, but this one is read: by ngspice's default step ceiling (min of the interval and a fiftieth of the span), by a $tstep in an expression, or by further segments of their own intervals. Dropping it would change the run, so the item is refused; the rules that write the ceiling and substitute $tstep run first.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        fs::FIRST_STEP_MOVED,
-        ir::Info {
-            title: "a transient's first step moved into its print step",
-            cite: "rewrite/RULINGS.md R73",
-            explain: "The target has no first-step field and needs a print step; this transient gave a first step and no print step, so the first step became the print step and the first step is the target's own rule, which takes one no larger (R73). The note's argument is the value.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        fs::FIRST_STEP_KEPT,
-        ir::Info {
-            title: "a transient's first step that cannot move",
-            cite: "rewrite/RULINGS.md R73",
-            explain: "The target has no first-step field. This one cannot become the print step: the transient already has one, its step ceiling is still a simulator's rule that would read it, or a $tstep in an expression would read it. The ceiling rules and the $tstep substitution run first; otherwise the item is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        fs::NO_STEP_VALUE,
-        ir::Info {
-            title: "a transient with neither a print step nor a first step",
-            cite: "rewrite/RULINGS.md R73",
-            explain: "The target needs a print step, and nothing in the deck determines one: no print step and no first step to move into it (R13: no invented value). The item is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        ic_next_only::IC_KEPT,
-        ir::Info {
-            title: "an initial condition or node set whose reach the target cannot state",
-            cite: "rewrite/AMEND-A12.md A22",
-            explain: "The target states a condition either for the next analysis only or for every analysis after it, not this one's way. The rule copies or re-labels a deck's conditions together, and here it cannot: a condition or an analysis stands in a body or loop, a value holds a random draw, one node is set both for the whole run and from a point on, or a next-only condition precedes an analysis that is not the last. The condition is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        names_dropped::NAME_DROPPED,
-        ir::Info {
-            title: "a statement name the target cannot spell, dropped",
-            cite: "rewrite/AMEND-A12.md A16, A22, A32",
-            explain: "The target has no name on this analysis, DC axis or loop, so the name was dropped; it labels results only. The note's argument is the old name: results are given back under it.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        names_dropped::LOOP_NAME_READ,
-        ir::Info {
-            title: "a named loop whose body may read its name",
-            cite: "rewrite/AMEND-A12.md A27",
-            explain: "The target has no loop name. This loop's body holds a statement kept as its dialect's text, which may read the name as the loop variable, so the name cannot be dropped and the loop is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        names_given::NAME_GIVEN,
-        ir::Info {
-            title: "a statement the target must name, given a name",
-            cite: "rewrite/AMEND-A12.md A35; R59",
-            explain: "The target names every analysis, DC axis and loop, and this one had no name, so it was given one: its kind's word and a count, unused by any other statement of its kind. It labels results only. The note's argument is the new name: results are given back under the source's addressing.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        names_given::LOOP_NAME_UNREAD,
-        ir::Info {
-            title: "an unnamed loop whose body may read a name",
-            cite: "rewrite/AMEND-A12.md A35",
-            explain: "The target names every loop. This loop's body holds a statement kept as its dialect's text, which may read a variable a new loop name would shadow, so no name is given and the loop is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        loop_end::LOOP_END_KEPT,
-        ir::Info {
-            title: "a loop whose targets' value after it the target cannot state",
-            cite: "rewrite/AMEND-A12.md A22, A27",
-            explain: "The target ends this loop the other way (restoring its targets, or keeping the last value), so an alter after the loop must set what the source holds there. It cannot here: a target is not a parameter, the value is not a stated expression (a range sweep, a Monte Carlo loop) or holds a random draw, the loop stands in a body, or something before it already changed the target. The loop is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        save_set_to_all::SAVE_SET_KEPT,
-        ir::Info {
-            title: "a save scoped to a set of analysis kinds, beside an analysis of another kind",
-            cite: "rewrite/AMEND-A12.md A22; R43",
-            explain: "The target's save governs every analysis. This one governs some kinds only, and the design runs an analysis of another kind, which writes its own default set in the source; widened, the save would drop vectors from that analysis's results, so it is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        run_items_together::HOLDS_RUN_ITEMS,
-        ir::Info {
-            title: "a circuit item between run items that holds run items",
-            cite: "rewrite/AMEND-A12.md A22",
-            explain: "The target lists a file's run items together. A circuit item between them would move before them, but it holds run items in its body or includes a file that does, and the move would reorder those, so it is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-];
+/// What a `dc_axes_to_loops` row's output may add: list sweep loops that keep their last value
+/// over the kinds of target a DC axis has, their names, an operating point in their bodies.
+const DC_LOOPS: ir::FeatureSet = ir::FeatureSet::EMPTY
+    .with(ir::Feature::Item(ir::ItemKind::Loop))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Loop,
+        ir::ItemKind::Analysis,
+    ))
+    .with(ir::Feature::Placed(ir::ScopeKind::Loop, ir::ItemKind::Loop))
+    .with(ir::Feature::Analysis(ir::AnalysisKind::Op))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Run(RunExtra::LoopKeepLast))
+    .with(ir::Feature::Run(RunExtra::SweepLoopList))
+    .with(ir::Feature::Run(RunExtra::LoopOverOp))
+    .with(ir::Feature::Run(RunExtra::LoopNamed))
+    .with(ir::Feature::Run(RunExtra::LoopUnnamed))
+    .with(ir::Feature::Run(RunExtra::LoopParam))
+    .with(ir::Feature::Run(RunExtra::LoopSourceDc))
+    .with(ir::Feature::Run(RunExtra::LoopElementValue))
+    .with(ir::Feature::Run(RunExtra::LoopDeviceParam))
+    .with(ir::Feature::Run(RunExtra::LoopModelParam));
 
 // ---- private ----
 
@@ -433,6 +328,22 @@ const fn to_from_here(
         name,
         removes: ir::Feature::Run(modes.0),
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(modes.1)),
+        notes,
+        run,
+    }
+}
+
+/// A `sweep_forms` row: it removes the form `forms.0` and requires the form `forms.1`.
+const fn sweep(
+    name: &'static str,
+    forms: (RunExtra, RunExtra),
+    notes: &'static [ir::Code],
+    run: fn(&mut ir::Design, &mut ir::Diags),
+) -> Pass {
+    Pass {
+        name,
+        removes: ir::Feature::Run(forms.0),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(forms.1)),
         notes,
         run,
     }

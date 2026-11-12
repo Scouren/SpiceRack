@@ -2,7 +2,9 @@
 //! the old cross-sim cells run (spice-bench for `ngspice-vacask`, the VACASK corpus for
 //! `vacask-ngspice`), read leniently with every file it names, through the six steps on
 //! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash) on every tenth written deck. A deck the
-//! corpus's cross-sim source list quarantines as `slow` is converted and not simulated.
+//! corpus's cross-sim source list quarantines as `slow` is neither converted nor simulated (step 1
+//! `quarantined`). Each deck's line is also appended to `pair-<cell>-census.partial.txt` as it
+//! finishes, so a census cut short keeps what ran.
 //!
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
 //! deck (`<path> <step>:<class> …`) in `$CARGO_TARGET_TMPDIR/pair-<cell>-census.txt`, and its
@@ -16,14 +18,14 @@
 //!
 //! Contents:
 //! - `pub struct Corpus`
-//! - `pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String>`
+//! - `pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String>`
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use spicerack::dialect::{Policy, Sources};
+use spicerack::dialect::{DialectRow, Policy, Sources};
 use spicerack::ir;
 
 use crate::files::PairFile;
@@ -46,12 +48,16 @@ pub struct Corpus {
 // when a nightly has the hour.
 const STRIDE_SIX: usize = 10;
 
+/// A deck's conversion budget in seconds: past it the deck is `converter-slow` at step 1 (named,
+/// never a pass or a skip; the class must be empty before a release).
+const BUDGET: u64 = 120;
+
 /// A deck still running after this many seconds is named on stderr while it runs.
 const SLOW: u64 = 120;
 
 /// Every deck of `corpus` through `c`'s six steps: the census written, its table printed, and
 /// the differences from the cell's corpus list returned (empty: the list holds).
-pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
+pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
     let (from, to) = rows(c);
     let root = std::env::var(corpus.var)
         .unwrap_or_else(|_| panic!("{} not set: run in `nix develop .#testing`", corpus.var));
@@ -109,10 +115,17 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     let running: Mutex<Vec<Option<(usize, std::time::Instant)>>> =
         Mutex::new(vec![None; jobs.max(1)]);
     let workers_left = AtomicUsize::new(jobs.max(1));
+    let partial_path = format!(
+        "{}/pair-{}-census.partial.txt",
+        env!("CARGO_TARGET_TMPDIR"),
+        c.name
+    );
+    let partial =
+        std::fs::File::create(&partial_path).unwrap_or_else(|e| panic!("{partial_path}: {e}"));
     std::thread::scope(|s| {
         for w in 0..jobs.max(1) {
             let (running, workers_left, next, done) = (&running, &workers_left, &next, &done);
-            let (load, none, paths) = (&load, &none, &paths);
+            let (load, none, paths, slow, partial) = (&load, &none, &paths, &slow, &partial);
             s.spawn(move || {
                 // Bounded: each index is taken once.
                 loop {
@@ -120,10 +133,26 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
                     let Some(p) = paths.get(k) else { break };
                     running.lock().expect("no worker panicked")[w] =
                         Some((k, std::time::Instant::now()));
-                    let mut v = run::steps(c, from, to, &load(p), none);
+                    let mut v = match slow.contains(&rel(p)) {
+                        // Quarantined: its conversion alone can run for hours (the
+                        // powergrid decks), so it is named, not run.
+                        true => Done {
+                            fails: [(
+                                1,
+                                run::fail("quarantined", "slow in the source list".into()),
+                            )]
+                            .into(),
+                            last: 1,
+                            written: None,
+                        },
+                        false => budgeted(c, from, to, load(p), none.clone()),
+                    };
                     running.lock().expect("no worker panicked")[w] = None;
                     let h = v.written.take().map(|w| hash(&w));
                     let mut all = done.lock().expect("no worker panicked");
+                    // The line as the deck finishes: a census cut short keeps what ran.
+                    let line = format!("{} {}\n", rel(p), crate::line(&v, h.is_some()));
+                    let _ = std::io::Write::write_all(&mut &*partial, line.as_bytes());
                     all.push((k, v, h));
                     if all.len().is_multiple_of(200) {
                         eprintln!("{}: {} of {} decks", c.name, all.len(), paths.len());
@@ -185,6 +214,42 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
 
 // ---- private ----
 
+/// `deck` through the steps on a thread of its own: its conversion first, within [`BUDGET`]
+/// seconds, else `converter-slow` (the thread is left to finish or to die with the process: a
+/// thread cannot be stopped), then the steps, whose simulator runs have their own budgets.
+fn budgeted(
+    c: &'static Cell,
+    from: &'static DialectRow,
+    to: &'static DialectRow,
+    deck: Deck,
+    pair: PairFile,
+) -> Done {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let name = deck.name.clone();
+    std::thread::spawn(move || {
+        let _ = run::convert(from, to, &deck);
+        if tx.send(None).is_ok() {
+            let _ = tx.send(Some(run::steps(c, from, to, &deck, &pair)));
+        }
+    });
+    let slow = || Done {
+        fails: [(
+            1,
+            run::fail(
+                "converter-slow",
+                format!("{name}: past {BUDGET} s converting"),
+            ),
+        )]
+        .into(),
+        last: 1,
+        written: None,
+    };
+    match rx.recv_timeout(std::time::Duration::from_secs(BUDGET)) {
+        Ok(_) => rx.recv().ok().flatten().unwrap_or_else(slow),
+        Err(_) => slow(),
+    }
+}
+
 /// A hash of a deck's written files, paths and bytes.
 fn hash(w: &run::Written) -> u64 {
     use std::hash::{Hash, Hasher};
@@ -243,7 +308,13 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
         }
     }
     let pass = decks - first.len();
-    let mut out = format!("pass all six: {pass}\nfirst failing step and class:\n");
+    let slow = seen
+        .values()
+        .filter(|f| f.class == "converter-slow")
+        .count();
+    let mut out = format!(
+        "pass all six: {pass}; converter-slow (must be 0 before a release): {slow}\nfirst failing step and class:\n"
+    );
     for (k, n) in &by_class {
         out += &format!("  {n:5} {k}\n");
     }

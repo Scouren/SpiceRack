@@ -1,0 +1,11 @@
+# Oracle: settle run/mc_param (VACASK 36be560: `mc m1 samples=k` with `parameters k=2` is
+# "Variable or constant 'k' not defined.", exit 1; a `var` runs, mc_var): an mc argument
+# reading a parameter is invalid in source, P2316, the line refused as an unmatched `mc` is,
+# so the `endmc` is refused too (P2320) and the analysis is read as written.
+# codes: P2316 P2320 S0004 S0004
+file "mc_param.sim" deck
+  title "an mc sample count from a parameter"
+  param k = 2i
+  opaque vacask invalid "mc m1 samples=k"
+  analysis op name=op1
+  opaque vacask invalid "endmc"
