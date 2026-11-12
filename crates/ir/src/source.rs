@@ -19,7 +19,7 @@
 //! - `Design::source(&self, &Element) -> Source`
 
 use crate::design::Design;
-use crate::element::Element;
+use crate::element::{DetailKind, Element};
 use crate::id::{ExprId, ExprList};
 use crate::wave::WaveRef;
 
@@ -106,6 +106,11 @@ const _: () = assert!(size_of::<Distof>() == 16);
 impl Design {
     /// The source row of a voltage source, current source or port. Asserts the kind.
     pub fn source(&self, element: &Element) -> Source {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Source,
+            "{:?} has no Source row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 }

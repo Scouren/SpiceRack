@@ -13,7 +13,7 @@
 //! Contents: `pub struct Line`, `Design::line(&self, &Element) -> Line`
 
 use crate::design::Design;
-use crate::element::Element;
+use crate::element::{DetailKind, Element};
 use crate::id::ExprId;
 
 /// The detail row of a line element. Which fields a kind may hold: `LosslessLine` `z0` and one
@@ -44,6 +44,11 @@ const _: () = assert!(size_of::<Line>() == 28);
 impl Design {
     /// The row of a line element. Asserts the kind.
     pub fn line(&self, element: &Element) -> Line {
-        todo!()
+        assert!(
+            element.kind.detail() == DetailKind::Line,
+            "{:?} has no Line row",
+            element.kind
+        );
+        self.detail(element.detail)
     }
 }
