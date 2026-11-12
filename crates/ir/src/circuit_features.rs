@@ -23,6 +23,7 @@ use crate::expr::Expr;
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{ExprId, NameId};
 use crate::item::ItemKind;
+use crate::letter::spice_letter;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily};
@@ -43,6 +44,25 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     if e.model.name == NameId::NONE {
         add(X::ElementWithoutModel);
     }
+    let source_like = matches!(
+        e.kind,
+        ElemKind::VSource
+            | ElemKind::ISource
+            | ElemKind::Vcvs
+            | ElemKind::Vccs
+            | ElemKind::Cccs
+            | ElemKind::Ccvs
+    );
+    let mutual = bound_family(design, e.model) == Some(ModelFamily::Mutual);
+    if source_like && e.model.name != NameId::NONE || e.kind == ElemKind::Coupling && mutual {
+        add(X::BuiltinMaster);
+    }
+    if let Some(letter) = spice_letter(design, e) {
+        let first = design.str(e.name).as_bytes().first().copied().unwrap_or(0);
+        if !first.eq_ignore_ascii_case(&letter) {
+            add(X::NameWithoutLetter);
+        }
+    }
     if some(e.mult) {
         add(mult_class(e.kind));
     }
@@ -58,7 +78,6 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
                     add(X::CouplingMany);
                 }
                 // a coupling bound to the builtin mutual inductance is no core (A12 C5)
-                let mutual = bound_family(design, e.model) == Some(ModelFamily::Mutual);
                 if e.model.name != NameId::NONE && !mutual {
                     add(X::CouplingCore);
                 }

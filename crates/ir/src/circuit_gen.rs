@@ -29,6 +29,7 @@ use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
 use crate::item::DefKind;
+use crate::letter::letter_of;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, IcMode};
 use crate::semi::{InitialState, Semi, Switch};
@@ -92,7 +93,24 @@ pub(crate) fn generate_element(
         ElemKind::VSwitch => r.maybe(X::SwitchControlExpr),
         _ => false,
     };
-    let name = r.g.fresh_name(r.b);
+    // the output and control quantities fix the SPICE letter, so they come before the name
+    let out = if r.g.chance(2) {
+        Quantity::Voltage
+    } else {
+        Quantity::Current
+    };
+    let ctl = if r.g.chance(2) {
+        Quantity::Voltage
+    } else {
+        Quantity::Current
+    };
+    let name = match letter_of(kind, out, ctl) {
+        Some(l) if !r.has(X::NameWithoutLetter) || r.g.chance(2) => {
+            let text = format!("{}{}", char::from(l.to_ascii_lowercase()), r.g.fresh());
+            r.b.name(&text)
+        }
+        _ => r.g.fresh_name(r.b),
+    };
     let terminals = r.terminals(kind, two_terminal);
     let model = r.master(kind);
     let mult = if r.maybe(crate::circuit_features::mult_class(kind)) {
@@ -107,7 +125,7 @@ pub(crate) fn generate_element(
         params: List::EMPTY,
         mult,
     };
-    let detail = r.detail(kind, two_terminal);
+    let detail = r.detail(kind, two_terminal, out, ctl);
     r.b.element(scope, kind, head, detail, Span::NONE)
 }
 
@@ -233,8 +251,10 @@ impl R<'_, '_> {
                 || kind == ElemKind::Unresolved
                 || match kind.master_kind() {
                     Some(_) if kind == ElemKind::Coupling => {
-                        self.has(X::CouplingCore) || self.has_visible(ModelFamily::Mutual)
+                        self.has(X::CouplingCore)
+                            || self.has(X::BuiltinMaster) && self.has_visible(ModelFamily::Mutual)
                     }
+                    Some(_) if BUILTINS.iter().any(|b| b.1 == kind) => self.has(X::BuiltinMaster),
                     Some(_) => true,
                     None => false,
                 })
@@ -284,7 +304,7 @@ impl R<'_, '_> {
     }
 
     /// Pushes `kind`'s detail row (its side and wave rows first, at their field positions).
-    fn detail(&mut self, kind: ElemKind, two: bool) -> u32 {
+    fn detail(&mut self, kind: ElemKind, two: bool, out: Quantity, ctl: Quantity) -> u32 {
         match kind.detail() {
             DetailKind::None => NO_ROW,
             DetailKind::Passive => {
@@ -312,20 +332,12 @@ impl R<'_, '_> {
             }
             DetailKind::Poly => {
                 let dimension = 1 + self.g.below(2) as u8;
-                let control = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let control = ctl;
                 let per = if control == Quantity::Voltage { 2 } else { 1 };
                 let controls = self.fresh_names(per * u32::from(dimension));
                 let n = 1 + self.g.below(3);
                 let coeffs = self.exprs(n);
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(Poly {
                     controls,
                     coeffs,
@@ -348,11 +360,7 @@ impl R<'_, '_> {
                 } else {
                     N
                 };
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(TableSource {
                     input,
                     points,
@@ -374,11 +382,7 @@ impl R<'_, '_> {
                 let num = self.exprs(a);
                 let den = self.exprs(c);
                 let input = if two { self.dy() } else { N };
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(Laplace {
                     num,
                     den,
@@ -396,11 +400,7 @@ impl R<'_, '_> {
                 let n = 3 + 3 * self.g.below(2);
                 let points = self.exprs(n);
                 let unit = FreqUnit::ALL[self.g.below(3) as usize];
-                let output = if self.g.chance(2) {
-                    Quantity::Voltage
-                } else {
-                    Quantity::Current
-                };
+                let output = out;
                 self.b.detail(FreqTable {
                     input,
                     points,

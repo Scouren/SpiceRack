@@ -23,7 +23,7 @@
 //! let (_, top) = b.file("rc.sp", Role::Deck);
 //! let span = Span::NONE;
 //!
-//! // `R1 a b 1k` (an ngspice reader: the letter is the kind, the digits as written)
+//! // `R1 a b 1k` (an ngspice reader: the kind from the letter, the whole name folded, A13)
 //! let one_k = b.literal(Literal { mantissa: 1, frac: 0, exp10: 3, form: NumForm::Scale });
 //! let head = b.head("r1", &["a", "b"], None, &[], ExprId::NONE);
 //! b.passive(top, ElemKind::Resistor, head, Passive { value: one_k, ..Passive::PLAIN }, span);
@@ -102,7 +102,7 @@ use crate::wave::{WaveRef, WaveRow};
 /// that binds the master itself.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ElemHead {
-    /// The element's name, without a type letter.
+    /// The element's whole name (A13), unique in its scope.
     pub name: NameId,
     /// Terminals in the kind's role order.
     pub terminals: NameList,

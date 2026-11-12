@@ -223,8 +223,10 @@ pub const NO_ROW: u32 = u32::MAX;
 pub struct Element {
     /// What it is.
     pub kind: ElemKind,
-    /// Its name, without any type letter (B16: `Vin1` and `in1 (a 0) vsource` are both `in1`
-    /// when the reader strips the letter, by its dialect's naming table).
+    /// Its whole name as its dialect spells it (A13, R23: ngspice `r1`, `vdd`, `x1`, the letter
+    /// included, folded; Spectre `in1`), unique in its scope across kinds, so a by-name
+    /// reference (`Expr::I`, a coupling's inductors, a sensing element) names one element. A
+    /// name that does not begin with `letter::spice_letter` is `NameWithoutLetter`.
     pub name: NameId,
     /// Its terminals, in the kind's role order.
     pub terminals: NameList,

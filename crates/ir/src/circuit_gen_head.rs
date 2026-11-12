@@ -7,7 +7,7 @@
 //! Contents: `R::terminals`, `R::reference`, `R::master`, `R::has_visible` (`pub(super)`)
 
 use super::{BUILTINS, NONE_REF, R};
-use crate::circuit_check::{bound_family, builtin_fits};
+use crate::circuit_check::{bound_family, builtin_fits, builtin_kind};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::element::ElemKind;
 use crate::id::{DefId, List, NameId, NameList, Ref};
@@ -68,7 +68,7 @@ impl R<'_, '_> {
             | ElemKind::Vccs
             | ElemKind::Cccs
             | ElemKind::Ccvs => {
-                if bare && !self.g.chance(4) {
+                if !self.has(X::BuiltinMaster) || bare && !self.g.chance(4) {
                     return NONE_REF;
                 }
                 let family = BUILTINS
@@ -82,11 +82,14 @@ impl R<'_, '_> {
                 }
             }
             ElemKind::Coupling => {
-                if self.maybe(X::CouplingCore) {
+                let mutual = self.has(X::BuiltinMaster) && self.has_visible(ModelFamily::Mutual);
+                // without a mutual model and with no bare element allowed, `can` left a core
+                let core = self.has(X::CouplingCore) && (!mutual && !bare || self.g.chance(2));
+                if core {
                     self.fitting_reference(kind, DefKind::Model)
-                } else if !bare {
+                } else if mutual && (!bare || self.g.chance(2)) {
                     self.visible_model(ModelFamily::Mutual)
-                        .expect("`can` found a mutual model")
+                        .expect("`has_visible` found a mutual model")
                 } else {
                     NONE_REF
                 }
@@ -110,7 +113,12 @@ impl R<'_, '_> {
     fn fitting_reference(&mut self, kind: ElemKind, dk: DefKind) -> Ref {
         let r = self.reference(dk);
         match bound_family(self.b.design(), r) {
-            Some(f) if !builtin_fits(kind, f) => Ref::unresolved(self.g.fresh_name(self.b)),
+            Some(f)
+                if !builtin_fits(kind, f)
+                    || builtin_kind(f).is_some() && !self.has(X::BuiltinMaster) =>
+            {
+                Ref::unresolved(self.g.fresh_name(self.b))
+            }
             _ => r,
         }
     }

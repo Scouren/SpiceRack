@@ -31,7 +31,12 @@ field and say which dialect needs it in its doc.
 
 ## 2. Elements
 
-Header as IR-KERNEL §6. For every `ElemKind` document the terminal roles in order, the allowed
+Header as IR-KERNEL §6, with A13 (R23): `name` is the element's whole name as its dialect
+spells it (ngspice: letter included, folded), unique in its scope across kinds; the SPICE card
+letter is the neutral fact `letter::spice_letter(design, element)`, and a name that does not
+begin with it is `CircuitExtra::NameWithoutLetter` (a SPICE-card writer lacks it; a pass
+renames). Two elements of one name in one scope are `Violation::DuplicateElement`
+(`element::design_check`). For every `ElemKind` document the terminal roles in order, the allowed
 terminal count (fixed or a range), whether `model` is required, and its detail row.
 
 | Family | Kinds | Detail row (owner file) | Decisions |
@@ -110,10 +115,14 @@ master of a builtin family serves only its kind; a source or linear controlled s
 only its builtin (a coupling may also name a core, and a coupling bound to `Mutual` does not set
 `CouplingCore`); a builtin model has no parameters and no polarity. A builtin family needs no
 `DeviceLibrary`, so it never sets `ModelWithoutLibrary` (assumed from DIALECT-VACASK: the
-builtins are not loaded; to be confirmed by the VACASK agent). The two conversions are the
-VACASK slice's neutral passes: `explicit_family_models` adds one such model per scope and
-family for the elements that lack one (the pass chooses the name), `drop_builtin_models`
-removes them and sets `Element.model` to `NONE`.
+builtins are not loaded; to be confirmed by the VACASK agent). Features: `ElementWithoutModel`
+(an element with no master: VACASK lacks it) and `BuiltinMaster` (a source or linear controlled
+source naming a model, or a coupling bound to `Mutual`: ngspice lacks it). The two conversions
+are the dialect slices' neutral passes (`src/passes/`), not this crate's; the rule they follow:
+one model per scope and family, in the scope that first needs it, named by the family's
+IR-text word (`source_v`, `vcvs`, …) and renamed on a collision; the reverse pass drops the
+models and sets `Element.model` to `NONE`. Names: the VACASK agent's `SourceV`/`SourceI`
+(not `VSource`/`ISource`, which read as the element kinds).
 
 ## 5. What to deliver
 
