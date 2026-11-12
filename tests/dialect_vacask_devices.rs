@@ -385,3 +385,60 @@ fn vacask_ac(deck: &str) -> Vec<(String, f64)> {
         .collect();
     names.into_iter().zip(values).collect()
 }
+
+/// The covering property of `Elem(Capacitor)`, `Elem(Inductor)` and `Elem(Mosfet)` for the laws'
+/// reach list (R55): the generator rarely draws one whose master is a visible model of its own
+/// proven family with the module's terminal count (what `admits` asks), so this builds such
+/// designs (IR text through the builder, seeded values from a pool of VACASK literals and
+/// parameter reads), checks `legalize` admits them, writes them, reads them back and compares
+/// meaning (`eq_meaning` through the canonical text). Floors: 64 designs, each holding every
+/// one of the three kinds.
+#[test]
+fn proven_device_kinds_round_trip() {
+    let values = ["1n", "2.5", "3", "-1", "1e-3", "p", "p*2", "100u"];
+    let mut rng = 0x9e37_79b9_7f4a_7c15_u64;
+    let mut next = |n: usize| {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        usize::try_from(rng % n as u64).expect("small")
+    };
+    let mut held = 0;
+    for seed in 0..64 {
+        let mut v = || values[next(values.len())];
+        let text = format!(
+            "file \"k{seed}.sim\" deck\n  title \"kinds\"\n  device_library capacitor\n  \
+             device_library inductor\n  device_library mos1\n  param p = 2i\n  \
+             model c capacitor\n  model l inductor\n  model m mos1 polarity={}\n  \
+             element capacitor c1 (a 0) model=c value={} tc1={}\n  \
+             element inductor l1 (a b) model=l value={} scale={}\n  \
+             element mosfet m1 (a b 0 0) model=m params=(w={} l={}) mult={}\n",
+            ["n", "p"][seed % 2],
+            v(),
+            v(),
+            v(),
+            v(),
+            v(),
+            v(),
+            v()
+        );
+        let (mut design, _) = read(&Sources::one("want.ir", &text), "ir");
+        let before = canonical(&design);
+        let back = written(&mut design);
+        let (again, _) = read(&back, "vacask");
+        assert_eq!(
+            canonical(&again),
+            before,
+            "seed {seed}:\n{}",
+            back.files()[0].1
+        );
+        let kinds = [
+            ir::ElemKind::Capacitor,
+            ir::ElemKind::Inductor,
+            ir::ElemKind::Mosfet,
+        ];
+        let used = ir::features_used(&again);
+        held += usize::from(kinds.iter().all(|&k| used.contains(ir::Feature::Elem(k))));
+    }
+    assert!(held >= 64, "designs holding all three kinds: {held}");
+}

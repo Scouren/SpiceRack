@@ -1,11 +1,11 @@
 //! `Model` rows → `model name module params`, the inverse of `read_models`: the module word
-//! from the family (`families::default_word`; a user module's own name), `type=-1` for a
-//! p-type model (n-type is VACASK's default, written as nothing), `version=` from the model's
+//! from the family (`families::default_word`; a user module's own name), `type=1` or `type=-1`
+//! for a model with a polarity (stated even for VACASK's default 1: run t1), `version=` from the model's
 //! version, each family parameter under the module's name for it (`model_<p>`).
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cir-masters; R21 (`admits`).
 //!
-//! Contents: `UNSPELLED`, `LIBRARIES`, `LACKED` (their rows are in `read_elements::CODES`), `admits`, `model`, `word` (crate-private)
+//! Contents: `UNSPELLED`, `LIBRARIES`, `UNPROVEN`, `LACKED` (their rows are in `read_elements::CODES`), `admits`, `model`, `word` (crate-private)
 
 use super::expr_write::write_expr;
 use super::families::{self, Name};
@@ -17,6 +17,8 @@ use crate::ir;
 pub(super) const UNSPELLED: ir::Code = ir::Code::new(b'W', 2101);
 /// Two device libraries of one family naming files of different modules.
 pub(super) const LIBRARIES: ir::Code = ir::Code::new(b'W', 2103);
+/// A model of a family no run proved a VACASK module implements.
+pub(super) const UNPROVEN: ir::Code = ir::Code::new(b'W', 2107);
 /// A parameter the target module does not have.
 pub(super) const LACKED: ir::Code = ir::Code::new(b'W', 2102);
 
@@ -30,8 +32,11 @@ pub(super) fn model(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     name::spell(d.str(row.name), Place::Other, w.out);
     w.out.push(' ');
     name::spell(&module, Place::Other, w.out);
-    if row.polarity == ir::Polarity::P {
-        w.out.push_str(" type=-1");
+    // Always stated: `print model` tells a given `type` from the default (run t1).
+    match row.polarity {
+        ir::Polarity::N => w.out.push_str(" type=1"),
+        ir::Polarity::P => w.out.push_str(" type=-1"),
+        ir::Polarity::None => {}
     }
     if !row.version.is_none() {
         w.out.push_str(" version=");
@@ -72,6 +77,10 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         if module.is_empty() {
             diags.push_at(LIBRARIES, design, at, 0);
         }
+        // A family no run proved VACASK's module implements reads back as a user module (R41 a).
+        if row.family != ir::ModelFamily::Module && !families::PROVEN.contains(&module.as_str()) {
+            diags.push_at(UNPROVEN, design, at, 0);
+        }
         if [design.str(row.name), module.as_str()]
             .iter()
             .any(|n| n.chars().any(char::is_whitespace))
@@ -90,6 +99,8 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
                 Name::Misplaced | Name::Unknown => true,
             }
         });
+        // A user module's `version=` is one of its parameters to the reader.
+        lacked |= !row.version.is_none() && module_family;
         lacked |= !row.version.is_none()
             && families::model_name_in(&module, "version") != Name::Ir("version".into());
         if lacked {
