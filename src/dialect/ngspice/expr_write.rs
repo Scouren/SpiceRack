@@ -17,7 +17,8 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) fn eval_of(&ir::Design, ir::ExprId) -> Eval`,
 //! `pub(super) fn expr(&ir::Design, ir::ExprId, &mut String)`,
 //! `pub(super) fn value(&ir::Design, ir::ExprId, &mut String)`,
-//! `pub(super) fn literals_spell(&ir::Design, ir::ExprId) -> bool`
+//! `pub(super) fn expr_in(&ir::Design, ir::ExprId, Eval, &mut String)`,
+//! `pub(super) fn spells_in(&ir::Design, ir::ExprId, Eval) -> bool`
 
 use super::number;
 use super::tables::{self, Eval};
@@ -180,7 +181,13 @@ pub(super) fn eval_of(design: &ir::Design, e: ir::ExprId) -> Eval {
 /// Appends `e` as an expression of its evaluator. Asserts every node is one ngspice spells
 /// (the spine wrote only a design legal for `FEATURES`).
 pub(super) fn expr(design: &ir::Design, e: ir::ExprId, out: &mut String) {
-    let eval = eval_of(design, e);
+    expr_in(design, e, eval_of(design, e), out);
+}
+
+/// Appends `e` as an expression of `eval`, whatever its class: a field ngspice always hands one
+/// evaluator (a B source's expression is the B-source parser's even when it is constant,
+/// `inpcom.c` `inp_bsource_compat`). Asserts every node is one `eval` spells ([`spells_in`]).
+pub(super) fn expr_in(design: &ir::Design, e: ir::ExprId, eval: Eval, out: &mut String) {
     let mut tasks = vec![Task::Expr(e, Role::Root, Pos::START)];
     // Bounded: each task pops once and pushes only the tasks of a node's children.
     while let Some(t) = tasks.pop() {
@@ -204,25 +211,46 @@ pub(super) fn value(design: &ir::Design, e: ir::ExprId, out: &mut String) {
     }
 }
 
-/// Whether every literal of `e` reads back as itself when spelled in `e`'s evaluator: a scale
-/// ngspice has a letter for, and no `mil` under numparam (which reads it as milli).
-pub(super) fn literals_spell(design: &ir::Design, e: ir::ExprId) -> bool {
-    let numparam = eval_of(design, e) == Eval::Numparam;
+/// Whether `eval` spells every node of `e` so that it reads back as itself: its functions and
+/// operators (numparam has no probe, time-like leaf or `temper`, and the B-source parser no `%`,
+/// `int`, `pow`, `sqr` or draw), and its literals (a scale ngspice has a letter for; no `mil`
+/// under numparam, which reads it as milli).
+pub(super) fn spells_in(design: &ir::Design, e: ir::ExprId, eval: Eval) -> bool {
+    let numparam = eval == Eval::Numparam;
     let mut stack = vec![e];
     let mut kids = Vec::new();
-    // Bounded: a tree of earlier rows; a shared row is checked once per path, at most the rows.
     let mut seen = vec![false; design.expr_count()];
+    // Bounded: each row is checked once.
     while let Some(x) = stack.pop() {
         if std::mem::replace(&mut seen[x.index()], true) {
             continue;
         }
         let row = design.expr(x);
-        if let ir::Expr::Num(n) = row {
-            let lit = design.num(n);
-            let scale_ok = lit.form != ir::NumForm::Scale || ![-2, 15].contains(&lit.exp10);
-            if !scale_ok || (numparam && lit.form == ir::NumForm::Mil) {
-                return false;
+        let ok = match row {
+            ir::Expr::Num(n) => {
+                let lit = design.num(n);
+                let scale_ok = lit.form != ir::NumForm::Scale || ![-2, 15].contains(&lit.exp10);
+                scale_ok && !(numparam && lit.form == ir::NumForm::Mil)
             }
+            ir::Expr::Param(_) | ir::Expr::UserCall(..) | ir::Expr::Ternary(..) => true,
+            ir::Expr::Call(ir::Func::PowAbs, _) => true,
+            ir::Expr::Call(ir::Func::Fmod, _) => numparam,
+            ir::Expr::Call(f, _) => tables::func_spelling(eval, f).is_some(),
+            ir::Expr::Draw(_, ir::DrawWhen::Always, ir::DrawPer::Reference, _) => numparam,
+            ir::Expr::Unary(op, _) => op != ir::UnOp::BitNot,
+            ir::Expr::Binary(op, ..) => tables::level(eval, op).is_some(),
+            ir::Expr::V(..) | ir::Expr::I(_) | ir::Expr::Time | ir::Expr::Temp | ir::Expr::Freq => {
+                !numparam
+            }
+            ir::Expr::Draw(..)
+            | ir::Expr::Str(_)
+            | ir::Expr::List(_)
+            | ir::Expr::TStep
+            | ir::Expr::TStop
+            | ir::Expr::Tnom => false,
+        };
+        if !ok {
+            return false;
         }
         kids.clear();
         children(design, row, &mut kids);

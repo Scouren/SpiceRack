@@ -241,7 +241,7 @@ pub(super) fn admits(d: &ir::Design, item: ir::ItemRef, scope: ir::ScopeId, diag
         if item.kind != ItemKind::Func && class >= limit {
             refuse(codes::READS_RUN);
         }
-        if !expr_write::literals_spell(d, e) {
+        if !expr_write::spells_in(d, e, expr_write::eval_of(d, e)) {
             refuse(codes::LITERAL_FORM);
         }
     }
