@@ -26,6 +26,7 @@ const READ: &[&str] = &[
     "default_which",
     "default_which2",
     "default_which3",
+    "default_which4",
     "element_twice",
     "expr_ops",
     "expr_power",
@@ -140,6 +141,7 @@ fn formal_defaults_run_where_the_instance_stands() {
         ("default_which", 3.0),
         ("default_which2", 3.0),
         ("default_which3", 6.0),
+        ("default_which4", 2.0),
     ] {
         let deck = text("read", name, "sp");
         let original = ngspice_op(&format!("{deck}{probe}"), 1)[0];
