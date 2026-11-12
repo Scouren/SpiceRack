@@ -18,7 +18,7 @@
 //! Cites: VD expr-operators, expr-functions, expr-special, expr-constants,
 //! dev-builtin-behavioral (Functions); R13 (sugar).
 //!
-//! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`,
+//! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`, `PARAM_READ_ARG`,
 //! `PROBE_IN_PARAM`, `check_expr`, `expr` (crate-private)
 
 use super::name;
@@ -53,7 +53,11 @@ pub(super) const NOT_A_NUMBER: ir::Code = ir::Code::new(b'P', 2001);
 pub(super) const NOT_FINITE: ir::Code = ir::Code::new(b'P', 2002);
 /// An integer literal past 32 bits, which VACASK wraps (run iw1).
 pub(super) const WIDE_INT: ir::Code = ir::Code::new(b'P', 2009);
-/// `v()`, `i()`, `ddt()`, `idt()` or `$abstime` outside a behavioural source.
+/// A `$intparam`/`$realparam` whose argument is not one identifier (run ip2: "$intparam()
+/// requires a single identifier argument.").
+pub(super) const PARAM_READ_ARG: ir::Code = ir::Code::new(b'P', 2010);
+/// `v()`, `i()`, `ddt()`, `idt()`, `$intparam()`, `$realparam()` or `$abstime` outside a
+/// behavioural source.
 pub(super) const PROBE_IN_PARAM: ir::Code = ir::Code::new(b'P', 2006);
 
 /// What a parameter expression uses: every node VACASK's parameter language reads into.
@@ -134,6 +138,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             cite: "DIALECT-VACASK Appendix A run iw1",
             explain: "VACASK's integers are 32 bits and a wider literal wraps (`2147483648` is -2147483648, `99999999999` is 1215752191); the IR's integer does not wrap. Write it with a point to make it real.",
             kind: ir::Kind::Note,
+        },
+    ),
+    (
+        PARAM_READ_ARG,
+        ir::Info {
+            title: "a parameter read function whose argument is not one identifier",
+            cite: "DIALECT-VACASK Appendix A run ip2",
+            explain: "VACASK's `$intparam(p)` and `$realparam(p)` take one parameter's name: \"$intparam() requires a single identifier argument.\"",
+            kind: ir::Kind::Refusal,
         },
     ),
     (
@@ -230,80 +243,6 @@ const fn refuse(code: ir::Code, class: ir::OpaqueClass) -> Refusal {
     Refusal { code, class }
 }
 
-/// The function a VACASK call name reads as, with its argument count.
-fn function(name: &str) -> Option<(ir::Func, usize)> {
-    use ir::Func as F;
-    Some(match name {
-        "sin" => (F::Sin, 1),
-        "cos" => (F::Cos, 1),
-        "tan" => (F::Tan, 1),
-        "asin" => (F::Asin, 1),
-        "acos" => (F::Acos, 1),
-        "atan" => (F::Atan, 1),
-        "atan2" => (F::Atan2, 2),
-        "sinh" => (F::Sinh, 1),
-        "cosh" => (F::Cosh, 1),
-        "tanh" => (F::Tanh, 1),
-        "asinh" => (F::Asinh, 1),
-        "acosh" => (F::Acosh, 1),
-        "atanh" => (F::Atanh, 1),
-        "exp" => (F::Exp, 1),
-        "log" | "ln" => (F::Ln, 1),
-        "log10" => (F::Log10, 1),
-        "sqrt" => (F::Sqrt, 1),
-        "pow" => (F::Pow, 2),
-        "hypot" => (F::Hypot, 2),
-        "abs" => (F::Abs, 1),
-        "floor" => (F::Floor, 1),
-        "ceil" => (F::Ceil, 1),
-        "round" => (F::RoundHalfAway, 1),
-        "integer" => (F::Trunc, 1),
-        "int" => (F::ToInt, 1),
-        "fmod" => (F::Fmod, 2),
-        "min" => (F::Min, 2),
-        "max" => (F::Max, 2),
-        "ddt" => (F::Ddt, 1),
-        "idt" => (F::Idt, 1),
-        _ => return None,
-    })
-}
-
-/// The draw a VACASK call name reads as.
-fn draw(name: &str) -> Option<ir::Dist> {
-    Some(match name {
-        "agauss" => ir::Dist::AbsGauss,
-        "gauss" => ir::Dist::RelGauss,
-        "aunif" => ir::Dist::AbsUnif,
-        "unif" => ir::Dist::RelUnif,
-        _ => return None,
-    })
-}
-
-/// The binary operator token `op` spells (`**` is `Pow`, handled by the caller).
-fn binary(op: &str) -> Option<ir::BinOp> {
-    use ir::BinOp as B;
-    Some(match op {
-        "+" => B::Add,
-        "-" => B::Sub,
-        "*" => B::Mul,
-        "/" => B::DivTyped,
-        "==" => B::Eq,
-        "!=" => B::Ne,
-        "<" => B::Lt,
-        "<=" => B::Le,
-        ">" => B::Gt,
-        ">=" => B::Ge,
-        "&&" => B::And,
-        "||" => B::Or,
-        "&" => B::BitAnd,
-        "|" => B::BitOr,
-        "^" => B::BitXor,
-        "<<" => B::Shl,
-        ">>" => B::Shr,
-        _ => return None,
-    })
-}
-
 /// A call's arguments (`extra [close, n, args…]`).
 fn call_args(l: &Lower<'_, '_, '_>, n: Node) -> Vec<u32> {
     let ast = &l.cst.ast;
@@ -373,7 +312,7 @@ fn check(
         },
         Tag::Binary => {
             let op = token(l, n);
-            if op != "**" && binary(&op).is_none() {
+            if op != "**" && tables::binary(&op).is_none() {
                 return Err(private);
             }
             if dynamic && matches!(op.as_str(), "&" | "|" | "^" | "<<" | ">>") {
@@ -392,7 +331,11 @@ fn check(
         Tag::Call | Tag::Probe => {
             let name = name_of(l, n);
             let args = call_args(l, n);
-            if matches!(name.as_str(), "v" | "i" | "ddt" | "idt") && ctx == Context::Param {
+            let behavioural_only = matches!(
+                name.as_str(),
+                "v" | "i" | "ddt" | "idt" | "$intparam" | "$realparam"
+            );
+            if behavioural_only && ctx == Context::Param {
                 return Err(refuse(PROBE_IN_PARAM, InvalidInSource));
             }
             let names = args
@@ -401,12 +344,18 @@ fn check(
             match (name.as_str(), args.len()) {
                 ("v", 1 | 2) | ("i", 1) if names => return Ok(()),
                 ("v" | "i", _) => return Err(private),
+                // R56: `$intparam(p)` is `to_int(p)`, `$realparam(p)` `to_real(p)` (runs ip1,
+                // ip2); VACASK takes one identifier only.
+                ("$intparam" | "$realparam", 1) if names => return Ok(()),
+                ("$intparam" | "$realparam", _) => {
+                    return Err(refuse(PARAM_READ_ARG, InvalidInSource));
+                }
                 ("ddt" | "idt", 1) => return down(args[0]),
                 // `idt(x, ic)` starts from `ic` (run bp3); the IR's `Idt` from 0.
                 ("ddt" | "idt", _) => return Err(private),
                 _ => {}
             }
-            let want = match (function(&name), draw(&name), name.as_str()) {
+            let want = match (tables::function(&name), tables::draw(&name), name.as_str()) {
                 (Some((_, k)), _, _) => k,
                 (_, Some(d), _) => usize::from(d.arity().0),
                 (_, _, "sgn") => 1,
@@ -477,7 +426,7 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
             let (op, left, right) = (token(l, n), ast.lhs(n), ast.rhs(n));
             let a = build(l, left, ctx);
             let b = build(l, right, ctx);
-            match binary(&op) {
+            match tables::binary(&op) {
                 Some(op) => l.b.binary(op, a, b),
                 None => l.b.call(ir::Func::Pow, &[a, b]),
             }
@@ -505,13 +454,23 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
                     let element = super::read::field_name(l.cst, raw[0]);
                     return l.b.i(&element);
                 }
+                "$intparam" | "$realparam" => {
+                    let p = super::read::field_name(l.cst, raw[0]);
+                    let e = l.b.param_ref(&super::name::unquote(&p));
+                    l.reads.push((e, l.scope, l.stmt));
+                    let func = match name.as_str() {
+                        "$intparam" => ir::Func::ToInt,
+                        _ => ir::Func::ToReal,
+                    };
+                    return l.b.call(func, &[e]);
+                }
                 _ => {}
             }
             let args: Vec<ir::ExprId> = raw.into_iter().map(|a| build(l, a, ctx)).collect();
-            if let Some((func, _)) = function(&name) {
+            if let Some((func, _)) = tables::function(&name) {
                 return l.b.call(func, &args);
             }
-            if let Some(dist) = draw(&name) {
+            if let Some(dist) = tables::draw(&name) {
                 return l
                     .b
                     .draw(dist, ir::DrawWhen::Sampling, ir::DrawPer::CallSite, &args);

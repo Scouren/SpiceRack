@@ -1,0 +1,13 @@
+intparam wide and strings
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters pa=3e9 pb=2147483647.5 pc=1e20
+b1 (n1 0) v=$intparam(pa)
+b2 (n2 0) v=$intparam(pb)
+b3 (n3 0) v=$intparam(pc)
+r1 (n1 0) res r=1
+r2 (n2 0) res r=1
+r3 (n3 0) res r=1
+control
+  analysis op1 op
+endc

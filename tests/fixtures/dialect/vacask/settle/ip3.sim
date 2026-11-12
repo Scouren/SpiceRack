@@ -1,0 +1,9 @@
+param string in behavioural
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters ps="x"
+b1 (n1 0) v=ps
+r1 (n1 0) res r=1
+control
+  analysis op1 op
+endc
