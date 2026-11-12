@@ -12,7 +12,7 @@
 //! 3.06; IR-KERNEL A10 (a head default is read from the subcircuit's body).
 //!
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
-//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::head`, `Declared::arity`, `Declared::class`,
+//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::head`, `Declared::top_head`, `Declared::arity`, `Declared::class`,
 //! `pub(super) struct Script`, `pub(super) fn script(&Ast, &Tokens) -> Script`
 
 use std::collections::HashMap;
@@ -39,6 +39,8 @@ pub(super) struct Declared {
     heads: HashMap<(u32, String), (usize, Vec<String>)>,
     /// `(block, folded .func name)` → its formal count (the first definition, the winner).
     arity: HashMap<(u32, String), usize>,
+    /// The file's root block.
+    root: u32,
 }
 
 /// A file's script facts (R49): its script statements in file order, and whether a dot card
@@ -80,7 +82,10 @@ struct Text {
 
 /// The declare step over one file.
 pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
-    let mut d = Declared::default();
+    let mut d = Declared {
+        root: ast.root().0,
+        ..Declared::default()
+    };
     let mut texts: Vec<Text> = Vec::new();
     let mut stack: Vec<Node> = vec![ast.root()];
     // Bounded: each block is pushed once.
@@ -236,6 +241,12 @@ impl Declared {
             at = self.parent.get(&b).copied();
         }
         None
+    }
+
+    /// The port count and head parameter names of a `.subckt name` at this file's top level.
+    pub(super) fn top_head(&self, name: &str) -> Option<(usize, &[String])> {
+        let (ports, f) = self.heads.get(&(self.root, name::key(name)))?;
+        Some((*ports, f))
     }
 
     /// The formal count of the `.func name` visible from `block`: the nearest block outward that

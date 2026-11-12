@@ -6,17 +6,18 @@
 //! Cites: `rewrite/S3-CONTROL.md` S3, S4, V1, L1; `rewrite/RULINGS.md` R1 (the literal as
 //! written), R3 (the reader binds).
 //!
-//! Contents: `pub(super) enum Ready`, `pub(super) enum Value`, `pub(super) fn ready(&mut Lower, Stmt, &[Op]) ->
+//! Contents: `pub(super) enum Ready`, `pub(super) fn ready(&mut Lower, Stmt, &[Op]) ->
 //! Vec<Ready>`, `pub(super) fn push(&mut Lower, Stmt, ir::ScopeId, &[Ready])`
 
 use super::plan::{Op, Target};
 use super::{FORM, OWN};
-use crate::dialect::ngspice::expr_read::{self, Tree};
-use crate::dialect::ngspice::number::{self, Grammar, Scan};
+use crate::dialect::ngspice::expr_read;
+use crate::dialect::ngspice::number::{self, Scan};
 use crate::dialect::ngspice::read::{Lower, Stmt};
 use crate::dialect::ngspice::read_outputs;
 use crate::dialect::ngspice::read_run::{self, Card};
 use crate::dialect::ngspice::tables::Eval;
+use crate::dialect::ngspice::value::{self, Val, unwrap};
 use crate::ir;
 
 /// An operation read, nothing appended yet.
@@ -24,11 +25,11 @@ pub(super) enum Ready {
     /// An analysis, read by the run area.
     Analysis(Box<Card>),
     /// An alter: its target and value.
-    Alter(Target, Value),
+    Alter(Target, Val),
     /// A typed option, from here.
-    Option(ir::OptionKey, Option<Value>),
+    Option(ir::OptionKey, Option<Val>),
     /// The temperature and the nominal one, from here (either may be absent).
-    Env(Option<Value>, Option<Value>),
+    Env(Option<Val>, Option<Val>),
     /// A load.
     Load(String),
     /// A `save` (with the holds the script gives it) or, with none, a `meas` command the
@@ -40,14 +41,6 @@ pub(super) enum Ready {
     Opaque(ir::OpaqueClass, ir::Code, String),
     /// A loop: its variable, target, values and body.
     Loop(String, Target, Vec<Scan>, Vec<Ready>),
-}
-
-/// A value read but not appended.
-pub(super) enum Value {
-    /// A number as written, its long digits kept (R37, A18; settle `loop_long.sp`).
-    Lit(Scan),
-    /// A numparam expression (an `alterparam` value).
-    Expr(Tree),
 }
 
 /// Every operation of `ops` read, each failure its own opaque at its place.
@@ -82,23 +75,23 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
             Ready::Analysis(card) => read_run::push_analysis(lw, Stmt { scope, ..st }, card),
             Ready::Alter(target, value) => {
                 let t = target_of(lw, target);
-                let v = emit(lw, st, scope, value);
+                let v = value::emit(lw, Stmt { scope, ..st }, value);
                 let item = lw.b.alter(scope, t, v, span);
                 refer(lw, item, scope, target);
             }
             Ready::Option(key, value) => {
-                let v = value
-                    .as_ref()
-                    .map_or(ir::ExprId::NONE, |v| emit(lw, st, scope, v));
+                let v = value.as_ref().map_or(ir::ExprId::NONE, |v| {
+                    value::emit(lw, Stmt { scope, ..st }, v)
+                });
                 lw.b.option(scope, *key, v, span);
             }
             Ready::Env(temp, tnom) => {
-                let t = temp
-                    .as_ref()
-                    .map_or(ir::ExprId::NONE, |v| emit(lw, st, scope, v));
-                let n = tnom
-                    .as_ref()
-                    .map_or(ir::ExprId::NONE, |v| emit(lw, st, scope, v));
+                let t = temp.as_ref().map_or(ir::ExprId::NONE, |v| {
+                    value::emit(lw, Stmt { scope, ..st }, v)
+                });
+                let n = tnom.as_ref().map_or(ir::ExprId::NONE, |v| {
+                    value::emit(lw, Stmt { scope, ..st }, v)
+                });
                 lw.b.env(scope, t, n, span);
             }
             Ready::Load(path) => {
@@ -169,16 +162,16 @@ fn one(
             value,
             ..
         } => {
-            let text = value
-                .strip_prefix('{')
-                .and_then(|v| v.strip_suffix('}'))
-                .unwrap_or(value);
+            // ponytail: a wrapper of parts or one nested is not settled for alterparam: Unread
+            let text = unwrap(value)
+                .plain()
+                .ok_or((ir::OpaqueClass::Unread, FORM))?;
             let tree = expr_read::parse_in(text, Eval::Numparam).map_err(fail)?;
-            Ready::Alter(Target::Param(p.clone()), Value::Expr(tree))
+            Ready::Alter(Target::Param(p.clone()), Val::Tree(tree))
         }
         Op::Alter { target, value, .. } => Ready::Alter(
             target.clone(),
-            Value::Lit(literal(value).ok_or((ir::OpaqueClass::Unread, FORM))?),
+            Val::of(number::whole(value).ok_or((ir::OpaqueClass::Unread, FORM))?),
         ),
         Op::State { keys, .. } => return state(keys),
         Op::Load { path, .. } => Ready::Load(path.clone()),
@@ -198,7 +191,7 @@ fn one(
         } => {
             let vals = values
                 .iter()
-                .map(|w| literal(w))
+                .map(|w| number::whole(w))
                 .collect::<Option<Vec<_>>>()
                 .ok_or((ir::OpaqueClass::Unread, FORM))?;
             let inner = ready(lw, st, body);
@@ -210,7 +203,7 @@ fn one(
 /// A script `option`/`set`: one `Option` per typed key, `temp`/`tnom` one `Env`.
 fn state(keys: &[(String, Option<String>)]) -> Result<Vec<Ready>, (ir::OpaqueClass, ir::Code)> {
     let own = (ir::OpaqueClass::Private, OWN);
-    let lit = |v: &Option<String>| v.as_deref().and_then(literal).map(Value::Lit).ok_or(own);
+    let lit = |v: &Option<String>| v.as_deref().and_then(number::whole).map(Val::of).ok_or(own);
     let mut out = Vec::new();
     let (mut temp, mut tnom) = (None, None);
     for (k, v) in keys {
@@ -239,30 +232,6 @@ fn state(keys: &[(String, Option<String>)]) -> Result<Vec<Ready>, (ir::OpaqueCla
         out.push(Ready::Env(temp, tnom));
     }
     Ok(out)
-}
-
-/// A whole word as one card number (R1: its digits as written; a long one's too, A18: run
-/// `loop_long.sp`, a script word reads as INPevaluate reads its digits).
-fn literal(word: &str) -> Option<Scan> {
-    let (negative, digits) = match word.as_bytes().first() {
-        Some(b'-') => (true, &word[1..]),
-        Some(b'+') => (false, &word[1..]),
-        _ => (false, word),
-    };
-    let mut s = number::scan(digits, Grammar::Inp).filter(|s| s.len == digits.len())?;
-    if negative && s.literal.mantissa != 0 {
-        s.literal.mantissa = -s.literal.mantissa;
-        s.fit.negate();
-    }
-    Some(s)
-}
-
-/// Appends a value.
-fn emit(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, v: &Value) -> ir::ExprId {
-    match v {
-        Value::Lit(s) => lw.number(s.literal, &s.fit),
-        Value::Expr(tree) => lw.expr(st, tree, scope),
-    }
 }
 
 /// The IR target of `t`, names folded (ngspice folds a control line).

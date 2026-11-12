@@ -19,9 +19,7 @@ use crate::ir;
 
 /// Whether `word` is one whole card number (`INPevaluate`'s reading, its unit tail included).
 pub(super) fn is_number(word: &str) -> bool {
-    use crate::dialect::ngspice::number::{Grammar, scan};
-    let digits = word.strip_prefix(['-', '+']).unwrap_or(word);
-    scan(digits, Grammar::Inp).is_some_and(|s| s.len == digits.len())
+    crate::dialect::ngspice::number::whole(word).is_some()
 }
 
 /// `line` with each `$var` of `env` replaced by its word; any other `$`, a backquote, is a

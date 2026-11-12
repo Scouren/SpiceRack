@@ -1,5 +1,7 @@
 alter_unread
 * oracle: R49 (5), lead's Q4: an alter of a vector parameter, a frontend expression value, a subcircuit element: Unread at its place
+r1 a 0 1k
+v1 a 0 1
 .control
 alter @v1[pulse]=[ 0 1 1n 1n 1n 5n 10n ]
 alter r1 = 2*1k

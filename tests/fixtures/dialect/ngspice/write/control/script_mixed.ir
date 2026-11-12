@@ -1,6 +1,8 @@
 # oracle: R49: whole-run state stays a card; the script holds the plan in IR order; written by hand
 file "script_mixed.sp" deck
   title "script_mixed"
+  element resistor r1 (a 0) value=1k
+  model dmod diode
   option rel_tol value=1e-4 whole_run
   alter (element_value r1) value=2k
   analysis op

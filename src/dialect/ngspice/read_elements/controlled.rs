@@ -370,7 +370,7 @@ fn table(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card, rest: &[Item], current: 
     }
     let h = head(lw, st, card);
     let input = lw.expr(st, &tree, st.scope);
-    let ids: Vec<ir::ExprId> = xy.into_iter().map(|s| emit(lw, st, &Val::Lit(s))).collect();
+    let ids: Vec<ir::ExprId> = xy.into_iter().map(|s| emit(lw, st, &Val::of(s))).collect();
     let points = lw.b.exprs(&ids);
     let output = if current {
         ir::controlled::Quantity::Current

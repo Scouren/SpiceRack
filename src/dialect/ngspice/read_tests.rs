@@ -556,3 +556,36 @@ fn a_hash_line_is_a_script_statement_and_the_script_is_in_file_order() {
     );
     assert_eq!(opaque(&d, top, 1).1, "*# echo first");
 }
+
+#[test]
+fn an_x_card_sees_a_subckt_of_a_file_included_after_it() {
+    // settle/include_subckt_{ok,bad}.sp: ngspice expands every include into one deck before it
+    // looks for subcircuits, so an X card binds to a .subckt of a later file (ok: R1 = 2k) and
+    // its node count is checked against it (bad: "Too many parameters", R61/A36): the declare
+    // step covers every file of the read before any is lowered.
+    let inc = include_str!("../../../tests/fixtures/dialect/ngspice/settle/include_subckt.inc");
+    let decks = [
+        (
+            include_str!("../../../tests/fixtures/dialect/ngspice/settle/include_subckt_ok.sp"),
+            false,
+        ),
+        (
+            include_str!("../../../tests/fixtures/dialect/ngspice/settle/include_subckt_bad.sp"),
+            true,
+        ),
+    ];
+    for (text, refused) in decks {
+        let mut src = Sources::new();
+        src.add("deck.sp", text);
+        src.add("include_subckt.inc", inc);
+        // ponytail: the ok deck's X1 stays unbound (`Design::lookup` does not cross into an
+        // included file's scope); the binding across files is the lead's question
+        let (_, diags) = read(&src);
+        let codes: Vec<ir::Code> = diags.rows().iter().map(|r| r.code).collect();
+        assert_eq!(
+            codes.contains(&super::read_elements::PORT_COUNT),
+            refused,
+            "{diags:?}"
+        );
+    }
+}

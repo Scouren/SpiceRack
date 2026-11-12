@@ -131,7 +131,7 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
             let Some(s) = number_word(&next.text) else {
                 return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
             };
-            card.dups |= f.tc2.replace(Val::Lit(s)).is_some();
+            card.dups |= f.tc2.replace(Val::of(s)).is_some();
             k += 1;
         }
         // settle passive_model_order.sp: an L with a model takes no `l=` ("unknown parameter (l)")
@@ -150,8 +150,8 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
             Slot::Scale => f.scale.replace(v).is_some(),
             Slot::Mult => card.mult.replace(v).is_some(),
             Slot::Noisy => match v {
-                Val::Lit(s) if s.literal.frac == 0 && s.literal.exp10 == 0 => {
-                    f.noisy = s.literal.mantissa != 0;
+                Val::Lit(l, _) if l.frac == 0 && l.exp10 == 0 => {
+                    f.noisy = l.mantissa != 0;
                     false
                 }
                 _ => return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM),
@@ -166,7 +166,7 @@ pub(super) fn rcl(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Ite
     if f.value.is_none() && card.model.is_none() {
         // restemp.c:79: an R with no value and no model resistance is 1 mOhm; a C or L is 0
         // (runs: `C1 a 0 w=1u l=1u`, `L1 a 0 ic=1m` show capacitance 0, inductance 0)
-        f.value = Some(Val::Lit(if letter == b'r' {
+        f.value = Some(Val::of(if letter == b'r' {
             literal(1, 0, -3, NumForm::Scale)
         } else {
             literal(0, 0, 0, NumForm::Plain)
@@ -304,15 +304,15 @@ fn reads_circuit(text: &str) -> bool {
 /// Whether `eval_tc`'s `%15.8e` changes a number (more than 9 significant digits).
 fn rounds(v: &Val) -> bool {
     match v {
-        Val::Lit(s) => {
-            let mut m = s.literal.mantissa.unsigned_abs();
+        Val::Lit(l, _) => {
+            let mut m = l.mantissa.unsigned_abs();
             // Bounded: at most 19 decimal digits.
             while m != 0 && m.is_multiple_of(10) {
                 m /= 10;
             }
             m >= 1_000_000_000
         }
-        Val::Tree(_) => false,
+        Val::Tree(_) | Val::Str(_) => false,
     }
 }
 

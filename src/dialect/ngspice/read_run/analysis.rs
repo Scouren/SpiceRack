@@ -18,7 +18,8 @@
 use super::super::expr_read::Fail;
 use super::super::read::{Lower, Stmt};
 use super::super::read_outputs;
-use super::words::{self, Val, invalid};
+use super::super::value::Val;
+use super::words::{self, invalid};
 use super::{NO_FIELD, RUN_DEFAULTS};
 use crate::ir;
 use crate::ir::dc_ac::{PzFind, PzTransfer};
@@ -201,7 +202,7 @@ pub(in super::super) fn read(
                 None => false,
                 Some(Val::Lit(l, _)) if l.mantissa == 0 => false,
                 Some(Val::Lit(..)) => true,
-                Some(Val::Expr(_)) => return Err(no_field()),
+                Some(Val::Tree(_) | Val::Str(_)) => return Err(no_field()),
             };
             Card::Sp { sweep, noise }
         }
@@ -348,7 +349,7 @@ fn sweep(lw: &Lower<'_, '_>, st: Stmt, w: &[String], at: usize) -> Result<Sweep,
 fn defaults(s: &Sweep) -> bool {
     let lit = |v: &Val| match v {
         Val::Lit(l, _) => Some(l.value()),
-        Val::Expr(_) => None,
+        Val::Tree(_) | Val::Str(_) => None,
     };
     let np = lit(&s.points).is_some_and(|n| n < 1.0);
     let start = lit(&s.start);
