@@ -68,27 +68,69 @@ fn given(design: &mut ir::Design, diags: &mut ir::Diags, cap: StepCap) {
         }
         let mut editor = design.editor();
         let mut b = editor.builder();
-        let span = match t.record_start.is_none() {
-            true => t.stop,
-            false => b.binary(ir::BinOp::Sub, t.stop, t.record_start),
-        };
-        let ceiling = match cap {
-            StepCap::None => span,
-            StepCap::SpanOver10 => {
-                let ten = b.num(10.0);
-                b.binary(ir::BinOp::Div, span, ten)
-            }
-            StepCap::SpanOver50 | StepCap::NgspiceRule => {
-                let fifty = b.num(50.0);
-                let over = b.binary(ir::BinOp::Div, span, fifty);
+        // R77: every term a literal, the ceiling is the literal of the simulator's own
+        // operations on those doubles (one subtraction, one division, the minimum), written
+        // through the shortest round-trip decimal; else the expression
+        let terms = [t.stop, t.record_start, t.print_step].map(|e| literal(b.design(), e));
+        let folded = match terms {
+            [Some(stop), start, print] if t.record_start.is_none() || start.is_some() => {
+                let span = start.map_or(stop, |s| stop - s);
                 match cap {
-                    StepCap::NgspiceRule => b.call(ir::Func::Min, &[t.print_step, over]),
-                    _ => over,
+                    StepCap::None => Some(span),
+                    StepCap::SpanOver10 => Some(span / 10.0),
+                    StepCap::SpanOver50 => Some(span / 50.0),
+                    StepCap::NgspiceRule => print.map(|p| p.min(span / 50.0)),
                 }
             }
+            _ => None,
+        };
+        let ceiling = match folded {
+            Some(v) if v.is_finite() && v != 0.0 => b.literal(ir::Literal::from_f64(v)),
+            _ => expression(&mut b, &t, cap),
         };
         assert!(!ceiling.is_none(), "a ceiling is an expression");
         t.ceiling = StepCeiling::Given(ceiling);
         editor.set_detail(detail, t);
     }
+}
+
+/// The rule's ceiling as an expression over the transient's own fields.
+fn expression(b: &mut ir::Builder<'_>, t: &Tran, cap: StepCap) -> ir::ExprId {
+    let span = match t.record_start.is_none() {
+        true => t.stop,
+        false => b.binary(ir::BinOp::Sub, t.stop, t.record_start),
+    };
+    match cap {
+        StepCap::None => span,
+        StepCap::SpanOver10 => {
+            let ten = b.num(10.0);
+            b.binary(ir::BinOp::Div, span, ten)
+        }
+        StepCap::SpanOver50 | StepCap::NgspiceRule => {
+            let fifty = b.num(50.0);
+            let over = b.binary(ir::BinOp::Div, span, fifty);
+            match cap {
+                StepCap::NgspiceRule => b.call(ir::Func::Min, &[t.print_step, over]),
+                _ => over,
+            }
+        }
+    }
+}
+
+/// The value of a literal, or of a literal under negations; `None` for any other expression
+/// and for `NONE`.
+fn literal(design: &ir::Design, e: ir::ExprId) -> Option<f64> {
+    let (mut sign, mut at) = (1.0, e);
+    // bounded by the expression table
+    for _ in 0..=design.expr_count() {
+        if at.is_none() {
+            return None;
+        }
+        match design.expr(at) {
+            ir::Expr::Num(n) => return Some(sign * design.literal_value(design.num(n))),
+            ir::Expr::Unary(ir::UnOp::Neg, a) => (sign, at) = (-sign, a),
+            _ => return None,
+        }
+    }
+    unreachable!("a chain of negations is shorter than the table")
 }
