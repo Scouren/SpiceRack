@@ -7,7 +7,7 @@ file "include_section.sim" deck
   include "include_section--models.lib" section=tt
   include "missing.inc"
   section local
-    param c = 3
+    param c = 3i
 file "include_section--models.lib" library
   section tt
     param vth = 0.4

@@ -23,6 +23,13 @@ fn write_entry(design: &mut ir::Design) -> String {
     let row = dialect::by_name("vacask").expect("the vacask row");
     let mut diags = ir::Diags::new();
     dialect::legalize(design, row, &mut diags);
+    let refused: Vec<String> = diags
+        .rows()
+        .iter()
+        .filter(|d| dialect::refuses(d.code))
+        .map(|d| format!("{:?} {:?}", d.code, ir::Feature::from_index(d.arg as u16)))
+        .collect();
+    assert!(refused.is_empty(), "legalize refused: {refused:?}");
     let text = dialect::write(design, design.entry(), row, &mut diags);
     assert!(
         !diags.rows().iter().any(|d| dialect::refuses(d.code)),

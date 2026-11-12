@@ -1,12 +1,15 @@
 //! VACASK's constant tables that more than one area reads: the builtin constants and their
-//! documented values, the library files VACASK ships (a `load` of one is the device library,
-//! A12 C5), and (S4.1) the instance and model parameter names of each module for
+//! documented values, the library files VACASK ships and their families (a `load` of one is a
+//! `DeviceLibrary`, A12 C5, R17), and (S4.1) the instance and model parameter names of each module for
 //! `Write::admits` (R21).
 //!
 //! Cites: VD expr-constants (the values); the store's `lib/vacask/mod` listing (36be560);
 //! `rewrite/DIALECT-VACASK.md` §3.2 (load), §4.
 //!
-//! Contents: `CONSTANTS`, `LIBRARY_FILES`, `is_library_file` (crate-private)
+//! Contents: `CONSTANTS`, `STATIC_FUNCS`, `DYNAMIC_LACKS`, `DYNAMIC_FUNCS`, `DYNAMIC_BINARY`,
+//! `SPICE_FILES`, `OWN_FILES`, `library`, `default_file` (crate-private)
+
+use crate::ir;
 
 /// `(name, value as VACASK documents it)`.
 pub(super) const CONSTANTS: &[(&str, &str)] = &[
@@ -34,29 +37,152 @@ pub(super) const CONSTANTS: &[(&str, &str)] = &[
     ("P_CELSIUS0", "273.15"),
 ];
 
-/// The library files under VACASK's module directory, by the path a `load` names them with.
-pub(super) const LIBRARY_FILES: &[&str] = &[
-    "resistor.osdi",
-    "capacitor.osdi",
-    "inductor.osdi",
-    "diode.osdi",
-    "bsim3v3.osdi",
-    "bsim4v8.osdi",
-    "bsimbulk106.osdi",
-    "psp103v4.osdi",
-    "vbic_1p3.osdi",
-    "vbic_1p3_4t.osdi",
-    "vbic_1p3_5t.osdi",
-    "tline_ideal.osdi",
-    "opamp.osdi",
+/// The functions VACASK has in a parameter expression (VD expr-functions).
+pub(super) const STATIC_FUNCS: &[ir::Func] = &[
+    ir::Func::Abs,
+    ir::Func::Sqrt,
+    ir::Func::Exp,
+    ir::Func::Ln,
+    ir::Func::Log10,
+    ir::Func::Pow,
+    ir::Func::Min,
+    ir::Func::Max,
+    ir::Func::Floor,
+    ir::Func::Ceil,
+    ir::Func::Trunc,
+    ir::Func::ToInt,
+    ir::Func::RoundHalfAway,
+    ir::Func::Sin,
+    ir::Func::Cos,
+    ir::Func::Tan,
+    ir::Func::Asin,
+    ir::Func::Acos,
+    ir::Func::Atan,
+    ir::Func::Atan2,
+    ir::Func::Sinh,
+    ir::Func::Cosh,
+    ir::Func::Tanh,
+    ir::Func::Asinh,
+    ir::Func::Acosh,
+    ir::Func::Atanh,
+    ir::Func::Hypot,
+    ir::Func::Fmod,
 ];
 
-/// Whether `path` (as a `load` writes it) names a library file VACASK ships: one of
-/// [`LIBRARY_FILES`], or a file under `spice/`, `spice/sn/` or `spice/full/`.
-pub(super) fn is_library_file(path: &str) -> bool {
-    LIBRARY_FILES.contains(&path)
-        || ["spice/", "spice/sn/", "spice/full/"].iter().any(|d| {
-            path.strip_prefix(d)
-                .is_some_and(|f| !f.contains('/') && f.ends_with(".osdi"))
-        })
+/// The functions VACASK's parameter language has and its behavioural sources lack (VD
+/// dev-builtin-behavioral, Functions): an expression the IR classes dynamic cannot hold them.
+/// ponytail: only a direct `$temp` makes it dynamic here; a parameter that reads one (R14's
+/// transitive class) is not traced yet (S4.1, with the behavioural sources).
+pub(super) const DYNAMIC_LACKS: &[&str] = &["round", "integer", "fmod"];
+
+/// The functions and operators of VACASK's behavioural sources (VD dev-builtin-behavioral).
+pub(super) const DYNAMIC_FUNCS: &[ir::Func] = &[
+    ir::Func::Abs,
+    ir::Func::Sqrt,
+    ir::Func::Exp,
+    ir::Func::Ln,
+    ir::Func::Log10,
+    ir::Func::Pow,
+    ir::Func::Min,
+    ir::Func::Max,
+    ir::Func::Floor,
+    ir::Func::Ceil,
+    ir::Func::ToInt,
+    ir::Func::Sin,
+    ir::Func::Cos,
+    ir::Func::Tan,
+    ir::Func::Asin,
+    ir::Func::Acos,
+    ir::Func::Atan,
+    ir::Func::Atan2,
+    ir::Func::Sinh,
+    ir::Func::Cosh,
+    ir::Func::Tanh,
+    ir::Func::Asinh,
+    ir::Func::Acosh,
+    ir::Func::Atanh,
+    ir::Func::Hypot,
+];
+
+/// The binary operators of VACASK's behavioural sources (no bit operators).
+pub(super) const DYNAMIC_BINARY: &[ir::BinOp] = &[
+    ir::BinOp::Add,
+    ir::BinOp::Sub,
+    ir::BinOp::Mul,
+    ir::BinOp::DivTyped,
+    ir::BinOp::Eq,
+    ir::BinOp::Ne,
+    ir::BinOp::Lt,
+    ir::BinOp::Le,
+    ir::BinOp::Gt,
+    ir::BinOp::Ge,
+    ir::BinOp::And,
+    ir::BinOp::Or,
+];
+
+/// The SPICE device files VACASK ships under `spice/` (and the `spice/sn/`, `spice/full/`
+/// variants), by module file stem, and the family each implements (VD dev-spice). `diode` serves
+/// levels 1 and 3; its library is stated as `Diode` (S4.1 settles the level-3 model's library).
+pub(super) const SPICE_FILES: &[(&str, ir::ModelFamily)] = &[
+    ("resistor", ir::ModelFamily::Resistor),
+    ("capacitor", ir::ModelFamily::Capacitor),
+    ("inductor", ir::ModelFamily::Inductor),
+    ("diode", ir::ModelFamily::Diode),
+    ("bjt", ir::ModelFamily::GummelPoon),
+    ("jfet1", ir::ModelFamily::JfetShichman),
+    ("jfet2", ir::ModelFamily::JfetParkerSkellern),
+    ("mes1", ir::ModelFamily::Mesfet),
+    ("mos1", ir::ModelFamily::Mos1),
+    ("mos2", ir::ModelFamily::Mos2),
+    ("mos3", ir::ModelFamily::Mos3),
+    ("mos6", ir::ModelFamily::Mos6),
+    ("mos9", ir::ModelFamily::Mos9),
+    ("vdmos", ir::ModelFamily::Vdmos),
+    ("bsim3v3", ir::ModelFamily::Bsim3),
+    ("bsim4v8", ir::ModelFamily::Bsim4),
+];
+
+/// VACASK's own device files at the top of its module directory, and their families; the first
+/// file of a family that has no `spice/` file is its default (VD dev-builtin, the store's
+/// `lib/vacask/mod` listing). `tline_ideal.osdi` and `opamp.osdi` implement no equation family:
+/// a `load` of either is a user module's.
+pub(super) const OWN_FILES: &[(&str, ir::ModelFamily)] = &[
+    ("psp103v4.osdi", ir::ModelFamily::Psp103),
+    ("bsimbulk106.osdi", ir::ModelFamily::BsimBulk),
+    ("vbic_1p3.osdi", ir::ModelFamily::Vbic),
+    ("vbic_1p3_4t.osdi", ir::ModelFamily::Vbic),
+    ("vbic_1p3_5t.osdi", ir::ModelFamily::Vbic),
+    ("resistor.osdi", ir::ModelFamily::Resistor),
+    ("capacitor.osdi", ir::ModelFamily::Capacitor),
+    ("inductor.osdi", ir::ModelFamily::Inductor),
+    ("diode.osdi", ir::ModelFamily::Diode),
+    ("bsim3v3.osdi", ir::ModelFamily::Bsim3),
+    ("bsim4v8.osdi", ir::ModelFamily::Bsim4),
+];
+
+/// The family the library file `path` (as a `load` writes it) implements, or `None` for any
+/// other file.
+pub(super) fn library(path: &str) -> Option<ir::ModelFamily> {
+    let spice = ["spice/", "spice/sn/", "spice/full/"]
+        .iter()
+        .filter_map(|d| path.strip_prefix(d)?.strip_suffix(".osdi"))
+        .find_map(|stem| {
+            SPICE_FILES
+                .iter()
+                .find(|(s, _)| *s == stem)
+                .map(|&(_, f)| f)
+        });
+    spice.or_else(|| OWN_FILES.iter().find(|(f, _)| *f == path).map(|&(_, f)| f))
+}
+
+/// The file VACASK loads `family` from by default: its `spice/` file, else its first own file.
+pub(super) fn default_file(family: ir::ModelFamily) -> Option<String> {
+    let spice = SPICE_FILES.iter().find(|(_, f)| *f == family);
+    match spice {
+        Some((stem, _)) => Some(format!("spice/{stem}.osdi")),
+        None => OWN_FILES
+            .iter()
+            .find(|(_, f)| *f == family)
+            .map(|(p, _)| (*p).to_string()),
+    }
 }

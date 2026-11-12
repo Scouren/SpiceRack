@@ -96,6 +96,13 @@ fn written(design: &mut ir::Design) -> Sources {
     let row = dialect::by_name("vacask").expect("the vacask row");
     let mut diags = ir::Diags::new();
     dialect::legalize(design, row, &mut diags);
+    let refused: Vec<String> = diags
+        .rows()
+        .iter()
+        .filter(|d| dialect::refuses(d.code))
+        .map(|d| format!("{:?} {:?}", d.code, ir::Feature::from_index(d.arg as u16)))
+        .collect();
+    assert!(refused.is_empty(), "legalize refused: {refused:?}");
     let mut src = Sources::new();
     let files: Vec<ir::FileId> = design.files().collect();
     for f in files {

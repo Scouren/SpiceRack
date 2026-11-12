@@ -8,15 +8,13 @@
 //! S 1.05–1.07); `0x`/`0X` hex. An integer literal (digits only, or hex) is VACASK's integer
 //! type (RUN i1, f1).
 //!
-//! Until AMEND-A12 K1 lands (`a12.rs`), an integer literal is `Plain` and a real whole number
-//! written with a point and no fraction digits (`2.`) is stored with one zero fraction digit
-//! (`2.0`), so that the writer's `Plain` digits stay VACASK integers and `2.` stays real.
+//! An integer literal is `NumForm::Int` (A12 K1); every other form is real, and the writer
+//! spells a whole `Plain` number with a trailing point (`2.`) so that VACASK reads it real.
 //!
 //! Cites: VD input-numbers; `rewrite/INV-semantics.md` 1.01–1.07, 1.13; `IR-KERNEL.md` A3.
 //!
 //! Contents: `Number`, `NotANumber`, `lex`, `spell` (crate-private)
 
-use super::a12;
 use crate::ir;
 
 /// A number as VACASK reads it.
@@ -111,11 +109,6 @@ pub(super) fn lex(text: &str) -> Result<Number, NotANumber> {
         Some(b'e' | b'E') => (exponent(&rest[1..])?, ir::NumForm::Exponent),
         Some(_) => scale(rest)?,
     };
-    // Until A12 K1: `2.` (a point, no fraction digit) is stored as `2.0` to stay real.
-    if point && frac == 0 && form == ir::NumForm::Plain {
-        digits.push('0');
-        frac = 1;
-    }
     let significant = digits.trim_start_matches('0').len();
     if significant > DIGITS_MAX || frac > DIGITS_MAX {
         return Err(NotANumber::Grammar);
@@ -126,10 +119,10 @@ pub(super) fn lex(text: &str) -> Result<Number, NotANumber> {
         mantissa,
         frac: u8::try_from(frac).expect("checked above"),
         exp10,
-        form: if int { a12::INT_FORM } else { form },
+        form: if int { ir::NumForm::Int } else { form },
     };
-    // The IR has one zero (`Literal::ZERO`), and holds only finite values (C9).
-    let literal = match literal.mantissa == 0 {
+    // The IR has one real zero (`Literal::ZERO`), and holds only finite values (C9).
+    let literal = match literal.mantissa == 0 && !int {
         true => ir::Literal::ZERO,
         false => literal,
     };
@@ -158,6 +151,9 @@ pub(super) fn spell(literal: ir::Literal, out: &mut String) {
         out.push_str(part);
     }
     match literal.form {
+        ir::NumForm::Int => {}
+        // VACASK reads digits alone as an integer: a real whole number gets its point.
+        ir::NumForm::Plain if literal.frac == 0 => out.push('.'),
         ir::NumForm::Plain => {}
         ir::NumForm::Mil => out.push_str("mil"),
         ir::NumForm::Exponent => out.push_str(&format!("e{}", literal.exp10)),
@@ -177,7 +173,7 @@ fn int_literal(value: i64) -> Number {
             mantissa: value,
             frac: 0,
             exp10: 0,
-            form: a12::INT_FORM,
+            form: ir::NumForm::Int,
         },
         int: true,
     }
@@ -228,10 +224,12 @@ mod tests {
     fn lex_reads_vacasks_spellings() {
         use ir::NumForm::{Exponent, Mil, Plain, Scale};
         let cases: &[(&str, ir::Literal, bool)] = &[
-            ("1", lit(1, 0, 0, a12::INT_FORM), true),
-            ("0x10", lit(16, 0, 0, a12::INT_FORM), true),
+            ("1", lit(1, 0, 0, ir::NumForm::Int), true),
+            ("0x10", lit(16, 0, 0, ir::NumForm::Int), true),
+            ("0", lit(0, 0, 0, ir::NumForm::Int), true),
+            ("0.0", ir::Literal::ZERO, false),
             ("2.5", lit(25, 1, 0, Plain), false),
-            ("2.", lit(20, 1, 0, Plain), false),
+            ("2.", lit(2, 0, 0, Plain), false),
             (".5", lit(5, 1, 0, Plain), false),
             ("0.050000", lit(50000, 6, 0, Plain), false),
             ("1e-3", lit(1, 0, -3, Exponent), false),
@@ -265,7 +263,9 @@ mod tests {
             (lit(1, 0, 6, Scale), "1meg"),
             (lit(1, 0, 0, Mil), "1mil"),
             (lit(7, 0, -2, Scale), "7e-2"),
-            (lit(-2, 0, 0, Plain), "-2"),
+            (lit(-2, 0, 0, ir::NumForm::Int), "-2"),
+            (lit(2, 0, 0, Plain), "2."),
+            (ir::Literal::ZERO, "0."),
         ];
         for (l, want) in cases {
             let mut out = String::new();

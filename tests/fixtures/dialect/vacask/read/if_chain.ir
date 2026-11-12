@@ -3,9 +3,9 @@
 # codes: P2004 P2004 P2005 S0001 S0001 S0004
 file "if_chain.sim" deck
   title "conditional blocks"
-  param a = 1
-  param b = 0
-  if (a == 1)
+  param a = 1i
+  param b = 0i
+  if (a == 1i)
     opaque vacask unread "r1 (n 0) res r=1k"
   elif (b)
     opaque vacask unread "r2 (n 0) res r=2k"

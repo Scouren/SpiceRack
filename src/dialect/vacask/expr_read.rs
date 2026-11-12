@@ -1,6 +1,6 @@
 //! A VACASK expression (a CST subtree) → an IR expression tree, by VACASK's own meaning of each
 //! operator and function (`rewrite/DIALECT-VACASK.md` §3.3; runs e1, i1, t3, f1–f3):
-//! `**` and `pow` are `Pow` (signed); `/` is `DivTyped` (A12 K1; `a12.rs`); `^` is `BitXor`;
+//! `**` and `pow` are `Pow` (signed); `/` is `DivTyped` (A12 K1); `^` is `BitXor`;
 //! `log` and `ln` are `Ln`; `round` is `RoundHalfAway`; `integer` is `Trunc`, `int` is `ToInt`;
 //! `sgn(x)` is the sugar `x >= 0 ? 1 : -1` and `sign(x, y)` the sugar `abs(x) * (y >= 0 ? 1 :
 //! -1)` (zero counts as positive, R13); `agauss`, `gauss`, `aunif`, `unif` are draws that sample
@@ -50,7 +50,9 @@ pub(super) const NOT_FINITE: ir::Code = ir::Code::new(b'P', 2002);
 pub(super) const PROBE_IN_PARAM: ir::Code = ir::Code::new(b'P', 2006);
 
 /// What a parameter expression uses: every node VACASK's parameter language reads into.
-pub(super) const FEATURES: ir::FeatureSet = static_funcs(ir::FeatureSet::EMPTY)
+pub(super) const FEATURES: ir::FeatureSet = dynamic(static_funcs(ir::FeatureSet::EMPTY))
+    .with(ir::Feature::UnaryDyn(ir::UnOp::Neg))
+    .with(ir::Feature::UnaryDyn(ir::UnOp::Not))
     .with(ir::Feature::Expr(ir::ExprTag::Num))
     .with(ir::Feature::Expr(ir::ExprTag::Str))
     .with(ir::Feature::Expr(ir::ExprTag::Param))
@@ -61,13 +63,14 @@ pub(super) const FEATURES: ir::FeatureSet = static_funcs(ir::FeatureSet::EMPTY)
     .with(ir::Feature::Expr(ir::ExprTag::Temp))
     .with(ir::Feature::Expr(ir::ExprTag::Tnom))
     .with(ir::Feature::Expr(ir::ExprTag::Draw))
+    .with(ir::Feature::Extra(ir::Extra::IntLiteral))
     .with(ir::Feature::Unary(ir::UnOp::Neg))
     .with(ir::Feature::Unary(ir::UnOp::Not))
     .with(ir::Feature::Unary(ir::UnOp::BitNot))
     .with(ir::Feature::Binary(ir::BinOp::Add))
     .with(ir::Feature::Binary(ir::BinOp::Sub))
     .with(ir::Feature::Binary(ir::BinOp::Mul))
-    .with(ir::Feature::Binary(super::a12::DIV_TYPED))
+    .with(ir::Feature::Binary(ir::BinOp::DivTyped))
     .with(ir::Feature::Binary(ir::BinOp::Eq))
     .with(ir::Feature::Binary(ir::BinOp::Ne))
     .with(ir::Feature::Binary(ir::BinOp::Lt))
@@ -119,43 +122,12 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     ),
 ];
 
-/// The functions VACASK has in a parameter expression (VD expr-functions).
-const STATIC_FUNCS: &[ir::Func] = &[
-    ir::Func::Abs,
-    ir::Func::Sqrt,
-    ir::Func::Exp,
-    ir::Func::Ln,
-    ir::Func::Log10,
-    ir::Func::Pow,
-    ir::Func::Min,
-    ir::Func::Max,
-    ir::Func::Floor,
-    ir::Func::Ceil,
-    ir::Func::Trunc,
-    ir::Func::RoundHalfAway,
-    ir::Func::Sin,
-    ir::Func::Cos,
-    ir::Func::Tan,
-    ir::Func::Asin,
-    ir::Func::Acos,
-    ir::Func::Atan,
-    ir::Func::Atan2,
-    ir::Func::Sinh,
-    ir::Func::Cosh,
-    ir::Func::Tanh,
-    ir::Func::Asinh,
-    ir::Func::Acosh,
-    ir::Func::Atanh,
-    ir::Func::Hypot,
-    ir::Func::Fmod,
-];
-
 /// Checks the expression at CST node `node` without pushing a row.
 ///
 /// # Errors
 /// As [`expr`].
 pub(super) fn check_expr(l: &Lower<'_, '_, '_>, node: u32, ctx: Context) -> Result<(), Refusal> {
-    check(l, node, ctx, 0)
+    check(l, node, ctx, reads_temp(l, node), 0)
 }
 
 /// The expression at CST node `node`, read in `ctx` into rows, each parameter read recorded
@@ -168,21 +140,63 @@ pub(super) fn expr(
     node: u32,
     ctx: Context,
 ) -> Result<ir::ExprId, Refusal> {
-    check(l, node, ctx, 0)?;
+    check_expr(l, node, ctx)?;
     Ok(build(l, node))
 }
 
 // ---- private ----
 
+/// `set` with every dynamic function's and operator's feature.
+const fn dynamic(set: ir::FeatureSet) -> ir::FeatureSet {
+    let mut out = set;
+    let mut i = 0;
+    while i < tables::DYNAMIC_FUNCS.len() {
+        out = out.with(ir::Feature::FuncDyn(tables::DYNAMIC_FUNCS[i]));
+        i += 1;
+    }
+    let mut k = 0;
+    while k < tables::DYNAMIC_BINARY.len() {
+        out = out.with(ir::Feature::BinaryDyn(tables::DYNAMIC_BINARY[k]));
+        k += 1;
+    }
+    out
+}
+
 /// `set` with every static function's feature.
 const fn static_funcs(set: ir::FeatureSet) -> ir::FeatureSet {
     let mut out = set;
     let mut i = 0;
-    while i < STATIC_FUNCS.len() {
-        out = out.with(ir::Feature::Func(STATIC_FUNCS[i]));
+    while i < tables::STATIC_FUNCS.len() {
+        out = out.with(ir::Feature::Func(tables::STATIC_FUNCS[i]));
         i += 1;
     }
     out
+}
+
+/// Whether the expression at `node` reads `$temp` directly: then the IR classes it dynamic (R14),
+/// whose functions are VACASK's behavioural set.
+fn reads_temp(l: &Lower<'_, '_, '_>, node: u32) -> bool {
+    let ast = &l.cst.ast;
+    let mut todo = vec![node];
+    // Bounded: each node of the (acyclic) expression tree is taken once.
+    while let Some(x) = todo.pop() {
+        if x == crate::syntax::ast::NONE {
+            continue;
+        }
+        let n = Node(x);
+        match ast.tag(n) {
+            Tag::Ident | Tag::Word if name_of(l, n) == "$temp" => return true,
+            Tag::Unary | Tag::Paren | Tag::Delimited => todo.push(ast.lhs(n)),
+            Tag::Binary => todo.extend([ast.lhs(n), ast.rhs(n)]),
+            Tag::Ternary => {
+                let at = ast.rhs(n);
+                todo.extend([ast.lhs(n), ast.extra(at), ast.extra(at + 1)]);
+            }
+            Tag::Call | Tag::Probe => todo.extend(call_args(l, n)),
+            _ => {}
+        }
+    }
+    false
 }
 
 /// A refusal of class `class` with code `code`.
@@ -218,7 +232,7 @@ fn function(name: &str) -> Option<(ir::Func, usize)> {
         "ceil" => (F::Ceil, 1),
         "round" => (F::RoundHalfAway, 1),
         "integer" => (F::Trunc, 1),
-        "int" => (super::a12::TO_INT, 1),
+        "int" => (F::ToInt, 1),
         "fmod" => (F::Fmod, 2),
         "min" => (F::Min, 2),
         "max" => (F::Max, 2),
@@ -244,7 +258,7 @@ fn binary(op: &str) -> Option<ir::BinOp> {
         "+" => B::Add,
         "-" => B::Sub,
         "*" => B::Mul,
-        "/" => super::a12::DIV_TYPED,
+        "/" => B::DivTyped,
         "==" => B::Eq,
         "!=" => B::Ne,
         "<" => B::Lt,
@@ -291,7 +305,13 @@ fn is_number(l: &Lower<'_, '_, '_>, n: Node) -> bool {
 }
 
 /// Checks the subtree at `node` (depth bounded by the parser's `DEPTH_MAX`).
-fn check(l: &Lower<'_, '_, '_>, node: u32, ctx: Context, depth: u32) -> Result<(), Refusal> {
+fn check(
+    l: &Lower<'_, '_, '_>,
+    node: u32,
+    ctx: Context,
+    dynamic: bool,
+    depth: u32,
+) -> Result<(), Refusal> {
     use ir::OpaqueClass::{InvalidInSource, Private};
     let private = refuse(super::codes::PRIVATE, Private);
     let ast = &l.cst.ast;
@@ -299,7 +319,7 @@ fn check(l: &Lower<'_, '_, '_>, node: u32, ctx: Context, depth: u32) -> Result<(
     if node == crate::syntax::ast::NONE || depth > crate::syntax::DEPTH_MAX {
         return Err(refuse(NOT_A_NUMBER, InvalidInSource));
     }
-    let down = |k: u32| check(l, k, ctx, depth + 1);
+    let down = |k: u32| check(l, k, ctx, dynamic, depth + 1);
     match ast.tag(n) {
         Tag::Num => number::lex(&token(l, n))
             .map(|_| ())
@@ -317,12 +337,16 @@ fn check(l: &Lower<'_, '_, '_>, node: u32, ctx: Context, depth: u32) -> Result<(
             }
         }
         Tag::Unary => match token(l, n).as_str() {
+            "~" if dynamic => Err(private),
             "-" | "+" | "!" | "~" => down(ast.lhs(n)),
             _ => Err(private),
         },
         Tag::Binary => {
             let op = token(l, n);
             if op != "**" && binary(&op).is_none() {
+                return Err(private);
+            }
+            if dynamic && matches!(op.as_str(), "&" | "|" | "^" | "<<" | ">>") {
                 return Err(private);
             }
             down(ast.lhs(n))?;
@@ -351,7 +375,7 @@ fn check(l: &Lower<'_, '_, '_>, node: u32, ctx: Context, depth: u32) -> Result<(
                 (_, _, "sign") => 2,
                 _ => return Err(private),
             };
-            if args.len() != want {
+            if args.len() != want || (dynamic && tables::DYNAMIC_LACKS.contains(&name.as_str())) {
                 return Err(private);
             }
             args.iter().try_for_each(|&a| down(a))
@@ -464,7 +488,7 @@ fn nonnegative_sign(l: &mut Lower<'_, '_, '_>, x: ir::ExprId) -> ir::ExprId {
             mantissa: v,
             frac: 0,
             exp10: 0,
-            form: super::a12::INT_FORM,
+            form: ir::NumForm::Int,
         })
     };
     let zero = int(l.b, 0);

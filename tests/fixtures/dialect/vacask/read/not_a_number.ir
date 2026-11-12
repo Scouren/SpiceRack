@@ -6,4 +6,4 @@ file "not_a_number.sim" deck
   opaque vacask invalid "parameters a=1k5"
   opaque vacask invalid "parameters b=1e3k"
   opaque vacask invalid "parameters c=inf"
-  param d = 2
+  param d = 2i

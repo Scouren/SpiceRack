@@ -2,4 +2,5 @@ expressions with no IR meaning
 parameters v=[1, 2]
 parameters s=$scale*2
 parameters t=isinf(1)
+parameters r=round($temp)
 parameters u=3

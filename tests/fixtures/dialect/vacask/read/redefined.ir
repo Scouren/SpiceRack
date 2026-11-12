@@ -3,5 +3,5 @@
 # codes: R2001 R2001
 file "redefined.sim" deck
   title "a parameter defined twice"
-  param a = 1
-  subckt s (p) x=1
+  param a = 1i
+  subckt s (p) x=1i

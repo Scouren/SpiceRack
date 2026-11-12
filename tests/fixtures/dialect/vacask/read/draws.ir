@@ -4,7 +4,7 @@
 # codes:
 file "draws.sim" deck
   title "draws"
-  param a = draw:abs_gauss:sampling:call_site(5, 1, 1)
-  param b = draw:rel_gauss:sampling:call_site(5, 0.1, 3)
-  param c = draw:abs_unif:sampling:call_site(5, 1)
-  param d = draw:rel_unif:sampling:call_site(5, 0.1)
+  param a = draw:abs_gauss:sampling:call_site(5i, 1i, 1i)
+  param b = draw:rel_gauss:sampling:call_site(5i, 0.1, 3i)
+  param c = draw:abs_unif:sampling:call_site(5i, 1i)
+  param d = draw:rel_unif:sampling:call_site(5i, 0.1)

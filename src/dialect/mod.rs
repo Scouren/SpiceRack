@@ -244,9 +244,11 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
                 diags.push(INERT_DROPPED, span, 0);
                 dropped.push((item, scope));
             }
+            // ponytail: Hint refused until ir-spine's own Hint arm (R19: dropped with S0103) merges.
             ir::OpaqueClass::Unread
             | ir::OpaqueClass::Private
             | ir::OpaqueClass::InvalidInSource
+            | ir::OpaqueClass::Hint
             | ir::OpaqueClass::Script => diags.push(ir::diag::UNSUPPORTED, span, opaque),
         }
     }

@@ -1,26 +1,26 @@
 # Oracle: VD expr-operators (precedence table: unary binds tighter than `**`, `**` right,
 # the rest left, `? :` loosest and right); DIALECT-VACASK Appendix A run e1 (`-2**2` 4,
 # `2**3**2` 512, `1?0?4:8:16` 8, `7^3` 4). `-` before a number is that negative literal;
-# unary `+` is its operand (R13). Until A12 K1 `/` is Div (a12.rs).
+# unary `+` is its operand (R13). `/` is typed division (`/:`, A12 K1).
 # codes:
 file "operators.sim" deck
   title "operators"
-  param a = 1
-  param b = 2
-  param c = 3
-  param p1 = pow(-2, 2)
-  param p2 = pow(2, pow(3, 2))
+  param a = 1i
+  param b = 2i
+  param c = 3i
+  param p1 = pow(-2i, 2i)
+  param p2 = pow(2i, pow(3i, 2i))
   param p3 = a + b * c
   param p4 = (a + b) * c
   param p5 = a - b - c
   param p6 = a - (b - c)
-  param p7 = pow(-a, 2)
-  param p8 = -pow(a, 2)
-  param p9 = a ? (b ? 1 : 2) : 3
+  param p7 = pow(-a, 2i)
+  param p8 = -pow(a, 2i)
+  param p9 = a ? (b ? 1i : 2i) : 3i
   param p10 = a == b || b != c && a <= c
   param p11 = !a
   param p12 = ~a
   param p13 = a & b | c ^ a
   param p14 = a << b >> c
   param p15 = a
-  param p16 = a / b
+  param p16 = a /: b

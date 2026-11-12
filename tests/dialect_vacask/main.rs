@@ -10,6 +10,7 @@
 //! Contents: tests only.
 
 mod corpus;
+mod laws;
 mod probe;
 mod read;
 mod settle;

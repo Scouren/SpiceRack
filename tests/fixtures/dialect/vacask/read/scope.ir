@@ -5,10 +5,10 @@
 # codes: R2003
 file "scope.sim" deck
   title "binding"
-  param top = 1
-  param early = late * 2
-  param late = 3
-  subckt outer (a) p=7
+  param top = 1i
+  param early = late * 2i
+  param late = 3i
+  subckt outer (a) p=7i
     param own = p + top
     subckt inner (b)
       param k = p? + top

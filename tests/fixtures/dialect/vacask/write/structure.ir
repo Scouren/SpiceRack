@@ -5,19 +5,19 @@ file "structure.sim" deck
   title "structure"
   comment " one line"
   comment " two\n lines "
-  param a = 1
-  param `q.r` = a + 2
+  param a = 1i
+  param `q.r` = a + 2i
   include "lib.inc" section=tt
   include "plain.inc"
   load osdi "mydev.osdi"
   load veriloga "nl2.va"
   global vdd vss
   section corner
-    param c = 3
-  subckt s (p n) x=(2 * 3) y=7
-    param w = x + 1
+    param c = 3i
+  subckt s (p n) x=(2i * 3i) y=7i
+    param w = x + 1i
     subckt inner (c)
-  if (a == 1)
+  if (a == 1i)
     opaque vacask unread "r1 (n 0) res r=1k"
   elif (a)
     opaque vacask unread "r2 (n 0) res r=2k"

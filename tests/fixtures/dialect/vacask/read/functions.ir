@@ -1,17 +1,18 @@
 # Oracle: VD expr-functions (each function's meaning); DIALECT-VACASK Appendix A runs e1, f1, f2
 # (`round` half away, `integer` and `int` truncate, `sgn(0)` and `sgn(-0.0)` 1, `sign(3,-0.0)`
-# 3). `sgn` and `sign` are sugar over `>= 0` (R13). Until A12 K1 `int` is Trunc (a12.rs).
+# 3). `sgn` and `sign` are sugar over `>= 0` (R13; `sgn` until A12 K1's SgnZeroPos). `int` is
+# `to_int` (integer-typed), `integer` is `trunc` (real: run f2).
 # codes:
 file "functions.sim" deck
   title "functions"
-  param x = 1
-  param y = 2
+  param x = 1i
+  param y = 2i
   param f1 = ln(x)
   param f2 = ln(x)
   param f3 = log10(x)
   param f4 = round_half_away(x)
   param f5 = trunc(x)
-  param f6 = trunc(x)
+  param f6 = to_int(x)
   param f7 = pow(x, y)
   param f8 = min(x, y)
   param f9 = max(x, y)
@@ -19,6 +20,6 @@ file "functions.sim" deck
   param f11 = atan2(y, x)
   param f12 = hypot(x, y)
   param f13 = abs(x)
-  param f14 = x >= 0 ? 1 : -1
-  param f15 = abs(x) * (y >= 0 ? 1 : -1)
+  param f14 = x >= 0i ? 1i : -1i
+  param f15 = abs(x) * (y >= 0i ? 1i : -1i)
   param f16 = sqrt(x) + exp(x) + floor(x) + ceil(x) + sinh(x) + atanh(x)

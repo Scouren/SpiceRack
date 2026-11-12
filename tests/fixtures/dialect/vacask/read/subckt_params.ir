@@ -5,8 +5,8 @@
 # codes:
 file "subckt_params.sim" deck
   title "formals and locals"
-  param q = 5
-  subckt s (a b) x=(2 * 3) y=3.141592653589793 z=(sqrt(4)) u=7
-    param w = q * 2
-    param v = x + 1
-    subckt inner (c) k=1
+  param q = 5i
+  subckt s (a b) x=(2i * 3i) y=3.141592653589793 z=(sqrt(4i)) u=7i
+    param w = q * 2i
+    param v = x + 1i
+    subckt inner (c) k=1i

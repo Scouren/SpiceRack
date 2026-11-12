@@ -119,8 +119,8 @@ fn binary(op: ir::BinOp) -> (u8, &'static str) {
         B::Add => (10, " + "),
         B::Sub => (10, " - "),
         B::Mul => (11, " * "),
-        B::Div => (11, " / "),
-        B::IntDiv => unreachable!("FEATURES lacks IntDiv"),
+        B::DivTyped => (11, " / "),
+        B::Div | B::IntDiv => unreachable!("FEATURES lacks {op:?}: a pass converts it"),
     }
 }
 
@@ -177,6 +177,7 @@ fn function(func: ir::Func) -> &'static str {
         F::Floor => "floor",
         F::Ceil => "ceil",
         F::Trunc => "integer",
+        F::ToInt => "int",
         F::RoundHalfAway => "round",
         F::Sin => "sin",
         F::Cos => "cos",

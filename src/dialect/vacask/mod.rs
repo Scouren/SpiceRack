@@ -75,6 +75,12 @@ impl Write for Vacask {
         &FEATURES
     }
 
+    /// What no feature states: a device library of a family VACASK ships no file for
+    /// (`write_structure::admits`).
+    fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
+        write_structure::admits(design, diags);
+    }
+
     /// One file of a legal design (`write.rs`).
     fn write(
         &self,

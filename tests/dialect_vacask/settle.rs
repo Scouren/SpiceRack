@@ -219,6 +219,8 @@ fn c_t_formals_and_dependent_parameters() {
     let got: Vec<f64> = resistances(&r).into_iter().map(|x| x.1).collect();
     assert_eq!(got, [7., 7., 7.], "{}", r.out);
     assert!(says(&run("vacask", "c1b.sim"), "Parameter 'x' not found."));
+    // A formal of `$temp` is dependent too (run c2).
+    assert!(says(&run("vacask", "c2.sim"), "Parameter 'x' not found."));
     assert!(says(&run("vacask", "t2.sim"), "Parameter 'y' not found."));
     let r = run("vacask", "t1.sim");
     assert!(

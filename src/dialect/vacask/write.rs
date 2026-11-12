@@ -112,7 +112,8 @@ fn item(w: &mut Writer<'_, '_>, todo: &mut Vec<Task>, at: ir::ItemRef) {
         ir::ItemKind::Comment => write_structure::comment(w, d.row(at.index)),
         ir::ItemKind::Include => write_structure::include(w, d.row(at.index)),
         ir::ItemKind::Global => write_structure::global(w, d.row(at.index)),
-        ir::ItemKind::Load => write_structure::load(w, d.row(at.index)),
+        ir::ItemKind::Load => write_structure::load(w, at),
+        ir::ItemKind::DeviceLibrary => write_structure::device_library(w, d.row(at.index)),
         ir::ItemKind::Opaque => write_structure::opaque(w, d.row(at.index)),
         ir::ItemKind::Param => write_structure::param(w, d.row(at.index)),
         ir::ItemKind::Subckt => {
@@ -147,6 +148,7 @@ fn item(w: &mut Writer<'_, '_>, todo: &mut Vec<Task>, at: ir::ItemRef) {
         | ir::ItemKind::NodeSet
         | ir::ItemKind::Save
         | ir::ItemKind::Print
-        | ir::ItemKind::Measure => write_run::analysis(w, at),
+        | ir::ItemKind::Measure
+        | ir::ItemKind::Elaborate => write_run::analysis(w, at),
     }
 }

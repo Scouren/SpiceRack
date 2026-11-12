@@ -9,7 +9,8 @@
 //! - a parameter defined twice in one scope is refused (RUN n3, `R2001`);
 //! - `@if` bodies hold instances, models and `@if`s: a `parameters` there is refused (`P2005`);
 //! - `ground` names are node `0` everywhere; the statement itself is `Inert` (R15);
-//! - a `load` of a library file VACASK ships is the device library (A12 C5, `a12.rs`); any
+//! - a `load` of a library file VACASK ships is a `DeviceLibrary` (A12 C5; its default file
+//!   with no path, `tables.rs`); any
 //!   other `.osdi` or `.va` a `Load`; a `map=` other than the default `Private`;
 //! - an `embed` that a `load` or `include` names is `Private`, else `Inert` (C A20).
 //!
@@ -35,6 +36,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Item(ir::ItemKind::Include))
     .with(ir::Feature::Item(ir::ItemKind::Global))
     .with(ir::Feature::Item(ir::ItemKind::Load))
+    .with(ir::Feature::Item(ir::ItemKind::DeviceLibrary))
     .with(ir::Feature::Item(ir::ItemKind::Opaque))
     .with(ir::Feature::Item(ir::ItemKind::Subckt))
     .with(ir::Feature::Item(ir::ItemKind::Section))
@@ -93,11 +95,14 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     ),
 ];
 
-/// The title line of an entry deck (VD; S 14.12): a `Title` item; an empty line has no item.
+/// The title line of an entry deck (VD; S 14.12): a `Title` item, an empty line too, except in
+/// a file that holds nothing else.
 pub(super) fn title(l: &mut Lower<'_, '_, '_>, n: Node) {
     let text = l.cst.tokens.text(l.cst.ast.main_token(n)).to_string();
     let deck = l.b.design().file(l.cst.file).role == ir::Role::Deck && l.cst.shift == 0;
-    if deck && !text.is_empty() {
+    // An empty file is no deck statement at all (law L1: an empty text holds no item).
+    let only = l.cst.ast.fields(l.cst.ast.root()).len() == 1;
+    if deck && !(text.is_empty() && only) {
         let span = l.span(n);
         l.b.title(l.scope, &text, span);
     }
@@ -319,19 +324,45 @@ pub(super) fn load(l: &mut Lower<'_, '_, '_>, n: Node) {
     let Some(&path) = fields.first() else {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(codes::PRIVATE));
     };
-    if fields.len() > 1 || l.cst.ast.tag(Node(path)) != Tag::Str {
+    if l.cst.ast.tag(Node(path)) != Tag::Str {
         return read::opaque(l, n, ir::OpaqueClass::Private, Some(codes::PRIVATE));
     }
+    // `map=["m", "m", …]` loads only the modules named, under their own names: the load's
+    // modules. Any other `map=` (a rename, a wildcard) has no IR spelling.
+    let modules = match fields.get(1..) {
+        Some([]) | None => Some(Vec::new()),
+        Some([only]) => identity_map(l, *only),
+        Some(_) => None,
+    };
+    let Some(modules) = modules else {
+        return read::opaque(l, n, ir::OpaqueClass::Private, Some(codes::PRIVATE));
+    };
     let path = read::field_name(l.cst, path);
-    if tables::is_library_file(&path) {
-        return read::opaque(l, n, super::a12::LIBRARY_LOAD, Some(codes::UNREAD));
+    let span = l.span(n);
+    if let (Some(family), true) = (tables::library(&path), modules.is_empty()) {
+        let default = tables::default_file(family).is_some_and(|d| d == path);
+        let path = if default {
+            ir::NameId::NONE
+        } else {
+            l.b.name(&path)
+        };
+        let row = ir::DeviceLibrary { path, family };
+        l.b.device_library(l.scope, row, span);
+        return;
     }
     let kind = match path.ends_with(".va") {
         true => ir::LoadKind::VerilogA,
         false => ir::LoadKind::Osdi,
     };
-    let span = l.span(n);
-    l.b.load(l.scope, kind, &path, span);
+    let item = l.b.load(l.scope, kind, &path, span);
+    for module in modules {
+        let id = l.b.name(&module);
+        if defined_here(l, ir::DefKind::Module, &module) {
+            l.diags.push(REDEFINED, span, 0);
+            continue;
+        }
+        l.b.define(ir::DefKind::Module, id, l.scope, item);
+    }
 }
 
 /// `embed "file" <<<MARK … >>>MARK`.
@@ -358,6 +389,39 @@ fn assign(l: &Lower<'_, '_, '_>, f: u32) -> Option<(String, u32)> {
     let ast = &l.cst.ast;
     let n = Node(f);
     (ast.tag(n) == Tag::Assign).then(|| (read::field_name(l.cst, ast.lhs(n)), ast.rhs(n)))
+}
+
+/// The modules of a `map=[…]` field whose pairs each map a module to itself, in order; `None`
+/// for any other field.
+fn identity_map(l: &Lower<'_, '_, '_>, field: u32) -> Option<Vec<String>> {
+    let (key, value) = assign(l, field)?;
+    let ast = &l.cst.ast;
+    let v = Node(value);
+    if key != "map" || ast.tag(v) != Tag::Vector {
+        return None;
+    }
+    let at = ast.rhs(v);
+    let items: Vec<u32> = (0..ast.extra(at + 1))
+        .map(|k| ast.extra(at + 2 + k))
+        .collect();
+    if items.is_empty() || !items.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut out = Vec::new();
+    for pair in items.chunks(2) {
+        if pair.iter().any(|&x| ast.tag(Node(x)) != Tag::Str) {
+            return None;
+        }
+        let (from, to) = (
+            read::field_name(l.cst, pair[0]),
+            read::field_name(l.cst, pair[1]),
+        );
+        if from != to || from.contains('*') {
+            return None;
+        }
+        out.push(from);
+    }
+    Some(out)
 }
 
 /// Whether the value at `node` folds to a constant at parse time: no name in it but a builtin
