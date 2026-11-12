@@ -59,7 +59,7 @@ the ground names, the files loads and includes name, the parameter reads to bind
 
 | File | Exports | Contract |
 |---|---|---|
-| `read_run.rs` | `FEATURES`, `CODES`, `control` | plan §3.4: run items in order; `sweep` + `op` is a `Dc`, around any other analysis a `Loop{Sweep, Restore}` (RUN s1); `options` split into typed keys, one `Hint` opaque, `Private` accuracy targets; `mc … endmc` a `Loop{MonteCarlo}` (an explicit stack) |
+| `read_run.rs` | `FEATURES`, `CODES`, `control` | plan §3.4: run items in order; `sweep` + `op` is a `Dc`, around any other analysis a `Loop{Sweep, Restore}` (RUN s1); `options` split into typed keys, one `Hint` opaque, `Private` accuracy targets; every state item (`Option`, `Env`, `NodeSet`) `applies: FromHere` (A14, R24); `mc … endmc` a `Loop{MonteCarlo}` (an explicit stack) |
 | `write_run.rs` | `analysis` | one `control` block; a loop's `sweep` lines repeated before each analysis of its body; generated analysis names `<kind><n>` (the backend reads them until S12) |
 | `read_outputs.rs` | `FEATURES`, `CODES`, `save` | `save` directives (read from tokens: the CST drops a probe's parentheses) → `Save`; `ic=`/`nodeset=` lists → `NodeSet` (`next_only`, differential pairs) |
 | `write_outputs.rs` | `save` | the inverse |
