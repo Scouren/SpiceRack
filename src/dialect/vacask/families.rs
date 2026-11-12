@@ -328,7 +328,9 @@ pub(super) fn instance_name_in(word: &str, written: &str) -> Name {
 
 /// The parameter `written` stands for on the module `word` (an alias's target, else itself).
 pub(super) fn canonical(word: &str, written: &str) -> String {
-    params(word).map_or(written, |p| p.target(written)).to_string()
+    params(word)
+        .map_or(written, |p| p.target(written))
+        .to_string()
 }
 
 /// The name an instance of a model of the module `word` spells the IR parameter `ir` with.
