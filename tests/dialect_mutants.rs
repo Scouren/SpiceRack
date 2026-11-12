@@ -23,13 +23,7 @@ use spicerack::ir;
 const MUTANTS: u64 = 32;
 
 /// The rows that fail today: (law, row, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "l1-mutants",
-    "ir",
-    "ir::parse pushes element rows ir::check refuses (X0016 a second element of one name, X0015 \
-     a key of another kind, X0006 a terminal count out of range) instead of a P9001; reported to \
-     the circuit owner",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 /// splitmix64.
 struct Rng(u64);

@@ -3,8 +3,9 @@
 //! `parse_model`). Total: an unknown key or word is a `TEXT_SYNTAX` row and is skipped; a
 //! statement the builder would assert on (a terminal count, a detail row or field outside its
 //! domain, a model's word, module or polarity) is one `TEXT_SYNTAX` row and pushes no item, as
-//! the kernel rows' reader does; the row is pushed through the low tier (`Builder::push`), so
-//! what only `check` decides (a duplicate element name, a class rule) is built and reported. Values are read, names interned and rows pushed in text order
+//! the kernel rows' reader does, and so is a second element of one whole name in a scope
+//! (`Builder::element_named`); the row is pushed through the low tier (`Builder::push`), so what
+//! only `check` decides (a class rule) is built and reported. Values are read, names interned and rows pushed in text order
 //! (side and wave rows at their field, the detail row after its fields), which is the order the
 //! builder calls of the same design make.
 //!
@@ -105,11 +106,17 @@ pub(crate) fn parse_element(
         // never linked (`master_kind` is `None`), so `name?`'s held mark is cleared here
         head.model.def = crate::id::DefId::NONE;
     }
-    // what `Builder::element` asserts on (its detail and side rows stay unreferenced)
+    // what `Builder::element` asserts on, and a second element of the name in `scope` (its
+    // detail and side rows stay unreferenced)
     let (lo, hi) = kind.terminals();
     let count = head.terminals.len();
     let v = verdict(b.design(), &head, Classes::Assume);
-    if count < lo as usize || count > hi as usize || !v.rows || !v.domain {
+    if count < lo as usize
+        || count > hi as usize
+        || !v.rows
+        || !v.domain
+        || b.element_named(scope, name).is_some()
+    {
         words.error(diags);
         return ItemRef::NONE;
     }
