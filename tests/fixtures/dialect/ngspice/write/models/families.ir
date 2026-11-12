@@ -1,0 +1,41 @@
+# oracle: inpdomod.c (the type word and level ngspice dispatches each family on; MOS 49 and 54 the PDK spellings of 8 and 14), inpcom.c inp_vdmos_model (pchan), vbic.c:183 (vers); written by hand
+file "families.sp" deck
+  title "families"
+  model a resistor
+  model b capacitor
+  model c inductor
+  model d diode
+  model e diode_level3
+  model f gummel_poon polarity=p
+  model g vbic polarity=n version="1.2"
+  model h hicum2 polarity=n version="2.4.0"
+  model i mos1 polarity=n
+  model j mos2 polarity=p
+  model k mos3 polarity=n
+  model l bsim1 polarity=n
+  model m bsim2 polarity=n
+  model n mos6 polarity=n
+  model o mos9 polarity=n
+  model p bsim3 polarity=n version="3.3.0"
+  model q bsim4 polarity=p version="4.8.3"
+  model r b4_soi polarity=n version="4.4"
+  model s b3_soi_fd polarity=n version="2.0"
+  model t b3_soi_dd polarity=n version="2.0"
+  model u b3_soi_pd polarity=n version="2.0"
+  model v soi3 polarity=n
+  model w hisim2 polarity=n version="280"
+  model x hisim_hv polarity=n version="2.20"
+  model y vdmos polarity=p
+  model z jfet_shichman polarity=n
+  model aa jfet_parker_skellern polarity=p
+  model ab mesfet polarity=n
+  model ac hfet1 polarity=n
+  model ad hfet2 polarity=p
+  model ae switch_hyst
+  model af current_switch_hyst
+  model ag ltra
+  model ah txl
+  model ai cpl
+  model aj urc
+  model ak code_model word=d_and
+  model al module module=mymod

@@ -1,0 +1,9 @@
+# codes:
+file "bsim_version.sp" deck
+  title "bsim_version"
+  comment " oracle: inpdomod.c levels 14 and 54 (version 4.0-4.5 BSIM4v5, 4.6, 4.7, 4.8 or none BSIM4), 73 (1.1, 1.2 HiSIM-HV 1; 2.x or none HiSIM-HV 2), b4set.c:205 (silent version 4.8.3), hsmhv2set.c:137 (2.20)"
+  model n4 bsim4 polarity=n params=(toxe=3n) version="4.5"
+  model p4 bsim4 polarity=p version="4.8.3"
+  model n4b bsim4 polarity=n version="4.8.2"
+  model hv hisim_hv polarity=n version="1.2"
+  model hv2 hisim_hv polarity=p version="2.20"
