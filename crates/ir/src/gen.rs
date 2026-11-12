@@ -70,6 +70,8 @@ pub struct Gen {
     /// kind and listing scope, in creation order (a run target draws from its item's name scope;
     /// an element in an `if` branch may reuse the name of one in a sibling branch).
     pub(crate) elements: crate::names::FxMap<ScopeId, Vec<(NameId, ElemKind, ScopeId)>>,
+    /// The same elements by listing scope, (name, kind): a branch's siblings are read here.
+    pub(crate) listed: crate::names::FxMap<ScopeId, Vec<(NameId, ElemKind)>>,
     /// Per element kind, the models generated so far of a family it takes (R48 d: an element
     /// names a model that exists; appended by the circuit owner's model generator).
     pub(crate) models_for: Vec<Vec<DefId>>,
@@ -373,6 +375,7 @@ impl Gen {
             formals: Vec::new(),
             by_kind: vec![Vec::new(); DefKind::COUNT],
             elements: crate::names::FxMap::default(),
+            listed: crate::names::FxMap::default(),
             models_for: vec![Vec::new(); ElemKind::COUNT],
             def_class: Vec::new(),
             class: ExprClass::Constant,

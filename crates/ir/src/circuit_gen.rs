@@ -222,6 +222,7 @@ pub(crate) fn generate_element(
         .entry(at)
         .or_default()
         .push((name, kind, scope));
+    r.g.listed.entry(scope).or_default().push((name, kind));
     r.b.element(scope, kind, head, detail, Span::NONE)
 }
 
@@ -531,20 +532,20 @@ impl R<'_, '_> {
 fn siblings(r: &R<'_, '_>, scope: ScopeId) -> Vec<(NameId, ElemKind)> {
     let d = r.b.design();
     let s = d.scope(scope);
-    if s.kind != ScopeKind::Branch {
+    if s.kind != ScopeKind::Branch || s.owner.kind != ItemKind::If {
         return Vec::new();
     }
-    let Some(all) = r.g.elements.get(&d.name_scope(scope)) else {
-        return Vec::new();
-    };
-    let here = |n: NameId| all.iter().any(|&(m, _, at)| at == scope && m == n);
-    all.iter()
-        .filter(|&&(n, _, at)| {
-            let sibling = at != scope
-                && d.scope(at).kind == ScopeKind::Branch
-                && d.scope(at).owner == s.owner;
-            sibling && !here(n)
-        })
-        .map(|&(n, k, _)| (n, k))
-        .collect()
+    let here = r.g.listed.get(&scope).map_or(&[][..], Vec::as_slice);
+    let row: crate::item::If = d.row(s.owner.index);
+    // O(the sibling branches' elements): each branch's own list
+    let mut out = Vec::new();
+    for b in d.branches(row.branches).iter().filter(|b| b.body != scope) {
+        let theirs = r.g.listed.get(&b.body).map_or(&[][..], Vec::as_slice);
+        out.extend(
+            theirs
+                .iter()
+                .filter(|(n, _)| !here.iter().any(|(m, _)| m == n)),
+        );
+    }
+    out
 }
