@@ -45,7 +45,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 0: a bsim4, b3_soi_dd or hicum2 model with no version reads back with ngspice's default version (models); a Load's modules list is lost on write (control); an Alter value 840127mil reads back as 213392258e-7, equal by value (R28), so eq_meaning on an Alter's value is in question (spine); each reported to its owner",
+        "seed 0: a bsim4, b3_soi_dd or hicum2 model with no version reads back with ngspice's default version (models: before the lead, an IR invariant proposed); an Alter value 840127mil reads back as 213392258e-7, equal by value (R28): eq_meaning on an Alter's value (spine)",
     ),
     (
         "l7",
@@ -66,7 +66,104 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 /// and checks write, read back and `eq_meaning`, with floors on designs run and designs
 /// holding the kind; its function name must be found as `fn <name>` in a file under `tests/`.
 /// Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[];
+const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
+    (
+        "ngspice",
+        "Elem(Capacitor)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_elements.rs's fixture fixpoint (read/elements/capacitor_inductor, controlled); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Elem(Inductor)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_elements.rs's fixture fixpoint (read/elements/capacitor_inductor, controlled); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Elem(VSource)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Elem(Table)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_elements.rs's fixture fixpoint (read/elements/capacitor_inductor, controlled); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Wave(Pulse)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Wave(Sin)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Wave(Exp)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Wave(Sffm)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Wave(Am)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Wave(TrNoise)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Wave(TrRandom)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_sources.rs's fixture fixpoint (read/sources/pulse, sin, exp, sffm, am, noise; write/sources/waves); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Analysis(Dc)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_run.rs's fixture fixpoint (read/run/dc, noise, sens, pss); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Analysis(Noise)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_run.rs's fixture fixpoint (read/run/dc, noise, sens, pss); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Analysis(SensAc)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_run.rs's fixture fixpoint (read/run/dc, noise, sens, pss); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Analysis(Pss)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_run.rs's fixture fixpoint (read/run/dc, noise, sens, pss); every admitted design drops it by an admits refusal",
+    ),
+    (
+        "ngspice",
+        "Family(Mesa)",
+        "each_read_fixture_is_a_fixpoint_of_read_write_read",
+        "interim (until round 7, then a seeded property or reached): tests/dialect_ngspice_models.rs's fixture fixpoint (read/models/jfet_mes_hfet); every admitted design drops it by an admits refusal",
+    ),
+];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).
