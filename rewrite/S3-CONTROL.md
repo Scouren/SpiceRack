@@ -34,7 +34,7 @@ tentative until the lead's answers (Step 0).
 
 | # | Fact | Evidence |
 |---|---|---|
-| V1 | A `foreach` variable is the word as written (`CP_STRING`): `1k`, `2.2k`, `0.5` substitute as those words, so `alter r1 $v` is exact. The word list is globbed, backquoted and substituted first (`{`, `` ` ``, `$`, `*`, `?`, `[`, `~` in a word are not constants). | `control.c:462-466`; `subst.sp` |
+| V1 | A `foreach` variable is the word as written (`CP_STRING`): `1k`, `2.2k`, `0.5` substitute as those words, so `alter r1 $v` is exact; a long word too: its digits are read as `INPevaluate` reads them (0.12345678901234567890123 and its 18-digit rounding run as different values), so the reader keeps the long digits (A18). The word list is globbed, backquoted and substituted first (`{`, `` ` ``, `$`, `*`, `?`, `[`, `~` in a word are not constants). | `control.c:462-466`; `subst.sp`, `loop_long.sp` |
 | V2 | A `set` number is stored as a double and reprinted with `%G`: `set x = 1.23456789k` gives `$x` = `1234.57`; a list element `1k` gives `1000`. | `variable.c:41-56`; `subst.sp` |
 | V3 | `$&v` (a vector) prints six significant digits, `%G`: `1234.57`, `0.333333`, `1.23457E+11`, `1.5E-17` (INV 13.01's "six digits" holds). `$#v` is the element count. | `variable.c:1045`; `subst.sp` |
 
@@ -203,7 +203,7 @@ Script 29, Analysis 11, State 8 (`set`, `setcs`, `option`, `options`, `alter`, `
 | W1 A deck whose run items hold an `Alter`, a `Loop`, a `FromHere` state item or a script-command pair is written as one script, analyses as commands; a `Load` is its own `pre_osdi` pair | R49 | `script_alter`, `script_mixed`, `opaque_pairs`, `load` |
 | W2 `Loop` → `foreach <name> <values>`, its target set from `$name` (`alterparam` + `reset` for a parameter), the body, `end`; an unnamed loop's variable is `sr<depth>`, read back unnamed | V1, S2 | `script_loop`, `script_loop_unnamed`, `script_param_loop` |
 | W3 A `Reset` writes the parameter alters right after it as `alterparam`, then `reset`; a `FromHere` save forces the script form | S1, S2, A28 | `script_reset`, `script_param_loop` |
-| W4 Refused (`admits`): a parameter alter not right after a `Reset` or a parameter loop whose body does not start with one (`W1401`), a loop not over numbers (`W1402`), an alter value that is no number (`W1403`), a Verilog-A load (`W1404`), a load listing its modules (`W1405`), a partial `Reset` (`W1406`) | S1, S2, S4, L1 | `script_items_ngspice_cannot_spell_are_refused` |
+| W4 Refused (`admits`): a parameter alter not right after a `Reset` or a parameter loop whose body does not start with one (`W1401`), a loop not over numbers (`W1402`), an alter value that is no number (`W1403`), a Verilog-A load (`W1404`), a load listing its modules (`W1405`), a partial `Reset` (`W1406`), an element-value alter or loop of a name that is no R, C or L, or a source-DC one of a name that is no V or I (`W1407`: the bare `alter` of S4 sets another device's own default parameter; L5 seed 11) | S1, S2, S4, L1 | `script_items_ngspice_cannot_spell_are_refused` |
 
 Census (ngspice-45 `examples/` and `tests/`, read in place; 404 files holding `.control`, each
 statement its own file's script): no panic; 258 read typed, 146 `Script` (98 flow, 31 effect,

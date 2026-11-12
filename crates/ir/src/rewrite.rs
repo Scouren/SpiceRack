@@ -105,7 +105,7 @@ fn rewrite_where(
         handles.clear();
         for_kind!(item.kind, R => design.row::<R>(item.index).handles(design, &mut handles));
         let mut flags = Vec::new();
-        for (root, use_) in roots_with_use(design, &handles) {
+        for (root, use_) in roots_with_use(design, item, &handles) {
             let pick = only.is_none_or(|f| root.is_none() || root_form(design, root, use_) == f);
             flags.push(pick);
             if pick {

@@ -9,7 +9,7 @@
 //!
 //! Contents: `options` (crate-private)
 
-use super::{OPTION_PRIVATE, REJECTED, assign, field_text, push_opaque, string};
+use super::{OPTION_PRIVATE, REJECTED, assign, check_value, field_text, push_opaque, string};
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
@@ -158,7 +158,7 @@ pub(super) fn options(l: &mut Lower<'_, '_, '_>, n: Node) {
     }
     for (_, value, class) in &keys {
         if matches!(class, Class::Typed(_) | Class::Env)
-            && let Err(r) = expr_read::check_expr(l, *value, Context::Param)
+            && let Err(r) = check_value(l, *value)
         {
             return read::opaque(l, n, r.class, Some(r.code));
         }

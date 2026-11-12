@@ -466,11 +466,11 @@ fn a_subckts_formals_are_known_from_any_enclosing_block() {
     let ast = crate::syntax::parse(&toks, lex);
     let d = super::declare::declare(&ast, &toks);
     let root = ast.root();
-    assert_eq!(d.formals(root, "TOP"), Some(&["m".to_string()][..]));
-    assert_eq!(d.formals(root, "inner"), None, "inner is outer's");
+    assert_eq!(d.head(root, "TOP"), Some((1, &["m".to_string()][..])));
+    assert_eq!(d.head(root, "inner"), None, "inner is outer's");
     let outer = crate::syntax::ast::Node(ast.fields(root)[1]);
     let want = ["m".to_string(), "w".to_string()];
-    assert_eq!(d.formals(outer, "inner"), Some(&want[..]));
+    assert_eq!(d.head(outer, "inner"), Some((1, &want[..])));
 }
 
 #[test]

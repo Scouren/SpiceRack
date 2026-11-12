@@ -452,15 +452,17 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
     let has = |x: RunExtra| features.contains(Feature::Run(x));
     match kind {
         AnalysisKind::Tran => {
-            has(RunExtra::TranMaxStep)
-                || [
-                    RunExtra::TranCapNone,
-                    RunExtra::TranCapNgspice,
-                    RunExtra::TranCapSpan50,
-                    RunExtra::TranCapSpan10,
-                ]
-                .into_iter()
-                .any(has)
+            // a print step given or not (R67/A41), and a step ceiling
+            (has(RunExtra::TranSimulatorStep) || has(RunExtra::TranPrintStep))
+                && (has(RunExtra::TranMaxStep)
+                    || [
+                        RunExtra::TranCapNone,
+                        RunExtra::TranCapNgspice,
+                        RunExtra::TranCapSpan50,
+                        RunExtra::TranCapSpan10,
+                    ]
+                    .into_iter()
+                    .any(has))
         }
         AnalysisKind::Pss => has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous),
         AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {

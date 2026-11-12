@@ -11,7 +11,7 @@
 //! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`,
 //! `vector`, `range`, `sweep`, `value`, `spec`, `target` (crate-private)
 
-use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, string};
+use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, check_value, string};
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
@@ -86,7 +86,7 @@ pub(super) fn get(pairs: &[(String, u32)], key: &str) -> u32 {
 /// Checks each expression node of `nodes` that is given.
 pub(super) fn check(l: &Lower<'_, '_, '_>, nodes: &[u32]) -> Result<(), Why> {
     for &node in nodes.iter().filter(|&&x| x != NONE) {
-        expr_read::check_expr(l, node, Context::Param).map_err(|r| Why {
+        check_value(l, node).map_err(|r| Why {
             class: r.class,
             code: Some(r.code),
         })?;
@@ -319,7 +319,7 @@ fn option_aim(name: &str) -> Option<Aim> {
     (own && !name.ends_with("_debug")).then(|| Aim::PrivateOption(name.to_string()))
 }
 
-/// `node` plus one: an integer literal's successor, else `node + 1`.
+/// `node` plus one: an integer literal's successor, `x` for `x - 1`, else `node + 1`.
 fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
     let ast = &l.cst.ast;
     if ast.tag(Node(node)) == Tag::Num
@@ -334,6 +334,14 @@ fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
         return l.b.literal(next);
     }
     let e = value(l, node);
+    // `x - 1` is the writer's spelling of the count `x` (`write_run::analyses::minus_one`).
+    if let ir::Expr::Binary(ir::BinOp::Sub, x, one) = l.b.design().expr(e)
+        && let ir::Expr::Num(n) = l.b.design().expr(one)
+        && l.b.design().num(n).form == ir::NumForm::Int
+        && l.b.design().num(n) == int_one()
+    {
+        return x;
+    }
     let one = l.b.literal(int_one());
     l.b.binary(ir::BinOp::Add, e, one)
 }

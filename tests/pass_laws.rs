@@ -27,6 +27,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::path::Path;
 
 use spicerack::ir;
@@ -49,13 +52,7 @@ const SIZE: Size = Size {
 
 /// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
 /// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "p1",
-    "toreal_to_mul",
-    "seed 53: `until=(to_real(\"two words\"))` becomes `until=\"two words\"`, a string root in a \
-         typed field (X0021, A25 item 4): the tag table counts a string Real, so to_real(x) is \
-         written x; with the expr owner",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
@@ -81,6 +78,34 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
                 ir::WaveKind::TrRandom,
             ],
             ir::Feature::Circuit(ir::CircuitExtra::GivenZeroAsGiven),
+        ),
+    ),
+    (
+        "pulse_vacask_to_spice",
+        sources_only(
+            &[ir::WaveKind::Pulse],
+            ir::Feature::Circuit(ir::CircuitExtra::PulseSpice),
+        ),
+    ),
+    (
+        "am_pre_hold_to_zero",
+        sources_only(
+            &[ir::WaveKind::Am],
+            ir::Feature::Circuit(ir::CircuitExtra::AmPreZero),
+        ),
+    ),
+    (
+        "as_given_to_given_zero",
+        sources_only(
+            &[
+                ir::WaveKind::Pulse,
+                ir::WaveKind::Sin,
+                ir::WaveKind::Exp,
+                ir::WaveKind::Sffm,
+                ir::WaveKind::Am,
+                ir::WaveKind::TrRandom,
+            ],
+            ir::Feature::Circuit(ir::CircuitExtra::GivenZeroSpiceDefault),
         ),
     ),
     (
@@ -111,50 +136,8 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             ir::Feature::Circuit(ir::CircuitExtra::SffmNgspice),
         ),
     ),
-    (
-        "hoist_enclosing_refs",
-        ir::FeatureSet::EMPTY
-            .with(ir::Feature::Item(ir::ItemKind::Title))
-            .with(ir::Feature::Item(ir::ItemKind::Subckt))
-            .with(ir::Feature::Item(ir::ItemKind::Param))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Subckt,
-            ))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Param,
-            ))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
-            .with(ir::Feature::Expr(ir::ExprTag::Num))
-            .with(ir::Feature::Expr(ir::ExprTag::Param))
-            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
-            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
-            .with(ir::Feature::Binary(ir::BinOp::Add))
-            .with(ir::Feature::Binary(ir::BinOp::Mul)),
-    ),
-    (
-        "hoist_enclosing_refs_default",
-        ir::FeatureSet::EMPTY
-            .with(ir::Feature::Item(ir::ItemKind::Title))
-            .with(ir::Feature::Item(ir::ItemKind::Subckt))
-            .with(ir::Feature::Item(ir::ItemKind::Param))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Subckt,
-            ))
-            .with(ir::Feature::Placed(
-                ir::ScopeKind::Subckt,
-                ir::ItemKind::Param,
-            ))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
-            .with(ir::Feature::Expr(ir::ExprTag::Num))
-            .with(ir::Feature::Expr(ir::ExprTag::Param))
-            .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
-            .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
-            .with(ir::Feature::Binary(ir::BinOp::Add))
-            .with(ir::Feature::Binary(ir::BinOp::Mul)),
-    ),
+    ("hoist_enclosing_refs", HOIST_SET),
+    ("hoist_enclosing_refs_default", HOIST_SET),
     (
         "dc_axis_device_param_to_loop",
         gen_sets::dc_loops(ir::RunExtra::DcAxisDeviceParam),
@@ -174,6 +157,27 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             .with(ir::Feature::Run(ir::RunExtra::TranRecordStart)),
     ),
 ];
+
+/// `hoist_enclosing_refs`' set (both rows): a subcircuit in a subcircuit reading its parent.
+const HOIST_SET: ir::FeatureSet = ir::FeatureSet::EMPTY
+    .with(ir::Feature::Item(ir::ItemKind::Title))
+    .with(ir::Feature::Item(ir::ItemKind::Subckt))
+    .with(ir::Feature::Item(ir::ItemKind::Param))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Subckt,
+        ir::ItemKind::Subckt,
+    ))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Subckt,
+        ir::ItemKind::Param,
+    ))
+    .with(ir::Feature::Extra(ir::Extra::EnclosingRef))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Expr(ir::ExprTag::Param))
+    .with(ir::Feature::Extra(ir::Extra::SubcktConstantParam))
+    .with(ir::Feature::Extra(ir::Extra::FormalNotConstant))
+    .with(ir::Feature::Binary(ir::BinOp::Add))
+    .with(ir::Feature::Binary(ir::BinOp::Mul));
 
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);

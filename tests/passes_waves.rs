@@ -10,10 +10,18 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
 use spicerack::ir::wave_eval::{At, source_value};
 use spicerack::passes;
+
+#[path = "passes_waves/am.rs"]
+mod am;
+#[path = "passes_waves/inverse.rs"]
+mod inverse;
 
 /// A moderate design (the pass laws' size).
 const SIZE: Size = Size {

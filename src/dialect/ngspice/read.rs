@@ -22,7 +22,7 @@
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, deck_card_analyses, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
-//! class, subckt_formals, refer, pending, rescope, unqueue_reads, measure_reads, include_path}`; the CST reads are `cst.rs`
+//! class, subckt_head, refer, pending, rescope, unqueue_reads, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use std::collections::HashSet;
 
@@ -390,12 +390,12 @@ impl<'a, 'd> Lower<'a, 'd> {
         self.measured.push((mark, self.pending.len()));
     }
 
-    /// The head parameter names (folded, `name::key`) of the `.subckt name` ngspice binds from
-    /// `st`'s block: the nearest block outward in this file, else a top-level `.subckt` of an
-    /// earlier file of the read; `None` when none is visible.
-    pub(super) fn subckt_formals(&self, st: Stmt, name: &str) -> Option<Vec<String>> {
-        if let Some(f) = self.declared.formals(st.container, name) {
-            return Some(f.to_vec());
+    /// The port count and the head parameter names (folded, `name::key`) of the `.subckt name`
+    /// ngspice binds from `st`'s block: the nearest block outward in this file, else a top-level
+    /// `.subckt` of an earlier file of the read; `None` when none is visible.
+    pub(super) fn subckt_head(&self, st: Stmt, name: &str) -> Option<(usize, Vec<String>)> {
+        if let Some((ports, f)) = self.declared.head(st.container, name) {
+            return Some((ports, f.to_vec()));
         }
         let d = self.b.design();
         let key = name::key(name);
@@ -405,12 +405,8 @@ impl<'a, 'd> Lower<'a, 'd> {
                 && name::key(d.str(def.name)) == key
         })?;
         let s: ir::item::Subckt = d.row(def.item.index);
-        Some(
-            d.params(s.params)
-                .iter()
-                .map(|&(n, _)| name::key(d.str(n)))
-                .collect(),
-        )
+        let formals = d.params(s.params).iter().map(|&(n, _)| name::key(d.str(n)));
+        Some((d.names(s.ports).len(), formals.collect()))
     }
 
     /// How many parameter reads and calls wait for the bind step (a mark for [`Lower::rescope`]).

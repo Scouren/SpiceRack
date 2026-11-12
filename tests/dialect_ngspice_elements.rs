@@ -15,6 +15,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::path::PathBuf;
 
 use spicerack::dialect::{self, DialectRow, Policy, Sources};
@@ -32,10 +35,12 @@ const READ: &[&str] = &[
     "defaults_duplicates",
     "diode_bjt",
     "instance",
+    "instance_ports",
     "lines",
     "mosfet_jfet_mesfet",
     "mosfet_soi3",
     "osdi_codemodel",
+    "passive_model_order",
     "rcl_dynamic",
     "rcl_dynamic_quoted",
     "rcl_dynamic_refused",
@@ -46,7 +51,7 @@ const READ: &[&str] = &[
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["cards"];
+const WRITE: &[&str] = &["cards", "model_value"];
 
 /// Known failures, by fixture name, with why: the design reads (or is written) but uses a feature
 /// ngspice's `FEATURES` lacks. Strict both ways (`known`): an unexpected pass fails until the
@@ -375,7 +380,10 @@ fn an_instance_temperature_on_a_family_without_one_is_refused_by_the_writer() {
         )
     };
     for (family, refused) in [("bsim4", true), ("mos1", false), ("hicum2", false)] {
-        let mut design = parse_ir(&ir(family));
+        // unchecked: a BSIM4 model with no version is X0015 for `check`, which `text::parse`
+        // now runs (the case is the writer's refusal, not the invariant)
+        let mut design = ir::Design::new();
+        ir::parse_unchecked(&ir(family), &mut design.builder(), &mut ir::Diags::new());
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row(), &mut diags);
         let got = diags.rows().iter().any(|d| d.code.to_string() == "W1100");

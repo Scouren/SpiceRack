@@ -250,7 +250,7 @@ fn idt_takes_an_initial_value() {
         let mut diags = spicerack_ir::Diags::new();
         let text =
             format!("file \"t.sp\" deck\n  element behav b1 (a 0) expr=({e}) output=current\n");
-        spicerack_ir::parse(&text, &mut d.builder(), &mut diags);
+        spicerack_ir::parse_unchecked(&text, &mut d.builder(), &mut diags);
         let mut checked = spicerack_ir::Diags::new();
         spicerack_ir::check(&d, &mut checked);
         (
@@ -268,4 +268,28 @@ fn idt_takes_an_initial_value() {
     );
     assert_eq!(read("idt(v(a), 1, 2)").0, 1, "at most two operands");
     assert_eq!(spicerack_ir::Func::Idt.arity(), (1, 2));
+}
+
+#[cfg(feature = "gen")]
+#[test]
+fn design_children_are_the_decoders_operands() {
+    // the audit's row 6: `Design::children` is the one walk the dialects and passes copy;
+    // oracle: the operands `Design::expr` decodes, in order, for every row of generated designs
+    use spicerack_ir::r#gen::{Size, generate};
+    let size = Size {
+        items: 30,
+        scope_depth: 3,
+        expr_depth: 4,
+        files: 1,
+    };
+    let mut out = Vec::new();
+    for seed in 0..50u64 {
+        let d = generate(seed, &spicerack_ir::FeatureSet::ALL, size);
+        for k in 0..d.expr_count() {
+            let e = ExprId(k as u32);
+            out.clear();
+            d.children(e, &mut out);
+            assert_eq!(out, children(&d, e), "seed {seed}, {e:?}: {:?}", d.expr(e));
+        }
+    }
 }

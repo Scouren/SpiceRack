@@ -11,7 +11,7 @@
 //!
 //! Cites: VD expr-operators, expr-functions, expr-special; `rewrite/DIALECT-VACASK.md` §4.
 //!
-//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `write_behavioural`, `admits` (crate-private)
+//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `write_behavioural`, `admit`, `string` (crate-private)
 
 use super::name::{self, Place};
 use super::number;
@@ -77,33 +77,52 @@ pub(super) fn write_behavioural(design: &ir::Design, e: ir::ExprId, out: &mut St
 }
 
 /// Appends a refusal, at its item, for each real conversion VACASK cannot spell ([`NO_REAL`])
-/// and each integer literal it would wrap ([`WIDE_INT`]).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    let mut handles = Vec::new();
-    for (at, _) in design.reachable() {
-        handles.clear();
-        design.item_handles(at, &mut handles);
-        // Only a behavioural source's expression is VACASK's behavioural evaluator (R52); a
-        // passive's value is its parameter evaluator's, whatever the handle's kind.
-        let behavioural = at.kind == ir::ItemKind::Element
-            && design.row::<ir::Element>(at.index).kind == ir::ElemKind::Behav;
-        let refused = handles.iter().find_map(|&h| match h {
-            ir::Handle::Expr(e) => refusal(design, e, false),
-            ir::Handle::ExprDyn(e) => refusal(design, e, behavioural),
-            ir::Handle::Exprs(list) => design
-                .exprs(list)
-                .iter()
-                .find_map(|&e| refusal(design, e, false)),
-            ir::Handle::Params(list) => design
-                .params(list)
-                .iter()
-                .find_map(|&(_, e)| refusal(design, e, false)),
-            _ => None,
-        });
-        if let Some(code) = refused {
-            diags.push_at(code, design, at, 0);
+/// and each integer literal it would wrap ([`WIDE_INT`]), in item `at` (`handles`: a buffer the
+/// caller keeps across items).
+pub(super) fn admit(
+    design: &ir::Design,
+    at: ir::ItemRef,
+    handles: &mut Vec<ir::Handle>,
+    diags: &mut ir::Diags,
+) {
+    handles.clear();
+    design.item_handles(at, handles);
+    // Only a behavioural source's expression is VACASK's behavioural evaluator (R52); a
+    // passive's value is its parameter evaluator's, whatever the handle's kind.
+    let behavioural = at.kind == ir::ItemKind::Element
+        && design.row::<ir::Element>(at.index).kind == ir::ElemKind::Behav;
+    let refused = handles.iter().find_map(|&h| match h {
+        ir::Handle::Expr(e) => refusal(design, e, false),
+        ir::Handle::ExprDyn(e) => refusal(design, e, behavioural),
+        ir::Handle::Exprs(list) => design
+            .exprs(list)
+            .iter()
+            .find_map(|&e| refusal(design, e, false)),
+        ir::Handle::Params(list) => design
+            .params(list)
+            .iter()
+            .find_map(|&(_, e)| refusal(design, e, false)),
+        _ => None,
+    });
+    if let Some(code) = refused {
+        diags.push_at(code, design, at, 0);
+    }
+}
+
+/// `"text"`, with `"`, `\\` and a line break escaped: VACASK reads `\"`, `\\`, `\n` back and
+/// ends a string at a raw line break (settle str_escapes, unclosed_q1). The dialect's one
+/// string quoter.
+pub(super) fn string(text: &str, out: &mut String) {
+    out.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            c => out.push(c),
         }
     }
+    out.push('"');
 }
 
 // ---- private ----
@@ -340,20 +359,6 @@ fn function(func: ir::Func) -> &'static str {
         F::Idt => "idt",
         other => unreachable!("FEATURES lacks {other:?}"),
     }
-}
-
-/// `"text"`, with `"`, `\\` and newlines escaped (VD input-strings).
-fn string(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
 }
 
 #[cfg(test)]

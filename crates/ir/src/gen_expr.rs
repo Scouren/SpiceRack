@@ -317,8 +317,8 @@ impl Gen {
         dynamic: bool,
     ) -> Option<(Node, usize)> {
         let has = |f| features.contains(f);
-        // A19: a field that may read the circuit counts the dynamic form whatever the class
-        let form = dynamic || self.reads == Reads::Circuit || self.dyn_form;
+        // R66: the tree's class decides the form, except in a behavioural source's expression
+        let form = dynamic || self.dyn_form;
         // a member is allowed in its form, or in both for a function body (A28)
         let both = self.both_forms;
         let allowed = |stat: Feature, dyn_: Feature| {

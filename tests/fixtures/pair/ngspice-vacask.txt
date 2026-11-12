@@ -4,17 +4,17 @@
 # Proofs: `ruling=<id>` a ruling or amendment that settles the cause and says when it goes;
 # `pass=<name>` the pass rewrite/DIALECT-VACASK.md §6.1 plans for the feature refused (not
 # registered on the trunk); `finding=<id>` a pair finding sent to the lead.
-# Recorded on pair-test after step2-vacask 1a5ea541 (R64a) and step2-passes 59d0ab4c (A35's
-# naming rules): every deck reaches the simulators again; F1 is gone (dc_sweep, diode, mosfet
-# pass all six).
-coupled_l 3 differs ruling=R67 # F2: read back without `print_step=5n` (the VACASK writer drops a given print step until R67's feature)
+# Recorded on pair-test after step2-passes 42e17438.., step2-ngspice b36494ca.. and ir-next
+# 64e3c8ef: TranPrintStep is a feature VACASK lacks (R67/A41) and its drop rule is owed, so the
+# transients are refused at step 2 again (F2 behind it); A38's strict refusal (S0104) landed.
+coupled_l 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
 dc_sweep_pulse 2 refused:W2007 ruling=R64 # R64a: a .dc over a source with a PULSE is refused, not swept (VACASK ignores a waveform source's dc)
-pulse_zero_edges 3 differs ruling=R67 # F2: read back without `print_step=0.1n` (the VACASK writer drops a given print step until R67's feature)
-sine_full 3 differs ruling=R67 # F2: read back without `print_step=0.1n` (the VACASK writer drops a given print step until R67's feature)
-tran_exp 3 differs ruling=R67 # F2: read back without `print_step=0.5n` (the VACASK writer drops a given print step until R67's feature)
-tran_pwl 3 differs ruling=R67 # F2: read back without `print_step=0.5n` (the VACASK writer drops a given print step until R67's feature)
-tran_rc_pulse 3 differs ruling=R67 # F2: read back without `print_step=0.1n` (the VACASK writer drops a given print step until R67's feature)
-tran_rl_isrc 3 differs ruling=R67 # F2: read back without `print_step=0.2n` (the VACASK writer drops a given print step until R67's feature)
-tran_sine 3 differs ruling=R67 # F2: read back without `print_step=10n` (the VACASK writer drops a given print step until R67's feature)
-tran_uic 2 refused:U0001:Circuit(IcUicOnly) pass=device_ic_to_nodeset # a capacitor's ic= under uic
-unresolved_param 4 source-fails ruling=A38 # ngspice: "Undefined parameter [nosuch]"; the strict read does not refuse it at step 1 yet (the spine half of A38)
+pulse_zero_edges 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
+sine_full 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
+tran_exp 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
+tran_pwl 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
+tran_rc_pulse 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
+tran_rl_isrc 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
+tran_sine 2 refused:U0001:Run(TranPrintStep) ruling=R67 # a .tran's tstep is a given print step VACASK cannot spell; the rule that drops it is owed
+tran_uic 2 refused:U0001:Circuit(IcUicOnly)+Run(TranPrintStep) pass=device_ic_to_nodeset # a capacitor's ic= under uic; and R67
+unresolved_param 1 refused:S0104 ruling=A38 # the strict read refuses a parameter read no definition binds (R63); ngspice rejects the deck too

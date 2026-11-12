@@ -11,6 +11,7 @@
 //! - `pub struct Deck`, `pub struct Fail`, `pub struct Done`, `pub type Written`, `pub const JOBS`
 //! - `pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &PairFile) -> Done`
 //! - `pub fn determinism(from: &DialectRow, to: &DialectRow, decks: &[Deck], once: &BTreeMap<String, Written>) -> Vec<(String, String)>`
+//! - `pub fn convert(from: &DialectRow, to: &DialectRow, deck: &Deck) -> Option<Written>`
 //! - `pub fn fail(class: &str, said: String) -> Fail`
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -39,6 +40,9 @@ pub struct Deck {
     pub policy: Policy,
     /// Whether the simulators run.
     pub simulate: bool,
+    /// The files the sources name that could not be loaded (a kit outside the corpus): the
+    /// deck fails step 1 as `environment`, a fact of the machine, not of the converter.
+    pub missing: Vec<String>,
 }
 
 /// A failed step: its class (what the expected list names) and what was seen.
@@ -47,6 +51,9 @@ pub struct Fail {
     pub class: String,
     /// The message.
     pub said: String,
+    /// For a step-2 refusal of a foreign `Opaque`: each refused opaque as
+    /// `<dialect>/<class>/<reader code>/<first word>`, in item order (the census counts them).
+    pub opaques: Vec<String>,
 }
 
 /// One deck's verdict: each failing step, the last step that ran, and the written files (when
@@ -76,7 +83,7 @@ struct Spine {
     devices: BTreeSet<String>,
 }
 
-/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run`).
+/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
 
 /// `name_with_letter`'s note at a renamed element, `arg` the old name (the pass's `RENAMED`,
@@ -94,6 +101,13 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
             written,
         }
     };
+    if !deck.missing.is_empty() {
+        let f = fail(
+            "environment",
+            format!("not found: {}", deck.missing.join(", ")),
+        );
+        return stop(fails, 1, f, None);
+    }
     let spine = match spine(from, to, &deck.src, deck.policy) {
         Ok(s) => s,
         Err((step, f)) => return stop(fails, step, f, None),
@@ -107,20 +121,33 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         let f = fail("slow", "quarantined by the corpus's source list".into());
         return stop(fails, 4, f, written);
     }
-    // ponytail: a written include outside the run directory's top level is not run (the run
-    // directory links the deck's folder, read-only in the store); place it when a corpus
-    // deck needs it.
-    if let Some((p, _)) = rest.iter().find(|(p, _)| p.contains('/')) {
-        let f = fail(
-            "harness-path",
-            format!("written include {p} not at the top level"),
-        );
-        return stop(fails, 4, f, written);
+    // The written includes, relative to the entry's folder: the run directory holds the
+    // entry and links that folder's files.
+    // ponytail: an include outside that folder's top level is not run (the linked folder is
+    // read-only in the store); place it when a corpus deck needs it.
+    let base = std::path::Path::new(&entry.0)
+        .parent()
+        .unwrap_or(std::path::Path::new(""));
+    let mut placed = Vec::new();
+    for (p, t) in rest {
+        match std::path::Path::new(p).strip_prefix(base) {
+            Ok(r) if !r.to_string_lossy().contains('/') => {
+                placed.push((r.to_string_lossy().into_owned(), t.clone()));
+            }
+            _ => {
+                let f = fail(
+                    "harness-path",
+                    format!("written include {p} not beside the deck"),
+                );
+                return stop(fails, 4, f, written);
+            }
+        }
     }
+    let rest = &placed[..];
     let text = &deck.src.files()[0].1;
     let ran = guard(4, || {
-        let a = sim::run(c.from_sim, &deck.path, text, &[], SECS);
-        let b = sim::run(
+        let a = sim::run_checked(c.from_sim, &deck.path, text, &[], SECS);
+        let b = sim::run_checked(
             c.to_sim,
             &deck.path.with_extension(c.to_ext),
             &entry.1,
@@ -203,11 +230,21 @@ pub fn determinism(
     out
 }
 
+/// `deck` read, legalized and written (steps 1 and 2 and the writing), or `None` when a step
+/// refused or panicked.
+#[cfg_attr(not(feature = "corpus"), allow(dead_code))] // the corpus cells call it
+pub fn convert(from: &DialectRow, to: &DialectRow, deck: &Deck) -> Option<Written> {
+    spine(from, to, &deck.src, deck.policy)
+        .ok()
+        .map(|s| s.files)
+}
+
 /// A failure of class `class`.
 pub fn fail(class: &str, said: String) -> Fail {
     Fail {
         class: class.to_string(),
         said,
+        opaques: Vec::new(),
     }
 }
 
@@ -230,6 +267,18 @@ fn spine(
         dialect::read(src, from, policy, &mut design, &mut diags)
     })?;
     let text = src.files().first().map_or("", |f| f.1.as_str());
+    // `ir::check`'s violations (`X` rows) are the reader's bug: a debug build panics on them in
+    // `dialect::read` (class `panic`), a release build only reports them (class `check:<codes>`).
+    let bad: Vec<&ir::Diag> = diags
+        .rows()
+        .iter()
+        .filter(|d| d.code.letter == b'X')
+        .collect();
+    if !bad.is_empty() {
+        let codes: BTreeSet<String> = bad.iter().map(|d| d.code.to_string()).collect();
+        let class = format!("check:{}", codes.into_iter().collect::<Vec<_>>().join(","));
+        return Err((1, fail(&class, describe(&bad, text))));
+    }
     if let Some(f) = refusal(&diags, 0, text) {
         return Err((1, f));
     }
@@ -244,7 +293,8 @@ fn spine(
     }
     let read = diags.len();
     guard(2, || dialect::legalize(&mut design, to, &mut diags))?;
-    if let Some(f) = refusal(&diags, read, text) {
+    if let Some(mut f) = refusal(&diags, read, text) {
+        f.opaques = opaques(&design, &diags, read);
         return Err((2, f));
     }
     let renames: HashMap<String, String> = diags.rows()[read..]
@@ -378,6 +428,37 @@ fn describe(rows: &[&ir::Diag], text: &str) -> String {
         })
         .collect();
     said.join(" | ")
+}
+
+/// Each `Opaque` `legalize` refused (a `U0001` row from `read` on whose feature is
+/// `Item(Opaque)`), as `<dialect>/<class>/<code>/<first word>`: the code is the reader's note at
+/// the same source bytes (its `P` code first; `-` when it gave none), the word the statement's
+/// first (`<instance>` for an instance line).
+fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
+    let opaque = u32::from(ir::Feature::Item(ir::ItemKind::Opaque).index());
+    let rows = diags.rows();
+    rows[read..]
+        .iter()
+        .filter(|d| d.code == ir::diag::UNSUPPORTED && d.arg == opaque)
+        .filter(|d| d.item.kind == ir::ItemKind::Opaque)
+        .map(|d| {
+            let o: ir::item::Opaque = design.row(d.item.index);
+            // The reader's own code at those bytes (`P…`) before the spine's class code (`S…`).
+            let at: Vec<&ir::Diag> = rows[..read].iter().filter(|r| r.span == d.span).collect();
+            let note = at
+                .iter()
+                .find(|r| r.code.letter == b'P')
+                .or(at.first())
+                .map_or("-".to_string(), |r| r.code.to_string());
+            let words: Vec<&str> = design.text(o.text).split_whitespace().take(2).collect();
+            let instance = words.iter().any(|w| w.contains('('));
+            let word = match instance {
+                true => "<instance>",
+                false => words.first().copied().unwrap_or(""),
+            };
+            format!("{}/{:?}/{note}/{word}", design.str(o.dialect), o.class)
+        })
+        .collect()
 }
 
 /// Step 4's verdict when a run gave no plots: whose run, and why.

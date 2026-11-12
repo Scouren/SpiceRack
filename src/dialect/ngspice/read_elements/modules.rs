@@ -1,11 +1,14 @@
 //! X, N and A cards → `Instance`, `ModuleModel` and `CodeModel` rows.
 //!
-//! - `X n1 … nk sub [params:] k=v …`: the last word before the parameters is the subcircuit;
+//! - `X n1 … nk sub [params:] k=v …`: the last word before the parameters is the subcircuit,
+//!   and `k` is its port count when it is visible (R61, A36: else ngspice rejects the deck);
 //!   `m=` is the multiplier under ngspice's append law (`MultLaw::NgspiceAppend`, R31:
 //!   `inp_fix_subckt_multiplier` hands `m={m}` to the inner cards) unless the subcircuit
 //!   declares `m` (`inp_fix_inst_calls_for_numparam`, `found_mult_param`; INV 6.01), then it is a
 //!   parameter;
-//! - `N n1 … nk model k=v …` (OSDI, `inp2n.c`): every parameter, `m` too, is the module's own;
+//! - `N n1 … nk model k=v …` (OSDI, `inp2n.c`): every parameter is the module's own but `m`,
+//!   the multiplicity (OpenVAF's `$mfactor`; settle `osdi_mult.sp`: `m=2` doubles the current,
+//!   and a module that declares a parameter `m` rejects `m=`, `osdi_mult_own.sp`);
 //! - `A n1 … nk model` (XSPICE): typed only when every connection is a plain node; a port
 //!   modifier (`%v`, `%id`, `[ ]`, `~`) has no IR field (`Private`).
 //!
@@ -13,7 +16,7 @@
 //! `(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[Item])`)
 
 use super::super::read::{Lower, Stmt};
-use super::{Card, Item, Kind, MALFORMED, PRIVATE_FORM, head, push_done, val};
+use super::{Card, Item, Kind, MALFORMED, PORT_COUNT, PRIVATE_FORM, head, push_done, val};
 use crate::ir::{self, ElemKind as K};
 
 /// An X card.
@@ -31,9 +34,15 @@ pub(super) fn x(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     }
     let sub = items[words - 1].text.clone();
-    let declares_m = lw
-        .subckt_formals(st, &sub)
-        .is_some_and(|f| f.iter().any(|p| p.eq_ignore_ascii_case("m")));
+    let sub_head = lw.subckt_head(st, &sub);
+    if sub_head
+        .as_ref()
+        .is_some_and(|(ports, _)| *ports != words - 1)
+    {
+        // R61/A36: ngspice rejects the deck (settle instance_ports_short.sp, _long.sp)
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, PORT_COUNT);
+    }
+    let declares_m = sub_head.is_some_and(|(_, f)| f.iter().any(|p| p.eq_ignore_ascii_case("m")));
     card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();
     card.model = Some(sub);
     if !keyed(lw, st, &mut card, rest, !declares_m) {
@@ -57,7 +66,7 @@ pub(super) fn n(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
     }
     card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();
     card.model = Some(items[words - 1].text.clone());
-    if !keyed(lw, st, &mut card, &items[words..], false) {
+    if !keyed(lw, st, &mut card, &items[words..], true) {
         return;
     }
     let h = head(lw, st, &card);

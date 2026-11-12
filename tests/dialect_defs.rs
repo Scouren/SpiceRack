@@ -18,6 +18,9 @@
 //!
 //! Contents: none (tests only).
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 

@@ -2,6 +2,7 @@ print, abort, postprocess, clear, var
 control
   // a comment before the first statement
   var x=2
+  options op_itl=(x+1)*2 reltol=1e-4
   print instance("r1")
   abort always
   analysis op1 op

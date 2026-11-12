@@ -114,8 +114,13 @@ pub trait RowFacts: ItemRow {
 pub enum ExprUse {
     /// A field constant in time (`Handle::Expr`, an `Exprs` element, a `Params` value).
     Constant,
-    /// A field that may read the circuit (`Handle::ExprDyn`).
+    /// A field that may read the circuit (`Handle::ExprDyn`), other than a behavioural source's
+    /// own expression: its root counts in its class's form (R66).
     Circuit,
+    /// A behavioural source's own expression (`Behav::expr`, a `Handle::ExprDyn`): it always
+    /// goes to the behavioural evaluator, so its root counts dynamic whatever its class (R66,
+    /// A40).
+    Behavioural,
 }
 
 /// One handle a row holds, typed by its table. `NONE` handles are listed too: whether `NONE` is

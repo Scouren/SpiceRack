@@ -48,8 +48,9 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     if matches!(e.kind, K::VSource | K::ISource | K::Port) {
         return write_sources::admits(design, item, diags);
     }
-    if !admit::spellable(design, &e) {
-        diags.push_at(UNSPELLABLE, design, item, 0);
+    if let Err(why) = admit::spellable(design, &e) {
+        // the arg names the branch (`admit::Why`), for a census by reason
+        diags.push_at(UNSPELLABLE, design, item, why as u32);
     }
 }
 

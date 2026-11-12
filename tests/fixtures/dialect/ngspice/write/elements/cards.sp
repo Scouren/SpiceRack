@@ -1,5 +1,5 @@
 cards
-R1 a b 1k rmod tc1=1m temp=50 noisy=0 l=1u m=2
+R1 a b rmod 1k tc1=1m temp=50 noisy=0 l=1u m=2
 C1 a 0 1p ic=0.5
 R2 a b {v(a) * 1k}
 C2 a b q={1p * v(a)}
@@ -16,5 +16,6 @@ W1 a b vctl wmod off
 T2 a 0 b 0 z0=75 f=1g nl=0.5
 U1 a b 0 umod l=1m n=5
 X1 a b sub m=2
+N1 a b nmod w=1 m=2
 A1 in out amod
 .end

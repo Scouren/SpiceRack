@@ -16,16 +16,22 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.4; R43, A22; VD cmd-overview, cmd-sweep,
 //! cmd-analysis-mc.
 //!
+//! Circuit variables: `variables.rs`.
+//!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
 mod options;
 mod plan;
 mod sweep;
+mod variables;
 
+use variables::check_value;
+
+use super::codes::UNCLOSED;
 use super::read::{self, Lower};
 use super::read_outputs;
 use crate::ir;
@@ -161,12 +167,22 @@ pub(super) const ELABORATE_TOP: ir::Code = ir::Code::new(b'P', 2311);
 pub(super) const SWEEP_FORM: ir::Code = ir::Code::new(b'P', 2312);
 /// An `alter` of a source's `type` (the fold of R42 is the scaffold's declare step, not yet).
 pub(super) const ALTER_TYPE: ir::Code = ir::Code::new(b'P', 2313);
+/// A statement that reads a circuit variable (a `var` name no top-level parameter defines).
+pub(super) const READS_VARIABLE: ir::Code = ir::Code::new(b'P', 2315);
 /// A sweep of a waveform source's `dc`, which VACASK ignores (settle run/sweep_source).
 pub(super) const SWEEP_WAVE: ir::Code = ir::Code::new(b'P', 2314);
 /// A sweep of a source's DC value where the source has a wave and its DC is the wave's: a
 /// feature candidate (class F: ngspice has the form; a pass giving such a source its wave's
 /// value at zero as a given DC, spelled as R42's fold, would convert it when a pair deck needs it).
 pub(super) const SOURCE_SWEEP_WAVE: ir::Code = ir::Code::new(b'W', 2307);
+/// A sweep of a source's DC value whose element is no independent source found from the top.
+pub(super) const SOURCE_SWEEP_NAME: ir::Code = ir::Code::new(b'W', 2309);
+/// A transfer or noise analysis whose output is no node or node pair.
+pub(super) const OUTPUT_FORM: ir::Code = ir::Code::new(b'W', 2311);
+/// An `mc` loop inside another.
+pub(super) const MC_NESTED: ir::Code = ir::Code::new(b'W', 2310);
+/// A node set no analysis line that takes its list follows.
+pub(super) const NODE_SET_PLACE: ir::Code = ir::Code::new(b'W', 2308);
 /// A control statement VACASK rejects.
 pub(super) const REJECTED: ir::Code = ir::Code::new(b'P', 2320);
 
@@ -272,6 +288,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Kind::Note,
     ),
     row(
+        READS_VARIABLE,
+        "a statement that reads a circuit variable, kept as its text",
+        "R43, R63; VD expr-cirvars; corpus demo/bsim3-ptm/characteristic.sim (`var a=2 b=2`, `options … op_itl=(a+b*a)*b`)",
+        "A var statement is Private (P2307), so a name only it defines has no IR definition; a statement that reads one is kept as text with it, VACASK's writer copies both.",
+        ir::Kind::Note,
+    ),
+    row(
         SWEEP_WAVE,
         "a sweep of a waveform source's dc, kept as its text",
         "R64; settle run/sweep_source (VACASK 36be560)",
@@ -283,6 +306,34 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "a sweep of the DC value of a source whose DC is its wave's",
         "R64; settle run/sweep_source (VACASK 36be560)",
         "VACASK ignores `dc` on a waveform source, so the sweep would move nothing (0, 0 where ngspice's .dc gives 2, 4); the source needs a given DC value (R42's type alternation) to be swept.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        SOURCE_SWEEP_NAME,
+        "a sweep of the DC value of a source VACASK would not find",
+        "R64; VD cmd-sweep (instance= is a hierarchical instance name)",
+        "VACASK finds a swept instance by its path from the top; a source-DC target whose path or name names no independent source there reads back as a device parameter of an unknown instance.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        OUTPUT_FORM,
+        "a transfer or noise analysis whose output is no node voltage",
+        "VD cmd-analysis-dcxf, -acxf, -noise (`out`: one node or a node pair)",
+        "VACASK's dcxf, acxf and noise name their output as a node or a node pair; a current or another probe has no VACASK spelling there (it would read back as a node of that name).",
+        ir::Kind::Refusal,
+    ),
+    row(
+        MC_NESTED,
+        "an mc loop inside another",
+        "VD cmd-analysis-mc (an mc block cannot be nested); the reader refuses one (P2320)",
+        "VACASK runs one Monte Carlo loop at a time; a loop of samples inside another has no VACASK spelling.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        NODE_SET_PLACE,
+        "a node set no analysis that takes it follows",
+        "VD cmd-analysis-op, -tran, -dcinc, -dcxf (`ic=` on tran, `nodeset=` on op, dcinc, dcxf and tran)",
+        "VACASK states an initial condition or a nodeset only as a list on the analysis line it applies to; a node set before any other item, or before an analysis without that list, has no VACASK spelling.",
         ir::Kind::Refusal,
     ),
     row(
@@ -345,6 +396,13 @@ pub(super) fn control(l: &mut Lower<'_, '_, '_>, n: Node) {
         let start = l.start(s);
         l.comments_until(start, true);
         l.stmt = l.span(s);
+        if read::unclosed(l.cst, s) {
+            for sw in sweeps.drain(..) {
+                read::opaque(l, sw, ir::OpaqueClass::InvalidInSource, Some(REJECTED));
+            }
+            read::opaque(l, s, ir::OpaqueClass::InvalidInSource, Some(UNCLOSED));
+            continue;
+        }
         let word = head(l, s);
         let private = mc.is_some_and(|(_, p)| p);
         if word == "sweep" && !private {

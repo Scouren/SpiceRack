@@ -474,15 +474,19 @@ mod tests {
 
     #[test]
     fn bins_of_a_group_and_an_instance_of_the_group() {
-        let text = "file \"t.sp\" deck\n  model nch.1 bsim4 polarity=n bin_of=nch\n  \
-                    model nch.2 bsim4 polarity=n bin_of=nch\n  model mz mesa polarity=p\n  \
+        // a versioned family states its version (round 7): without it `check` refuses the
+        // bins, and so does the reader since it refuses what `check` refuses
+        let text = "file \"t.sp\" deck\n  model nch.1 bsim4 polarity=n bin_of=nch version=\"4.8\"\n  \
+                    model nch.2 bsim4 polarity=n bin_of=nch version=\"4.8\"\n  model mz mesa polarity=p\n  \
                     element mosfet m1 (d g s b) model=nch\n";
         same(text, |b, top| {
             for bin in ["nch.1", "nch.2"] {
                 let name = b.name(bin);
                 let bin_of = b.name("nch");
+                let version = b.string("4.8");
                 let row = spicerack_ir::Model {
                     bin_of,
+                    version,
                     ..model(name, ModelFamily::Bsim4, Polarity::N)
                 };
                 b.model(top, row, Span::NONE);
@@ -596,6 +600,44 @@ mod tests {
                 Span::NONE,
             );
         });
+    }
+
+    /// R61/A36 at the reader (the trunk's mutation law, `ir` row, `worked.ir` seed 9): an
+    /// instance whose terminals number differently from its subcircuit's ports, known only once
+    /// `link` has bound it, is one `TEXT_SYNTAX` row at its line and is taken out of the design.
+    /// Oracle: `check` of what was read reports nothing; the matching instance stays.
+    #[test]
+    fn an_instance_of_another_port_count_is_refused() {
+        let text = concat!(
+            "file \"rc.sp\" deck\n",
+            "  subckt div (in gnd)\n",
+            "    element resistor r1 (in gnd) value=1\n",
+            "  element instance x1 (a b 0) model=div\n",
+            "  element instance x2 (a 0) model=div\n",
+        );
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        parse(text, &mut d.builder(), &mut diags);
+        let codes: Vec<_> = diags.rows().iter().map(|r| r.code).collect();
+        assert_eq!(
+            codes,
+            vec![spicerack_ir::diag::TEXT_SYNTAX],
+            "{:?}",
+            diags.rows()
+        );
+        let at = diags.rows()[0].span;
+        let x1 = text.find("element instance x1").unwrap() as u32;
+        let x2 = text.find("element instance x2").unwrap() as u32;
+        assert!(
+            at.start >= x1 && at.start < x2,
+            "the row names the instance's line: {at:?}"
+        );
+        let mut checked = Diags::new();
+        spicerack_ir::check(&d, &mut checked);
+        assert!(checked.is_empty(), "{:?}", checked.rows());
+        let mut out = String::new();
+        dump(&d, FileId(0), &mut out);
+        assert!(!out.contains(" x1 ") && out.contains(" x2 "), "{out}");
     }
 
     /// The spine's mutation law (ir-spine 51cd4f21, `tests/dialect_mutants.rs`): an element or

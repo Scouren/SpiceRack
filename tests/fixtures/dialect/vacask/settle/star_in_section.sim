@@ -1,0 +1,7 @@
+star inside the chosen section
+include "star.lib" section=a
+model vsource vsource
+v1 (a 0) vsource dc=p
+control
+  analysis op1 op
+endc

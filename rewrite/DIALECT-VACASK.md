@@ -340,7 +340,8 @@ asserts an old code (R9).
 | P2001 | refusal | not a VACASK number (`1k5`, `1e3k`, `1d3`) | S 1.05–1.07 |
 | P2002 | refusal | `inf`/`nan` literal (NaN gate) | VD input-numbers; C9 |
 | P2003 | note | a statement read as `Private` (one per construct class of §3) | §3 |
-| P2004 | note | a statement of an area not written yet, kept `Unread` (S4.0's stubs) | §2 |
+| P2013 | refusal | a statement VACASK has no syntax for (an ngspice card, a `*` line): `InvalidInSource` | run fx; settle star_deck, star_in_section |
+| P2014 | note | the same at a library's top outside every section, which VACASK skips when included by `section=`: `Inert` | settle star_outside_section, junk_outside_section |
 | P2005 | refusal | `parameters` inside an `@if` branch | VD cir-conditional |
 | P2006 | refusal | `v()`, `i()` or `$abstime` outside a behavioural source | VD dev-builtin-behavioral |
 | P2008 | refusal | `load`, `embed`, `global` or `ground` inside a subcircuit or branch | VD cir-subckt, cir-loading |
@@ -359,11 +360,15 @@ VACASK (a candidate feature), or VACASK's own limit.
 
 | Code | Owner | What it refuses | Class |
 |---|---|---|---|
-| W2105 (subckt half) | S4.1 | an instance whose terminal count is not its subckt's ports | IR invariant (the lead's ruling) |
 | W2203 (coupling) | S4.2 | a mutual coupling with a multiplicity (VACASK "Parameter '$mfactor' not found.", run src_r_mfactor; ngspice-45 "unknown parameter (m)") | IR invariant (`Coupling.mult` NONE) |
 | W2203 (sources) | S4.2 | a source, controlled source or line with untyped instance parameters (VACASK "Parameter 'foo' not found.", run src_r_foo; ngspice-45 "unknown parameter (foo)"; Spectre's sources take some, no run) | feature, settled by the Spectre slice |
 | W2006 | S4.0 | `to_real` in a parameter expression of class Temp: R52's deferred gap (c) (the bare read in a behavioural source is A33's `BehavUntypedParam`, which `FEATURES` lacks) | feature |
-| W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp` or `rpar` (ngspice's B has them) | feature |
+| W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp`, `rpar` (ngspice's B has them) or a multiplicity (`MultOther` covers it with lines; law L5 seed 15) | feature |
+| W2109 | S4.1 | an unresolved element with a multiplicity (`$mfactor` is a parameter on a subckt that declares it: it reads back as one; law L5 seed 1) | VACASK's own |
+| W2311 | S4.3 | a `dcxf`, `acxf` or `noise` output that is no node or node pair (`ProbeI` is held for saves; law L5 seed 37) | feature (R58's grain: a probe kind per use) |
+| W2310 | S4.3 | an `mc` loop inside another (VD cmd-analysis-mc: no nesting; law L5 seed 20) | VACASK's own |
+| W2308 | S4.3 | a node set that no analysis line taking its list follows (law L5 seed 12) | VACASK's own |
+| W2309 | S4.3 | a source-DC sweep whose path names no independent source from the top (law L5 seed 15) | VACASK's own |
 | W2108 | S4.1 | an element whose kind is not the one its model's family gives | feature |
 | W2304 | S4.3 | an option row of a key only another simulator has | feature |
 | W2307 | S4.3 | a sweep of the DC value of a source whose DC is its wave at zero (VACASK reads `dc` only while the type is dc: settle run/sweep_source, e = 0 0 where ngspice-45's `.dc` gives 2 4) | feature (R64: a pass giving the source its wave's value at zero as a given DC, written as R42's fold, would convert it) |
@@ -375,13 +380,15 @@ VACASK (a candidate feature), or VACASK's own limit.
 | W2101 | S4.1 | a name with white space or a line break | VACASK's own |
 | W2102 | S4.1 | a parameter the shipped module lacks; a user module's `version=` | VACASK's own |
 | W2103 | S4.1 | two libraries of one family whose files hold different modules | VACASK's own |
-| W2104 | S4.1 | a master no visible model or subckt statement names (VACASK takes the kind from the master) | VACASK's own |
+| W2104 | S4.1 | a master no visible model or subckt statement names (VACASK takes the kind from the master), a source's included (law L5 seed 1) | VACASK's own |
 | W2105 (module half) | S4.1 | a device against its shipped module's terminal count | VACASK's own |
 | W2107 | S4.1 | a model of a family no run proved a VACASK module implements (R41 a) | VACASK's own |
 | W2303 | S4.3 | a save shape VACASK has no directive for (R29, S12) | VACASK's own |
 
-W2301 and W2302 are notes (a name the writer gave), not refusals. They go with ir-run's
-`AnalysisUnnamed`, `DcAxisUnnamed` and `LoopUnnamed`, which `FEATURES` will lack.
+The writer gives no name (W2301 and W2302 are retired): `FEATURES` holds `AnalysisNamed`,
+`DcAxisNamed` and `LoopNamed` and none of the unnamed three, so the run group's naming rows
+(`analysis_name_given`, `dc_axis_name_given`, `loop_name_given`: R59, A35) name every
+analysis, DC axis and loop before `write`, each with its `U0410` note.
 
 ## 8. Tests (each names its oracle)
 
@@ -497,6 +504,6 @@ Still open:
 | lr1 | `vsource dc=` of 1 + 2⁻⁵³ (a tie), a hair above it, 1 + 3·2⁻⁵³ (a tie), and 30 digits `e-29` | the correctly rounded doubles, ties to even: VACASK keeps a long literal's digits (A18 `LongLiteral`) |
 | dp1 | `subckt s(a a)` | "Terminal '1' is not unique.": a subckt naming a port twice is `InvalidInSource` R2001 (found by the mutation law) |
 | ip1–ip5 | behavioural sources over `parameters pi=3 pr=2.7 pw=3.0 pn=-2.7`: `$intparam(pi)/2`, `$intparam(pr)`, `$intparam(pw)/2`, `$intparam(pn)`, `$realparam(pi)/2`, `pi/2`, `sin(pi)`, `$intparam(pr)/2`; `$intparam` of 3e9, 2147483647.5, 1e20; `v=ps` with `ps="x"`; `$intparam` in a parameter; `$intparam(pa+1)` | 1, 2, 1, −2, 1.5, 1.5, sin 3, 1: `$intparam` is `to_int`, `$realparam` and a bare name `to_real` (R56); −2147483648, 2147483647, −2147483648 (R54's domain); "Cannot convert string into real."; "Function '$intparam' not found."; "$intparam() requires a single identifier argument." (P2010) |
-| fx | SPICE text in a VACASK file: `.model dn d is=1e-14`, `save v(p0)` at the top, `+ is=1`, `.subckt s a b` | "Syntax error, unexpected string." (and "Parser syntax error … expecting (" for `save`): every statement no reader rule reads is one VACASK rejects: today it stays `Unread` P2004 (all of them in the corpus' 37 ngspice-format files); `InvalidInSource` waits for `write_run::control_span` to tell a top-level `save` from a control block's |
+| fx | SPICE text in a VACASK file: `.model dn d is=1e-14`, `save v(p0)` at the top, `+ is=1`, `.subckt s a b` | "Syntax error, unexpected string." (and "Parser syntax error … expecting (" for `save`): every statement no reader rule reads is one VACASK rejects: `InvalidInSource` P2013, or `Inert` P2014 at a library's top outside every section, which VACASK skips under `section=` (settle star_*, junk_outside_section) |
 | ca1, ca2 | `parameters p=sin(1, 2)`, `p=atan2(1)` | "Function 'sin' accepts at most 1 argument(s).", "Function 'atan2' requires at least 2 argument(s)).": a call of another argument count is `InvalidInSource` P2011 (the IR's CallArity X0019) |
 | which1–which3 | a subckt parameter `r=u` with `u` 2k at the top and 8k in the wrapper holding the instance; `r=v` with `v=3k` declared later (same line, later line); `r=u` with `u` only in the instance's enclosing subckt | 2000 (bound where the definition stands: R62/A37's lexical feature; the dynamic lookup is not VACASK's); 3000 and 3000; "Variable or constant 'u' not defined." (no lookup from the instance's scope)  The reader binds by VACASK's rule and leaves a read no file defines unresolved, silently; it never refuses one (R63, A38: under `Policy::Strict` the spine refuses a design that still holds one, at its item; under `Lenient` it stays). Over the 184 corpus files read alone, 37 statements in 3 files hold such a read: `demo/cmos180n.lib` and `demo/bsim3-ptm-amp/miller.inc` (libraries whose names the deck that includes them defines: 24 params, 10 elements, 2 models) and `demo/bsim3-ptm/characteristic.sim` (one option row reading `var a=2 b=2`, a `Private` statement: R43). A reader refusal would have dropped those 37 statements' definitions with them |

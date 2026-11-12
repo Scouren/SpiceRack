@@ -26,7 +26,7 @@
 //!   `pub(crate) fn unplaced_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`,
-//!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; re-exported from
+//!   `pub(crate) fn roots_with_use(&Design, ItemRef, &[Handle]) -> Vec<(ExprId, ExprUse)>`; re-exported from
 //!   `form`: `pub enum Form`, `pub fn root_form(&Design, ExprId, ExprUse) -> Form`
 
 use crate::analysis::AnalysisKind;
@@ -504,9 +504,9 @@ pub(crate) fn item_features(
     if enclosing {
         *set = set.with(Feature::Extra(Extra::EnclosingRef));
     }
-    for (root, use_) in roots_with_use(design, &handles) {
+    for (root, use_) in roots_with_use(design, item, &handles) {
         let nodes = walk.tree(design, root);
-        // the one form decision (A26): the field's use and the tree's class (R14, A19)
+        // the one form decision (A26): the tree's class and a behavioural use (R14, R66)
         let class = crate::class::tree_class(design, root, def_classes(design));
         // A28 (R51): a function body counts in its callers' forms, every other root in its own
         let forms = if item.kind == ItemKind::Func {
@@ -582,21 +582,32 @@ impl ExprWalk {
 /// The expression roots among a row's handles: value fields, list elements, parameter values.
 /// Out-of-range lists are skipped (`check` reports them).
 pub(crate) fn expr_roots(design: &Design, handles: &[Handle]) -> Vec<ExprId> {
-    roots_with_use(design, handles)
+    roots_with_use(design, ItemRef::NONE, handles)
         .into_iter()
         .map(|(e, _)| e)
         .collect()
 }
 
-/// The expression roots `handles` lists with how each field reads, in `RowFacts::map_exprs`'s
-/// order (A23): `Circuit` for `ExprDyn`, `Constant` for `Expr`, `Exprs` elements and `Params`
-/// values. A list outside its pool lists nothing (`check` reports it).
-pub(crate) fn roots_with_use(design: &Design, handles: &[Handle]) -> Vec<(ExprId, ExprUse)> {
+/// The expression roots `handles` (the handles of `item`) lists with how each field reads, in
+/// `RowFacts::map_exprs`'s order (A23): `Constant` for `Expr`, `Exprs` elements and `Params`
+/// values; for `ExprDyn`, `Behavioural` in an element whose detail is `Behav` (its one
+/// `ExprDyn` is `Behav::expr`, R66) and `Circuit` elsewhere. A list outside its pool lists
+/// nothing (`check` reports it).
+pub(crate) fn roots_with_use(
+    design: &Design,
+    item: ItemRef,
+    handles: &[Handle],
+) -> Vec<(ExprId, ExprUse)> {
+    let dyn_use = if crate::circuit_fields::is_behavioural(design, item) {
+        ExprUse::Behavioural
+    } else {
+        ExprUse::Circuit
+    };
     let mut roots = Vec::new();
     for h in handles {
         match *h {
             Handle::Expr(e) => roots.push((e, ExprUse::Constant)),
-            Handle::ExprDyn(e) => roots.push((e, ExprUse::Circuit)),
+            Handle::ExprDyn(e) => roots.push((e, dyn_use)),
             Handle::Exprs(l) if l.start as usize + l.len() <= design.expr_pool.len() => {
                 roots.extend(design.exprs(l).iter().map(|&e| (e, ExprUse::Constant)))
             }

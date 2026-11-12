@@ -15,13 +15,19 @@
 //! Contents:
 //! - `pub enum Sim`, `Sim::name(self) -> &'static str`, `Sim::on_path(self) -> bool`
 //! - `pub enum Ran`
-//! - `pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: u64) -> Ran`
+//! - `pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: u64) -> Ran`,
+//!   `pub fn run_checked(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: u64) -> Ran`
 //! - `pub fn refined(sim: Sim, text: &str, n: f64) -> Option<String>`
 
 use std::path::Path;
 use std::process::Command;
 
 use spicerack::result::{RawData, VarInfo, VarType};
+
+#[path = "sim_said.rs"]
+mod said;
+
+use said::{errors, ltspice_said, reported};
 
 /// A simulator a cell runs, with the reading mode it is started in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,7 +107,28 @@ impl Sim {
 /// CPU seconds.
 pub fn run(sim: Sim, deck: &Path, text: &str, files: &[(String, String)], secs: u64) -> Ran {
     assert!(secs > 0, "a CPU budget");
-    match run_in(sim, deck, text, files, secs) {
+    match run_in(sim, deck, text, files, secs, false) {
+        Ok(r) => r,
+        Err(e) => Ran::Failed(e),
+    }
+}
+
+/// As [`run`], and a run whose simulator reported an error is [`Ran::Failed`] with the report,
+/// whatever its exit code and whatever plots it wrote: ngspice goes on after "Error: no such
+/// device or model name" (R70's F7 deck), VACASK exits 0 after a failed analysis. The error
+/// forms: ngspice, a line starting `Error` or holding `Simulation interrupted`; VACASK, a line
+/// after its banner holding `not defined`, `error`, `aborted` or `failed` (any case). The pair
+/// test's runs; the cross-sim cells keep [`run`] until their lists are re-recorded under it.
+#[allow(dead_code)] // `test_cross_sim` and `common/oracle.rs` run unchecked
+pub fn run_checked(
+    sim: Sim,
+    deck: &Path,
+    text: &str,
+    files: &[(String, String)],
+    secs: u64,
+) -> Ran {
+    assert!(secs > 0, "a CPU budget");
+    match run_in(sim, deck, text, files, secs, true) {
         Ok(r) => r,
         Err(e) => Ran::Failed(e),
     }
@@ -132,6 +159,7 @@ fn run_in(
     text: &str,
     files: &[(String, String)],
     secs: u64,
+    checked: bool,
 ) -> Result<Ran, String> {
     let mut tmp = Some(tempfile::TempDir::new().unwrap_or_else(|e| harness(&e)));
     let kept = tmp
@@ -234,6 +262,12 @@ fn run_in(
         .replace(&format!("{}/", dir.display()), "");
     // ngspice runs a MOS model of a level it lacks (PSP's 102, ...) as level
     // 1, with a warning only: a result, of another circuit.
+    if checked && let Some(said) = reported(sim, &log) {
+        return Ok(Ran::Failed(format!(
+            "{} reported an error: {said}",
+            sim.name()
+        )));
+    }
     if log.contains("Setting Level to 1") {
         return Ok(Ran::Failed(format!(
             "ngspice swapped the model: {}",
@@ -435,87 +469,6 @@ fn timed_out(o: &std::process::Output) -> bool {
     matches!(o.status.code(), Some(124 | 137 | 152)) || matches!(o.status.signal(), Some(9 | 24))
 }
 
-/// The first four lines of `log` that name an error, each with the line
-/// after it when that one names the cause instead (ngspice's "Error on line
-/// N", Xyce's "Netlist error in file F at or near line N"), so a reason
-/// reads `Netlist error ... line 8: Model is required for device Q0`.
-fn errors(log: &str) -> String {
-    const CAUSES: [&str; 6] = [
-        "error",
-        "undefined",
-        "level must",
-        "not enough",
-        "unknown",
-        "no such",
-    ];
-    // VACASK names no error: its messages are the lines after
-    // `Simulating:` (its banner, `This is vacask unknown.`, is not one).
-    if let Some((_, run)) = log.split_once("Simulating:") {
-        let said: Vec<&str> = run
-            .lines()
-            .skip(1)
-            .map(str::trim)
-            .filter(|l| {
-                !l.is_empty()
-                    && !l.starts_with("Running analysis")
-                    && !l.starts_with("Elapsed time")
-            })
-            .take(4)
-            .collect();
-        if !said.is_empty() {
-            return said.join(" | ");
-        }
-    }
-    let all: Vec<&str> = log.lines().map(str::trim).collect();
-    let mut out = Vec::new();
-    for (i, l) in all.iter().enumerate() {
-        let low = l.to_lowercase();
-        if !CAUSES.iter().any(|c| low.contains(c))
-            || low.contains("fatal error in ngspice")
-            || low.starts_with("this is vacask")
-        {
-            continue;
-        }
-        // Xyce wraps its location ("... at" / "or near line 8", "... at or" /
-        // "near line 8"): the cause
-        // is the line after the wrap.
-        let after = |k: usize| all.get(i + k).copied().unwrap_or("");
-        let next = if after(1).starts_with("or near") || after(1).starts_with("near line") {
-            after(2)
-        } else {
-            after(1)
-        };
-        let located = low.starts_with("netlist error in file") || low.starts_with("error on line");
-        out.push(if located {
-            format!("{l}: {next}")
-        } else {
-            l.to_string()
-        });
-        if out.len() == 4 {
-            break;
-        }
-    }
-    out.join(" | ")
-}
-
-/// Why an LTspice run failed: its log's lines after `Start Time:`, less
-/// the settings it lists (`solver = Normal`, `Maximum thread count: 32`,
-/// `Total elapsed time: …`) and each line's Windows path, the first four.
-fn ltspice_said(log: &Path) -> String {
-    let text = std::fs::read_to_string(log).unwrap_or_default();
-    let run = text.split_once("Start Time:").map_or("", |(_, r)| r);
-    let setting =
-        |l: &str| l.contains(" = ") || l.starts_with("Maximum thread") || l.starts_with("Total ");
-    let said: Vec<&str> = run
-        .lines()
-        .skip(1)
-        .map(|l| l.rsplit('\\').next().unwrap_or(l).trim())
-        .filter(|l| !l.is_empty() && !setting(l))
-        .take(4)
-        .collect();
-    said.join(" | ")
-}
-
 /// An LTspice `.tran <Tstop> [modifiers]` line as `.tran 0 <Tstop>
 /// [modifiers]`, the order `tmax` reads (LTspice 26.1.1 help, `.TRAN`:
 /// one number is the stop time; the other form is `.TRAN <Tstep> <Tstop>
@@ -652,6 +605,35 @@ fn vacask_raws(dir: &Path, text: &str, files: &[(String, String)]) -> Vec<std::p
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_simulators_own_error_report_is_found() {
+        // Oracle: the simulators' own output, recorded in .#testing (R70's F7 deck on
+        // ngspice-45; VACASK on an analysis reading `$temp`, which exits 0 and writes op1.raw).
+        // A clean log of each has no report. Checks: 4.
+        let ng = "Circuit: alter_toplevel\nError: no such device or model name __topinst__\n\
+                  No. of Data Rows : 1\n";
+        let said = reported(Sim::Ngspice, ng);
+        assert_eq!(
+            said.as_deref(),
+            Some("Error: no such device or model name __topinst__")
+        );
+        let vc = "This is vacask unknown.\nSimulating: analysis_temp\nRunning analysis 'op1'.\n\
+                  Running analysis 'tran1'.\nVariable or constant '$temp' not defined.\n";
+        let said = reported(Sim::Vacask, vc);
+        assert_eq!(
+            said.as_deref(),
+            Some("Variable or constant '$temp' not defined.")
+        );
+        assert_eq!(
+            reported(Sim::Ngspice, "Circuit: rc\nNo. of Data Rows : 432\n"),
+            None
+        );
+        assert_eq!(
+            reported(Sim::Vacask, "Simulating: rc\nRunning analysis 'op1'.\n"),
+            None
+        );
+    }
 
     #[test]
     fn p1_066_an_included_files_analysis_names_a_raw_file() {

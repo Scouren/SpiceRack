@@ -19,7 +19,7 @@
 //! dev-builtin-behavioral (Functions); R13 (sugar).
 //!
 //! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`, `CALL_ARITY`, `PARAM_READ_ARG`,
-//! `PROBE_IN_PARAM`, `check_expr`, `expr` (crate-private)
+//! `PROBE_IN_PARAM`, `check_expr`, `expr`, `names_read`, `unescape` (crate-private)
 
 use super::name;
 use super::number;
@@ -194,6 +194,58 @@ pub(super) fn expr(
     Ok(build(l, node, ctx))
 }
 
+/// Every name the expression at CST node `node` reads (identifiers and words, `$temp` among
+/// them), in walk order; calls' and probes' arguments included, a vector's elements not (a
+/// vector value is Private, G13).
+pub(super) fn names_read(l: &Lower<'_, '_, '_>, node: u32) -> Vec<String> {
+    let ast = &l.cst.ast;
+    let mut out = Vec::new();
+    let mut todo = vec![node];
+    // Bounded by the node count: each node of the (acyclic) expression tree is taken once and
+    // pushes at most three children; the assertion stops a layout read wrong before it walks
+    // forever (wip/vc-run read a list count from another tag's slot and ran out of memory).
+    for _ in 0..=4 * ast.len() {
+        let Some(x) = todo.pop() else {
+            return out;
+        };
+        if x == crate::syntax::ast::NONE {
+            continue;
+        }
+        let n = Node(x);
+        match ast.tag(n) {
+            Tag::Ident | Tag::Word => out.push(name_of(l, n)),
+            Tag::Unary | Tag::Paren | Tag::Delimited => todo.push(ast.lhs(n)),
+            Tag::Binary => todo.extend([ast.lhs(n), ast.rhs(n)]),
+            Tag::Ternary => {
+                let at = ast.rhs(n);
+                todo.extend([ast.lhs(n), ast.extra(at), ast.extra(at + 1)]);
+            }
+            Tag::Call | Tag::Probe => todo.extend(call_args(l, n)),
+            _ => {}
+        }
+    }
+    unreachable!("an expression tree holds at most every node once")
+}
+
+/// A VACASK string's text with its escapes read: `\n`, `\t`, and any other `\c` as `c` (settle
+/// str_escapes: `\q` is q).
+pub(super) fn unescape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        match (c, c == '\\') {
+            (_, true) => match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some(other) => out.push(other),
+                None => out.push('\\'),
+            },
+            (c, false) => out.push(c),
+        }
+    }
+    out
+}
+
 // ---- private ----
 
 /// `set` with every dynamic function's and operator's feature.
@@ -226,27 +278,7 @@ const fn static_funcs(set: ir::FeatureSet) -> ir::FeatureSet {
 /// Whether the expression at `node` reads `$temp` directly: then the IR classes it dynamic (R14),
 /// whose functions are VACASK's behavioural set.
 fn reads_temp(l: &Lower<'_, '_, '_>, node: u32) -> bool {
-    let ast = &l.cst.ast;
-    let mut todo = vec![node];
-    // Bounded: each node of the (acyclic) expression tree is taken once.
-    while let Some(x) = todo.pop() {
-        if x == crate::syntax::ast::NONE {
-            continue;
-        }
-        let n = Node(x);
-        match ast.tag(n) {
-            Tag::Ident | Tag::Word if name_of(l, n) == "$temp" => return true,
-            Tag::Unary | Tag::Paren | Tag::Delimited => todo.push(ast.lhs(n)),
-            Tag::Binary => todo.extend([ast.lhs(n), ast.rhs(n)]),
-            Tag::Ternary => {
-                let at = ast.rhs(n);
-                todo.extend([ast.lhs(n), ast.extra(at), ast.extra(at + 1)]);
-            }
-            Tag::Call | Tag::Probe => todo.extend(call_args(l, n)),
-            _ => {}
-        }
-    }
-    false
+    names_read(l, node).iter().any(|n| n == "$temp")
 }
 
 /// A refusal of class `class` with code `code`.
@@ -547,22 +579,4 @@ fn nonnegative_sign(l: &mut Lower<'_, '_, '_>, x: ir::ExprId) -> ir::ExprId {
     let one = int(l.b, 1);
     let minus = int(l.b, -1);
     l.b.ternary(cond, one, minus)
-}
-
-/// A VACASK string's text with `\"`, `\\` and `\n` read (VD input-strings).
-fn unescape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars();
-    while let Some(c) = chars.next() {
-        match (c, c == '\\') {
-            (_, true) => match chars.next() {
-                Some('n') => out.push('\n'),
-                Some('t') => out.push('\t'),
-                Some(other) => out.push(other),
-                None => out.push('\\'),
-            },
-            (c, false) => out.push(c),
-        }
-    }
-    out
 }

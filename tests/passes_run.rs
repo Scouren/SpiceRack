@@ -8,6 +8,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
 #[path = "passes_run/dc_loops.rs"]
@@ -158,7 +161,7 @@ fn names_given_keep_the_state_at_every_analysis() {
 
 /// After each naming row (R59, A35), over generated designs holding its feature: every
 /// statement of its kind has a name, but a loop it noted (an opaque body), no two share one
-/// without case, and each note's argument is the name now at its item. Each design runs twice:
+/// without case (DC axes and loops as one set), and each note's argument is the name now at its item. Each design runs twice:
 /// as generated, and with its first named statement renamed to the upper case of the first
 /// name the rule gave (a name the rule must then skip). Oracle: the rows' names read back,
 /// against the rule's statement.

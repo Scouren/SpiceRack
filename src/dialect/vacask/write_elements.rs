@@ -8,7 +8,7 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cir-instance, cir-mfactor,
 //! dev-builtin-behavioral; R21 (`admits`).
 //!
-//! Contents: `MASTERLESS`, `PORTS`, `KIND`, `BEHAV_FIELD`, `admits`, `element` (crate-private)
+//! Contents: `MASTERLESS`, `PORTS`, `UNRESOLVED_MULT`, `KIND`, `BEHAV_FIELD`, `admit`, `element` (crate-private)
 
 use super::expr_write::write_expr;
 use super::families::{self, Name};
@@ -19,9 +19,14 @@ use crate::ir;
 
 /// An element whose master VACASK would not find from its place.
 pub(super) const MASTERLESS: ir::Code = ir::Code::new(b'W', 2104);
-/// An instance whose terminal count is not its subckt's ports or its shipped module's terminals.
+/// A device whose terminal count is not its shipped module's (a subcircuit instance's is the IR
+/// invariant X0022: R61, A36).
 pub(super) const PORTS: ir::Code = ir::Code::new(b'W', 2105);
 
+/// An unresolved element with a multiplicity: VACASK's `$mfactor` is the multiplicity on a
+/// device and an ordinary parameter on a subckt that declares it (VD cir-mfactor; run n2), so
+/// with no master it reads back as a parameter. VACASK's own.
+pub(super) const UNRESOLVED_MULT: ir::Code = ir::Code::new(b'W', 2109);
 /// An element whose kind is not the one its master's family gives.
 pub(super) const KIND: ir::Code = ir::Code::new(b'W', 2108);
 /// A behavioural source with a field VACASK's `b` source has no parameter for.
@@ -69,67 +74,66 @@ pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// Appends a refusal for each reachable element of this area VACASK cannot spell for a reason
 /// no feature states (R21): a name holding white space, a parameter its module lacks, a master
 /// VACASK would not find from the element's place (it takes the kind from the master, so the
-/// element would read back `Unresolved`), an instance whose terminal count is not its subckt's
-/// or its shipped module's (VACASK connects the missing ones to internal nodes: read back
-/// `Private`), a kind other than its model's family gives (W2108), a behavioural source with
-/// `tc1 tc2 temp dtemp rpar` (VD dev-builtin-behavioral: its expression only; W2106).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, scope) in design.reachable() {
-        if at.kind != ir::ItemKind::Element {
-            continue;
+/// element would read back `Unresolved`; a source's too), an unresolved element with a
+/// multiplicity (W2109), a device whose terminal count is not its shipped module's (VACASK
+/// connects the missing ones to internal nodes: read back `Private`), a kind other than its model's family gives (W2108), a behavioural source with
+/// `tc1 tc2 temp dtemp rpar` or a multiplicity (VD dev-builtin-behavioral: its expression only;
+/// W2106).
+pub(super) fn admit(
+    design: &ir::Design,
+    at: ir::ItemRef,
+    scope: ir::ScopeId,
+    diags: &mut ir::Diags,
+) {
+    let e: ir::Element = design.row(at.index);
+    // Every kind with a master, sources included: VACASK takes the kind from the master,
+    // so one it does not find reads back `Unresolved` (law L5, seed 1).
+    if let Some(kind) = e.kind.master_kind()
+        && !e.model.name.is_none()
+        && !visible(design, scope, kind, e.model.name)
+    {
+        diags.push_at(MASTERLESS, design, at, 0);
+    }
+    // VACASK takes the kind from the master: a model of another kind's family reads back as
+    // that kind.
+    if e.kind.master_kind() == Some(ir::DefKind::Model) && !SOURCE_KINDS.contains(&e.kind) {
+        let kinds = model_kinds(design, scope, e.model.name);
+        if !kinds.is_empty() && !kinds.contains(&e.kind) {
+            diags.push_at(KIND, design, at, 0);
         }
-        let e: ir::Element = design.row(at.index);
-        if let Some(kind) = e.kind.master_kind()
-            && !SOURCE_KINDS.contains(&e.kind)
-            && !e.model.name.is_none()
-            && !visible(design, scope, kind, e.model.name)
-        {
-            diags.push_at(MASTERLESS, design, at, 0);
+    }
+    if e.kind == ir::ElemKind::Unresolved && !e.mult.is_none() {
+        diags.push_at(UNRESOLVED_MULT, design, at, 0);
+    }
+    if e.kind == ir::ElemKind::Behav {
+        let b = design.behav(&e);
+        // VD dev-builtin-behavioral: no `$mfactor` either (law L5 seed 15).
+        let extra = [b.tc1, b.tc2, b.temp_abs, b.dtemp, b.rpar, e.mult];
+        if extra.iter().any(|x| !x.is_none()) {
+            diags.push_at(BEHAV_FIELD, design, at, 0);
         }
-        // VACASK takes the kind from the master: a model of another kind's family reads back as
-        // that kind.
-        if e.kind.master_kind() == Some(ir::DefKind::Model) && !SOURCE_KINDS.contains(&e.kind) {
-            let kinds = model_kinds(design, scope, e.model.name);
-            if !kinds.is_empty() && !kinds.contains(&e.kind) {
-                diags.push_at(KIND, design, at, 0);
-            }
-        }
-        if e.kind == ir::ElemKind::Behav {
-            let b = design.behav(&e);
-            let extra = [b.tc1, b.tc2, b.temp_abs, b.dtemp, b.rpar];
-            if extra.iter().any(|x| !x.is_none()) {
-                diags.push_at(BEHAV_FIELD, design, at, 0);
-            }
-        }
-        if e.kind == ir::ElemKind::Instance && !e.model.def.is_none() {
-            let def = design.def(e.model.def);
-            let sub: ir::item::Subckt = design.row(def.item.index);
-            if design.names(sub.ports).len() != e.terminals.len() {
-                diags.push_at(PORTS, design, at, 0);
-            }
-        }
-        let names = std::iter::once(e.name)
-            .chain(std::iter::once(e.model.name))
-            .chain(design.names(e.terminals).iter().copied())
-            .filter(|n| !n.is_none());
-        if names
-            .map(|n| design.str(n))
-            .any(|n| n.chars().any(char::is_whitespace))
-        {
-            diags.push_at(write_models::UNSPELLED, design, at, 0);
-        }
-        let Some(word) = module(design, &e) else {
-            continue;
-        };
-        if families::module(&word).is_some_and(|m| usize::from(m.terminals) != e.terminals.len()) {
-            diags.push_at(PORTS, design, at, 0);
-        }
-        let lacked = fields(design, &e).iter().any(|(key, _)| {
-            key != "$mfactor" && !matches!(families::instance_name_in(&word, key), Name::Ir(_))
-        });
-        if lacked {
-            diags.push_at(write_models::LACKED, design, at, 0);
-        }
+    }
+    let names = std::iter::once(e.name)
+        .chain(std::iter::once(e.model.name))
+        .chain(design.names(e.terminals).iter().copied())
+        .filter(|n| !n.is_none());
+    if names
+        .map(|n| design.str(n))
+        .any(|n| n.chars().any(char::is_whitespace))
+    {
+        diags.push_at(write_models::UNSPELLED, design, at, 0);
+    }
+    let Some(word) = module(design, &e) else {
+        return;
+    };
+    if families::module(&word).is_some_and(|m| usize::from(m.terminals) != e.terminals.len()) {
+        diags.push_at(PORTS, design, at, 0);
+    }
+    let lacked = fields(design, &e).iter().any(|(key, _)| {
+        key != "$mfactor" && !matches!(families::instance_name_in(&word, key), Name::Ir(_))
+    });
+    if lacked {
+        diags.push_at(write_models::LACKED, design, at, 0);
     }
 }
 

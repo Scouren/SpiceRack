@@ -19,6 +19,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::path::{Path, PathBuf};
 
 use spicerack::dialect::{self, DialectRow, Policy, Sources};
@@ -36,6 +39,7 @@ const READ: &[&str] = &[
     "continuation",
     "foreach_alterparam",
     "foreach_inert_var",
+    "foreach_long",
     "foreach_loop",
     "foreach_unrolled",
     "hash_line",
@@ -288,31 +292,21 @@ fn script_items_ngspice_cannot_spell_are_refused() {
     // Oracle: ngspice-45's forms. pre_osdi takes a path (inp.c:791-797) and the modules are the
     // binary's; a foreach word is no expression (control.c:462-466); an alter takes one number
     // (device.c ft_getpnames); alterparam applies at a reset that drops live alters
-    // (runcoms2.c:172-240).
+    // (runcoms2.c:172-240); a bare alter of a device other than R, C, L (V, I for a DC) sets its
+    // own default parameter (spiceif.c:951; L5 seed 11's `g149`).
+    #[rustfmt::skip] // a table: one row per line
     const REFUSED: &[(&str, &str, &str)] = &[
-        (
-            "a load naming its modules",
-            "  load osdi \"a.osdi\" modules=(m1)",
-            "W1405",
-        ),
+        ("a load naming its modules", "  load osdi \"a.osdi\" modules=(m1)", "W1405"),
         ("a Verilog-A load", "  load veriloga \"a.va\"", "W1404"),
-        (
-            "a loop over an expression",
-            "  param p = 1\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op",
-            "W1402",
-        ),
-        (
-            "a parameter alter not right before a reset",
-            "  param p = 1\n  alter (param p) value=3\n  analysis op",
-            "W1401",
-        ),
-        (
-            "a parameter loop whose body does not start with a reset",
-            "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op",
-            "W1401",
-        ),
+        ("a loop over an expression", "  param p = 1\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op", "W1402"),
+        ("a parameter alter not right before a reset", "  param p = 1\n  alter (param p) value=3\n  analysis op", "W1401"),
+        ("a parameter loop whose body does not start with a reset", "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op", "W1401"),
         ("a partial reset", "  reset values saves", "W1406"),
+        ("an element-value alter of a G", "  alter (element_value g1) value=2", "W1407"),
+        ("a G loop", "  loop sweep keep_last (element_value g1) (list values=[1])", "W1407"),
+        ("an R's source DC", "  alter (source_dc r1) value=2", "W1407"),
     ];
+
     for (why, items, code) in REFUSED {
         let mut design = parse_ir(why, &format!("file \"r.sp\" deck\n{items}\n"));
         let mut diags = ir::Diags::new();

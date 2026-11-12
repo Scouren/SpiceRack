@@ -6,7 +6,7 @@
 //! Oracle: VACASK 36be560 itself (its own dialect, R5), and ngspice-45 for the decks that
 //! settle a pair (`q13.cir`, `sp2.cir`); closed forms where the appendix gives one.
 //!
-//! Contents: tests only.
+//! Contents: tests, and for `settle_syntax` `Run`, `run`, `says`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -14,23 +14,30 @@ use std::process::Command;
 use spicerack::rawfile::parse_raw;
 use spicerack::result::RawData;
 
-/// The settle decks, relative to the crate root.
-const DIR: &str = "tests/fixtures/dialect/vacask/settle";
-
 /// One simulator run: what it printed (stdout then stderr) and the directory it wrote in.
-struct Run {
+pub(super) struct Run {
     out: String,
     dir: tempfile::TempDir,
 }
 
-// ---- private ----
+/// The settle decks, relative to the crate root.
+const DIR: &str = "tests/fixtures/dialect/vacask/settle";
 
 /// `deck` run by `program` (`vacask` or `ngspice -b`) in a fresh directory.
-fn run(program: &str, deck: &str) -> Run {
+pub(super) fn run(program: &str, deck: &str) -> Run {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join(DIR).join(deck);
     let dir = tempfile::tempdir().expect("a temporary directory");
     let local: PathBuf = dir.path().join(deck);
     std::fs::copy(&src, &local).expect("the settle deck");
+    // A file `<deck stem>--<name>` beside the deck is a file it includes, run as `<name>`.
+    let stem = deck.trim_end_matches(".sim").trim_end_matches(".cir");
+    for e in std::fs::read_dir(src.parent().unwrap()).expect("the settle directory") {
+        let p = e.expect("an entry").path();
+        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        if let Some(rest) = name.strip_prefix(&format!("{stem}--")) {
+            std::fs::copy(&p, dir.path().join(rest)).expect("an included file");
+        }
+    }
     let mut cmd = Command::new(program);
     if program == "ngspice" {
         cmd.arg("-b");
@@ -44,6 +51,13 @@ fn run(program: &str, deck: &str) -> Run {
     out.push_str(&String::from_utf8_lossy(&done.stderr));
     Run { out, dir }
 }
+
+/// Whether the run printed `message`.
+pub(super) fn says(run: &Run, message: &str) -> bool {
+    run.out.contains(message)
+}
+
+// ---- private ----
 
 /// The values a `print (…)` line printed after each label, in order.
 fn printed(run: &Run, labels: &[&str]) -> Vec<f64> {
@@ -78,11 +92,6 @@ fn resistances(run: &Run) -> Vec<(String, f64)> {
         }
     }
     out
-}
-
-/// Whether the run printed `message`.
-fn says(run: &Run, message: &str) -> bool {
-    run.out.contains(message)
 }
 
 /// The plot of raw file `name` the run wrote.
@@ -490,7 +499,7 @@ fn ip_parameter_reads_in_a_behavioural_source() {
 
 #[test]
 fn fx_spice_text_is_no_vacask_statement() {
-    // A statement no VACASK rule reads is one VACASK rejects (the reader keeps it Unread P2004).
+    // A statement no VACASK rule reads is one VACASK rejects (InvalidInSource P2013).
     assert!(says(
         &run("vacask", "fx.sim"),
         "Syntax error, unexpected string."

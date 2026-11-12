@@ -75,6 +75,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     // an analysis card and a `.dc` axis carry no name (A35)
     Feature::Run(RunExtra::AnalysisUnnamed),
     Feature::Run(RunExtra::DcAxisUnnamed),
+    // a `.tran` card always gives its print step (`tstep`, inp2dot.c), R67/A41
+    Feature::Run(RunExtra::TranPrintStep),
     Feature::Run(RunExtra::TranRecordStart),
     Feature::Run(RunExtra::TranMaxStep),
     Feature::Run(RunExtra::TranCapNgspice),

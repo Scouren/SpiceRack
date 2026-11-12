@@ -11,18 +11,21 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cmd-overview, cmd-sweep, cmd-analysis-*.
 //!
-//! Contents: `analysis`, `control_span`, `admits` (crate-private), and for the children
+//! Contents: `analysis`, `control_span`, `admit` (crate-private), and for the children
 //! `quote`, `name_of`, `fold_alters`, `body`
 
 mod analyses;
 mod plan;
 
+pub(super) use super::expr_write::string as quote;
 use super::read_run::{
-    NAME_SPELLING, OPTION_ROW_PRIVATE, RESET_CLASS, SOURCE_SWEEP_WAVE, identifier,
+    MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM, RESET_CLASS,
+    SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, identifier,
 };
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
 use crate::ir;
+use crate::ir::source::DcRule;
 
 /// The control commands' head words (VD cmd-overview "Summary").
 const COMMANDS: &[&str] = &[
@@ -69,12 +72,15 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// the first analysis), across comments; with no run item, the first and last control-command
 /// opaque of class Private, Inert or Hint (the classes only this area gives a command line). A
 /// command word alone is no proof: outside a block `print …` or `save v(…)` is another area's
-/// opaque (Unread, or InvalidInSource: run fx). So a block that holds only refused statements
-/// reads back as refused statements at the top: VACASK rejects both.
+/// opaque (InvalidInSource P2013: run fx). So a block that holds only refused statements reads
+/// back as refused statements at the top: VACASK rejects both.
 pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
     let items = design.items(top);
     let command = |k: usize| command_opaque(design, items[k]);
-    let ours = |k: usize| command(k).is_some_and(|c| c != ir::OpaqueClass::Unread);
+    // ponytail: every class widens, a top-level invalid command line beside the block
+    // included (it reads back inside the block: VACASK rejects that deck either way); an
+    // invalid statement inside a block (a refused `save (…)`) must not cut the block short.
+    let ours = |k: usize| command(k).is_some();
     let comment = |k: usize| items[k].kind == ir::ItemKind::Comment;
     if let Some(mut first) = items.iter().position(|&at| run_item(at)) {
         let mut last = items.iter().rposition(|&at| run_item(at))?;
@@ -110,40 +116,50 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
 
 /// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
 /// states (R21): an option row of a private key (W2304; VACASK's own options are Hint or
-/// Private opaques); a sweep of a waveform source's DC value (W2307, VACASK's own limit).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    for (at, _) in design.reachable() {
-        if at.kind == ir::ItemKind::Option
-            && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
-        {
-            diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
+/// Private opaques); a sweep of a waveform source's DC value (W2307, a feature candidate) or
+/// of a source VACASK would not find by its name from the top (W2309); a
+/// node set no analysis line that takes its list follows (W2308: VACASK states `ic=` and
+/// `nodeset=` on an analysis only); an `mc` loop inside another (W2310: VD cmd-analysis-mc, no
+/// nesting); a transfer or noise analysis whose output is no node or node pair (W2311).
+pub(super) fn admit(
+    design: &ir::Design,
+    at: ir::ItemRef,
+    scope: ir::ScopeId,
+    diags: &mut ir::Diags,
+) {
+    if output_unspelled(design, at) {
+        diags.push_at(OUTPUT_FORM, design, at, 0);
+    }
+    if is_mc(design, at) && within_mc(design, scope) {
+        diags.push_at(MC_NESTED, design, at, 0);
+    }
+    if at.kind == ir::ItemKind::NodeSet && !on_an_analysis(design, scope, at) {
+        diags.push_at(NODE_SET_PLACE, design, at, 0);
+    }
+    if at.kind == ir::ItemKind::Option
+        && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
+    {
+        diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
+    }
+    if !names_spelled(design, at) {
+        diags.push_at(NAME_SPELLING, design, at, 0);
+    }
+    for t in swept_targets(design, at) {
+        if t.kind != ir::TargetKind::SourceDc {
+            continue;
         }
-        if !names_spelled(design, at) {
-            diags.push_at(NAME_SPELLING, design, at, 0);
-        }
-        if swept_targets(design, at)
-            .iter()
-            .any(|&t| sweeps_a_wave(design, t))
-        {
-            diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
-        }
-        let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
-        if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
-            diags.push_at(RESET_CLASS, design, at, 0);
+        match source_of(design, t) {
+            None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
+            Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
+                diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
+            }
+            Some(_) => {}
         }
     }
-}
-
-/// `text` as a VACASK string (`"…"`, `"` and `\` escaped).
-pub(super) fn quote(text: &str, out: &mut String) {
-    out.push('"');
-    for c in text.chars() {
-        if c == '"' || c == '\\' {
-            out.push('\\');
-        }
-        out.push(c);
+    let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
+    if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
+        diags.push_at(RESET_CLASS, design, at, 0);
     }
-    out.push('"');
 }
 
 /// The hierarchical name of `path` (`x1:r1`).
@@ -212,6 +228,68 @@ pub(super) fn body(w: &mut Writer<'_, '_>, scope: ir::ScopeId) {
 
 // ---- private ----
 
+/// Whether analysis `at` is a `dcxf`, `acxf` or `noise` whose output is neither a node nor a
+/// node pair (VD cmd-analysis-dcxf, -acxf, -noise: `out` names one node or two).
+fn output_unspelled(design: &ir::Design, at: ir::ItemRef) -> bool {
+    if at.kind != ir::ItemKind::Analysis {
+        return false;
+    }
+    let row: ir::Analysis = design.row(at.index);
+    let probe = match row.kind {
+        ir::AnalysisKind::DcXf => design.detail::<ir::dc_ac::DcXf>(row.detail).output,
+        ir::AnalysisKind::Xf => design.detail::<ir::dc_ac::Xf>(row.detail).output,
+        ir::AnalysisKind::Noise => design.detail::<ir::dc_ac::Noise>(row.detail).output,
+        _ => return false,
+    };
+    !matches!(probe.kind, ir::ProbeKind::V | ir::ProbeKind::Vdiff)
+}
+
+/// Whether item `at` is a Monte Carlo loop.
+fn is_mc(design: &ir::Design, at: ir::ItemRef) -> bool {
+    at.kind == ir::ItemKind::Loop
+        && design.row::<ir::Loop>(at.index).kind == ir::LoopKind::MonteCarlo
+}
+
+/// Whether `scope` lies in the body of a Monte Carlo loop.
+fn within_mc(design: &ir::Design, scope: ir::ScopeId) -> bool {
+    let mut at = scope;
+    // Bounded: each step moves to a parent; the scope tree is acyclic (`ir::check`).
+    for _ in 0..1 << 16 {
+        if at.is_none() {
+            return false;
+        }
+        let s = design.scope(at);
+        if s.kind == ir::ScopeKind::Loop && is_mc(design, s.owner) {
+            return true;
+        }
+        at = s.parent;
+    }
+    false
+}
+
+/// Whether node set `at` stands in the run of node sets just before an analysis whose line
+/// takes its list (`analyses::lists`; VD cmd-analysis-*: `ic=` on `tran`, `nodeset=` on `op`,
+/// its sweeps, `dcinc`, `dcxf` and `tran`).
+fn on_an_analysis(design: &ir::Design, scope: ir::ScopeId, at: ir::ItemRef) -> bool {
+    use ir::AnalysisKind as A;
+    let items = design.items(scope);
+    let Some(k) = items.iter().position(|&i| i == at) else {
+        return false;
+    };
+    let Some(next) = items[k..].iter().find(|i| i.kind != ir::ItemKind::NodeSet) else {
+        return false;
+    };
+    if next.kind != ir::ItemKind::Analysis {
+        return false;
+    }
+    let kind = design.row::<ir::Analysis>(next.index).kind;
+    match design.row::<ir::NodeSet>(at.index).kind {
+        ir::NodeSetKind::Ic => kind == A::Tran,
+        ir::NodeSetKind::Nodeset => matches!(kind, A::Op | A::Dc | A::DcInc | A::DcXf | A::Tran),
+        ir::NodeSetKind::Device => false,
+    }
+}
+
 /// The targets a DC analysis's axes or a sweep loop sweep; none for any other item.
 fn swept_targets(design: &ir::Design, at: ir::ItemRef) -> Vec<ir::Target> {
     match at.kind {
@@ -236,14 +314,10 @@ fn swept_targets(design: &ir::Design, at: ir::ItemRef) -> Vec<ir::Target> {
     }
 }
 
-/// Whether `t` sweeps the DC value of a source whose DC is its wave's (`WaveAtZero`): VACASK
-/// ignores `dc` on a waveform source, so the sweep would move nothing (settle run/sweep_source,
-/// W2307). The element is found from the entry file's top through each instance's bound
-/// subcircuit; one not found so is not refused.
-fn sweeps_a_wave(design: &ir::Design, t: ir::Target) -> bool {
-    if t.kind != ir::TargetKind::SourceDc {
-        return false;
-    }
+/// The independent source a source-DC target names, found from the entry file's top through
+/// each instance's bound subcircuit, as VACASK's `instance="x1:v1"` finds it (the reader's
+/// `masters::Declared::source`); `None` when a name on the way is no element of that kind.
+fn source_of(design: &ir::Design, t: ir::Target) -> Option<ir::source::Source> {
     let named = |scope: ir::ScopeId, name: ir::NameId| {
         design.items(scope).iter().copied().find(|i| {
             i.kind == ir::ItemKind::Element && design.row::<ir::Element>(i.index).name == name
@@ -252,25 +326,19 @@ fn sweeps_a_wave(design: &ir::Design, t: ir::Target) -> bool {
     let mut scope = design.file(design.entry()).top;
     // Bounded by the path's length.
     for &inst in design.names(t.path) {
-        let Some(at) = named(scope, inst) else {
-            return false;
-        };
-        let model = design.row::<ir::Element>(at.index).model.def;
+        let model = design
+            .row::<ir::Element>(named(scope, inst)?.index)
+            .model
+            .def;
         if model.is_none() || design.def(model).kind != ir::DefKind::Subckt {
-            return false;
+            return None;
         }
         scope = design
             .row::<ir::item::Subckt>(design.def(model).item.index)
             .body;
     }
-    let Some(at) = named(scope, t.a.name) else {
-        return false;
-    };
-    let row: ir::Element = design.row(at.index);
-    matches!(row.kind, ir::ElemKind::VSource | ir::ElemKind::ISource) && {
-        let src = design.source(&row);
-        src.dc_rule == ir::source::DcRule::WaveAtZero && !src.wave.is_none()
-    }
+    let row: ir::Element = design.row(named(scope, t.a.name)?.index);
+    matches!(row.kind, ir::ElemKind::VSource | ir::ElemKind::ISource).then(|| design.source(&row))
 }
 
 /// Whether `at` is a run item.

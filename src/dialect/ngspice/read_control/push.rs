@@ -12,7 +12,7 @@
 use super::plan::{Op, Target};
 use super::{FORM, OWN};
 use crate::dialect::ngspice::expr_read::{self, Tree};
-use crate::dialect::ngspice::number::{self, Grammar};
+use crate::dialect::ngspice::number::{self, Grammar, Scan};
 use crate::dialect::ngspice::read::{Lower, Stmt};
 use crate::dialect::ngspice::read_outputs;
 use crate::dialect::ngspice::read_run::{self, Card};
@@ -39,13 +39,13 @@ pub(super) enum Ready {
     /// An opaque: class, code, text.
     Opaque(ir::OpaqueClass, ir::Code, String),
     /// A loop: its variable, target, values and body.
-    Loop(String, Target, Vec<ir::Literal>, Vec<Ready>),
+    Loop(String, Target, Vec<Scan>, Vec<Ready>),
 }
 
 /// A value read but not appended.
 pub(super) enum Value {
-    /// A number as written.
-    Lit(ir::Literal),
+    /// A number as written, its long digits kept (R37, A18; settle `loop_long.sp`).
+    Lit(Scan),
     /// A numparam expression (an `alterparam` value).
     Expr(Tree),
 }
@@ -131,7 +131,10 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
                     lw.b.name(n); // interned before its target, as the IR text names them
                 }
                 let t = target_of(lw, target);
-                let vals: Vec<ir::ExprId> = values.iter().map(|&l| lw.b.literal(l)).collect();
+                let vals: Vec<ir::ExprId> = values
+                    .iter()
+                    .map(|s| lw.number(s.literal, &s.fit))
+                    .collect();
                 let list = lw.b.exprs(&vals);
                 let row = ir::plan::SweepLoop {
                     target: t,
@@ -238,25 +241,26 @@ fn state(keys: &[(String, Option<String>)]) -> Result<Vec<Ready>, (ir::OpaqueCla
     Ok(out)
 }
 
-/// A whole word as one card number (R1: its digits as written).
-fn literal(word: &str) -> Option<ir::Literal> {
+/// A whole word as one card number (R1: its digits as written; a long one's too, A18: run
+/// `loop_long.sp`, a script word reads as INPevaluate reads its digits).
+fn literal(word: &str) -> Option<Scan> {
     let (negative, digits) = match word.as_bytes().first() {
         Some(b'-') => (true, &word[1..]),
         Some(b'+') => (false, &word[1..]),
         _ => (false, word),
     };
-    let s = number::scan(digits, Grammar::Inp).filter(|s| s.len == digits.len())?;
-    let mut lit = s.literal;
-    if negative && lit.mantissa != 0 {
-        lit.mantissa = -lit.mantissa;
+    let mut s = number::scan(digits, Grammar::Inp).filter(|s| s.len == digits.len())?;
+    if negative && s.literal.mantissa != 0 {
+        s.literal.mantissa = -s.literal.mantissa;
+        s.fit.negate();
     }
-    Some(lit)
+    Some(s)
 }
 
 /// Appends a value.
 fn emit(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, v: &Value) -> ir::ExprId {
     match v {
-        Value::Lit(l) => lw.b.literal(*l),
+        Value::Lit(s) => lw.number(s.literal, &s.fit),
         Value::Expr(tree) => lw.expr(st, tree, scope),
     }
 }

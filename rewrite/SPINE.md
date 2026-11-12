@@ -86,8 +86,10 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   `read`, one `legalize`, one `write` per file.
 - `transpile` = `read`, `legalize`, `write` of the entry file, and the verdict: any
   `Kind::Refusal` row refuses the deck, and a step is not run after a refusal. `Policy::Strict`
-  turns an `Opaque` of class `Unread` into a refusal; `Lenient` keeps it (a writer of the same
-  text family copies it).
+  turns an `Opaque` of class `Unread` into a refusal (`S0101`) and refuses, at its item, each
+  parameter read no definition binds (`S0104`, the name as the argument; `ir::unbound_reads`,
+  a formal default's held read aside: R63, A38); `Lenient` keeps both (a writer of the same
+  text family copies the opaque; the read stays unresolved).
 - Every branch on which work happens is in these four functions.
 
 ## 4. Legalization (`src/passes/`)
@@ -127,7 +129,8 @@ point, computed once per call, so a chain (`round_half_even_to_away` then
 (`powabs_to_pow`, `pow_to_powabs`) supports nothing for a target with neither, and a chain whose
 last link the target cannot take runs nothing (no half-converted design). The bound holds: each
 link of a chain is one pass, the fixed point admits no cycle, so the missing set settles within
-one round per link. P3 is unchanged: a pass still states every feature its output adds. Then
+one round per link. P3 still asks a pass to state every feature its output adds, a function,
+operator or draw compared without its form (R65). Then
 `ir::check_legal` reports what is left: one `U0001` row per item that carries
 a feature. A pass may produce input for the passes after it, never rely on one after it:
 `structure` first (every other pass walks the scopes, names and definitions it settles), then
@@ -150,7 +153,9 @@ generated designs that use the pass's `removes` and over ones that do not: P1 `i
 clean after it (so a pass that drops a defining item through `items_mut` instead of
 `Editor::remove_item` fails P1 on the stale definition, X0018: intended); P2 every item still carrying `removes` (by `ir::check_legal`, matched by `Diag::item`, never by span: a generated item has none) has a note of the
 pass at it, every other has lost it (`check_legal` reports the run owner's design-level features at their items, `analysis::feature_items`); P3 the output uses nothing outside the input's features
-plus `requires`; P4 running it twice equals running it once (IR text equal); P5 on a design
+plus `requires`, a function, operator or draw in its static and its dynamic member counted as
+one (R65, A39: a pass that merges two roots or drops a function's only dynamic caller moves
+what it did not write between the members; `check_legal` refuses what that makes illegal); P4 running it twice equals running it once (IR text equal); P5 on a design
 without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
 simulator on both forms) is each pass's own test. A pass whose feature the generator does not
 reach over every feature (a competing feature always wins) gets its own generation set in the
@@ -233,7 +238,8 @@ laws run on.
   the top of the test.
 - `tests/test_spine.rs`: `transpile` over the `ir` dialect on hand-written IR text (a deck with
   a subcircuit, an element, an analysis); a refusal when `PASSES` cannot remove a feature a stub
-  writer lacks; `Policy::Strict` refusing an `Unread`; the facade's message format; the route
+  writer lacks; `Policy::Strict` refusing an `Unread` and an unresolved parameter read (a held
+  one passes); the facade's message format; the route
   override.
 
 ## 8a. The pair test (`tests/test_pair.rs`, from the trunk merge)

@@ -1,13 +1,14 @@
 //! The corpus cells of the pair test (`--features corpus`, SPINE §8a): every deck of a corpus
 //! the old cross-sim cells run (spice-bench for `ngspice-vacask`, the VACASK corpus for
 //! `vacask-ngspice`), read leniently with every file it names, through the six steps on
-//! `PAIR_JOBS` workers (6). A deck the corpus's cross-sim source list quarantines as `slow` is
-//! converted and not simulated.
+//! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash) on every tenth written deck. A deck the
+//! corpus's cross-sim source list quarantines as `slow` is converted and not simulated.
 //!
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
 //! deck (`<path> <step>:<class> …`) in `$CARGO_TARGET_TMPDIR/pair-<cell>-census.txt`, and its
 //! table on stderr: decks by the first step that fails and its class, and the step-2
-//! refusals by feature (a deck once per feature it is refused for). The failing steps are
+//! refusals by feature (a deck once per feature it is refused for) and its refused opaques by
+//! dialect, class and the reader's code. The failing steps are
 //! compared with `tests/fixtures/pair/<cell>-corpus.txt` as an authored cell's are.
 //!
 //! Cites: `rewrite/SPINE.md` §8a; `tests/test_cross_sim/main.rs` (the corpora and their keep
@@ -17,7 +18,7 @@
 //! - `pub struct Corpus`
 //! - `pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String>`
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -39,6 +40,14 @@ pub struct Corpus {
     /// The cross-sim corpus name.
     pub source_list: &'static str,
 }
+
+/// Step 6 runs on every this-many-th written deck of a corpus.
+// ponytail: a sample; one job over all of spice-bench is an hour on one core. The whole set
+// when a nightly has the hour.
+const STRIDE_SIX: usize = 10;
+
+/// A deck still running after this many seconds is named on stderr while it runs.
+const SLOW: u64 = 120;
 
 /// Every deck of `corpus` through `c`'s six steps: the census written, its table printed, and
 /// the differences from the cell's corpus list returned (empty: the list holds).
@@ -66,80 +75,123 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     );
     let slow = quarantined(corpus.source_list);
     let reader = from.read.expect("rows checked it");
-    let decks: Vec<Deck> = paths
-        .iter()
-        .map(|p| {
-            let dir = p.parent().expect("a deck in a folder").to_path_buf();
-            let name = p
-                .file_name()
-                .expect("a file")
-                .to_string_lossy()
-                .into_owned();
-            let mut load = |f: &str| std::fs::read_to_string(dir.join(f)).ok();
-            let src = Sources::load(&[&name], ir::Role::Deck, reader, &mut load);
-            Deck {
-                name: rel(p),
-                path: p.clone(),
-                src,
-                policy: Policy::Lenient,
-                simulate: !slow.contains(&rel(p)),
+    // A deck is loaded in the worker that runs it and dropped after: a corpus does not fit in
+    // memory at once. Step 6 keeps a hash of the written bytes, not the bytes.
+    // Paths relative to the corpus root, so an include above the deck's folder
+    // (`include "../mosmm.inc"`) stays inside what `Sources::load` confines a kit to.
+    let load = |p: &Path| {
+        let mut missing = Vec::new();
+        let mut read = |f: &str| {
+            let text = std::fs::read_to_string(root.join(f)).ok();
+            if text.is_none() {
+                missing.push(f.to_string());
             }
-        })
-        .collect();
+            text
+        };
+        let src = Sources::load(&[&rel(p)], ir::Role::Deck, reader, &mut read);
+        Deck {
+            name: rel(p),
+            path: p.to_path_buf(),
+            src,
+            policy: Policy::Lenient,
+            simulate: !slow.contains(&rel(p)),
+            missing,
+        }
+    };
     let jobs = std::env::var("PAIR_JOBS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6usize);
     let next = AtomicUsize::new(0);
-    let done: Mutex<Vec<(usize, Done)>> = Mutex::new(Vec::new());
+    let done: Mutex<Vec<(usize, Done, Option<u64>)>> = Mutex::new(Vec::new());
     let none = PairFile::default();
+    // Each worker's deck and its start, so a deck that runs long is named while it runs.
+    let running: Mutex<Vec<Option<(usize, std::time::Instant)>>> =
+        Mutex::new(vec![None; jobs.max(1)]);
+    let workers_left = AtomicUsize::new(jobs.max(1));
     std::thread::scope(|s| {
-        for _ in 0..jobs.max(1) {
-            s.spawn(|| {
+        for w in 0..jobs.max(1) {
+            let (running, workers_left, next, done) = (&running, &workers_left, &next, &done);
+            let (load, none, paths) = (&load, &none, &paths);
+            s.spawn(move || {
                 // Bounded: each index is taken once.
                 loop {
                     let k = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(d) = decks.get(k) else { break };
-                    let v = run::steps(c, from, to, d, &none);
-                    done.lock().expect("no worker panicked").push((k, v));
+                    let Some(p) = paths.get(k) else { break };
+                    running.lock().expect("no worker panicked")[w] =
+                        Some((k, std::time::Instant::now()));
+                    let mut v = run::steps(c, from, to, &load(p), none);
+                    running.lock().expect("no worker panicked")[w] = None;
+                    let h = v.written.take().map(|w| hash(&w));
+                    let mut all = done.lock().expect("no worker panicked");
+                    all.push((k, v, h));
+                    if all.len().is_multiple_of(200) {
+                        eprintln!("{}: {} of {} decks", c.name, all.len(), paths.len());
+                    }
                 }
+                workers_left.fetch_sub(1, Ordering::Relaxed);
             });
         }
+        // The watch: every 30 s, each deck past SLOW seconds is named (once a minute at most).
+        s.spawn(|| {
+            let mut told = std::collections::BTreeSet::new();
+            while workers_left.load(Ordering::Relaxed) > 0 {
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                for (k, t) in running.lock().expect("no worker panicked").iter().flatten() {
+                    let secs = t.elapsed().as_secs();
+                    if secs > SLOW && told.insert((*k, secs / 60)) {
+                        eprintln!("{}: still on {} after {secs} s", c.name, rel(&paths[*k]));
+                    }
+                }
+            }
+        });
     });
     let mut done = done.into_inner().expect("no worker panicked");
-    done.sort_by_key(|(k, _)| *k);
-    assert_eq!(done.len(), decks.len(), "{}: every deck ran", c.name);
-    let once: BTreeMap<String, run::Written> = done
-        .iter()
-        .filter_map(|(k, v)| v.written.clone().map(|w| (decks[*k].name.clone(), w)))
-        .collect();
+    done.sort_by_key(|(k, _, _)| *k);
+    assert_eq!(done.len(), paths.len(), "{}: every deck ran", c.name);
     let mut seen: BTreeMap<(String, u8), Fail> = BTreeMap::new();
     let mut lines = Vec::new();
-    for (k, v) in done {
-        let name = &decks[k].name;
-        lines.push(format!(
-            "{name} {}",
-            crate::line(&v, once.contains_key(name))
-        ));
+    let mut again = Vec::new();
+    for (k, v, h) in done {
+        let name = rel(&paths[k]);
+        lines.push(format!("{name} {}", crate::line(&v, h.is_some())));
         for (step, f) in v.fails {
             seen.insert((name.clone(), step), f);
         }
-    }
-    for (name, why) in run::determinism(from, to, &decks, &once) {
-        seen.insert((name, 6), run::fail("nondeterministic", why));
+        if let Some(h) = h
+            && k % STRIDE_SIX == 0
+        {
+            again.push((k, name, h));
+        }
     }
     let file = format!("{}/pair-{}-census.txt", env!("CARGO_TARGET_TMPDIR"), c.name);
     std::fs::write(&file, lines.join("\n") + "\n").unwrap_or_else(|e| panic!("{file}: {e}"));
+    // Step 6, on every STRIDE_SIX-th written deck: converted again on one job, against the
+    // bytes the workers wrote.
+    for (k, name, h) in again {
+        if run::convert(from, to, &load(&paths[k])).map(|w| hash(&w)) != Some(h) {
+            let said = format!("the written bytes differ between {jobs} jobs and 1");
+            seen.insert((name, 6), run::fail("nondeterministic", said));
+        }
+    }
     eprintln!(
         "{}: census of {} decks in {file}\n{}",
         c.name,
-        decks.len(),
-        table(&seen, decks.len())
+        paths.len(),
+        table(&seen, paths.len())
     );
     crate::judge(&format!("{}-corpus", c.name), &seen)
 }
 
 // ---- private ----
+
+/// A hash of a deck's written files, paths and bytes.
+fn hash(w: &run::Written) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    w.hash(&mut h);
+    h.finish()
+}
 
 /// The decks a cross-sim source list names `slow` (corpus-relative paths).
 fn quarantined(list: &str) -> Vec<String> {
@@ -168,12 +220,17 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
     }
     let mut by_class: BTreeMap<String, usize> = BTreeMap::new();
     let mut by_feature: BTreeMap<String, usize> = BTreeMap::new();
+    let mut by_opaque: BTreeMap<String, usize> = BTreeMap::new();
     for ((deck, step), f) in seen {
         if std::ptr::eq(first[deck], f) {
             let class = f.class.split(':').take(2).collect::<Vec<_>>().join(":");
             *by_class.entry(format!("{step} {class}")).or_default() += 1;
         }
         if *step == 2 {
+            let kinds: BTreeSet<&String> = f.opaques.iter().collect();
+            for o in kinds {
+                *by_opaque.entry(o.clone()).or_default() += 1;
+            }
             for feature in f
                 .class
                 .split(':')
@@ -195,6 +252,12 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
     feats.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     for (f, n) in feats {
         out += &format!("  {n:5} {f}\n");
+    }
+    out += "step-2 refused opaques by dialect/class/reader code (decks):\n";
+    let mut ops: Vec<(&String, &usize)> = by_opaque.iter().collect();
+    ops.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+    for (o, n) in ops {
+        out += &format!("  {n:5} {o}\n");
     }
     out
 }
