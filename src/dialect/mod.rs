@@ -39,7 +39,7 @@
 //!   `Write::citations`), `pub struct Citation`
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
-//!   `pub const STRICT_UNBOUND: ir::Code`,
+//!   `pub const STRICT_UNBOUND: ir::Code`, `pub const STRICT_UNBOUND_TARGET: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
 //!   `pub mod ngspice`, `pub mod vacask`
@@ -180,6 +180,11 @@ pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
 /// `NameId` (R63, A38).
 pub const STRICT_UNBOUND: ir::Code = ir::Code::new(b'S', 104);
 
+/// The refusal a strict read adds at each run item (an alter, a loop, an analysis, an
+/// elaborate) that holds a target nothing defines (an element no scope lists, a parameter,
+/// model or subcircuit reference nothing binds): `S0105`, `arg` the name's `NameId` (R70, A43).
+pub const STRICT_UNBOUND_TARGET: ir::Code = ir::Code::new(b'S', 105);
+
 /// The note [`legalize`] adds where it drops an `Inert` statement of another dialect: `S0102`,
 /// `arg` 0.
 pub const INERT_DROPPED: ir::Code = ir::Code::new(b'S', 102);
@@ -226,6 +231,15 @@ const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
             kind: ir::Kind::Refusal,
         },
     ),
+    (
+        STRICT_UNBOUND_TARGET,
+        ir::Info {
+            title: "a run item whose target nothing defines, under a strict read",
+            cite: "rewrite/RULINGS.md R70; rewrite/AMEND-A12.md A43 (the pair's F7)",
+            explain: "An alter, a loop, a DC axis or an elaborate names an element, model, parameter or subcircuit no statement of the complete program defines. A simulator either rejects it or (ngspice: \"no such device\") runs on at the old value, a wrong number with no error. The argument is the name.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
 ];
 
 /// The row named `name`, or `None`.
@@ -236,7 +250,8 @@ pub fn by_name(name: &str) -> Option<&'static DialectRow> {
 /// `src` read by `from` into `design`, then checked. A check violation is a bug in the
 /// reader: an `X` row, and a debug assertion. Under [`Policy::Strict`] each `Unread` item
 /// gets a [`STRICT_UNREAD`] row, and each item holding a parameter read no definition binds
-/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38).
+/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38), and
+/// each run item whose target nothing defines one [`STRICT_UNBOUND_TARGET`] row per name (R70).
 ///
 /// # Panics
 /// When `from` has no reader (the caller checks the row) or `src` holds no file.
@@ -273,6 +288,7 @@ pub fn read(
         for read in ir::unbound_reads(design).into_iter().filter(|r| !r.held) {
             diags.push_at(STRICT_UNBOUND, design, read.item, read.name.0);
         }
+        unbound_targets(design, diags);
     }
 }
 
@@ -410,6 +426,38 @@ pub fn refuses(code: ir::Code) -> bool {
 }
 
 // ---- private ----
+
+/// One [`STRICT_UNBOUND_TARGET`] row per name a run item (alter, loop, analysis, elaborate)
+/// targets that nothing defines (R70, A43): a definition reference nothing binds
+/// (`Design::item_refs`), and an element name its scope does not list (`Design::element_uses`;
+/// an unresolvable scope is `NONE`, never guessed).
+fn unbound_targets(design: &ir::Design, diags: &mut ir::Diags) {
+    use ir::ItemKind as K;
+    let run = |k: K| matches!(k, K::Alter | K::Loop | K::Analysis | K::Elaborate);
+    let mut refs = Vec::new();
+    for (item, _) in design.reachable() {
+        if !run(item.kind) {
+            continue;
+        }
+        refs.clear();
+        design.item_refs(item, &mut refs);
+        for (r, _) in &refs {
+            if !r.is_resolved() && !r.name.is_none() {
+                diags.push_at(STRICT_UNBOUND_TARGET, design, item, r.name.0);
+            }
+        }
+    }
+    for (item, u) in design.element_uses() {
+        let listed = !u.scope.is_none()
+            && design
+                .items(u.scope)
+                .iter()
+                .any(|i| i.kind == K::Element && design.row::<ir::Element>(i.index).name == u.name);
+        if run(item.kind) && !listed {
+            diags.push_at(STRICT_UNBOUND_TARGET, design, item, u.name.0);
+        }
+    }
+}
 
 /// Whether any row of `diags` refuses.
 fn refused(diags: &ir::Diags) -> bool {
