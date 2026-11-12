@@ -50,7 +50,7 @@ mod tests {
         master: Option<&str>,
         detail: u32,
     ) {
-        let name = b.name("e1");
+        let name = unique(b, top);
         let terminals = b.names(terms);
         let model = Ref {
             name: master.map_or(NameId::NONE, |m| b.name(m)),
@@ -94,7 +94,7 @@ mod tests {
                 }),
             ),
         };
-        let name = b.name("e2");
+        let name = unique(b, top);
         let terminals = b.names(terms);
         let row = Element {
             kind,
@@ -106,6 +106,13 @@ mod tests {
             detail,
         };
         b.push(top, row, Span::NONE);
+    }
+
+    /// A name no element of `top` has yet: `e` and the scope's item count (A13: names are unique
+    /// in a scope).
+    fn unique(b: &mut Builder<'_>, top: ScopeId) -> spicerack_ir::NameId {
+        let k = b.design().items(top).len();
+        b.name(&format!("e{k}"))
     }
 
     fn only(v: Violation) -> Vec<Code> {

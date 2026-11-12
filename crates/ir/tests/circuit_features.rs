@@ -1289,6 +1289,37 @@ mod tests {
                 Span::NONE,
             );
         }),
+        (X::BuiltinMaster, |b, t, on| {
+            let dc = n(b, 0);
+            let h = b.head(
+                "v1",
+                &["a", "0"],
+                if on { Some("v") } else { None },
+                &[],
+                ExprId::NONE,
+            );
+            b.source(t, ElemKind::VSource, h, source(dc), Span::NONE);
+        }),
+        (X::NameWithoutLetter, |b, t, on| {
+            let one = n(b, 1);
+            let h = b.head(
+                if on { "load" } else { "R1" },
+                &["a", "b"],
+                None,
+                &[],
+                ExprId::NONE,
+            );
+            b.passive(
+                t,
+                ElemKind::Resistor,
+                h,
+                Passive {
+                    value: one,
+                    ..Passive::PLAIN
+                },
+                Span::NONE,
+            );
+        }),
     ];
 
     #[test]

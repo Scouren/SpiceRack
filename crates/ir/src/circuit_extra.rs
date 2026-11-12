@@ -216,11 +216,20 @@ pub enum CircuitExtra {
     ElementWithoutModel,
     /// A model whose family has no `DeviceLibrary` of that family in the design (design-level; A12 C5).
     ModelWithoutLibrary,
+    /// An independent or linear controlled source that names a model, or a coupling bound to
+    /// the builtin `Mutual` model: ngspice has no model for these (AMEND-A12 C5; a pass drops
+    /// the model and unbinds the element).
+    BuiltinMaster,
+    // A13 (R23)
+    /// An element whose name does not begin with its SPICE letter (`letter::spice_letter`,
+    /// ASCII case ignored): a SPICE-card dialect cannot spell it; a pass renames it and every
+    /// reference to it.
+    NameWithoutLetter,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 95] = [
+    pub const ALL: [CircuitExtra; 97] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -316,6 +325,8 @@ impl CircuitExtra {
         CircuitExtra::DcAtZeroPattern,
         CircuitExtra::ElementWithoutModel,
         CircuitExtra::ModelWithoutLibrary,
+        CircuitExtra::BuiltinMaster,
+        CircuitExtra::NameWithoutLetter,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

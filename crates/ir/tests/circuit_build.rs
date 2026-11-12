@@ -79,6 +79,106 @@ mod tests {
         ]
     };
 
+    /// The SPICE letter of every kind, from `letter.rs`'s header (A13), at voltage output and
+    /// control.
+    const LETTERS: [(ElemKind, Option<u8>); 37] = {
+        use ElemKind as E;
+        [
+            (E::Resistor, Some(b'R')),
+            (E::Capacitor, Some(b'C')),
+            (E::Inductor, Some(b'L')),
+            (E::ChargeCapacitor, Some(b'C')),
+            (E::FluxInductor, Some(b'L')),
+            (E::Coupling, Some(b'K')),
+            (E::VSource, Some(b'V')),
+            (E::ISource, Some(b'I')),
+            (E::Port, Some(b'P')),
+            (E::Vcvs, Some(b'E')),
+            (E::Vccs, Some(b'G')),
+            (E::Cccs, Some(b'F')),
+            (E::Ccvs, Some(b'H')),
+            (E::Poly, Some(b'E')),
+            (E::Table, Some(b'E')),
+            (E::Behav, Some(b'B')),
+            (E::Laplace, Some(b'E')),
+            (E::FreqTable, Some(b'E')),
+            (E::Delay, Some(b'E')),
+            (E::Diode, Some(b'D')),
+            (E::Bjt, Some(b'Q')),
+            (E::Mosfet, Some(b'M')),
+            (E::Jfet, Some(b'J')),
+            (E::Mesfet, Some(b'Z')),
+            (E::Igbt, Some(b'Z')),
+            (E::VSwitch, Some(b'S')),
+            (E::ISwitch, Some(b'W')),
+            (E::LosslessLine, Some(b'T')),
+            (E::LossyLine, Some(b'O')),
+            (E::RcLine, Some(b'U')),
+            (E::SingleLossyLine, Some(b'Y')),
+            (E::CoupledLines, Some(b'P')),
+            (E::CodeModel, Some(b'A')),
+            (E::ModuleModel, Some(b'N')),
+            (E::Module, Some(b'X')),
+            (E::Instance, Some(b'X')),
+            (E::Unresolved, None),
+        ]
+    };
+
+    #[test]
+    fn every_kind_has_its_spice_letter() {
+        use spicerack_ir::controlled::Quantity::{Current as I, Voltage as V};
+        use spicerack_ir::letter::letter_of;
+        let listed: Vec<ElemKind> = LETTERS.iter().map(|l| l.0).collect();
+        assert_eq!(listed, ElemKind::ALL.to_vec());
+        for (kind, letter) in LETTERS {
+            assert_eq!(letter_of(kind, V, V), letter, "{kind:?}");
+        }
+        // the polynomial's letter follows its output and control; tables, Laplace and
+        // frequency tables are voltage-controlled, so only their output counts
+        assert_eq!(letter_of(ElemKind::Poly, I, V), Some(b'G'));
+        assert_eq!(letter_of(ElemKind::Poly, I, I), Some(b'F'));
+        assert_eq!(letter_of(ElemKind::Poly, V, I), Some(b'H'));
+        for kind in [ElemKind::Table, ElemKind::Laplace, ElemKind::FreqTable] {
+            assert_eq!(letter_of(kind, I, V), Some(b'G'), "{kind:?}");
+            assert_eq!(letter_of(kind, I, I), Some(b'G'), "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn spice_letter_reads_the_detail() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        let one = n(&mut b, 1);
+        let controls = b.names(&["v1"]);
+        let coeffs = b.exprs(&[one]);
+        let poly = Poly {
+            controls,
+            coeffs,
+            dimension: 1,
+            output: Quantity::Current,
+            control: Quantity::Current,
+        };
+        let h = b.head("f1", &["o", "0"], None, &[], ExprId::NONE);
+        let f1 = b.poly(top, h, poly, Span::NONE);
+        let points = b.exprs(&[one, one]);
+        let table = TableSource {
+            input: one,
+            points,
+            delta: ExprId::NONE,
+            law: TableLaw::Exact,
+            output: Quantity::Current,
+        };
+        let h = b.head("g1", &["o", "0"], None, &[], ExprId::NONE);
+        let g1 = b.table_source(top, h, table, Span::NONE);
+        let design = b.design();
+        let letter = |i: spicerack_ir::ItemRef| {
+            spicerack_ir::spice_letter(design, &design.row::<Element>(i.index))
+        };
+        assert_eq!(letter(f1), Some(b'F'));
+        assert_eq!(letter(g1), Some(b'G'));
+    }
+
     #[test]
     fn kind_facts_match_the_docs() {
         let listed: Vec<ElemKind> = FACTS.iter().map(|f| f.0).collect();
