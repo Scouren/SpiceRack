@@ -454,6 +454,9 @@ mod tests {
                 "idt(v(a)) + ddt(v(a))",
                 false,
             ),
+            // A28: `idt(x, ic)` keeps its initial value; a literal-0 one is the absent one.
+            ("b1 (c 0) v=idt(v(a), 3)", "idt(v(a), 3)", false),
+            ("b1 (c 0) v=idt(v(a), 0.0)", "idt(v(a))", false),
             ("b1 (c 0) v=p/2", "p / 2", true),
             // R56: `$realparam(p)` is `to_real(p)`, written back as the bare `p`.
             ("b1 (c 0) v=$realparam(p)/2", "p / 2", true),
