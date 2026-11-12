@@ -120,8 +120,10 @@ struct Interp {
     card_kinds: Vec<(String, usize)>,
     /// Whether `quit` ended the script.
     quit: bool,
-    /// Operations produced so far (the unroll bound).
+    /// Commands read inside unrolled passes so far (the unroll bound).
     count: usize,
+    /// How many unrolled loops enclose the command being read.
+    unrolling: usize,
 }
 
 /// What a `set` assigns.
@@ -186,15 +188,20 @@ impl Interp {
                 Node::Flow(_) => return Err(FLOW),
                 Node::Repeat { head, body } => {
                     let n = repeat_count(&subst(head.rest(), env)?).ok_or(FLOW)?;
+                    self.unrolling += 1;
                     for _ in 0..n {
                         self.nodes(body, env, out)?;
                     }
+                    self.unrolling -= 1;
                 }
                 Node::Foreach { head, body } => self.foreach(head, body, env, out)?,
             }
-            self.count += 1;
-            if self.count > UNROLL_MAX || out.len() > UNROLL_MAX {
-                return Err(UNROLL);
+            // the bound is on what unrolling makes, not on a long script read as written
+            if self.unrolling > 0 {
+                self.count += 1;
+                if self.count > UNROLL_MAX {
+                    return Err(UNROLL);
+                }
             }
         }
         Ok(())
@@ -234,11 +241,13 @@ impl Interp {
             return Ok(());
         }
         *self = saved;
+        self.unrolling += 1;
         for w in &words {
             let mut inner = env.to_vec();
             inner.push((var.clone(), w.clone()));
             self.nodes(body, &inner, out)?;
         }
+        self.unrolling -= 1;
         Ok(())
     }
 
@@ -326,12 +335,14 @@ impl Interp {
             }
             "reset" => {
                 self.changed = true;
-                // every class back to the design's own (A28); the waiting alterparams after it
-                out.push(Op::Reset { cmd: c.clone() });
+                // the waiting alterparams, then every class back to the design's own (A28): the
+                // same as the other order, since a Reset restores no parameter, and written
+                // with no lookahead (each alterparam where it stands, then reset)
                 for (id, target, value, cmd) in std::mem::take(&mut self.pending) {
                     self.applied[id] = true;
                     out.push(Op::Alter { target, value, cmd });
                 }
+                out.push(Op::Reset { cmd: c.clone() });
             }
             "option" | "options" | "set" | "setcs" => self.state(c, w, env, out)?,
             "unset" => match self.set_kind(c.rest()) {
@@ -510,27 +521,16 @@ fn law(template: &[Op], words: &[String], applied: &[bool]) -> Option<(Target, V
         return None;
     }
     let kept: Vec<Op> = settle(template.to_vec(), applied);
-    // a parameter is set by `alterparam` and applied by the `reset` after it: the pass is
-    // [Reset, Alter(param)], the loop's body keeps the Reset (it restores, a parameter stays)
-    let (lead, kept) = match kept.as_slice() {
-        [
-            Op::Reset { .. },
-            Op::Alter {
-                target: Target::Param(_),
-                ..
-            },
-            ..,
-        ] => (Some(kept[0].clone()), kept[1..].to_vec()),
-        _ => (None, kept),
-    };
     let (first, rest) = kept.split_first()?;
     let Op::Alter { target, value, .. } = first else {
         return None;
     };
-    if matches!(target, Target::Param(_)) != lead.is_some() {
+    // a parameter is applied by the `reset` after its `alterparam`: the pass is
+    // [Alter(param), Reset, …], and the loop's body keeps the Reset
+    if matches!(target, Target::Param(_)) && !matches!(rest.first(), Some(Op::Reset { .. })) {
         return None;
     }
-    let rest: Vec<Op> = lead.into_iter().chain(rest.iter().cloned()).collect();
+    let rest = rest.to_vec();
     if value != MARK || !words.iter().all(|w| is_number(w)) {
         return None;
     }

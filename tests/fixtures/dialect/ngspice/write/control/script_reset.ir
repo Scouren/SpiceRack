@@ -1,9 +1,9 @@
-# oracle: S3-CONTROL S1, S2: a Reset writes the parameter alters right after it as alterparam, then reset, which applies them (inp.c:1735-1857, runcoms2.c:172-240); written by hand
+# oracle: S3-CONTROL S1, S2: a parameter alter is alterparam where it stands; the Reset right after it is reset, which applies it (inp.c:1735-1857, runcoms2.c:172-240); written by hand
 file "script_reset.sp" deck
   title "script_reset"
   param p = 1k
   alter (element_value r1) value=2k
   analysis op
-  reset values options temp tnom saves
   alter (param p) value=3k
+  reset values options temp tnom saves
   analysis op

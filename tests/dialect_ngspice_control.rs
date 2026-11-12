@@ -64,6 +64,7 @@ const READ: &[&str] = &[
     "script_vector",
     "two_blocks",
     "unclosed",
+    "unclosed_end",
 ];
 
 /// The write fixtures, by name.
@@ -300,8 +301,8 @@ fn script_items_ngspice_cannot_spell_are_refused() {
             "W1402",
         ),
         (
-            "a parameter alter not right after a reset",
-            "  param p = 1\n  alter (element_value r1) value=2k\n  alter (param p) value=3",
+            "a parameter alter not right before a reset",
+            "  param p = 1\n  alter (param p) value=3\n  analysis op",
             "W1401",
         ),
         (
@@ -318,6 +319,47 @@ fn script_items_ngspice_cannot_spell_are_refused() {
         let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
         assert_eq!(codes, [*code], "{why}");
     }
+}
+
+#[test]
+fn a_script_reads_and_writes_in_linear_time() {
+    // Oracle: a scaling law (the IR's scaling gate): a script four times as long reads and
+    // writes within eight times the time (linear is 4x, quadratic 16x). The script is the
+    // shape a generated sweep reaches: alterparam, reset and an analysis per pass, and alters.
+    let deck = |n: usize| {
+        let mut s = String::from("scaling\n.param p=1\n.control\n");
+        for k in 0..n / 4 {
+            s.push_str(&format!(
+                "alterparam p={}\nreset\nalter r1 {}k\nop\n",
+                k + 1,
+                k + 1
+            ));
+        }
+        s.push_str(".endc\n.end\n");
+        s
+    };
+    let time = |n: usize| {
+        let text = deck(n);
+        (0..3)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                let (design, diags) = read_deck("s.sp", &text);
+                assert!(
+                    diags.rows().iter().all(|d| d.code.number != 1405),
+                    "a long script read as written is no unroll"
+                );
+                let written = write_entry(&design);
+                assert!(written.len() > text.len() / 2, "written whole");
+                start.elapsed()
+            })
+            .min()
+            .expect("three runs")
+    };
+    let (small, large) = (time(1000), time(4000));
+    assert!(
+        large <= small * 8,
+        "1000 commands in {small:?}, 4000 in {large:?}: not linear"
+    );
 }
 
 /// A deck in IR text from `seed`: a parameter, then up to six run items, a loop holding up to
