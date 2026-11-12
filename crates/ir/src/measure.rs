@@ -41,8 +41,7 @@ use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
-    close, flag, open, put_expr, put_flag, put_word, reads_circuit, take_enum, take_expr,
-    take_word, word,
+    close, flag, open, put_expr, put_flag, put_word, take_enum, take_expr, take_word, word,
 };
 use crate::text::Words;
 use crate::text_expr::Ctx;
@@ -319,7 +318,7 @@ pub(crate) fn event_features(design: &Design, e: &Event, set: &mut FeatureSet) {
     flag(set, e.skip_initial, RunExtra::MeasSkipInitial);
     flag(
         set,
-        reads_circuit(design, e.value),
+        crate::class::expr_class(design, e.value) == crate::class::ExprClass::Circuit,
         RunExtra::MeasCircuitThreshold,
     );
 }
