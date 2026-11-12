@@ -1,0 +1,11 @@
+# codes:
+file "default_which2.sp" deck
+  title "default_which2"
+  comment " oracle: ngspice-45 run of this deck with `i1 0 n1 1m` and `print v(n1)` added (the test formal_defaults_run_where_the_instance_stands), R53: a head default reads its sibling formals, any other name where the instance stands; v(n1) = 3 (the instance's u=3k)"
+  param u = 1k
+  subckt s (a b) t=u?
+    element resistor r1 (a b) value=t
+  subckt w (a b)
+    param u = 3k
+    element instance xs (a b) model=s
+  element instance xw (n1 0) model=w
