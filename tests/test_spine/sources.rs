@@ -73,3 +73,23 @@ fn a_reference_resolves_beside_its_file() {
     );
     assert_eq!(Reference::VerilogA("r.va".into()).resolve("a.sp"), "r.va");
 }
+
+#[test]
+fn a_parent_reference_above_the_root_is_a_missing_file_never_a_sibling() {
+    // The pair agent's finding: `..` above the root was dropped, so `../lib.ir` from the root's
+    // `deck.ir` became the unrelated `lib.ir` beside it. It is a path no root file answers.
+    let files: HashMap<&str, &str> = HashMap::from([
+        ("deck.ir", "file \"deck\" deck\n  include \"../lib.ir\"\n"),
+        ("lib.ir", "  param wrong = 1\n"),
+    ]);
+    let mut asked = Vec::new();
+    let mut loader = |p: &str| {
+        asked.push(p.to_string());
+        files.get(p).map(|t| t.to_string())
+    };
+    let src = Sources::load(&["deck.ir"], ir::Role::Deck, &IrText, &mut loader);
+    let paths: Vec<&str> = src.files().iter().map(|(p, _)| p.as_str()).collect();
+    assert_eq!(paths, ["deck.ir"], "the sibling is not taken");
+    assert_eq!(asked, ["deck.ir", "../lib.ir"]);
+    assert_eq!(Reference::File("../../x".into()).resolve("a/b.sp"), "../x");
+}

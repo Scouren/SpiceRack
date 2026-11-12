@@ -166,7 +166,7 @@ impl Reference {
     }
 
     /// The path, relative to the directory of `from` (the naming file's path) unless it is
-    /// absolute, with `.` and `..` folded.
+    /// absolute, with `.` and `..` folded; a `..` above the root is kept (`../x`).
     pub fn resolve(&self, from: &str) -> String {
         let dir = Path::new(from).parent().unwrap_or(Path::new(""));
         normalize(&dir.join(self.path()).to_string_lossy())
@@ -175,15 +175,21 @@ impl Reference {
 
 // ---- private ----
 
-/// `path` with `.` dropped and `..` folded into its parent (`resolve::normalize`'s rule).
+/// `path` with `.` dropped and `..` folded into its parent. A `..` with no parent left to fold
+/// (it climbs above the root) is kept, so the path names no file under the root, never a
+/// different one (`a/deck.sp`'s `../lib.inc` from root `a/` is `../lib.inc`, not `lib.inc`).
 fn normalize(path: &str) -> String {
     let mut out = PathBuf::new();
     for c in Path::new(path).components() {
         match c {
             Component::CurDir => {}
-            Component::ParentDir => {
-                out.pop();
-            }
+            Component::ParentDir => match out.components().next_back() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir | Component::Prefix(_)) => {}
+                _ => out.push(".."),
+            },
             c => out.push(c),
         }
     }
