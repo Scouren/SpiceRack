@@ -81,6 +81,10 @@ impl RowFacts for Measure {
         let _ = (design, at, f); // no reference
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         let x = match self.kind {
             MeasureKind::TrigTarg => RunExtra::MeasTrigTarg,

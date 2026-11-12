@@ -195,6 +195,10 @@ impl RowFacts for OptionRow {
         let _ = (design, at, f); // no reference
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Option(self.key));
         // `OptionMidRun` and `WholeRunMidRun` are facts of the listed order: `state_order_features`.
@@ -313,6 +317,10 @@ impl RowFacts for Env {
         let _ = (design, at, f); // no reference
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
         // placement is the kernel's `Placed` (A15 K1)
     }
@@ -383,6 +391,10 @@ impl RowFacts for NodeSet {
 
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

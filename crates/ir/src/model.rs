@@ -382,6 +382,16 @@ impl RowFacts for Model {
         design.editor().set(at.index, row);
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order
+        if self.ako.name != NameId::NONE {
+            out.push((self.ako, DefKind::Model));
+        }
+        if self.module.name != NameId::NONE {
+            out.push((self.module, DefKind::Module));
+        }
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         crate::circuit_features::model_features(self, set)
     }
