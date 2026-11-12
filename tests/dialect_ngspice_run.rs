@@ -224,6 +224,25 @@ fn a_node_set_that_holds_from_its_place_on_is_refused() {
 }
 
 #[test]
+fn a_script_option_whose_value_is_no_number_is_refused() {
+    // Oracle: ng-control's run settle/option_brace.sp (ng-control 5a5949dd): a script `option
+    // temp={q}` is "bad type given" and runs 27, `option temp={10+40}` runs 10; a script option's
+    // value is the frontend's number, never a numparam expression. L5 seed 10 wrote one.
+    for item in [
+        "env tnom=(1 + 2)",
+        "env temp=t",
+        "option rel_tol value=(1e-3 * 2)",
+    ] {
+        let text = format!("file \"f.sp\" deck\n  title \"f\"\n  param t = 50\n  {item}\n");
+        let mut design = parse_ir("from_here_value", &text);
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row(), &mut diags);
+        let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
+        assert_eq!(codes, ["W1304"], "{item}");
+    }
+}
+
+#[test]
 fn a_temp_or_nfreqs_in_another_file_is_not_seen_today() {
     // Oracle: none yet; pins the `ponytail:` limit of `read_run` (`.temp` and `nfreqs` are found
     // in the statement's own file only). ngspice would read `temp=50` as beaten by the library's

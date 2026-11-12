@@ -157,6 +157,51 @@ fn formal_defaults_run_where_the_instance_stands() {
     }
 }
 
+#[test]
+fn every_code_the_dialect_defines_has_a_catalogue_row() {
+    // Oracle: the dialect's own source, every `Code::new(b'L', N)` it spells, against
+    // `dialect::info`: a code with no row is "no catalogue holds it", a refusal by accident.
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/dialect/ngspice");
+    let mut stack = vec![root];
+    let mut missing = Vec::new();
+    let mut seen = 0usize;
+    // Bounded: each directory is entered once.
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).expect("the dialect's source") {
+            let path = entry.expect("an entry").path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).expect("a source file");
+            // a file's tests may name a code on purpose that no catalogue holds
+            let text = text.split("#[cfg(test)]").next().unwrap_or("");
+            for (at, _) in text.match_indices("Code::new(b'") {
+                let rest = &text[at + "Code::new(b'".len()..];
+                let letter = rest.as_bytes()[0];
+                let digits: String = rest[3..]
+                    .trim_start()
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect();
+                let Ok(number) = digits.parse::<u16>() else {
+                    continue;
+                };
+                seen += 1;
+                let code = ir::Code::new(letter, number);
+                if dialect::info(code).is_none() {
+                    missing.push(format!("{code} ({})", path.display()));
+                }
+            }
+        }
+    }
+    assert!(seen > 50, "the scan found the dialect's codes ({seen})");
+    assert!(
+        missing.is_empty(),
+        "codes with no catalogue row: {missing:?}"
+    );
+}
+
 /// The ngspice row.
 fn row() -> &'static DialectRow {
     dialect::by_name("ngspice").expect("the ngspice row")

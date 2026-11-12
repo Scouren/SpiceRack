@@ -152,6 +152,12 @@ pub(super) const CODES: &[Row] = &[
         "a value that reads the temperature or the circuit is written for the B-source parser, which has no draw function; refused.",
     ),
     row(
+        NEGATION,
+        "a numparam minus after an operator before no number",
+        "ngspice-45 xpressn.c (\"wrongly determined negation\"), INV-semantics 2.24",
+        "numparam negates only the number after an operator (`{2*-q}` is no expression it reads as written); kept as InvalidInSource text.",
+    ),
+    row(
         CALL_ARITY,
         "a .func call with another argument count than its formals",
         "ngspice-45 runs (arity: \"parameter mismatch for function call\")",

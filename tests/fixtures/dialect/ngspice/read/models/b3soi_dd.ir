@@ -1,6 +1,6 @@
 # codes:
 file "b3soi_dd.sp" deck
   title "b3soi_dd"
-  comment " oracle: inpdomod.c level 56 (B3SOIDD), b3soiddset.c:69 (a silent version is 2.0), b3soidd.c model table (tox tsi nsub u0)"
+  comment " oracle: inpdomod.c level 56 (B3SOIDD), b3soiddset.c:69 (a silent version is 2.0; the version is never read again: 2.1 runs it, run), b3soidd.c model table (tox tsi nsub u0)"
   model d1 b3_soi_dd polarity=n params=(tox=8n nsub=6e16) version="2.0"
-  model d2 b3_soi_dd polarity=p params=(u0=250) version="2.1"
+  model d2 b3_soi_dd polarity=p params=(u0=250) version="2.0"

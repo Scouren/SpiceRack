@@ -122,11 +122,8 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         ("model a mesa polarity=n params=(vto=1)", "W1203"),
         ("model a bsim4 polarity=n version=\"4.9\"", "W1202"),
         ("model a hisim_hv polarity=n version=\"3.0\"", "W1202"),
-        // no version on a versioned family: written without one, ngspice's reader would read
-        // its default back (b4set.c:205, b3soiddset.c:69, hicum2setup.c:45): L5 seed 0
-        ("model a bsim4 polarity=n", "W1202"),
-        ("model a b3_soi_dd polarity=n", "W1202"),
-        ("model a hicum2 polarity=n", "W1202"),
+        // a version is written as the vocabulary spells it (b4v5check.c:64: 4.5 is 4.5.0)
+        ("model a bsim4 polarity=n version=\"4.5\"", "W1202"),
         // a module's version is no field ngspice has (its reader keeps `version=` a parameter)
         ("model a module module=m version=\"1.0\"", "W1202"),
         // the type word is a code model or an OSDI module by what ngspice loaded (inpdomod.c
@@ -152,7 +149,7 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         assert_eq!(got, [code], "{line}");
     }
     // and admits a card of each kind it spells
-    let fine = "file \"t.sp\" deck\n  title \"t\"\n  model a mos1 polarity=n params=(vto=1 kp=2)\n  model b.1 bsim4 polarity=p params=(lmin=1 toxe=2) bin_of=b version=\"4.5\"\n  model c vbic polarity=n version=\"1.2\"\n  model d diode params=(m=0.3)\n";
+    let fine = "file \"t.sp\" deck\n  title \"t\"\n  model a mos1 polarity=n params=(vto=1 kp=2)\n  model b.1 bsim4 polarity=p params=(lmin=1 toxe=2) bin_of=b version=\"4.5.0\"\n  model c vbic polarity=n version=\"1.2\"\n  model d diode params=(m=0.3)\n";
     let mut design = parse_ir(fine);
     let mut diags = ir::Diags::new();
     dialect::legalize(&mut design, row(), &mut diags);
@@ -223,6 +220,146 @@ fn written_models_run_on_ngspice_to_the_original_numbers() {
         let written = write_entry(&design);
         let want = ngspice_print(&deck);
         assert_eq!(ngspice_print(&written), want, "{cards}\n---\n{written}");
+    }
+}
+
+#[test]
+fn code_models_of_the_build_round_trip_by_meaning() {
+    // The covering property for `Family(CodeModel)` (the neutral generator does not know
+    // ngspice's code-model names, R55): seeded designs of code models whose words are the
+    // pinned build's (families.rs `CODE_MODELS`, a `devhelp` run), with and without parameters,
+    // each with one A instance; written, read back, equal by meaning (oracle: the round trip).
+    let source = include_str!("../src/dialect/ngspice/families.rs");
+    let words: Vec<&str> = source
+        .split("const CODE_MODELS: &str = \"")
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .expect("the code-model list")
+        .split(|c: char| c.is_whitespace() || c == '\\')
+        .filter(|w| !w.is_empty())
+        .collect();
+    assert!(words.len() > 50, "the list parsed: {words:?}");
+    let (mut run, mut holding) = (0, 0);
+    for seed in 0..64u64 {
+        let mut state = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        let mut next = |n: u64| {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (state >> 33) % n
+        };
+        let mut ir = String::from("file \"p.sp\" deck\n  title \"p\"\n");
+        let models = 1 + next(3);
+        for k in 0..models {
+            let word = words[next(words.len() as u64) as usize];
+            let params: Vec<String> = (0..next(3))
+                .map(|j| format!("p{j}={}.{}", next(100), next(10)))
+                .collect();
+            let params = if params.is_empty() {
+                String::new()
+            } else {
+                format!(" params=({})", params.join(" "))
+            };
+            ir.push_str(&format!("  model m{k} code_model{params} word={word}\n"));
+            ir.push_str(&format!("  element code_model a{k} (n{k} 0) model=m{k}\n"));
+        }
+        let mut design = parse_ir(&ir);
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row(), &mut diags);
+        assert!(
+            !diags.rows().iter().any(|d| dialect::refuses(d.code)),
+            "seed {seed}: {diags:?}\n{ir}"
+        );
+        let text = write_entry(&design);
+        let (back, _) = read_deck("p.sp", &text);
+        assert!(
+            back.eq_meaning(&design),
+            "seed {seed}:\n{ir}\n{text}\n{}",
+            dump(&back)
+        );
+        run += 1;
+        holding += usize::from(ir.contains("code_model"));
+    }
+    // floors: every seed ran and held a code model
+    assert!(run >= 64 && holding >= 64, "{run} run, {holding} holding");
+}
+
+#[test]
+fn the_version_spellings_run_the_same_device() {
+    // Settle decks for families::standard: each family's card in two spellings of one version
+    // (or, where ngspice never reads the version again, two versions) prints the same
+    // operating point on ngspice-45, and the reader stores the standard version both times.
+    // (card head, spelling a, spelling b, the standard version, instance)
+    let m4 = "M1 d g 0 0 mm w=1u l=0.5u";
+    let soi = "M1 d g 0 0 0 mm w=1u l=1u";
+    let cases: &[(&str, &str, &str, &str, &str)] = &[
+        // b3v32set.c:86-92: 3.24 is 3.2.4, 3.20 is 3.2
+        (
+            "nmos level=49 tox=4n vth0=0.4",
+            "version=3.24",
+            "version=3.2.4",
+            "3.2.4",
+            m4,
+        ),
+        (
+            "nmos level=49 tox=4n vth0=0.4",
+            "version=3.20",
+            "version=3.2",
+            "3.2",
+            m4,
+        ),
+        // b4v5check.c:64: 4.5 is 4.5.0; b4set.c:345: 4.81 is 4.8.1
+        ("nmos level=54", "version=4.5", "version=4.5.0", "4.5.0", m4),
+        (
+            "nmos level=54",
+            "version=4.81",
+            "version=4.8.1",
+            "4.8.1",
+            m4,
+        ),
+        // hsmhv2set.c:136-150: 2.1 is reset to 2.20 (a warning); hsm2set.c:136: 281 to 280
+        (
+            "nmos level=73",
+            "version=2.1",
+            "version=2.20",
+            "2.20",
+            "M1 d g 0 0 mm w=10u l=10u",
+        ),
+        ("nmos level=68", "version=281", "version=280", "280", m4),
+        // never read again (no use beyond *mpar.c/*mask.c): silently their one version
+        (
+            "npn level=8",
+            "version=2.3",
+            "version=2.4.0",
+            "2.4.0",
+            "Q1 d g 0 q",
+        ),
+        ("npn level=4", "vers=1.3", "vers=1.2", "1.2", "Q1 d g 0 q"),
+        ("nmos level=10", "version=4.3", "version=4.4", "4.4", soi),
+        ("nmos level=57", "version=2.2", "version=2.0", "2.0", soi),
+    ];
+    for (head, a, b, standard, instance) in cases {
+        let name = if instance.starts_with('Q') { "q" } else { "mm" };
+        let deck = |v: &str| {
+            format!(
+                "probe\n.model {name} {head} {v}\n{instance}\nVd d 0 1\nVg g 0 1\n.control\nop\nprint i(vd)\n.endc\n.end\n"
+            )
+        };
+        assert_eq!(
+            ngspice_print(&deck(a)),
+            ngspice_print(&deck(b)),
+            "{head} {a} / {b}"
+        );
+        for v in [a, b] {
+            let (design, _) = read_deck("v.sp", &deck(v));
+            let text = dump(&design);
+            assert!(
+                text.contains(&format!("version=\"{standard}\"")),
+                "{head} {v}:\n{text}"
+            );
+        }
     }
 }
 

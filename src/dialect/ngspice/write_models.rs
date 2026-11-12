@@ -116,15 +116,23 @@ pub(super) fn admits(
             .clone()
             .flatten()
             .filter(|_| families::dispatches(m.family));
-        // a family ngspice runs in several versions states one (IR-CIRCUIT §4: `NONE` only for
-        // a family with a single version; ngspice's reader writes its device's default, R6):
-        // left out, ngspice would pick its own default, which the row does not say
+        // `check` refuses a versioned family's model without a version (round 7); a version
+        // is written as the vocabulary spells it, so it reads back as itself
         let ok = match &version {
-            None => !has,
+            None => true,
             Some(v) => has && v.as_deref().is_some_and(bare),
         };
         match families::device(m.family, picked.as_deref()) {
-            Some(d) if ok => Some(d),
+            Some(d)
+                if ok
+                    && version.as_ref().is_none_or(|v| {
+                        v.as_deref()
+                            .and_then(|t| families::standard(m.family, d, t))
+                            == v.as_deref()
+                    }) =>
+            {
+                Some(d)
+            }
             _ => {
                 refuse(VERSION);
                 None

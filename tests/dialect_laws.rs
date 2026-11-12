@@ -48,7 +48,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 10 Untyped: a FromHere Env tnom={expression} is written as a script `option tnom={…}` and reads back a Private opaque (the frontend's option takes no numparam braces): control and run (ng-control, ng-run)",
+        "a formal default's lexically bound outer read: goes with A37 (R62; seed 11 Untyped, `g28=(acos(atanh(g5)))` reads back `g5?`)",
     ),
     (
         "l7",
