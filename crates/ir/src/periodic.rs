@@ -20,7 +20,10 @@ use crate::sweep::SweepSpec;
 
 /// Harmonic balance over one or more tones (several from the start: a one-tone writer lacks
 /// `Extra::HbMultiTone`). The spectral index set is explicit: per-tone harmonics, the
-/// intermodulation order and the truncation shape (`INV-semantics.md` 8.15).
+/// intermodulation order and the truncation shape (`INV-semantics.md` 8.15). How a source
+/// drives each tone (HSPICE ignores a plain SIN in `.HB`, 5.20) is not this row's: it belongs on
+/// the source (the circuit owner's side, its gap G8), referring to tones by their index in
+/// `tones`; until it is ruled, it is gap G-HBDRIVE.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Hb {
     /// The tones' frequencies, Hz, at least one, each positive.

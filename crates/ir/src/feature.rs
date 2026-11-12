@@ -426,6 +426,8 @@ pub enum Extra {
     NodeSetInSubckt,
     /// An initial condition or node set on a node inside an instance.
     NodeSetHierarchical,
+    /// An initial condition on a device's own state (`NodeSetKind::Device`).
+    IcDevice,
     /// A probe of the voltage between two nodes.
     ProbeVdiff,
     /// A probe of an element's branch current.
@@ -709,6 +711,7 @@ impl Extra {
         Extra::NodesetAll,
         Extra::NodeSetInSubckt,
         Extra::NodeSetHierarchical,
+        Extra::IcDevice,
         Extra::ProbeVdiff,
         Extra::ProbeI,
         Extra::ProbeITerminal,

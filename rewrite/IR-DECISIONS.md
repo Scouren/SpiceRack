@@ -110,7 +110,8 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - R17. HSPICE `.noise` takes the deck's AC frequencies; Xyce refers input noise to the source's AC magnitude → `Noise::ac_sweep: bool`, `Noise::input_ref: NoiseRef::{Unit, SourceAc}`.
 - R18. A Spectre statistics `correlate param=[a b c]` → its pairs (`Correlation { a, b, cc }`), which write back as pairs (the law holds on the IR). `Vary::mean` (`NONE` = the parameter's value) is added for table forms that state a centre (Xyce `means=`).
 - R19. "Analysis kind or none" fields (IR-RUN §6) → `Save { analysis, every_analysis: bool }`; `Print` always names its kind (`.print` requires one).
-- R20. Item count of `Extra` → the run owner adds 118 members; with the kernel's 8 the `u8` repr leaves the circuit owner 130. If the two owners' regions together pass 256, `Extra` needs `#[repr(u16)]` (kernel).
+- R20. Item count of `Extra` → the run owner adds 119 members; with the kernel's 8 the `u8` repr leaves the circuit owner 129. If the two owners' regions together pass 256, `Extra` needs `#[repr(u16)]` (kernel).
+- R21. A device's initial state stated outside the device (VACASK's transient `ic` entry, Xyce `.INITCOND`; circuit cross-request D6) → `NodeSetKind::Device`, `node` the element path; an instance's own `IC=` stays the circuit owner's field. The HB drive of a source (5.20) and Spectre `xfmag` stay on the source side (gaps G-HBDRIVE, G-XFMAG, for the circuit owner's ruling); `Hb` and `Xf` refer to no source field.
 
 ## Addendum A6 (one detail door)
 
