@@ -80,3 +80,8 @@ Where `IR-KERNEL.md` is silent or two statements conflict: the question, the cho
 - `Table` row → named `TableSource` (the kernel's `table::Table` is re-exported at the root).
 - Look-alike families split (7.18): `Diode`/`DiodeLevel3`/`DiodePspice`/`DiodePspiceTemp`/`DiodeLtspice`/`DiodeIdeal`/`DiodeSpectre`, `Mos0`, `VdmosRpi`, `Gaas`, `JfetShockley`, `JfetHspice2`, `*Multiplier` R/C/L (xy). 70 families; xy levels the inventory does not name are `Other` (COVERAGE gap G12).
 - Multiplicity features → one `Extra` per kind class (`MultResistor` … `MultOther`), since targets drop `m` per kind (ESPice on X, C, L; Xyce on V/I).
+
+## Addendum A5 (requests from the circuit owner)
+
+- `Violation::FieldDomain` is appended last (`X0015`), so no earlier `X` code moves; `arg` is the row's index in its kind's table.
+- `ProbeContext` keeps its name; its doc now reads "a circuit read inside a `Handle::Expr` field". `Gen`'s `Reads::Constant`/`Reads::Circuit` are documented as `Handle::Expr`/`Handle::ExprDyn`.

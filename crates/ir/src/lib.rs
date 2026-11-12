@@ -16,13 +16,20 @@
 //! writer.write(&design, design.entry(), &mut text, &mut diags);
 //! ```
 //!
-//! Cites: `REWRITE-PLAN.md` §2–§4; `rewrite/IR-KERNEL.md` (conventions C1–C14, Addendum A1).
+//! Cites: `REWRITE-PLAN.md` §2–§4; `rewrite/IR-KERNEL.md` (conventions C1–C14, Addenda A1–A5);
+//! `rewrite/RULINGS.md`.
 //!
-//! Contents: the modules below, and re-exports of `Design`, `ItemRow`, `Builder`, `Editor`, the
-//! handles of `id`, `Span`, `Table`, the kernel enums of `item` and `expr`, `RowFacts`,
-//! `Handle`, `Feature`,
-//! `FeatureSet`, `Extra`, `features_used`, `link`, `check`, `check_legal`, `Violation`, the diagnostic
-//! rows of `diag`, `eval`, `Bindings`, `Domain`, `dump`, `parse`.
+//! Contents: the modules below (kernel, circuit owner, run owner, in three groups), and
+//! re-exports:
+//! - kernel: `Design`, `ItemRow`, `Builder`, `Editor`, the handles of `id` (`NameId`, `FileId`,
+//!   `ScopeId`, `ExprId`, `DefId`, `TextId`, `NumId`, `ItemRef`, `Ref`, `List` and its aliases),
+//!   `Span`, `Table`, the kernel enums of `item` and `expr`, `Literal`, `NumForm`, `RowFacts`,
+//!   `Handle`, `Feature`, `FeatureSet`, `Extra`, `features_used`, `link`, `check`,
+//!   `check_legal`, `Violation`, the diagnostic rows of `diag`, `eval`, `Bindings`, `Domain`,
+//!   `dump`, `parse`
+//! - circuit owner: `ElemHead`, `DetailKind`, `DetailRow`, `ElemKind`, `Element`, `NO_ROW`,
+//!   `Model`, `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
+//! - run owner: (its merge adds its re-exports here)
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

@@ -54,13 +54,15 @@ pub struct Gen {
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
-/// `Idt`): the field's context decides, as `check`'s `ProbeContext` does.
+/// `Idt`): chosen by the field's handle kind, as `check`'s `ProbeContext` decides.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Reads {
-    /// A parameter-like field: constants, parameters, `Temp` and the analysis leaves only.
+    /// A field the row lists as `Handle::Expr`: constants, parameters, `Temp` and the A1 leaves
+    /// only.
     Constant,
-    /// A field that may read the circuit (a behavioural source, a charge).
+    /// A field the row lists as `Handle::ExprDyn` (a behavioural source, a charge, a table's
+    /// input, a switch's control).
     Circuit,
 }
 

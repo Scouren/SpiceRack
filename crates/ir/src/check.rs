@@ -13,6 +13,8 @@
 
 use crate::design::Design;
 use crate::diag::Diags;
+#[cfg(doc)]
+use crate::facts::Handle;
 use crate::feature::FeatureSet;
 
 /// One invariant of a well-formed design. Each has its `X` code (`diag::violation_code`); the
@@ -50,19 +52,24 @@ pub enum Violation {
     LiteralShape,
     /// A name used by a row is empty. `arg`: the name.
     EmptyName,
-    /// A `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt` appears in an expression whose field may not
-    /// read the circuit (a parameter, a model value, an analysis argument). `arg`: the
-    /// expression.
+    /// A `V`, `I`, `Time`, `Freq`, `Ddt` or `Idt` appears in an expression a row lists as a
+    /// [`Handle::Expr`] (a field that must be constant in time: a parameter, a model value, an
+    /// analysis argument). Under [`Handle::ExprDyn`] they are legal. `arg`: the expression.
     ProbeContext,
     /// Two definitions of one kind and name in one scope. `arg`: the second definition.
     DuplicateDef,
     /// An `Opaque` has no dialect or empty text. `arg`: the opaque row.
     OpaqueEmpty,
+    /// A row's field is outside its domain, or two of its fields disagree (an `ic_mode` of
+    /// `None` with an `ic` present, an AC phase without a magnitude, port fields on a non-port, a
+    /// master named where the kind takes none). Reported by the row's own `RowFacts::check`.
+    /// `arg`: the row's index in its kind's table (the span names the item).
+    FieldDomain,
 }
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; 14] = [
+    pub const ALL: [Violation; 15] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -77,6 +84,7 @@ impl Violation {
         Violation::ProbeContext,
         Violation::DuplicateDef,
         Violation::OpaqueEmpty,
+        Violation::FieldDomain,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();

@@ -72,8 +72,14 @@ pub trait RowFacts: ItemRow {
 /// allowed is the row's own `check`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Handle {
-    /// An expression (a value field).
+    /// An expression field that must be constant in time: parameters, `Temp` and the A1 leaves
+    /// (`TStep`, `TStop`, `Tnom`) may appear; `V`, `I`, `Time`, `Freq`, `Ddt`, `Idt` may not
+    /// (`check`: `ProbeContext`; `Gen::expr` with `Reads::Constant`).
     Expr(ExprId),
+    /// An expression field that may read the circuit: a behavioural source's expression, a
+    /// table's input, a circuit-dependent passive value, a switch's control (`Gen::expr` with
+    /// `Reads::Circuit`). Which features it uses is still decided by what it holds (A1).
+    ExprDyn(ExprId),
     /// A name.
     Name(NameId),
     /// A reference to a definition.
