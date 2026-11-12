@@ -58,6 +58,7 @@ One line per change, written by hand, citing its pull request. Every number is m
 - syntax: a Xyce harmonic balance print written for HSPICE takes HSPICE RF's print types: `.print hb_fd` is `.print hb`, `.print hb_td` is `.print hbtran`, and `.print hb_ic` and `.print hb_startup` (the transient ahead of the balance, which HSPICE RF does not print) are left out with a note (`W0023`); they were copied as read (ZERO-LEDGER P5-007).
 - backend: ESPice is started with `--tokenizer=ngspice`. A deck written for ESPice is ngspice text, and ESPice 0.3.0, not told, reads a deck holding a card ngspice lacks (`.fft`, `.data`, `.alter`, …) as HSPICE text: a brace expression stops it (ParseError) and the temperature defaults to 25 °C (a diode's voltage 0.6255 V where the deck's own 27 °C gives 0.6294 V, measured). The cross-sim harness's ESPice cells are started the same way (S4-rf-espice-tokenizer).
 - xyce: an ngspice `.print … all` is written `v(*) i(*)` and a branch vector `v1#branch` as `i(v1)`; Xyce stopped on both words (ZERO-LEDGER P1-066).
+- xyce: an ngspice MESFET card's threshold `vt0` is written `vto`, and ngspice's -2 V default when the card gives none; Xyce ignored `vt0` and computed with 0 V (ZERO-LEDGER P1-066).
 
 ## 0.2.0 (2026-11-03)
 
