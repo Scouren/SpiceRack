@@ -473,7 +473,7 @@ fn binary_text(op: ir::BinOp) -> &'static str {
         B::Ge => " >= ",
         B::And => " && ",
         B::Or => " || ",
-        B::IntDiv | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
+        B::IntDiv | B::DivTyped | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
             panic!("ngspice has no {op:?} (FEATURES lacks it)")
         }
     }

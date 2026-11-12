@@ -200,7 +200,10 @@ pub(super) const fn level(eval: Eval, op: BinOp) -> Option<u8> {
         B::And => 7,
         B::Or if numparam => 7,
         B::Or => 8,
-        B::IntDiv | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => return None,
+        // `DivTyped` is VACASK's typed division (A12): ngspice divides reals only
+        B::IntDiv | B::DivTyped | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
+            return None;
+        }
     })
 }
 

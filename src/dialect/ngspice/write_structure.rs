@@ -39,6 +39,10 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Extra(Extra::NestedSubckt),
     Feature::Extra(Extra::LocalFunc),
     Feature::Extra(Extra::IncludeSection),
+    // ngspice resolves a name through every enclosing subcircuit (numparam's nested levels), and
+    // a head default may read a parameter (A12 K2)
+    Feature::Extra(Extra::EnclosingRef),
+    Feature::Extra(Extra::FormalReadsParam),
 ]);
 
 /// A `Title` past the first item: the IR puts it first, and the spine writes line 1, so a
