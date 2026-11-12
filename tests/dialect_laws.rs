@@ -80,8 +80,8 @@ const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     (
         "vacask",
         "Elem(Diode)",
-        "every_reader_fixture_is_a_fixpoint_of_write_and_read",
-        "interim: as Elem(Capacitor); covered by the devices' semis fixture (diodes) until proven_device_kinds_round_trip builds diodes too",
+        "proven_device_kinds_round_trip",
+        "as Elem(Capacitor)",
     ),
     (
         "vacask",
