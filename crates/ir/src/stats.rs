@@ -180,6 +180,25 @@ impl RowFacts for Statistics {
         }
     }
 
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order: every vary's parameter, then every correlation's two ends
+        for list in [self.process, self.mismatch] {
+            let start = list.start as usize;
+            let end = (start + list.len as usize).min(design.run.varies.len());
+            for v in &design.run.varies[start.min(end)..end] {
+                out.push((v.param, DefKind::Param));
+            }
+        }
+        for list in [self.process_correlations, self.mismatch_correlations] {
+            let start = list.start as usize;
+            let end = (start + list.len as usize).min(design.run.correlations.len());
+            for c in &design.run.correlations[start.min(end)..end] {
+                out.push((c.a, DefKind::Param));
+                out.push((c.b, DefKind::Param));
+            }
+        }
+    }
+
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         flag(set, self.mismatch.len > 0, RunExtra::StatsMismatch);
         let correlated = self.process_correlations.len + self.mismatch_correlations.len > 0;

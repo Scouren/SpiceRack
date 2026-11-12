@@ -310,3 +310,10 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - Ruled: every head default that is not a constant (a parameter read, or class `Temp`) sets it. The old name would mislead for `w=$temp`, so it is `Extra::FormalNotConstant`; its index is unchanged. `$tnom` and the other A1 leaves are constants of the run and do not set it. The generator keeps a default constant (`param_reads` off, `constant_only` on) unless the set has it.
 
+## M5: the `refs` twin
+
+- `RowFacts::refs(&self, design, at, out: &mut Vec<(Ref, DefKind)>)` is a required method (no default could be derived: a `Handle::Ref` carries no kind), written for every row of all three owners in one commit, as ruled. `Design::item_refs` is its dispatcher (`Design::refs` already named the reference pool's accessor). `plan::target_refs_into` is `target_refs`'s twin.
+- `check` reads through it and no longer clones the design; `link` and `bind_ref` keep `map_refs`, since they write.
+- The drift property runs 300 seeds of `FeatureSet::ALL` and asserts the kinds that hold references (Element, Model, Analysis, Loop, Alter, Statistics, Elaborate) were each seen with one, so it cannot pass vacuously.
+- `probe_classes` (A15 K3) walks with one stamped `ExprWalk` rather than `tree_class`'s per-call set; `tree_class` stays for the row facts that call it once per row.
+

@@ -44,7 +44,7 @@ use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
     Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
     TargetUse, dump_target, parse_target, target_features, target_handles, target_refs,
-    target_valid,
+    target_refs_into, target_valid,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::{gen_ref, gen_target, target_kinds};
@@ -94,6 +94,30 @@ impl RowFacts for Loop {
                 let end = (start + t.columns.len as usize).min(design.run.targets.len());
                 for target in &mut design.run.targets[start.min(end)..end] {
                     target_refs(target, f);
+                }
+            }
+            LoopKind::MonteCarlo => {}
+        }
+    }
+
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order
+        match self.kind {
+            LoopKind::Sweep => {
+                if let Some(d) =
+                    <SweepLoop as crate::design::DetailRow>::rows(design).get(self.detail as usize)
+                {
+                    target_refs_into(&d.target, out);
+                }
+            }
+            LoopKind::Table => {
+                let Some(t) = detail_get::<TableLoop>(design, self.detail) else {
+                    return;
+                };
+                let start = t.columns.start as usize;
+                let end = (start + t.columns.len as usize).min(design.run.targets.len());
+                for target in &design.run.targets[start.min(end)..end] {
+                    target_refs_into(target, out);
                 }
             }
             LoopKind::MonteCarlo => {}
@@ -269,6 +293,10 @@ impl RowFacts for Alter {
         design.editor().set(at.index, row);
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        target_refs_into(&self.target, out);
+    }
+
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         target_features(&self.target, TargetUse::Alter, set);
         if !self.value.is_none() && matches!(design.expr(self.value), Expr::Str(_)) {
@@ -344,6 +372,14 @@ impl RowFacts for Elaborate {
         let end = (start + row.circuits.len as usize).min(design.run.refs.len());
         for r in &mut design.run.refs[start.min(end)..end] {
             f(r, DefKind::Subckt);
+        }
+    }
+
+    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        let start = self.circuits.start as usize;
+        let end = (start + self.circuits.len as usize).min(design.run.refs.len());
+        for r in &design.run.refs[start.min(end)..end] {
+            out.push((*r, DefKind::Subckt));
         }
     }
 
