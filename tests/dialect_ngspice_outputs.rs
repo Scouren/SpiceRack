@@ -52,7 +52,6 @@ const REFUSED: &[(&str, &str)] = &[
     ),
     ("save of a part", "  save (v mag (a))"),
     ("print of an op table", "  print op (v (a))"),
-    ("print of a phase in degrees", "  print ac (v phase_deg (a))"),
     (
         "measure of an op analysis",
         "  measure m op find (v (a)) (at value=1n)",
@@ -117,11 +116,7 @@ fn each_read_fixture_reads_to_its_ir() {
     for name in READ {
         let (got, _) = read_deck(&format!("{name}.sp"), &text("read", name, "sp"));
         let want = parse_ir(&text("read", name, "ir"));
-        assert!(
-            got.eq_ignoring_spans(&want),
-            "{name}: got\n{}",
-            dump(&got)
-        );
+        assert!(got.eq_ignoring_spans(&want), "{name}: got\n{}", dump(&got));
     }
 }
 
@@ -189,8 +184,119 @@ C1 b 0 100p
     let written = write_entry(&design);
     assert_ne!(written, deck, "the measures are written, not copied");
     let want = ngspice_measures(deck);
-    assert_eq!(want.len(), 15, "every measure of the original ran:\n{want:?}");
+    assert_eq!(
+        want.len(),
+        15,
+        "every measure of the original ran:\n{want:?}"
+    );
     assert_eq!(ngspice_measures(&written), want, "{written}");
+}
+
+#[test]
+fn ac_measures_read_and_written_run_on_ngspice_to_the_original_values() {
+    // Oracle: ngspice-45 on the original deck (an ac v() is its real part, vp is radians).
+    let deck = "meas ac round trip
+V1 in 0 dc 0 ac 1
+R1 in out 1k
+C1 out 0 1u
+.ac dec 10 1 1meg
+.meas ac g find v(out) at=100
+.meas ac gm max vdb(out)
+.meas ac ph find vp(out) at=100
+.meas ac bw when vdb(out)=-3 fall=1
+.meas ac m find vm(out) when vr(out)=0.5
+.end
+";
+    let (design, _) = read_deck("ac.sp", deck);
+    let written = write_entry(&design);
+    assert_ne!(written, deck, "the measures are written, not copied");
+    let want = ngspice_measures(deck);
+    assert_eq!(
+        want.len(),
+        5,
+        "every measure of the original ran:\n{want:?}"
+    );
+    assert_eq!(ngspice_measures(&written), want, "{written}");
+}
+
+#[test]
+fn generated_outputs_the_writer_admits_read_back_as_themselves() {
+    // Oracle: law L5 on this area's rows. Designs of one output item over this area's features
+    // (ir::gen, valid by construction); each one `legalize` admits is written and read back,
+    // and its IR text must be the original's. Every item form must be admitted at least once.
+    use ir::{ExprTag as T, Feature as F, ItemKind as K, RunExtra as X};
+    let row = row();
+    let set = [
+        F::Item(K::Title),
+        F::Item(K::Save),
+        F::Item(K::Print),
+        F::Item(K::Measure),
+        F::Expr(T::Num),
+        F::Expr(T::Binary),
+        F::Expr(T::V),
+        F::Expr(T::I),
+        F::Run(X::ProbeVdiff),
+        F::Run(X::ProbeI),
+        F::Run(X::ProbeParam),
+        F::Run(X::ProbeHierarchical),
+        F::Run(X::PartRe),
+        F::Run(X::PartMag),
+        F::Run(X::PartPhaseRad),
+        F::Run(X::PartDb),
+        F::Run(X::MeasTrigTarg),
+        F::Run(X::MeasWhen),
+        F::Run(X::MeasFind),
+        F::Run(X::MeasStat),
+        F::Run(X::MeasParam),
+        F::Run(X::MeasLast),
+        F::Run(X::MeasDelay),
+        F::Run(X::MeasCircuitThreshold),
+    ]
+    .iter()
+    .fold(ir::FeatureSet::EMPTY, |s, f| s.with(*f));
+    let size = ir::r#gen::Size {
+        items: 2,
+        scope_depth: 0,
+        expr_depth: 2,
+        files: 1,
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    for seed in 0..20_000 {
+        let mut design = ir::r#gen::generate(seed, &set, size);
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row, &mut diags);
+        if diags.rows().iter().any(|r| dialect::refuses(r.code)) {
+            continue;
+        }
+        let want = dump(&design);
+        let text = dialect::write(&design, design.entry(), row, &mut diags);
+        let path = design.str(design.file(design.entry()).path).to_string();
+        let (back, _) = read_deck(&path, &text);
+        assert_eq!(dump(&back), want, "seed {seed}:\n{text}");
+        for form in [
+            "save ",
+            "print ",
+            "trig_targ ",
+            "when ",
+            "find ",
+            "stat ",
+            "param value",
+        ] {
+            if want.contains(form) {
+                seen.insert(form);
+            }
+        }
+    }
+    let all = [
+        "find ",
+        "param value",
+        "print ",
+        "save ",
+        "stat ",
+        "trig_targ ",
+        "when ",
+    ];
+    assert_eq!(seen.into_iter().collect::<Vec<_>>(), all);
 }
 
 /// The ngspice row.

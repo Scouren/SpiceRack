@@ -415,7 +415,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// step binds each to a measure of its name first, then to a parameter (ngspice-45
     /// `measure.c` `do_measure`: every other measure runs first and enters its result with
     /// `nupa_add_param`, so a measure, even a later one, hides a `.param` of its name).
-    #[expect(dead_code, reason = "the output area calls it (S3.3b)")]
     pub(super) fn measure_reads(&mut self, mark: usize) {
         assert!(
             mark <= self.pending.len(),
