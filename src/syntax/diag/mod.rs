@@ -16,6 +16,7 @@
 //! | W0001–W0100 | render: the SPICE-family writer and the rules both writers share |
 //! | W0101–W0200 | render: the named writer (Spectre, VACASK) |
 //! | W0201–W0300 | render: rules a dialect definition declares |
+//! | W0301–W0399 | render: stream S4 (D56) |
 //!
 //! A `W0201`/`W0202` diagnostic carries a `detail`: which of the codes a
 //! definition declared (`syntax::def::DialectDef::code`) it is, its
@@ -27,7 +28,7 @@
 //! one `catalogue!` list: `rows_lp.rs` (L, P), `rows_r.rs` (R),
 //! `rows_w_spice.rs` (W0001–W0100), `rows_w_named.rs` (W0101–W0139),
 //! `rows_s1.rs` (W0140–W0159), `rows_s2.rs` (W0160–W0179), `rows_s3.rs`
-//! (W0180–W0199), `rows_w_def.rs` (W0201–W0300).
+//! (W0180–W0199), `rows_w_def.rs` (W0201–W0300), `rows_s4.rs` (W0301–W0399).
 //!
 //! Adding a code is one entry in its block's file: take the next free
 //! number of your block (the `// Wxxxx–Wyyyy:` headers in each file name
@@ -36,7 +37,7 @@
 //! its numeric place (the codes stay ascending: `Code`'s `Ord` is the
 //! order two diagnostics on one token are rendered in, and
 //! `codes_follow_their_stage_ranges` fails out of order). A stream's free
-//! code (S1, S2, S3, and P0015–P0019) holds a `// slot <CODE>` line at its
+//! code (S1, S2, S3, S4, and P0015–P0019) holds a `// slot <CODE>` line at its
 //! numeric place: write the row directly after its slot and delete the
 //! marker, so the codes stay ascending whatever order rows land in. `cite`
 //! names the target's manual clause (or the run) that makes it a refusal;
@@ -65,6 +66,8 @@ mod rows_s1;
 mod rows_s2;
 #[macro_use]
 mod rows_s3;
+#[macro_use]
+mod rows_s4;
 #[macro_use]
 mod rows_w_def;
 #[macro_use]
@@ -116,7 +119,7 @@ const _: () = assert!(size_of::<Diag>() == 8);
 
 // The catalogue: each block's rows appended in code order, then
 // `catalogue!` over them all.
-rows_lp! { rows_r rows_w_spice rows_w_named rows_s1 rows_s2 rows_s3 rows_w_def catalogue_end ; }
+rows_lp! { rows_r rows_w_spice rows_w_named rows_s1 rows_s2 rows_s3 rows_w_def rows_s4 catalogue_end ; }
 
 impl Diag {
     /// `code` at `token`, with `detail` (0 but for `W0201`/`W0202`).
@@ -150,13 +153,14 @@ mod tests {
     #[test]
     fn codes_follow_their_stage_ranges() {
         // The module header's table: (letter, first, last, stage).
-        const RANGES: [(char, u32, u32, &str); 6] = [
+        const RANGES: [(char, u32, u32, &str); 7] = [
             ('L', 1, 100, "tokenize"),
             ('P', 1, 100, "parse"),
             ('R', 1, 100, "resolve"),
             ('W', 1, 100, "render: SPICE and shared"),
             ('W', 101, 200, "render: named"),
             ('W', 201, 300, "render: a definition's rules"),
+            ('W', 301, 399, "render: stream S4"),
         ];
         let mut last: Option<(char, u32)> = None;
         for &c in Code::ALL {

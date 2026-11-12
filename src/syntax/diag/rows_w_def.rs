@@ -1,6 +1,6 @@
 //! The catalogue's W0201–W0300 rows: the rules a dialect definition
-//! declares. The last block of `catalogue!`'s list (`mod.rs` chains every
-//! block, in code order).
+//! declares. A block of `catalogue!`'s list (`mod.rs` chains every block,
+//! in code order).
 //!
 //! Cites: each row's `cite` names its own clause.
 //!
