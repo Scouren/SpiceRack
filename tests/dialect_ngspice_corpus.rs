@@ -26,11 +26,6 @@ use spicerack::ir;
 /// The decks that fail today: (deck relative to `examples/`, step, why). Strict both ways.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "Monte_Carlo/MC_ring_ts.sp",
-        "round_trip",
-        "control: a .control block with no .endc reads to the end of the file, so the written `.end` lands inside the Script opaque",
-    ),
-    (
         "Monte_Carlo/OpWien.sp",
         "legalize",
         "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
@@ -51,29 +46,9 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
     ),
     (
-        "measure/buggy-meas-tran.sp",
-        "round_trip",
-        "outputs/control: a .measure kept as an Unread `.control\nmeas …` opaque is written as script commands and read back as a Measure",
-    ),
-    (
-        "measure/meas_expression.cir",
-        "round_trip",
-        "outputs/control: as buggy-meas-tran.sp",
-    ),
-    (
-        "measure/simple-meas-tran.sp",
-        "round_trip",
-        "control: a .control `tran` read as a run item reads back as a Script opaque; an Inert plot block is lost",
-    ),
-    (
         "memristor/memristor_x.sp",
         "legalize",
         "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "numparam/param-example.cir",
-        "round_trip",
-        "sources: `V1 input 0 dc dcvoltage ac amplitude phase` reads back Unread",
     ),
     (
         "optran/HiPass3opamps_optran.cir",
@@ -114,31 +89,6 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "tclspice/tcl-testbench4/example.cir",
         "legalize",
         "Extra(CaseSensitiveNames): the kernel's case_clash compares names across namespaces (an element `RS` and a diode key `rs`); the kernel narrows it to one namespace (lead, A25 follow-up)",
-    ),
-    (
-        "transient-noise/noise_vnoi.cir",
-        "round_trip",
-        "outputs/control: as buggy-meas-tran.sp",
-    ),
-    (
-        "transient-noise/shot_ng.cir",
-        "round_trip",
-        "outputs/control: as buggy-meas-tran.sp",
-    ),
-    (
-        "various/integrate1.cir",
-        "round_trip",
-        "outputs/control: as buggy-meas-tran.sp",
-    ),
-    (
-        "vdmos/100W.sp",
-        "round_trip",
-        "sources: `Vin N013 0 dc 0 ac 0 sin(0 V 1k)` is written in a form that reads back InvalidInSource",
-    ),
-    (
-        "xspice/delay/analog-delay1.cir",
-        "round_trip",
-        "sources: `V1 in1 0 dc 0 sin(0 1 freq)` reads back Unread",
     ),
     (
         "xspice/see/CMOSOpAmp/CMOS-OP1.cir",
