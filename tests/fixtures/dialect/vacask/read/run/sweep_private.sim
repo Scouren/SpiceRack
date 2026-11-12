@@ -1,0 +1,11 @@
+sweeps the IR cannot state yet
+control
+  sweep s1 variable="x" values=[1, 2]
+    analysis t1 tran stop=1m
+  sweep s2 instance="r1" from=1k to=2k step=500
+    analysis t2 tran stop=1m
+  sweep s3 instance="r1" parameter="r" values=[1k] continuation=0
+    analysis t3 tran stop=1m
+  sweep s4 instance="r1" parameter="r" values=[1k]
+    analysis t4 tran stop=1m write=0
+endc

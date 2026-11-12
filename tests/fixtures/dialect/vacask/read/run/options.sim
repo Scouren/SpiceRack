@@ -1,0 +1,8 @@
+typed options
+control
+  options reltol=1e-4 abstol=1p vntol=1u chgtol=1f gmin=1e-15 gshunt=0 scale=1
+  options temp=50 tnom=25
+  options tran_maxord=2 op_itl=200 tran_itl=20 homotopy_gminsteps=10 homotopy_srcsteps=10
+  options op_skipinitial=1 tran_method="trap"
+  options tran_method="euler" temp=27
+endc

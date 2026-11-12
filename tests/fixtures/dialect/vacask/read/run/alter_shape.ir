@@ -1,0 +1,7 @@
+# Oracle: VD cmd-alter (`alter instance("name" [, "name2" …]) p=v …`: the names, then the
+# assignments): a name after an assignment is no alter VACASK reads (P2320). Shrunk mutant of
+# dialect_mutants alter_elaborate.sim seed 15 (two tokens swapped), which panicked in fold.rs.
+# codes: P2320 S0004
+file "alter_shape.sim" deck
+  title "an alter whose names and assignments are interleaved"
+  opaque vacask invalid "alter instance(\"r1\", r=2k \"r2\")"

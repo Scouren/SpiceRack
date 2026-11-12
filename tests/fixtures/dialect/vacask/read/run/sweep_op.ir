@@ -1,0 +1,6 @@
+# Oracle: VD cmd-sweep (sweep + op is one result over the grid; the last sweep is the inner
+# axis; the name names the swept vector); A22 (DcAxis gains an optional name).
+# codes:
+file "sweep_op.sim" deck
+  title "sweeps before an op"
+  analysis dc name=dc1 (device_param v2 dc) (list values=[0i, 1i]) name=vd (device_param v1 dc) (lin start=1i stop=3i step=0.5) name=vg

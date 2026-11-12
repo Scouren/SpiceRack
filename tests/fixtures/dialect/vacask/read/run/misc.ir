@@ -1,0 +1,17 @@
+# Oracle: DIALECT-VACASK §3.4 (print, abort, postprocess: Inert, C K10); R43 (var Private under
+# its own code, P2307); VD cmd-options-set, cmd-save (`clear options`, `clear` reset state:
+# Private, P2310); comments keep their place among the statements.
+# codes: P2307 P2310 P2310 S0002 S0002 S0002 S0003 S0003 S0003
+file "misc.sim" deck
+  title "print, abort, postprocess, clear, var"
+  comment " a comment before the first statement"
+  opaque vacask private "var x=2"
+  opaque vacask inert "print instance(\"r1\")"
+  opaque vacask inert "abort always"
+  analysis op name=op1
+  comment " between"
+  comment "     analyses "
+  analysis op name=op2
+  opaque vacask inert "postprocess(PYTHON, \"x.py\")"
+  opaque vacask private "clear options"
+  opaque vacask private "clear"

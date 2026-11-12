@@ -1,0 +1,9 @@
+statements VACASK rejects
+control
+  analysis op1 op foo=1
+  analysis t1 tran stop=1m nodeset={"a"}
+  analysis z1 frob
+  endmc
+  mc m1 samples=2
+    analysis op2 op
+endc

@@ -41,7 +41,14 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
-const KNOWN: &[(&str, &str, &str)] = &[("l7", "vacask", "no ngspice<->VACASK passes until S4.4")];
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "l5",
+        "vacask",
+        "seed 2 Untyped: an analysis with no name (`analysis xf …`) is written with a generated name (`acxf1`, W2301) and reads back named; VACASK requires a name, so an unnamed analysis needs a feature VACASK lacks or a naming pass (vc-run's)",
+    ),
+    ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
+];
 
 /// The most seeds the shrink self-test searches for its case.
 const SEARCH_MAX: u64 = 1024;
@@ -60,15 +67,21 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     (
         "vacask",
+        "Item(Save)",
+        "generated_save_plans_read_back_to_their_meaning",
+        "W2303: VACASK spells two save shapes only (R29/S12)",
+    ),
+    (
+        "vacask",
         "Elem(Capacitor)",
         "proven_device_kinds_round_trip",
         "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws",
     ),
     (
         "vacask",
-        "Elem(Inductor)",
-        "proven_device_kinds_round_trip",
-        "as Elem(Capacitor)",
+        "Elem(Diode)",
+        "every_reader_fixture_is_a_fixpoint_of_write_and_read",
+        "interim: as Elem(Capacitor); covered by the devices' semis fixture (diodes) until proven_device_kinds_round_trip builds diodes too",
     ),
     (
         "vacask",

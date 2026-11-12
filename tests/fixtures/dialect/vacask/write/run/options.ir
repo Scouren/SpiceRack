@@ -1,0 +1,14 @@
+# Oracle: VD cmd-options-set (options name=value, one or more per line), cmd-options-tol,
+# -temp, -tran, -op; the writer spells one row per line, an Env as temp and tnom, a flag as the
+# key's value (tran_method, op_skipinitial=1); a hint opaque copied.
+file "options.ir" deck
+  title "written options"
+  option rel_tol value=1e-4
+  option abs_tol value=1p
+  env temp=50i tnom=25i
+  env tnom=30i
+  option method_trap
+  option no_op_iter
+  option itl1 value=200i
+  opaque vacask hint "options tran_fs=0.1"
+  analysis op name=op1

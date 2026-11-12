@@ -1,0 +1,17 @@
+written analyses
+control
+  analysis op1 op nodeset={"a", 1, "b", "c", 0.5}
+  analysis t1 tran stop=10m step=1u start=6m maxstep=10u icmode="uic" ic={"x1:n", 1}
+  analysis t2 tran stop=1m noisefmax=5k noisefmin=5k / 1e3 noiseseed=3
+  analysis a1 ac from=1k to=2k mode="lin" points=10
+  analysis a2 ac from=1k to=2k step=100
+  analysis a3 ac from=1 to=1G mode="dec" points=10
+  analysis a4 ac values=[1k, 2k]
+  analysis a5 ac from=1 to=2 mode="lin" points=n
+  analysis d1 dcinc
+  analysis x1 dcxf out=["o", "p"]
+  analysis x2 acxf out="o" from=1 to=1k mode="oct" points=3
+  analysis n1 noise out="o" in="v1" from=1 to=1k mode="dec" points=5
+  analysis s1 acstb probe="vp" from=1 to=1k mode="dec" points=5
+  analysis s2 acsp ports=["v1", "r1", "v2", "r2"] from=1 to=1k mode="dec" points=5
+endc

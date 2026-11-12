@@ -1,0 +1,18 @@
+# Oracle: VD cmd-alter (one or more names, each parameter set from the next analysis on;
+# hierarchical names); run e2 (an alter persists); VD cmd-elaboration (`circuit("a", …)`
+# promotes; `circuit` alone and `changes` are what happens anyway: Inert; topdef/topinst have no
+# field: Private, P2311).
+# codes: P2311 S0002 S0003 S0003
+file "alter_elaborate.sim" deck
+  title "alter and elaborate"
+  subckt a (p)
+  subckt b (p)
+  alter (device_param r1 r) value=2k
+  alter (device_param r2 r) value=2k
+  alter (device_param r1 r path=(x1)) value=3k
+  alter (model_param res tc) value=1m
+  elaborate (a b)
+  opaque vacask inert "elaborate circuit"
+  opaque vacask inert "elaborate changes"
+  opaque vacask private "elaborate circuit(\"a\") topdef=\"t\""
+  analysis op name=op1
