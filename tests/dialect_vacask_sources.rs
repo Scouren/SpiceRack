@@ -33,16 +33,6 @@ const KNOWN: &[(&str, &str)] = &[(
     "A20: the ideal-line family and LosslessLine's model master wait for ir-circuit",
 )];
 
-/// Fixtures that need a bound `mutual` model (a coupling whose master is unbound counts as a
-/// core's, `CouplingCore`, which VACASK lacks): skipped by the write tests while the marker
-/// below is false, compared everywhere else.
-const NEEDS_MUTUAL_MODEL: &[&str] = &["mutual.sim", "mutual.ir"];
-
-/// Marker: the `model` statements are the devices area's (S4.1), not read on this branch yet;
-/// while false, `model` rows and the `Unread` opaques of `model` lines (and their codes) are
-/// left out of both sides of a comparison. Goes the day vc-devices' builtin models merge.
-const MODEL_LINES_READ: bool = false;
-
 // ---- private ----
 
 /// The files of `dir` with extension `ext`, sorted.
@@ -72,51 +62,22 @@ fn deck(path: &Path) -> Sources {
     Sources::one(&name, &std::fs::read_to_string(path).unwrap())
 }
 
-/// Whether a canonical line is a `model` row or a `model` line's `Unread` opaque.
-fn model_line(line: &str) -> bool {
-    let t = line.trim_start();
-    t.starts_with("model ") || t.starts_with("opaque vacask unread \"model ")
-}
-
-/// The canonical IR text of every file of `design` (without model lines, per the marker).
+/// The canonical IR text of every file of `design`.
 fn canonical(design: &ir::Design) -> String {
     let mut out = String::new();
     for f in design.files() {
         ir::dump(design, f, &mut out);
     }
-    match MODEL_LINES_READ {
-        true => out,
-        false => out
-            .lines()
-            .filter(|l| !model_line(l))
-            .map(|l| format!("{l}\n"))
-            .collect(),
-    }
+    out
 }
 
-/// The codes of `diags`, as `P2001`-style words, sorted; per the marker without one `P2004`
-/// and one `S0001` per model line of `text`.
-fn codes(diags: &ir::Diags, text: &str) -> Vec<String> {
+/// The codes of `diags`, as `P2001`-style words, sorted.
+fn codes(diags: &ir::Diags) -> Vec<String> {
     let mut out: Vec<String> = diags
         .rows()
         .iter()
         .map(|d| format!("{}{:04}", d.code.letter as char, d.code.number))
         .collect();
-    if !MODEL_LINES_READ {
-        let models = text
-            .lines()
-            .filter(|l| l.trim_start().starts_with("model "))
-            .count();
-        for code in ["P2004", "S0001"] {
-            for _ in 0..models {
-                let k = out
-                    .iter()
-                    .position(|c| c == code)
-                    .expect("a model line's code");
-                out.remove(k);
-            }
-        }
-    }
     out.sort();
     out
 }
@@ -236,7 +197,6 @@ fn every_reader_fixture_reads_to_its_ir() {
         let ir_path = path.with_extension("ir");
         let want_text = std::fs::read_to_string(&ir_path).expect("a .ir beside the deck");
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
-        let text = std::fs::read_to_string(&path).unwrap();
         // A panic (a want the IR cannot hold yet, a reader assertion) is a failure too.
         let compared = std::panic::catch_unwind(|| {
             let (want, _) = read(&Sources::one("want.ir", &want_text), "ir");
@@ -249,8 +209,8 @@ fn every_reader_fixture_reads_to_its_ir() {
                     canonical(&want)
                 ));
             }
-            if codes(&diags, &text) != expected_codes(&want_text) {
-                bad.push(format!("codes {:?}", codes(&diags, &text)));
+            if codes(&diags) != expected_codes(&want_text) {
+                bad.push(format!("codes {:?}", codes(&diags)));
             }
             bad
         });
@@ -269,8 +229,7 @@ fn every_reader_fixture_reads_to_its_ir() {
 fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
     for path in files(READ, "sim") {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
-        let waits = !MODEL_LINES_READ && NEEDS_MUTUAL_MODEL.contains(&name.as_str());
-        if waits || KNOWN.iter().any(|(k, _)| *k == name) {
+        if KNOWN.iter().any(|(k, _)| *k == name) {
             continue;
         }
         let (mut once, _) = read(&deck(&path), "vacask");
@@ -284,35 +243,10 @@ fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
 fn every_writer_fixture_writes_its_text() {
     let mut failed = Vec::new();
     for ir_path in files(WRITE, "ir") {
-        let name = ir_path.file_name().unwrap().to_string_lossy().into_owned();
-        if !MODEL_LINES_READ && NEEDS_MUTUAL_MODEL.contains(&name.as_str()) {
-            continue;
-        }
         let want = std::fs::read_to_string(ir_path.with_extension("sim")).expect("a .sim beside");
-        let ir_text = std::fs::read_to_string(&ir_path).unwrap();
-        let ir_text: String = match MODEL_LINES_READ {
-            true => ir_text,
-            false => ir_text
-                .lines()
-                .filter(|l| !model_line(l))
-                .map(|l| format!("{l}\n"))
-                .collect(),
-        };
-        let (mut design, _) = read(&Sources::one("sources.sim", &ir_text), "ir");
+        let (mut design, _) = read(&deck(&ir_path), "ir");
         let src = written(&mut design);
         let got = src.files()[0].1.clone();
-        let (got, want) = match MODEL_LINES_READ {
-            true => (got, want),
-            false => {
-                let strip = |s: &str| -> String {
-                    s.lines()
-                        .filter(|l| !l.starts_with("model "))
-                        .map(|l| format!("{l}\n"))
-                        .collect()
-                };
-                (strip(&got), strip(&want))
-            }
-        };
         if got != want {
             failed.push(format!(
                 "{}:\n--- got\n{got}--- want\n{want}",
