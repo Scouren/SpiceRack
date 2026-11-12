@@ -7,7 +7,7 @@
 
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::element_uses::path_scopes;
+use crate::element_uses::{ElementUse, walk_path};
 use crate::id::ScopeId;
 use crate::item::{DefKind, Subckt};
 
@@ -32,12 +32,20 @@ fn a_path_walks_into_each_instances_master() {
         let def = d.lookup(top, DefKind::Subckt, d.find_name(n));
         d.row::<Subckt>(d.def(def).item.index).body
     };
+    let scopes = |path: &[crate::id::NameId]| {
+        let mut out = Vec::new();
+        walk_path(&d, top, path, &mut |u: ElementUse| {
+            out.push(u.scope);
+            None
+        });
+        out
+    };
     let path = [d.find_name("x1"), d.find_name("x2"), d.find_name("r1")];
-    assert_eq!(path_scopes(&d, top, &path), vec![top, body("s"), body("t")]);
+    assert_eq!(scopes(&path), vec![top, body("s"), body("t")]);
     let bad = [d.find_name("r1"), d.find_name("x2")];
     assert_eq!(
-        path_scopes(&d, top, &bad),
+        scopes(&bad),
         vec![top, ScopeId::NONE],
-        "r1 is no instance here"
+        "r1 is no element of the top"
     );
 }

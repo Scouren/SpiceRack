@@ -456,6 +456,15 @@ for a reference bound to a definition the index does not hold: a pass that drops
 `Editor::items_mut` fails it. `rewrite_tree(b, root, rule)` rewrites one root with its own memo
 and returns the new root; `Builder::param_ref_to(def)` builds a bound read.
 
+**A32 (2026-11-12): element names used as references.** `RowFacts::map_element_names(design, at,
+f: FnMut(&mut [NameId]))` (default none): each by-name element reference a row holds outside its
+expressions, a single name as a slice of one, a path as its name-pool slice, in field order.
+`Editor::map_element_uses(scope, item, f: FnMut(ElementUse) -> Option<NameId>)` adds the item's
+`Expr::I` reads (root by root, left to right) and resolves each path segment's scope: segment 0
+in the item's listing scope, each next in the body of the master of the instance before it, by
+its old name or else its new one; `ScopeId::NONE` after a non-instance or an unresolved master
+(never guessed). `Design::element_uses()` is the read-only twin over every live item.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

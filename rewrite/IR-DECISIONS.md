@@ -441,3 +441,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `move_item` re-parents the item's body scopes and asserts both scopes are in one file (a scope's `file` is not rewritten).
 - `rename_def` leaves bound references' names to the pass (else `RefTarget`).
 
+## A32 applied (the element-name door)
+
+- `map_element_uses` takes the item's listing scope (`(scope, item, f)`, changed from the first proposal before any body): finding it per item would scan every list.
+- Three phases per item: the row's paths are copied (the row's walk holds `&mut Design`), the pass answers each segment with the design readable (`walk_path`), and a second walk stores the names in the same order. A segment after `NONE` is still offered to the pass with `scope: NONE`, so it can note the reference.
+- The drift property A32 asks for ("every use listed resolves, every resolved reference is listed") needs `check` to resolve element references, which it does not today; until the owners' rows land, the tests pin the kernel's `Expr::I` part and the path walk by hand.
+
