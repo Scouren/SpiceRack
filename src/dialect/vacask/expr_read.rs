@@ -2,8 +2,8 @@
 //! operator and function (`rewrite/DIALECT-VACASK.md` §3.3; runs e1, i1, t3, f1–f3):
 //! `**` and `pow` are `Pow` (signed); `/` is `DivTyped` (A12 K1); `^` is `BitXor`;
 //! `log` and `ln` are `Ln`; `round` is `RoundHalfAway`; `integer` is `Trunc`, `int` is `ToInt`;
-//! `sgn(x)` is the sugar `x >= 0 ? 1 : -1` and `sign(x, y)` the sugar `abs(x) * (y >= 0 ? 1 :
-//! -1)` (zero counts as positive, R13); `agauss`, `gauss`, `aunif`, `unif` are draws that sample
+//! `sgn(x)` is `SgnZeroPos` (typed as its operand: run f4) and `sign(x, y)` the sugar
+//! `abs(x) * (y >= 0 ? 1 : -1)` (always real; zero counts as positive, R13); `agauss`, `gauss`, `aunif`, `unif` are draws that sample
 //! only in an `mc` loop, once per call site (RUN g2); `M_*`/`P_*` are the literals VACASK
 //! documents; `$temp`, `$tnom` the leaves; a `-` directly before a number is that negative
 //! literal; a unary `+` is its operand. A construct with no IR meaning (vectors, indexing,
@@ -464,13 +464,11 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
                     .b
                     .draw(dist, ir::DrawWhen::Sampling, ir::DrawPer::CallSite, &args);
             }
-            // `sgn(x)` is `SgnZeroPos(x)` (typed as `x`: run f4), `x >= 0 ? 1 : -1` until it
-            // lands; `sign(x, y)` is `abs(x) * (y >= 0 ? 1 : -1)` (always real): zero counts as
+            // `sgn(x)` is `SgnZeroPos(x)` (typed as `x`: run f4); `sign(x, y)` is `abs(x) * (y >= 0 ? 1 : -1)` (always real): zero counts as
             // positive (runs e1, f1, f4; R13 sugar: each operand once, read back the same).
             let last = *args.last().expect("checked arity");
-            match (name.as_str(), super::a12::SGN_ZERO_POS) {
-                ("sgn", Some(f)) => l.b.call(f, &[last]),
-                ("sgn", None) => nonnegative_sign(l, last),
+            match name.as_str() {
+                "sgn" => l.b.call(ir::Func::SgnZeroPos, &[last]),
                 _ => {
                     let mag = l.b.call(ir::Func::Abs, &[args[0]]);
                     let sign = nonnegative_sign(l, last);

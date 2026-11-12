@@ -6,14 +6,12 @@
 //! Areas (one owner per file, `rewrite/S4-AREAS.md`): numbers (`number.rs`), names
 //! (`name.rs`), expressions (`expr_read.rs`, `expr_write.rs`), structure (`read_structure.rs`,
 //! `write_structure.rs`), devices and models (S4.1), sources (S4.2), the control block (S4.3).
-//! Stand-ins for AMEND-A12 members that have not landed are in `a12.rs`.
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §1–§4, §7; `REWRITE-PLAN.md` §4.1, §4.3.
 //!
 //! Contents: `pub struct Vacask` (`impl Read`, `impl Write`), `pub static VACASK: Vacask`,
 //! `pub static FEATURES: ir::FeatureSet`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
-mod a12;
 mod codes;
 mod expr_read;
 mod expr_write;

@@ -1,6 +1,6 @@
 # Oracle: VD expr-functions (each function's meaning); DIALECT-VACASK Appendix A runs e1, f1, f2
 # (`round` half away, `integer` and `int` truncate, `sgn(0)` and `sgn(-0.0)` 1, `sign(3,-0.0)`
-# 3). `sgn` and `sign` are sugar over `>= 0` (R13; `sgn` until A12 K1's SgnZeroPos). `int` is
+# 3). `sgn` is SgnZeroPos (typed as its operand: run f4), `sign` sugar over `>= 0` (R13). `int` is
 # `to_int` (integer-typed), `integer` is `trunc` (real: run f2).
 # codes:
 file "functions.sim" deck
@@ -20,6 +20,6 @@ file "functions.sim" deck
   param f11 = atan2(y, x)
   param f12 = hypot(x, y)
   param f13 = abs(x)
-  param f14 = x >= 0i ? 1i : -1i
+  param f14 = sgn_zero_pos(x)
   param f15 = abs(x) * (y >= 0i ? 1i : -1i)
   param f16 = sqrt(x) + exp(x) + floor(x) + ceil(x) + sinh(x) + atanh(x)

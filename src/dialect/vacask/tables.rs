@@ -66,6 +66,7 @@ pub(super) const STATIC_FUNCS: &[ir::Func] = &[
     ir::Func::Acosh,
     ir::Func::Atanh,
     ir::Func::Hypot,
+    ir::Func::SgnZeroPos,
     ir::Func::Fmod,
 ];
 
@@ -102,6 +103,7 @@ pub(super) const DYNAMIC_FUNCS: &[ir::Func] = &[
     ir::Func::Acosh,
     ir::Func::Atanh,
     ir::Func::Hypot,
+    ir::Func::SgnZeroPos,
 ];
 
 /// The binary operators of VACASK's behavioural sources (no bit operators).

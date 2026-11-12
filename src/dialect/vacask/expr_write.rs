@@ -194,6 +194,7 @@ fn function(func: ir::Func) -> &'static str {
         F::Atanh => "atanh",
         F::Hypot => "hypot",
         F::Fmod => "fmod",
+        F::SgnZeroPos => "sgn",
         other => unreachable!("FEATURES lacks {other:?}"),
     }
 }

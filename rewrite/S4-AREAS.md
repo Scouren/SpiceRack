@@ -30,13 +30,12 @@ the ground names, the files loads and includes name, the parameter reads to bind
 | `write.rs` | `Writer` (`line`), `write` | title line, items in order, bodies indented two spaces per level with an explicit stack, one exhaustive `match` over `ItemKind` |
 | `number.rs` | `Number`, `NotANumber`, `lex`, `spell` | token bytes → `Literal` and VACASK type, no float arithmetic; `spell` reads back through `lex` |
 | `name.rs` | `GROUND`, `Place`, `unquote`, `spell` | `'…'` parts and `''`; bare only when VACASK reads it bare |
-| `expr_read.rs` | `Context`, `Refusal`, `FEATURES`, `CODES`, `expr` | §3.3 of the plan; `/` is `a12::DIV_TYPED`, integer literals `a12::INT_FORM`, `int` `a12::TO_INT` |
+| `expr_read.rs` | `Context`, `Refusal`, `FEATURES`, `CODES`, `expr` | §3.3 of the plan; `/` is `DivTyped`, integer literals `Int`, `int` `ToInt`, `sgn` `SgnZeroPos` (A12 K1) |
 | `expr_write.rs` | `write_expr` | VACASK precedence, fewest parentheses, the reader's tree back |
 | `read_structure.rs` | `FEATURES`, `CODES`, `title`, `include`, `section`, `subckt`, `if_chain`, `param`, `global`, `ground`, `load`, `embed` | §3.2 rows title … `@if`; formals are the constant `parameters` entries (RUN c1) |
 | `write_structure.rs` | `CODES`, `title`, `comment`, `include`, `section`, `section_end`, `load`, `subckt`, `subckt_end`, `param`, `global`, `branch`, `if_end`, `opaque` | the inverse of `read_structure` |
 | `codes.rs` | `CODES`, `UNREAD`, `PRIVATE`, `info` | the spine's rows and the lookup over every area's table |
 | `tables.rs` | `CONSTANTS`, `LIBRARY_FILES`, `is_library_file` | VD expr-constants; the shipped `lib/vacask/mod` files |
-| `a12.rs` | `INT_FORM`, `DIV_TYPED`, `TO_INT`, `HINT`, `LIBRARY_LOAD` | stand-ins until AMEND-A12 lands, each with a marker test |
 
 ## S4.1 devices and models (stubs)
 
