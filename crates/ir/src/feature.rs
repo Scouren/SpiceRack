@@ -144,6 +144,12 @@ pub enum Extra {
     StringValue,
     /// A `Param`'s value, or a `Subckt` head default, whose root is a list (A25 item 4).
     ListValue,
+    /// A `Subckt` head default holding a read bound to a definition outside the subcircuit's
+    /// body: read by the lexical rule (R62, A37). A read of a sibling formal is none.
+    FormalOuterRead,
+    /// A `Subckt` head default holding an unbound read whose name is no sibling formal's: looked
+    /// up from each instance's scope (R62, A37, A29).
+    FormalUnboundRead,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -295,7 +301,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::ListValue as usize + 1] = [
+    pub const ALL: [Extra; Extra::FormalUnboundRead as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
@@ -309,6 +315,8 @@ impl Extra {
         Extra::SubcktConstantParam,
         Extra::StringValue,
         Extra::ListValue,
+        Extra::FormalOuterRead,
+        Extra::FormalUnboundRead,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

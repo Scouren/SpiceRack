@@ -10,9 +10,9 @@
 
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
-    AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
-    ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, OpaqueClass, OptionKey,
-    Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
+    AnalysisKind, BinOp, CircuitExtra, Code, DefKind, Design, Diags, Dist, DrawPer, DrawWhen,
+    ElemKind, ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, OpaqueClass,
+    OptionKey, Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
 // ---- private ----
@@ -345,6 +345,52 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             |b, top| {
                 let s = b.string("fast");
                 b.subckt(top, "s", &[], &[("w", s)], Span::NONE);
+            },
+        ),
+        (
+            // R62/A37: a default bound to a definition outside the subcircuit; the neighbour
+            // reads a sibling formal, bound to it
+            Extra::FormalOuterRead,
+            |b, top| {
+                let one = b.num(1.0);
+                b.param(top, "w0", one, Span::NONE);
+                let w0 = b
+                    .design()
+                    .lookup(top, DefKind::Param, b.design().find_name("w0"));
+                let read = b.param_ref("w0");
+                b.resolve(read, w0);
+                b.subckt(top, "s", &[], &[("w", read)], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                let read = b.param_ref("a");
+                let (_, body) = b.subckt(top, "s", &[], &[("a", one), ("w", read)], Span::NONE);
+                let a = b
+                    .design()
+                    .lookup(body, DefKind::Param, b.design().find_name("a"));
+                b.resolve(read, a);
+            },
+        ),
+        (
+            // an unbound read no sibling names; the neighbours: an unbound read of a sibling's
+            // name, and a bound outer read
+            Extra::FormalUnboundRead,
+            |b, top| {
+                let read = b.param_ref("vdd");
+                b.subckt(top, "s", &[], &[("w", read)], Span::NONE);
+            },
+            |b, top| {
+                let one = b.num(1.0);
+                let sibling = b.param_ref("a");
+                b.subckt(top, "s", &[], &[("a", one), ("w", sibling)], Span::NONE);
+                let two = b.num(2.0);
+                b.param(top, "w0", two, Span::NONE);
+                let w0 = b
+                    .design()
+                    .lookup(top, DefKind::Param, b.design().find_name("w0"));
+                let outer = b.param_ref("w0");
+                b.resolve(outer, w0);
+                b.subckt(top, "t", &[], &[("w", outer)], Span::NONE);
             },
         ),
     ];

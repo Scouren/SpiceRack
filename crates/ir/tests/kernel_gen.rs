@@ -324,3 +324,23 @@ fn a_generated_load_names_a_file_of_its_kind() {
     }
     assert_eq!(seen, [true; 2], "both kinds generated");
 }
+
+#[test]
+fn a_set_without_a_default_rule_draws_no_default_under_it() {
+    // R62/A37 (oracle: `features_used`, which reads each default's references): a set holding
+    // `FormalNotConstant` but not `FormalOuterRead` (`FormalUnboundRead`) draws no default
+    // bound outside its subcircuit (unbound) over 300 seeds; with the rule, some seed draws one
+    for rule in [Extra::FormalOuterRead, Extra::FormalUnboundRead] {
+        let without = FeatureSet::ALL.minus(FeatureSet::EMPTY.with(Feature::Extra(rule)));
+        let mut drawn = false;
+        for seed in 0..300u64 {
+            let f = Feature::Extra(rule);
+            assert!(
+                !features_used(&generate(seed, &without, SIZE)).contains(f),
+                "{rule:?}, seed {seed}"
+            );
+            drawn |= features_used(&generate(seed, &FeatureSet::ALL, SIZE)).contains(f);
+        }
+        assert!(drawn, "{rule:?} is drawn when the set holds it");
+    }
+}
