@@ -254,6 +254,7 @@ pub(crate) fn parse_opaque(
         Some("inert") => OpaqueClass::Inert,
         Some("invalid") => OpaqueClass::InvalidInSource,
         Some("script") => OpaqueClass::Script,
+        Some("hint") => OpaqueClass::Hint,
         _ => {
             w.error(diags);
             return ItemRef::NONE;
@@ -432,6 +433,7 @@ fn class_word(class: OpaqueClass) -> &'static str {
         OpaqueClass::Inert => "inert",
         OpaqueClass::InvalidInSource => "invalid",
         OpaqueClass::Script => "script",
+        OpaqueClass::Hint => "hint",
     }
 }
 
