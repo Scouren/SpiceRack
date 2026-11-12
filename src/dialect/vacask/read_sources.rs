@@ -9,7 +9,7 @@
 //!   t = 0 (`DcRule::WaveAtZero`; src-sine, src-pulse, src-exp); `type="dc"` is `Given`;
 //! - no `mag` and no `phase`: no AC stimulus; either: both, the other at its default 0;
 //! - a parameter the `type` does not read is kept by VACASK for a later `alter … type=` (VS V5):
-//!   dropped when it is a literal at VACASK's default (exact), else the statement is `Private`;
+//!   with no such alter it moves no number, dropped with a note (R42);
 //! - what VACASK rejects is `InvalidInSource` (src-r-*): an unknown parameter, a terminal count
 //!   the module does not have, a literal `rise` ≤ 0 (p2), no `td2` or a literal one ≤ 0, a
 //!   literal sine `freq` ≤ 0, a PWL with an odd count or one point, a missing `ctlinst`,
@@ -112,9 +112,9 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     ),
     row(
         DORMANT,
-        "a source parameter its type does not read",
-        "VD dev-builtin-src; VS V5 (the alter type pair)",
-        "VACASK keeps it for a later `alter … type=`; off its default it would change the source then, which the source row cannot state. The statement is kept as text.",
+        "a source parameter its type does not read, dropped",
+        "R42; VD dev-builtin-src",
+        "VACASK keeps it for a later `alter … type=`; with no such alter it moves no number, so it is dropped (a `wave` beside a `file` too).",
         ir::Kind::Note,
     ),
     row(
@@ -146,10 +146,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Kind::Refusal,
     ),
     row(
+        super::write_sources::PWL_JUMP,
+        "a periodic PWL that jumps back to its first point",
+        "VD dev-builtin-src (PWL period); A22 (PwlJoin::Extrapolate is VACASK's law)",
+        "VACASK's periodic PWL joins its last point to the next period's first by a line; a jump has no spelling.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        super::write_sources::PARAMS,
+        "a source, controlled source or mutual with instance parameters",
+        "VD dev-builtin-src, -vcvs, -cccs, -mutual; S 7.11",
+        "VACASK's builtins take only their own parameters; any other is \"Parameter not found\".",
+        ir::Kind::Refusal,
+    ),
+    row(
         UNSTATED,
         "a source value the IR cannot hold",
         "VD dev-builtin-src; DIALECT-VACASK §3.2 sources",
-        "a type, ctlinst, ind1, ind2 or file that is no string literal, a wave that is no vector literal, a period that is no literal, or a PWL first time that is no literal. The statement is kept as text.",
+        "a type, ctlinst, ind1, ind2 or file that is no string literal, a wave that is no vector literal, or a period that is no literal. The statement is kept as text.",
         ir::Kind::Note,
     ),
 ];
@@ -270,13 +284,14 @@ fn controlled(l: &mut Lower<'_, '_, '_>, n: Node, p: &Params, module: &str) -> R
     };
     let head = head(l, n, mult);
     let span = l.span(n);
-    l.b.controlled(
+    let at = l.b.controlled(
         l.scope,
         kind,
         head,
         ir::controlled::Controlled { gain, sense },
         span,
     );
+    l.bind_master_later(at);
     Ok(())
 }
 
@@ -297,6 +312,8 @@ fn mutual(l: &mut Lower<'_, '_, '_>, n: Node, p: &Params) -> Result<(), Fail> {
     let inductors = l.b.names(&[ind1.as_str(), ind2.as_str()]);
     let head = head(l, n, ir::ExprId::NONE);
     let span = l.span(n);
-    l.b.coupling(l.scope, head, ir::passive::Coupling { inductors, k }, span);
+    let at =
+        l.b.coupling(l.scope, head, ir::passive::Coupling { inductors, k }, span);
+    l.bind_master_later(at);
     Ok(())
 }

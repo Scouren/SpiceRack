@@ -10,6 +10,7 @@
 //! `string`, `check`, `build`, `head`, `mult`, `terminals`, `flow_node` (crate-private)
 
 use super::{CTLNODE, INVALID, UNSTATED, default_of};
+use crate::dialect::vacask::bind;
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
@@ -71,9 +72,6 @@ const TYPES: &[(&str, &[&str])] = &[
 const AM_FM: &[&str] = &[
     "sinedc", "ampl", "freq", "tdphase", "delay", "modfreq", "modphase", "modindex",
 ];
-
-/// The deepest scope chain the master lookup walks (as `read.rs`).
-const SCOPE_DEPTH_MAX: usize = 1 << 16;
 
 impl Params {
     /// The value node of `key`, if given.
@@ -240,31 +238,20 @@ pub(super) fn build(l: &mut Lower<'_, '_, '_>, v: Val) -> ir::ExprId {
     }
 }
 
-/// The element header of `n`: its whole name, its terminals (a ground name is `0`), its
-/// master bound by VACASK's rule (the own subcircuit, then the top; RUN m1), `mult`.
+/// The element header of `n` (`bind::head`: the whole name, the terminals with a ground name
+/// as `0`), its master by name, unbound: the caller records the pushed element for
+/// `bind::masters` (`Lower::bind_master_later`, VACASK's rule: own subcircuit, then the top).
 pub(super) fn head(l: &mut Lower<'_, '_, '_>, n: Node, mult: ir::ExprId) -> ir::ElemHead {
-    let h = l.cst.ast.header(n);
-    let name = read::field_name(l.cst, h.name);
-    let nodes: Vec<String> = h
-        .nodes
-        .iter()
-        .map(|&x| {
-            let node = read::field_name(l.cst, x);
-            match l.grounds.contains(&node) {
-                true => crate::dialect::vacask::name::GROUND.to_string(),
-                false => node,
-            }
-        })
-        .collect();
-    let master = read::field_name(l.cst, h.master);
-    let model = master_ref(l, &master);
-    let name = l.b.name(&name);
-    let terminals = match nodes.is_empty() {
+    let h = bind::head(l, n);
+    let master = h.master.expect("an instance routed here names its master");
+    let name = l.b.name(&h.name);
+    let terminals = match h.terminals.is_empty() {
         true => ir::List::EMPTY,
         false => {
-            l.b.names(&nodes.iter().map(String::as_str).collect::<Vec<_>>())
+            l.b.names(&h.terminals.iter().map(String::as_str).collect::<Vec<_>>())
         }
     };
+    let model = ir::Ref::unresolved(l.b.name(&master));
     ir::ElemHead {
         name,
         terminals,
@@ -297,41 +284,4 @@ pub(super) fn flow_node(l: &Lower<'_, '_, '_>, p: &Params, key: &str) -> Result<
         Some(v) if !at_default(l, v, "\"flow(br)\"") => Err(private(CTLNODE)),
         _ => Ok(()),
     }
-}
-
-// ---- private ----
-
-/// The model `master`, bound by VACASK's rule: a definition in the own region (the scope up to
-/// its subcircuit's body or file's top), else the file's top; never an enclosing subcircuit.
-/// ponytail: bound at push time, so a model defined later stays unbound until the spine's
-/// deferred master binding lands (asked of vacask-plan).
-fn master_ref(l: &mut Lower<'_, '_, '_>, master: &str) -> ir::Ref {
-    let name = l.b.name(master);
-    let d = l.b.design();
-    let found = d.lookup(l.scope, ir::DefKind::Model, name);
-    let mut own = vec![];
-    let mut at = l.scope;
-    // Bounded: each step moves to a parent (the scope tree is acyclic, `ir::check`).
-    for _ in 0..SCOPE_DEPTH_MAX {
-        own.push(at);
-        let s = d.scope(at);
-        if matches!(s.kind, ir::ScopeKind::Subckt | ir::ScopeKind::File) || s.parent.is_none() {
-            break;
-        }
-        at = s.parent;
-    }
-    let ok = |def: ir::DefId| {
-        !def.is_none() && {
-            let at = d.def(def).scope;
-            own.contains(&at) || d.scope(at).kind == ir::ScopeKind::File
-        }
-    };
-    let def = match ok(found) {
-        true => found,
-        false => {
-            let top = d.file(d.scope(l.scope).file).top;
-            d.lookup(top, ir::DefKind::Model, name)
-        }
-    };
-    ir::Ref { name, def }
 }

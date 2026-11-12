@@ -8,7 +8,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD dev-builtin-src, -vcvs, -cccs, -mutual.
 //!
-//! Contents: `AM_OFFSET` (its catalogue row is in `read_sources::CODES`, the area's one table),
+//! Contents: `AM_OFFSET`, `PWL_JUMP`, `PARAMS` (their catalogue rows are in `read_sources::CODES`, the area's one table),
 //! `admits`, `source` (crate-private)
 
 use super::expr_write::write_expr;
@@ -21,6 +21,10 @@ use crate::ir::wave as w;
 
 /// An `Am` whose `mod_offset` is not the literal 1 VACASK's AM means.
 pub(super) const AM_OFFSET: ir::Code = ir::Code::new(b'W', 2201);
+/// A periodic `Pwl` whose join is a jump.
+pub(super) const PWL_JUMP: ir::Code = ir::Code::new(b'W', 2202);
+/// A source-like element with instance parameters.
+pub(super) const PARAMS: ir::Code = ir::Code::new(b'W', 2203);
 
 /// One source-like `Element` row as its instance line.
 pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
@@ -67,24 +71,39 @@ pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 }
 
 /// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
-/// states (R21): an `Am` whose `mod_offset` is not the literal 1.
+/// states (R21): an `Am` whose `mod_offset` is not the literal 1 (`AM_OFFSET`), a periodic
+/// `Pwl` whose join is a jump (`PWL_JUMP`: `PwlJoin::Jump` has no feature), a source-like
+/// element with instance parameters (`PARAMS`: VACASK's builtins take only their own).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
+    use ir::ElemKind as K;
     for (at, _) in design.reachable() {
         if at.kind != ir::ItemKind::Element {
             continue;
         }
         let e: ir::Element = design.row(at.index);
-        if e.kind.detail() != ir::DetailKind::Source {
+        let span = design.span_of(at);
+        let source_like = matches!(
+            e.kind,
+            K::VSource | K::ISource | K::Vcvs | K::Vccs | K::Cccs | K::Ccvs | K::Coupling
+        );
+        if source_like && !e.params.is_empty() {
+            diags.push(PARAMS, span, 0);
+        }
+        if !matches!(e.kind, K::VSource | K::ISource) {
             continue;
         }
         let s = design.source(&e);
         if s.wave.is_none() {
             continue;
         }
-        if let ir::Wave::Am(am) = design.wave(s.wave)
-            && !is_default(design, am.mod_offset, "1.")
-        {
-            diags.push(AM_OFFSET, design.span_of(at), 0);
+        match design.wave(s.wave) {
+            ir::Wave::Am(am) if !is_default(design, am.mod_offset, "1.") => {
+                diags.push(AM_OFFSET, span, 0);
+            }
+            ir::Wave::Pwl(p) if p.repeat == w::PwlRepeat::Period && p.join == w::PwlJoin::Jump => {
+                diags.push(PWL_JUMP, span, 0);
+            }
+            _ => {}
         }
     }
 }

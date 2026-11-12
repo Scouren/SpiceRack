@@ -7,11 +7,13 @@
 //! | `sine` | `Sin{offset sinedc, amplitude ampl, freq, delay, damping theta, phase_deg tdphase, pre: HoldDelayValue}` |
 //! | `pulse` | `Pulse{v1 val0, v2 val1, delay, rise, fall, width, period, law: Vacask}` |
 //! | `exp` | `Exp{v1 val0, v2 val1, td1 delay, tau1, td2, tau2, td2_from: Td1}` |
-//! | `pwl` | `Pwl{points wave (a first time above 0 gets the point (0, y1) VACASK holds), delay, period → Period + Extrapolate, file}` |
+//! | `pwl` | `Pwl{points wave (A22: the first value holds before the first point, no point written), delay, period → Period + Extrapolate (A22's law), file}` |
 //! | `am` | `Am{offset sinedc, amplitude ampl, mod_offset 1, mod_index, mod_freq modfreq, carrier_freq freq, delay, phase_m modphase, phase_c tdphase, mod_time: Delay, pre: HoldDelayValue}` |
 //! | `fm` | `Sffm{offset sinedc, amplitude ampl, carrier_freq freq, mod_index, signal_freq modfreq, delay, phase_c tdphase, phase_m modphase, law: Spice3, pre: HoldDelayValue}` |
 //!
-//! Every wave is `GivenZero::AsGiven` and `DcRule::WaveAtZero` (`dc` ignored, run src-sine).
+//! Every wave is `GivenZero::AsGiven` and `DcRule::WaveAtZero` (`dc` ignored, run src-sine). A
+//! parameter the type does not read is dropped with the note `DORMANT` (R42; the alter-type
+//! pair that reads it is the scaffold's declare step, not here yet).
 //!
 //! Cites: VD dev-builtin-src; `rewrite/DIALECT-VACASK.md` §3.2 sources … fm; A12 C1–C4, A17.
 //!
@@ -76,15 +78,12 @@ pub(super) fn independent(
     {
         return Err(private(SPURS));
     }
-    for key in p.keys() {
-        if COMMON.contains(&key) || active.contains(&key) {
-            continue;
-        }
-        let v = p.get(key).expect("a given key");
-        if !default_of(key).is_some_and(|d| at_default(l, v, d)) {
-            return Err(private(DORMANT));
-        }
-    }
+    // R42: a parameter the type does not read (a `wave` beside a `file` included) moves no
+    // number: dropped with a note.
+    let dormant = p
+        .keys()
+        .any(|key| !(COMMON.contains(&key) || active.contains(&key)))
+        || (typ == "pwl" && p.get("file").is_some() && p.get("wave").is_some());
     let plan = plan(l, p, &typ)?;
     let ac = (p.get("mag").is_some() || p.get("phase").is_some())
         .then(|| (p.val("mag"), p.val("phase")));
@@ -135,7 +134,11 @@ pub(super) fn independent(
     };
     let head = head(l, n, mult);
     let span = l.span(n);
-    l.b.source(l.scope, kind, head, row, span);
+    let at = l.b.source(l.scope, kind, head, row, span);
+    l.bind_master_later(at);
+    if dormant {
+        l.diags.push(DORMANT, span, 0);
+    }
     Ok(())
 }
 
@@ -196,9 +199,6 @@ fn pwl(l: &Lower<'_, '_, '_>, p: &Params) -> Result<Plan, Fail> {
         Some(_) => return Err(private(UNSTATED)),
     };
     if let Some(v) = p.get("file") {
-        if p.get("wave").is_some() {
-            return Err(private(DORMANT));
-        }
         return Ok(Plan::Pwl {
             points: Vec::new(),
             delay,
@@ -218,15 +218,8 @@ fn pwl(l: &Lower<'_, '_, '_>, p: &Params) -> Result<Plan, Fail> {
     if items.len() < 4 || !items.len().is_multiple_of(2) {
         return Err(invalid());
     }
-    let mut points: Vec<Val> = Vec::with_capacity(items.len() + 2);
-    if period.is_none() && !at_default(l, items[0], "0.") {
-        // VACASK holds y1 before x1: the IR states it as the point (0, y1).
-        if ast.tag(Node(items[0])) != Tag::Num {
-            return Err(private(UNSTATED));
-        }
-        points.extend([Val::Lit("0."), Val::Node(items[1])]);
-    }
-    points.extend(items.iter().map(|&x| Val::Node(x)));
+    // A22: before the first point the first value holds; no point is written.
+    let points: Vec<Val> = items.iter().map(|&x| Val::Node(x)).collect();
     Ok(Plan::Pwl {
         points,
         delay,

@@ -2,9 +2,9 @@
 # runs: the phase parameter is `tdphase` (`phase` is the AC phase: run src-sine, VD's syntax line
 # is wrong); `dc` is ignored, the op is the wave at t = 0 (DcRule::WaveAtZero: `dc=5` with
 # sinedc=1 gives op 1); before `delay` the value at `delay`, tdphase included (op 3 with
-# delay=0.25m tdphase=90: PreDelay::HoldDelayValue). `dc=0` on a wave type is VACASK's default
-# for a parameter the type does not read: dropped, exact.
-# codes:
+# delay=0.25m tdphase=90: PreDelay::HoldDelayValue). `dc=0` on a wave type: a parameter the
+# type does not read, dropped with the note P2203 (R42).
+# codes: P2203
 file "sine.sim" deck
   title "sine"
   model vsource source_v
