@@ -62,7 +62,6 @@ pub(super) fn measure(_w: &mut Out<'_>, _item: ir::ItemRef) {
 /// Appends one probe as ngspice spells it inside another card (`v(a)`, `v(a,b)`, `i(vin)`): the
 /// run area calls it for the outputs of `.four`, `.tf`, `.noise`. Stub: unreachable (no probe
 /// feature is in `FEATURES` yet).
-#[expect(dead_code, reason = "the run area calls it (S3.3a)")]
 pub(super) fn probe(design: &ir::Design, probe: &ir::Probe, out: &mut String) {
     let _ = (design, probe, out);
     unreachable!("ngspice write: no probe is spelled until S3.3b lands")

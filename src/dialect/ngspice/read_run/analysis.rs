@@ -15,7 +15,8 @@
 
 use super::super::expr_read::Fail;
 use super::super::read::{Lower, Stmt};
-use super::words::{self, Out, Val, invalid};
+use super::super::read_outputs;
+use super::words::{self, Val, invalid};
 use super::{NO_FIELD, RUN_DEFAULTS};
 use crate::ir;
 use crate::ir::dc_ac::{Ac, Dc, DcAxis, Disto, Noise, NoiseRef, Pz, PzFind, PzInput, PzTransfer};
@@ -41,15 +42,15 @@ pub(super) enum Card {
     },
     /// `noise v(out[,ref]) src sweep [ptspersum]`.
     Noise {
-        out: Out,
+        out: ir::Probe,
         source: String,
         sweep: Sweep,
         summary: Option<Val>,
     },
     /// `tf out src`.
-    Tf { out: Out, source: String },
+    Tf { out: ir::Probe, source: String },
     /// `sens out [dc | ac sweep]`.
-    Sens { out: Out, ac: Option<Sweep> },
+    Sens { out: ir::Probe, ac: Option<Sweep> },
     /// `pz in+ in- out+ out- vol|cur pol|zer|pz`.
     Pz {
         nodes: [String; 4],
@@ -61,7 +62,10 @@ pub(super) enum Card {
     /// `sp sweep [donoise]`.
     Sp { sweep: Sweep, noise: bool },
     /// `four freq out …`.
-    Four { fundamental: Val, outs: Vec<Out> },
+    Four {
+        fundamental: Val,
+        outs: Vec<ir::Probe>,
+    },
 }
 
 /// What a DC axis sweeps.
@@ -116,10 +120,13 @@ pub(super) fn read(
         }
         "tran" => tran(lw, st, w)?,
         "noise" => {
-            let out = words::output(lw, w.first().ok_or_else(invalid)?).ok_or_else(invalid)?;
-            if !matches!(out, Out::V(..)) || w.len() < 6 || w.len() > 7 {
+            // `dot_noise`: the output is `V(…)` (inp2dot.c:48), else ngspice's error
+            let first = w.first().ok_or_else(invalid)?;
+            let v = first.len() > 2 && first[..2].eq_ignore_ascii_case("v(");
+            if !v || w.len() < 6 || w.len() > 7 {
                 return Err(invalid());
             }
+            let out = read_outputs::probe(lw, st, first, ir::AnalysisKind::Noise)?;
             let source = lw.names.fold(&w[1]);
             let sweep = sweep(lw, st, w, 2)?;
             let summary = (w.len() == 7).then(|| val(lw, 6)).transpose()?;
@@ -131,14 +138,15 @@ pub(super) fn read(
             }
         }
         "tf" if w.len() == 2 => {
-            let out = words::output(lw, &w[0]).ok_or_else(invalid)?;
+            let out = read_outputs::probe(lw, st, &w[0], ir::AnalysisKind::Tf)?;
             Card::Tf {
                 out,
                 source: lw.names.fold(&w[1]),
             }
         }
         "sens" => {
-            let out = words::output(lw, w.first().ok_or_else(invalid)?).ok_or_else(invalid)?;
+            let first = w.first().ok_or_else(invalid)?;
+            let out = read_outputs::probe(lw, st, first, ir::AnalysisKind::Sens)?;
             match w.get(1).map(|s| s.to_ascii_lowercase()).as_deref() {
                 None if w.len() == 1 => Card::Sens { out, ac: None },
                 Some("dc") if w.len() == 2 => Card::Sens { out, ac: None },
@@ -198,7 +206,7 @@ pub(super) fn read(
             let fundamental = val(lw, 0)?;
             let outs = w[1..]
                 .iter()
-                .map(|o| words::output(lw, o).ok_or_else(no_field))
+                .map(|o| read_outputs::probe(lw, st, o, ir::AnalysisKind::Four))
                 .collect::<Result<Vec<_>, _>>()?;
             Card::Four { fundamental, outs }
         }
@@ -284,7 +292,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             sweep,
             summary,
         } => {
-            let output = words::probe(lw, out);
+            let output = *out;
             let source = lw.b.name(source);
             let sweep = emit_sweep(lw, st, sweep);
             let points_per_summary = summary.as_ref().map_or(none, |v| words::emit(lw, st, v));
@@ -299,16 +307,16 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             lw.b.analysis(scope, None, row, span);
         }
         Card::Tf { out, source } => {
-            let output = words::probe(lw, out);
+            let output = *out;
             let source = lw.b.name(source);
             lw.b.analysis(scope, None, Tf { output, source }, span);
         }
         Card::Sens { out, ac: None } => {
-            let output = words::probe(lw, out);
+            let output = *out;
             lw.b.analysis(scope, None, Sens { output }, span);
         }
         Card::Sens { out, ac: Some(s) } => {
-            let output = words::probe(lw, out);
+            let output = *out;
             let sweep = emit_sweep(lw, st, s);
             lw.b.analysis(scope, None, SensAc { output, sweep }, span);
         }
@@ -348,8 +356,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             let fundamental = words::emit(lw, st, fundamental);
             let harmonics = lw.b.literal(plain(9));
             let periods = lw.b.literal(plain(1));
-            let probes: Vec<ir::Probe> = outs.iter().map(|o| words::probe(lw, o)).collect();
-            let outputs = lw.b.probes(&probes);
+            let outputs = lw.b.probes(outs);
             let row = Four {
                 fundamental,
                 harmonics,

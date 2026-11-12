@@ -1,0 +1,8 @@
+# codes:
+file "state_after_analysis.sp" deck
+  title "state_after_analysis"
+  comment " oracle: R24, runs late.cir and early.cir (a .ic and .options after the .tran still hold for it)"
+  analysis tran stop=1u print_step=1n cap=ngspice_rule uic
+  nodeset ic transient node=(b) value=0.5 whole_run
+  option method_gear whole_run
+  env temp=50 whole_run

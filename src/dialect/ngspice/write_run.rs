@@ -20,6 +20,7 @@ use super::expr_write;
 use super::number::{self, Grammar};
 use super::read_run;
 use super::write::Out;
+use super::write_outputs;
 use crate::ir::dc_ac::{Ac, Dc, Disto, Noise, Pz, PzFind, PzTransfer, Sens, SensAc, Sp, Tf};
 use crate::ir::tran::{Four, StepCap, Tran};
 use crate::ir::{self, AnalysisKind};
@@ -42,6 +43,12 @@ pub(super) const CODES: &[Row] = &[
         "a DC axis over another target or sweep, a frequency sweep by step, or a transient ceiling ngspice would read back otherwise; refused.",
     ),
     refusal(
+        FROM_HERE,
+        "a state item that holds from its place on",
+        "ngspice-45 inp.c, inppas3.c, INPdoOpts (dot state cards hold for the whole deck); rewrite/RULINGS.md R24",
+        "an ngspice .options, .temp, .ic or .nodeset holds for every analysis wherever it stands; refused.",
+    ),
+    refusal(
         ANALYSIS_NAME,
         "a named analysis",
         "ngspice-45 inp2dot.c (no card has a name)",
@@ -54,25 +61,55 @@ pub(super) const CODES: &[Row] = &[
 const FOUR_HARMONICS: ir::Code = ir::Code::new(b'W', 1300);
 /// An analysis field ngspice's card has no position for: a DC axis other than a source, a
 /// resistor or `temp` swept by step; a frequency sweep by step; a transient ceiling without a
-/// start, a zero ceiling, or another default ceiling than ngspice's.
+/// start, a zero ceiling, or another default ceiling than ngspice's; an `Env` of both fields
+/// beside one of the temperature alone (its `temp=` would lose to that `.temp`).
 const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
+/// A state item that holds from its place on (`FromHere`): every ngspice dot state card holds
+/// for the whole run (R24); a `.control` script spells it (S3.4).
+const FROM_HERE: ir::Code = ir::Code::new(b'W', 1303);
 /// A named analysis: an ngspice card has no name.
 const ANALYSIS_NAME: ir::Code = ir::Code::new(b'W', 1302);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21): a card form (`W1300–W1302`), a value that reads the run (`W1005`: numparam evaluates a
-/// card's `{…}` once) or a literal ngspice reads back otherwise (`W1003`).
+/// (R21): a card form (`W1300–W1303`) or a value that reads the run (`W1005`: numparam evaluates
+/// a card's `{…}` once).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let span = design.span_of(item);
     let mut refuse = |code| diags.push(code, span, 0);
+    let mut values = Vec::new();
+    let held = match item.kind {
+        ir::ItemKind::Option => {
+            let o: ir::OptionRow = design.row(item.index);
+            values.push(o.value);
+            o.holds
+        }
+        ir::ItemKind::Env => {
+            let e: ir::Env = design.row(item.index);
+            values.extend([e.temp, e.tnom]);
+            // `.options temp= tnom=` loses its `temp=` to any `.temp` the writer spells
+            if !e.temp.is_none() && !e.tnom.is_none() && temp_elsewhere(design, item) {
+                refuse(CARD_FORM);
+            }
+            e.holds
+        }
+        ir::ItemKind::NodeSet => {
+            let n: ir::NodeSet = design.row(item.index);
+            values.push(n.value);
+            n.holds
+        }
+        _ => ir::Applies::WholeRun,
+    };
+    // every ngspice dot state card holds for the whole run (R24)
+    if held != ir::Applies::WholeRun {
+        refuse(FROM_HERE);
+    }
     if item.kind != ir::ItemKind::Analysis {
-        return;
+        return check_values(design, &values, &mut refuse);
     }
     let a: ir::Analysis = design.row(item.index);
     if !a.name.is_none() {
         refuse(ANALYSIS_NAME);
     }
-    let mut values = Vec::new();
     let mut form_ok = true;
     let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
         values.extend([s.start, s.stop, s.points]);
@@ -134,14 +171,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     if !form_ok {
         refuse(CARD_FORM);
     }
-    for e in values.into_iter().filter(|e| !e.is_none()) {
-        if ir::expr_class(design, e) >= ir::ExprClass::Temp {
-            refuse(codes::READS_RUN);
-        }
-        if !expr_write::literals_spell(design, e) {
-            refuse(codes::LITERAL_FORM);
-        }
-    }
+    check_values(design, &values, &mut refuse);
 }
 
 /// An `Analysis` as its card.
@@ -188,7 +218,7 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
         AnalysisKind::Noise => {
             let n: Noise = d.detail(a.detail);
             t.push_str(".noise");
-            probe(d, n.output, &mut t);
+            probe(d, &n.output, &mut t);
             t.push(' ');
             t.push_str(d.str(n.source));
             sweep(d, n.sweep, &mut t);
@@ -199,18 +229,18 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
         AnalysisKind::Tf => {
             let f: Tf = d.detail(a.detail);
             t.push_str(".tf");
-            probe(d, f.output, &mut t);
+            probe(d, &f.output, &mut t);
             t.push(' ');
             t.push_str(d.str(f.source));
         }
         AnalysisKind::Sens => {
             t.push_str(".sens");
-            probe(d, d.detail::<Sens>(a.detail).output, &mut t);
+            probe(d, &d.detail::<Sens>(a.detail).output, &mut t);
         }
         AnalysisKind::SensAc => {
             let s: SensAc = d.detail(a.detail);
             t.push_str(".sens");
-            probe(d, s.output, &mut t);
+            probe(d, &s.output, &mut t);
             t.push_str(" ac");
             sweep(d, s.sweep, &mut t);
         }
@@ -251,7 +281,7 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
             let f: Four = d.detail(a.detail);
             t.push_str(".four");
             value(d, f.fundamental, &mut t);
-            for &p in d.probes(f.outputs) {
+            for p in d.probes(f.outputs) {
                 probe(d, p, &mut t);
             }
         }
@@ -296,9 +326,27 @@ pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
     w.line(&t.replace("= ", "="));
 }
 
-/// An `Env` (until A14 lands: unreachable, `FEATURES` lacks `Item(Env)`).
-pub(super) fn env(_w: &mut Out<'_>, _item: ir::ItemRef) {
-    unreachable!("ngspice write: FEATURES lacks Item(Env) until A14 lands")
+/// An `Env`: `.temp t` when it sets the temperature only, else `.options temp=t tnom=n` (what
+/// it sets).
+pub(super) fn env(w: &mut Out<'_>, item: ir::ItemRef) {
+    let d = w.design;
+    let e: ir::Env = d.row(item.index);
+    let mut t = String::new();
+    if e.tnom.is_none() {
+        t.push_str(".temp");
+        value(d, e.temp, &mut t);
+    } else {
+        t.push_str(".options");
+        for (key, v) in [("temp", e.temp), ("tnom", e.tnom)] {
+            if !v.is_none() {
+                t.push(' ');
+                t.push_str(key);
+                t.push('=');
+                value(d, v, &mut t);
+            }
+        }
+    }
+    w.line(&t.replace("= ", "="));
 }
 
 /// A `NodeSet` as `.ic v(path)=value`, `.nodeset v(path)=value` or `.nodeset all=value`.
@@ -328,6 +376,26 @@ pub(super) fn statistics(_w: &mut Out<'_>, _item: ir::ItemRef) {
 }
 
 // ---- private ----
+
+/// Refuses a card value that reads the run (numparam evaluates a card's `{…}` once; a literal
+/// is never refused: R28).
+fn check_values(design: &ir::Design, values: &[ir::ExprId], refuse: &mut impl FnMut(ir::Code)) {
+    for &e in values.iter().filter(|e| !e.is_none()) {
+        if ir::expr_class(design, e) >= ir::ExprClass::Temp {
+            refuse(codes::READS_RUN);
+        }
+    }
+}
+
+/// Whether another `Env` of `design` sets the temperature alone (written as `.temp`).
+fn temp_elsewhere(design: &ir::Design, item: ir::ItemRef) -> bool {
+    design.reachable().into_iter().any(|(i, _)| {
+        i.kind == ir::ItemKind::Env && i != item && {
+            let e: ir::Env = design.row(i.index);
+            !e.temp.is_none() && e.tnom.is_none()
+        }
+    })
+}
 
 /// A refusal row of this area.
 const fn refusal(
@@ -359,33 +427,10 @@ fn value(d: &ir::Design, e: ir::ExprId, out: &mut String) {
     out.push('}');
 }
 
-/// ` v(path)`, ` v(a,b)` or ` i(path)`: a path's names joined by `.` (ngspice's flattened
-/// name). Asserts a kind `FEATURES` has.
-fn probe(d: &ir::Design, p: ir::Probe, out: &mut String) {
-    assert_eq!(
-        p.part,
-        ir::AcPart::None,
-        "ngspice write: a probe part FEATURES lacks"
-    );
-    let join = |list: ir::NameList, out: &mut String| path(d, list, out);
-    match p.kind {
-        ir::ProbeKind::V => {
-            out.push_str(" v(");
-            join(p.a, out);
-        }
-        ir::ProbeKind::Vdiff => {
-            out.push_str(" v(");
-            join(p.a, out);
-            out.push(',');
-            join(p.b, out);
-        }
-        ir::ProbeKind::I => {
-            out.push_str(" i(");
-            join(p.a, out);
-        }
-        other => unreachable!("ngspice write: FEATURES lacks the probe {other:?} on a card"),
-    }
-    out.push(')');
+/// ` probe`, as the outputs area spells it (one spelling of probes: `write_outputs::probe`).
+fn probe(d: &ir::Design, p: &ir::Probe, out: &mut String) {
+    out.push(' ');
+    write_outputs::probe(d, p, out);
 }
 
 /// A path's names joined by `.`.

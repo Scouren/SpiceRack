@@ -1,15 +1,15 @@
 //! A run card's words and values as ngspice's `INPgetTok`/`INPevaluate` read them: the words of a
 //! card's text, a card value (a number as `INPevaluate` reads it, or a `{…}`/`'…'` numparam
-//! expression), an output (`v(n)`, `v(n,m)`, `i(src)`) and a node path. Text in, plain values
+//! expression), a state card's node (`v(x1.n)`) and its path. Outputs are the outputs area's
+//! (`read_outputs::probe`). Text in, plain values
 //! out; nothing is pushed here, so a caller validates a whole card before its first push.
 //!
 //! Cites: ngspice-45 `inpgtok.c` (blanks, `,`, `=` and parentheses end a token), `inpeval.c`
 //! (`INPevaluate` with gobble: the rest of a number's token is ignored); runs: a bare parameter
 //! name in a dot card is an error (`.tran 1m ts`: circuit not parsed), `{ts}` is read.
 //!
-//! Contents: `pub(super) enum Val`, `pub(super) enum Out`, `pub(super) fn split`,
-//! `pub(super) fn value`, `pub(super) fn emit`, `pub(super) fn output`, `pub(super) fn path`,
-//! `pub(super) fn probe`, `pub(super) fn invalid`
+//! Contents: `pub(super) enum Val`, `pub(super) fn split`, `pub(super) fn value`,
+//! `pub(super) fn emit`, `pub(super) fn node`, `pub(super) fn invalid`
 
 use super::super::codes;
 use super::super::declare::Class;
@@ -26,15 +26,6 @@ pub(super) enum Val {
     Lit(ir::Literal, bool),
     /// A numparam expression (`{…}`).
     Expr(Tree),
-}
-
-/// An output a run card names.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum Out {
-    /// `v(n)`, or `v(n,m)` with the reference node.
-    V(Vec<String>, Option<Vec<String>>),
-    /// `i(src)`.
-    I(Vec<String>),
 }
 
 /// The words of `text`: blanks and `,` separate them, `=` is a word of its own, and a word
@@ -112,43 +103,13 @@ pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
     }
 }
 
-/// `v(n)`, `v(n,m)` or `i(src)` (either case), or `None`.
-pub(super) fn output(lw: &mut Lower<'_, '_>, word: &str) -> Option<Out> {
-    let lower = word.to_ascii_lowercase();
-    let (head, inner) = lower.split_once('(')?;
-    let inner = inner.strip_suffix(')')?;
-    let parts: Vec<&str> = inner
-        .split([',', ' ', '\t'])
-        .filter(|p| !p.is_empty())
-        .collect();
-    match (head.trim(), parts.as_slice()) {
-        ("v", [n]) => Some(Out::V(path(lw, n), None)),
-        ("v", [n, m]) => Some(Out::V(path(lw, n), Some(path(lw, m)))),
-        ("i", [e]) => Some(Out::I(element(lw, e))),
-        _ => None,
-    }
-}
-
-/// A node path as ngspice names a flattened node (`x1.n`: the instances, then the net; `gnd`
-/// is `0`).
-pub(super) fn path(lw: &mut Lower<'_, '_>, node: &str) -> Vec<String> {
-    let mut parts: Vec<&str> = node.split('.').collect();
-    let net = parts.pop().unwrap_or("");
-    let mut out: Vec<String> = parts.iter().map(|p| lw.names.fold(p)).collect();
-    out.push(lw.names.node(net));
-    out
-}
-
-/// The probe of `out`.
-pub(super) fn probe(lw: &mut Lower<'_, '_>, out: &Out) -> ir::Probe {
-    fn refs(p: &[String]) -> Vec<&str> {
-        p.iter().map(String::as_str).collect()
-    }
-    match out {
-        Out::V(n, None) => lw.b.probe_v(&refs(n)),
-        Out::V(n, Some(m)) => lw.b.probe_vdiff(&refs(n), &refs(m)),
-        Out::I(e) => lw.b.probe_i(&refs(e)),
-    }
+/// The node of `v(n)` (either case), as a path, or `None` (`.ic`, `.nodeset`: `inppas3.c`).
+pub(super) fn node(lw: &mut Lower<'_, '_>, word: &str) -> Option<Vec<String>> {
+    let (head, inner) = word.split_once('(')?;
+    let inner = inner.strip_suffix(')')?.trim();
+    let ok =
+        head.trim().eq_ignore_ascii_case("v") && !inner.is_empty() && !inner.contains([',', ' ']);
+    ok.then(|| path(lw, inner))
 }
 
 /// `P1300`, `InvalidInSource`: a run card ngspice rejects.
@@ -161,9 +122,14 @@ pub(super) fn invalid() -> Fail {
 
 // ---- private ----
 
-/// An element path (`x1.r1`: the instances, then the element), each part folded.
-fn element(lw: &mut Lower<'_, '_>, name: &str) -> Vec<String> {
-    name.split('.').map(|p| lw.names.fold(p)).collect()
+/// A node path as ngspice names a flattened node (`x1.n`: the instances, then the net; `gnd`
+/// is `0`).
+fn path(lw: &mut Lower<'_, '_>, node: &str) -> Vec<String> {
+    let mut parts: Vec<&str> = node.split('.').collect();
+    let net = parts.pop().unwrap_or("");
+    let mut out: Vec<String> = parts.iter().map(|p| lw.names.fold(p)).collect();
+    out.push(lw.names.node(net));
+    out
 }
 
 /// The text inside one `{…}` or `'…'` that wraps all of `word`.

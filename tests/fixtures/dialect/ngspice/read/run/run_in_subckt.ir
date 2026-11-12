@@ -1,0 +1,7 @@
+# codes:
+file "run_in_subckt.sp" deck
+  title "run_in_subckt"
+  comment " oracle: R26, run sub.cir (an .op and an .options in a .subckt body run as the deck's)"
+  subckt s1 (n)
+    analysis op
+    option rel_tol value=0.5 whole_run

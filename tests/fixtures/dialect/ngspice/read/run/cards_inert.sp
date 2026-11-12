@@ -1,4 +1,5 @@
 cards_inert
-* oracle: ngspice-45 inp2dot.c:845 (.width ignored), frontend .csparam (a control-script vector); runs: both run on
-.width in=72
+* oracle: ngspice-45 inp2dot.c:955-959 (.prot, .unprot ignored), frontend .csparam (a control-script vector); runs: .csparam runs on
 .csparam x=1
+.prot
+.unprot

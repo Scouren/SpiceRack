@@ -1,8 +1,8 @@
 //! Run cards → run items: the analyses (`Tag::Analysis`, and `.disto`, `.pss` among the dot
 //! cards no other area claims) → `Analysis`; `.options`, `.temp`, `.ic`, `.nodeset` → `Option`,
-//! `Env`, `NodeSet` (AMEND-A12 A14: state that holds for the whole run); the other dot cards
-//! ngspice ignores → `Inert`, those it rejects (`.step`, `.hb`, an unknown card) →
-//! `InvalidInSource`.
+//! `Env`, `NodeSet` of `holds: WholeRun` (AMEND-A12 A14); the other dot cards ngspice ignores →
+//! `Inert`, those it rejects (`.step`, `.hb`, an unknown card) → `InvalidInSource`. A run card in
+//! a subcircuit body stays there and is the deck's (R26, `RunItemNested`).
 //!
 //! Each card is one item (or one per key or node) at its own place, in card order (R25): ngspice
 //! runs analyses by type rank, reverse card order inside a type (`cktdojob.c:208-216`,
@@ -112,6 +112,9 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::NodesetAll),
     Feature::Run(RunExtra::NodeSetHierarchical),
     Feature::Run(RunExtra::NodeSetInSubckt),
+    Feature::Item(ItemKind::Env),
+    Feature::Run(RunExtra::WholeRunMidRun),
+    Feature::Run(RunExtra::RunItemNested),
 ]);
 
 /// This area's reading codes, `P1300–P1349`.
@@ -141,9 +144,21 @@ pub(super) const CODES: &[Row] = &[
         "kept as text (Unread) until the IR has the field (.pss sc_iter and steady_coeff, a .sens filter, a .four under nfreqs).",
     ),
     note(
+        TEMP_27,
+        "a .temp ngspice runs at 27 °C",
+        "ngspice-45 inp.c:1173-1182; runs .temp 27 85, .temp 0.1k",
+        "ngspice reads the value with strtod and warns and runs 27 °C when anything is left (a list, a scale suffix); the Env holds 27.",
+    ),
+    note(
+        TEMP_BEATEN,
+        "an .options temp= a .temp card beats",
+        "ngspice-45 inp.c:1159-1186; runs temp1.cir, temp2.cir",
+        "a .temp card sets the temperature whatever the order; this key changes nothing and is kept as Inert text.",
+    ),
+    note(
         INERT_CARD,
         "a dot card ngspice reads and ignores",
-        "ngspice-45 inp2dot.c:845, 955",
+        "ngspice-45 inp2dot.c:955; run: .csparam x=1",
         "it moves no number; kept as Inert text.",
     ),
     note(
@@ -156,7 +171,7 @@ pub(super) const CODES: &[Row] = &[
         PRIVATE_OPTION,
         "an ngspice option the IR has no key for",
         "rewrite/RULINGS.md R19; ngspice-45 cktsopt.c",
-        "kept as ngspice text (Private): only ngspice reads it.",
+        "kept as ngspice text (Private, or Hint for a solver knob that names no accuracy target: R19): only ngspice reads it.",
     ),
 ];
 
@@ -170,7 +185,11 @@ const RUN_DEFAULTS: ir::Code = ir::Code::new(b'P', 1302);
 /// A run card form the IR has no field for (`.pss`'s `sc_iter`, a `.sens` filter, a `.four`
 /// whose harmonic count is the deck's `nfreqs`): `Unread`.
 const NO_FIELD: ir::Code = ir::Code::new(b'P', 1303);
-/// A dot card ngspice reads and ignores (`.width`, `.csparam`, `.prot`): `Inert`.
+/// A `.temp` ngspice cannot read (a list, a scale suffix): it runs 27 °C, the `Env`'s literal.
+const TEMP_27: ir::Code = ir::Code::new(b'P', 1304);
+/// An `.options temp=` a `.temp` card beats (in either order): `Inert`.
+const TEMP_BEATEN: ir::Code = ir::Code::new(b'P', 1305);
+/// A dot card ngspice reads and ignores (`.csparam`, `.prot`): `Inert`.
 const INERT_CARD: ir::Code = ir::Code::new(b'P', 1306);
 /// An ngspice option the IR has no key for: `Private` (a solver knob becomes `Hint`, R19).
 const PRIVATE_OPTION: ir::Code = ir::Code::new(b'P', 1307);
@@ -191,14 +210,13 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
                 Err(f) => lw.opaque(st, f.class, f.code),
             }
         }
-        "width" | "csparam" | "prot" | "unprot" => {
+        "csparam" | "prot" | "unprot" => {
             lw.opaque(st, ir::OpaqueClass::Inert, INERT_CARD);
         }
         "options" | "option" | "opt" => state::options(lw, st),
         "ic" => state::node_sets(lw, st, ir::NodeSetKind::Ic),
         "nodeset" => state::node_sets(lw, st, ir::NodeSetKind::Nodeset),
-        // ponytail: `.temp` is an `Env` of one field with A14; until it lands
-        "temp" => lw.unread(st),
+        "temp" => state::temp(lw, st),
         // frontend cards of compatibility modes, and `.opts` (accepted, its reading unknown)
         "opts" | "backanno" | "distribution" | "incpslt" | "cmodel" | "libsave" => lw.unread(st),
         _ => lw.opaque(st, ir::OpaqueClass::InvalidInSource, NO_SUCH_CARD),

@@ -1,0 +1,12 @@
+# oracle: R24 (WholeRun: ngspice's dot state cards), ngspice-45 cktsopt.c (option words), inp.c (.temp), inppas3.c (.ic, .nodeset); written by hand
+file "state.sp" deck
+  title "state"
+  analysis op
+  option rel_tol value=1e-4 whole_run
+  option method_trap whole_run
+  option src_steps value=5 whole_run
+  option interp whole_run
+  env temp=60 tnom=50 whole_run
+  env tnom=40 whole_run
+  nodeset ic transient node=(x1 b) value=0.5 whole_run
+  nodeset nodeset every_op value=0.1 whole_run

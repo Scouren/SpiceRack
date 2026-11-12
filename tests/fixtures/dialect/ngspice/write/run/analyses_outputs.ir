@@ -1,0 +1,7 @@
+# oracle: ngspice-45 inp2dot.c dot_noise, dot_tf, dot_sens, fourier.c (outputs spelled by write_outputs::probe); written by hand
+file "analyses_outputs.sp" deck
+  title "analyses_outputs"
+  analysis noise (vdiff (a) (b)) source=vin (oct start=1 stop=10 points=5) points_per_summary=2
+  analysis tf (i (vx)) source=vin
+  analysis sens_ac (v (x1 b)) (dec start=1 stop=1k points=10)
+  analysis four fundamental=1k harmonics=9 periods=1 (v (out)) (i (v1))

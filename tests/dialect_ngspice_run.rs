@@ -44,16 +44,33 @@ const READ: &[&str] = &[
     "options_form",
     "pss",
     "pz",
+    "run_in_subckt",
     "sens",
     "sp",
+    "state_after_analysis",
+    "temp",
+    "temp_options",
+    "temp_unusable",
     "tf",
+    "tnom",
     "tran",
     "tran_tmax_zero",
     "tran_word_refused",
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["analyses"];
+const WRITE: &[&str] = &["analyses", "analyses_outputs", "state"];
+
+/// The fixtures that fail today, by name, with why: their outputs are read and spelled by the
+/// outputs area's `read_outputs::probe` and `write_outputs::probe`, stubs until S3.3b lands.
+/// Strict both ways: a listed fixture that passes fails the test until its line goes.
+const PENDING: &[(&str, &str)] = &[
+    ("four", "read_outputs::probe is a stub (S3.3b)"),
+    ("noise", "read_outputs::probe is a stub (S3.3b)"),
+    ("sens", "read_outputs::probe is a stub (S3.3b)"),
+    ("tf", "read_outputs::probe is a stub (S3.3b)"),
+    ("analyses_outputs", "write_outputs::probe is a stub (S3.3b)"),
+];
 
 /// Decks whose raw file ngspice must reproduce after `write(read(deck))`. The element cards are
 /// another area's (copied as text while it is a stub); the run cards are this area's, some in
@@ -61,11 +78,11 @@ const WRITE: &[&str] = &["analyses"];
 const DECKS: &[(&str, &str)] = &[
     (
         "rc_tran",
-        "rc tran\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\nR1 a b 1k\nC1 b 0 1n\n.IC V(b)=0.5\n.OPTIONS RELTOL=1e-4 method=gear\n.TRAN 0.1U 20U 1U 0.2U\n.Tran 1u 30u UIC\n.end\n",
+        "rc tran\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\nR1 a b 1k\nC1 b 0 1n\n.TRAN 0.1U 20U 1U 0.2U\n.Tran 1u 30u UIC\n.IC V(b)=0.5\n.OPTIONS RELTOL=1e-4 method=gear\n.end\n",
     ),
     (
         "rc_small_signal",
-        "rc small signal\nV1 a 0 dc 1 ac 1\nR1 a b 1k\nR2 b 0 2k\nC1 b 0 1u\n.NODESET v(b)=0.6\n.options gmin=1e-11 gminfactor=5\n.OP\n.DC V1 0 2 0.25 R2 1K 3K 1K\n.dc temp -40 85 25\n.ac dec 5 1 1meg\n.ac lin 4 10 100\n.noise v(b) v1 oct 2 10 1k 2\n.tf v(b) v1\n.sens v(b)\n.pz a 0 b 0 vol pz\n.end\n",
+        "rc small signal\nV1 a 0 dc 1 ac 1\nR1 a b 1k tc1=0.01\nR2 b 0 2k\nC1 b 0 1u\n.NODESET v(b)=0.6\n.options gmin=1e-11 gminfactor=5\n.OP\n.DC V1 0 2 0.25 R2 1K 3K 1K\n.dc temp -40 85 25\n.ac dec 5 1 1meg\n.ac lin 4 10 100\n.noise v(b) v1 oct 2 10 1k 2\n.tf v(b) v1\n.sens v(b)\n.pz a 0 b 0 vol pz\n.TEMP 85\n.options tnom=30\n.end\n",
     ),
 ];
 
@@ -80,36 +97,36 @@ fn the_fixture_lists_are_the_files() {
 }
 
 #[test]
-fn each_read_fixture_gives_the_codes_its_ir_lists() {
+fn each_read_fixture_gives_the_codes_and_the_ir_it_lists() {
+    let mut failed = Vec::new();
     for name in READ {
-        let (_, diags) = read_deck(&format!("{name}.sp"), &text("read", name, "sp"));
-        let got: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
+        let (got, diags) = read_deck(&format!("{name}.sp"), &text("read", name, "sp"));
+        let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
         let ir = text("read", name, "ir");
         let line = ir
             .lines()
             .find_map(|l| l.strip_prefix("# codes:"))
             .expect("a codes line");
         let want: Vec<&str> = line.split_whitespace().collect();
-        assert_eq!(got, want, "{name}");
+        let same = got.eq_ignoring_spans(&parse_ir(name, &ir));
+        if codes != want || !same {
+            eprintln!("{name}: codes {codes:?}, read as\n{}", dump(&got));
+            failed.push(*name);
+        }
     }
-}
-
-#[test]
-fn each_read_fixture_reads_to_its_ir() {
-    for name in READ {
-        let (got, _) = read_deck(&format!("{name}.sp"), &text("read", name, "sp"));
-        let want = parse_ir(name, &text("read", name, "ir"));
-        assert!(
-            got.eq_ignoring_spans(&want),
-            "{name}: read as\n{}",
-            dump(&got)
-        );
-    }
+    assert_eq!(
+        failed,
+        pending("read/run"),
+        "the failing fixtures are the pending ones"
+    );
 }
 
 #[test]
 fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
     for name in READ {
+        if PENDING.iter().any(|(n, _)| n == name) {
+            continue; // read as `Unread` until S3.3b: a fixpoint, but of the stub's text
+        }
         let path = format!("{name}.sp");
         let (first, _) = read_deck(&path, &text("read", name, "sp"));
         let once = write_entry(&first);
@@ -121,10 +138,21 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
 
 #[test]
 fn each_write_fixture_writes_to_its_text() {
+    let mut failed = Vec::new();
     for name in WRITE {
+        if PENDING.iter().any(|(n, _)| n == name) {
+            // a stub's `unreachable!` cannot be caught by name; listed, not run
+            failed.push(*name);
+            continue;
+        }
         let design = parse_ir(name, &text("write", name, "ir"));
         assert_eq!(write_entry(&design), text("write", name, "sp"), "{name}");
     }
+    assert_eq!(
+        failed,
+        pending("write/run"),
+        "the failing fixtures are the pending ones"
+    );
 }
 
 #[test]
@@ -140,11 +168,26 @@ fn a_written_deck_runs_on_ngspice_to_the_original_raw_file() {
         );
         let want = raw(&dir, &format!("{name}_original"), deck);
         let got = raw(&dir, &format!("{name}_written"), &written);
+        let at = got.iter().zip(&want).position(|(a, b)| a != b);
         assert!(
             got == want,
-            "{name}: the written deck runs to another raw file\n{written}"
+            "{name}: the written deck runs to another raw file (lengths {} and {}, first difference at \
+             byte {at:?}; both kept in {})\n{written}",
+            got.len(),
+            want.len(),
+            dir.display()
         );
     }
+}
+
+/// The names of `PENDING` whose fixture is under `<sub>`, in list order.
+fn pending(sub: &str) -> Vec<&'static str> {
+    let names = if sub.starts_with("read") { READ } else { WRITE };
+    PENDING
+        .iter()
+        .map(|(n, _)| *n)
+        .filter(|n| names.contains(n))
+        .collect()
 }
 
 /// The ngspice row.

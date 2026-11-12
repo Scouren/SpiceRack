@@ -35,7 +35,6 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
 /// vin`), as the probe it reads in the analysis of `analysis`: the run area calls it for those
 /// cards' outputs, so that one reader spells probes. `Err` is the class and code of the
 /// `Opaque` the calling statement becomes. Stub: no probe is read yet (`Unread`).
-#[expect(dead_code, reason = "the run area calls it (S3.3a)")]
 pub(super) fn probe(
     lw: &mut Lower<'_, '_>,
     st: Stmt,

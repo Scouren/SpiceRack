@@ -1,14 +1,14 @@
 # codes: P1307 P1307
 file "options.sp" deck
   title "options"
-  comment " oracle: ngspice-45 cktsopt.c:246-330 (each option, its type; itl6 is srcsteps; method trap or gear), rewrite/IR-RUN.md 3 (OptionKey)"
-  option rel_tol value=1e-4
-  option abs_tol value=1p
-  option method_gear
-  option max_ord value=2
-  option no_op_iter
-  option src_steps value=20
-  opaque ngspice private ".options gminfactor=10"
+  comment " oracle: ngspice-45 cktsopt.c:246-330 (each option, its type; itl6 is srcsteps; method trap or gear), R19 (gminfactor tunes the solver: hint), rewrite/IR-RUN.md 3 (OptionKey)"
+  option rel_tol value=1e-4 whole_run
+  option abs_tol value=1p whole_run
+  option method_gear whole_run
+  option max_ord value=2 whole_run
+  option no_op_iter whole_run
+  option src_steps value=20 whole_run
+  opaque ngspice hint ".options gminfactor=10"
   opaque ngspice private ".options savecurrents"
-  option klu
-  option gshunt value=g
+  option klu whole_run
+  option gshunt value=g whole_run
