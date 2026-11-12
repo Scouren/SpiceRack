@@ -156,13 +156,6 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Kind::Refusal,
     ),
     row(
-        super::write_sources::PWL_JUMP,
-        "a periodic PWL that jumps back to its first point",
-        "VD dev-builtin-src (PWL period); A22 (PwlJoin::Extrapolate is VACASK's law)",
-        "VACASK's periodic PWL joins its last point to the next period's first by a line; a jump has no spelling.",
-        ir::Kind::Refusal,
-    ),
-    row(
         super::write_sources::PARAMS,
         "a source, controlled source or mutual with instance parameters",
         "VD dev-builtin-src, -vcvs, -cccs, -mutual; S 7.11",
