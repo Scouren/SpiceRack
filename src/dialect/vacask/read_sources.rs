@@ -18,13 +18,15 @@
 //!   spurs, a `ctlnode` other than the branch flow, a value the IR cannot hold (a `type` or a
 //!   name that is no string literal, a `wave` that is no vector literal).
 //!
-//! `tline_ideal` waits for A20 (its family and `LosslessLine`'s master): `Unread` until then.
+//! `tline_ideal` (R39, A20; run t3) is a `LosslessLine` naming its `TlineIdeal` model: `td`
+//! given is the delay (`f`, `nl` beside it are ignored by VACASK: dropped with `LINE_IGNORED`);
+//! else `f` and `nl`, each at VACASK's default (1k, 1) when absent; `z0` 50 by default.
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.2 (sources … mutual); VD dev-builtin-src,
 //! dev-builtin-vcvs, -vccs, -cccs, -ccvs, -mutual, cir-mfactor; R39, A20.
 //!
 //! Contents: `FEATURES`, `INVALID`, `SHAPING`, `DORMANT`, `SPURS`, `CTLNODE`, `LINE_IGNORED`,
-//! `UNSTATED`, `CODES`, `DEFAULTS`, `default_of`, `source` (crate-private); the statement's
+//! `TYPE_ALTER`, `UNSTATED`, `CODES`, `DEFAULTS`, `default_of`, `source` (crate-private); the statement's
 //! parts in `common.rs`, the independent sources in `wave.rs`
 
 mod common;
@@ -50,6 +52,9 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(F::Elem(ir::ElemKind::Cccs))
     .with(F::Elem(ir::ElemKind::Ccvs))
     .with(F::Elem(ir::ElemKind::Coupling))
+    .with(F::Elem(ir::ElemKind::LosslessLine))
+    .with(F::Circuit(X::LineFreqNl))
+    .with(F::Circuit(X::MultOther))
     .with(F::Wave(ir::WaveKind::Pulse))
     .with(F::Wave(ir::WaveKind::Sin))
     .with(F::Wave(ir::WaveKind::Exp))
@@ -77,7 +82,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(F::Circuit(X::DcAtZeroExp))
     .with(F::Circuit(X::DcAtZeroPwl))
     .with(F::Circuit(X::DcAtZeroSffm))
-    .with(F::Circuit(X::DcAtZeroAm));
+    .with(F::Circuit(X::DcAtZeroAm))
+    .with(F::Circuit(X::DcGivenWithWave));
 
 /// A source statement VACASK rejects.
 pub(super) const INVALID: ir::Code = ir::Code::new(b'P', 2201);
@@ -91,6 +97,8 @@ pub(super) const SPURS: ir::Code = ir::Code::new(b'P', 2204);
 pub(super) const CTLNODE: ir::Code = ir::Code::new(b'P', 2205);
 /// `tline_ideal` given both `td` and `f`/`nl`: VACASK reads `td` (R39).
 pub(super) const LINE_IGNORED: ir::Code = ir::Code::new(b'P', 2206);
+/// A source a `type` alter reaches other than by R42's alternation.
+pub(super) const TYPE_ALTER: ir::Code = ir::Code::new(b'P', 2208);
 /// A value VACASK reads that the IR cannot hold here.
 pub(super) const UNSTATED: ir::Code = ir::Code::new(b'P', 2207);
 
@@ -160,6 +168,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Kind::Refusal,
     ),
     row(
+        TYPE_ALTER,
+        "a source whose type an alter changes otherwise than the dc/wave alternation",
+        "R42; VD cmd-alter",
+        "Only the alternation of `type=\"dc\"` before DC-kind analyses and one wave before transients states a source row (DcRule::Given with the wave); any other `type` alter makes the line and its alters VACASK's alone.",
+        ir::Kind::Note,
+    ),
+    row(
         UNSTATED,
         "a source value the IR cannot hold",
         "VD dev-builtin-src; DIALECT-VACASK §3.2 sources",
@@ -201,6 +216,9 @@ pub(super) const DEFAULTS: &[(&str, &str)] = &[
     ("slopeglob", "0.01"),
     ("file", "\"\""),
     ("gain", "1."),
+    ("z0", "50."),
+    ("f", "1k"),
+    ("nl", "1."),
     ("k", "0."),
     ("ctlnode", "\"flow(br)\""),
     ("ctlnode1", "\"flow(br)\""),
@@ -218,16 +236,13 @@ pub(super) fn source(l: &mut Lower<'_, '_, '_>, n: Node) {
     let h = l.cst.ast.header(n);
     let master = read::field_name(l.cst, h.master);
     let module = module_of(l, &master);
-    if module.as_deref() == Some("tline_ideal") {
-        // A20: LosslessLine names no master and no family states the ideal line yet.
-        return read::unread(l, n);
-    }
     let result = params(l, n).and_then(|p| match module.as_deref() {
         Some("vsource" | "isource") => {
             wave::independent(l, n, &p, module.as_deref() == Some("isource"))
         }
         Some(m @ ("vcvs" | "vccs" | "cccs" | "ccvs")) => controlled(l, n, &p, m),
         Some("mutual") => mutual(l, n, &p),
+        Some("tline_ideal") => line(l, n, &p),
         _ => unreachable!("routed here only for a model of a source module"),
     });
     if let Err((class, code)) = result {
@@ -315,5 +330,44 @@ fn mutual(l: &mut Lower<'_, '_, '_>, n: Node, p: &Params) -> Result<(), Fail> {
     let at =
         l.b.coupling(l.scope, head, ir::passive::Coupling { inductors, k }, span);
     l.bind_master_later(at);
+    Ok(())
+}
+
+/// `tline_ideal` (`p n p2 n2`; R39, run t3).
+fn line(l: &mut Lower<'_, '_, '_>, n: Node, p: &Params) -> Result<(), Fail> {
+    p.only(&["z0", "td", "f", "nl", "$mfactor"])?;
+    terminals(l, n, 4)?;
+    let z0 = p.val("z0");
+    let by_td = p.get("td").map(Val::Node);
+    let ignored = by_td.is_some() && (p.get("f").is_some() || p.get("nl").is_some());
+    let (freq, nl) = match by_td {
+        Some(_) => (None, None),
+        None => (Some(p.val("f")), Some(p.val("nl"))),
+    };
+    let m = p.get("$mfactor").map(Val::Node);
+    let vals: Vec<Val> = [Some(z0), by_td, freq, nl, m]
+        .into_iter()
+        .flatten()
+        .collect();
+    check(l, &vals)?;
+    let mult = mult(l, p);
+    let mut opt = |v: Option<Val>| v.map_or(ir::ExprId::NONE, |v| build(l, v));
+    let row = ir::line::Line {
+        z0: opt(Some(z0)),
+        td: opt(by_td),
+        freq: opt(freq),
+        nl: opt(nl),
+        length: ir::ExprId::NONE,
+        vel: ir::ExprId::NONE,
+        lumps: ir::ExprId::NONE,
+    };
+    let head = head(l, n, mult);
+    let span = l.span(n);
+    let at =
+        l.b.line(l.scope, ir::ElemKind::LosslessLine, head, row, span);
+    l.bind_master_later(at);
+    if ignored {
+        l.diags.push(LINE_IGNORED, span, 0);
+    }
     Ok(())
 }

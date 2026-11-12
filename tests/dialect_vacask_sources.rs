@@ -28,9 +28,12 @@ const WRITE: &str = "tests/fixtures/dialect/vacask/write/sources";
 const SETTLE: &str = "tests/fixtures/dialect/vacask/settle";
 
 /// Known failures, by fixture and cause; a fixture that passes while listed fails the test.
-const KNOWN: &[(&str, &str)] = &[(
-    "tline.sim",
-    "A20: the ideal-line family and LosslessLine's model master wait for ir-circuit",
+const KNOWN: &[(&str, &str)] = &[];
+
+/// Reader fixtures the write tests cannot take yet, by cause (compared by the reader test).
+const KNOWN_WRITE: &[(&str, &str)] = &[(
+    "fold.sim",
+    "S4.3: the control block is Unread, so fold::admits sees no analysis and refuses the Given source (W2007)",
 )];
 
 // ---- private ----
@@ -229,7 +232,7 @@ fn every_reader_fixture_reads_to_its_ir() {
 fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
     for path in files(READ, "sim") {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
-        if KNOWN.iter().any(|(k, _)| *k == name) {
+        if KNOWN.iter().chain(KNOWN_WRITE).any(|(k, _)| *k == name) {
             continue;
         }
         let (mut once, _) = read(&deck(&path), "vacask");

@@ -4,7 +4,7 @@
 //! `ind2` (mutual). A field holding exactly the literal the reader fills for an absent
 //! parameter (`read_sources::DEFAULTS`) is left out, so the line reads back as the same row.
 //! A wave's `Am.mod_offset` other than the literal 1 the reader fills has no VACASK spelling:
-//! `admits` refuses it (W2201). `tline_ideal` waits for A20 (FEATURES lacks `LosslessLine`).
+//! `admits` refuses it (W2201). `tline_ideal`: `z0`, then `td` or `f` and `nl` (R39).
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD dev-builtin-src, -vcvs, -cccs, -mutual.
 //!
@@ -50,6 +50,20 @@ pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
                 string(d.str(ind), w.out);
             }
         }
+        ir::ElemKind::LosslessLine => {
+            let line = d.line(&e);
+            param(w, "z0", line.z0);
+            match line.td.is_none() {
+                true => {
+                    param(w, "f", line.freq);
+                    param(w, "nl", line.nl);
+                }
+                false => {
+                    w.out.push_str(" td=");
+                    write_expr(d, line.td, w.out);
+                }
+            }
+        }
         k => unreachable!("FEATURES lacks {k:?}: legalize refused it"),
     }
     if !e.mult.is_none() {
@@ -62,7 +76,8 @@ pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 /// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
 /// states (R21): an `Am` whose `mod_offset` is not the literal 1 (`AM_OFFSET`), a periodic
 /// `Pwl` whose join is a jump (`PWL_JUMP`: `PwlJoin::Jump` has no feature), a source-like
-/// element with instance parameters (`PARAMS`: VACASK's builtins take only their own).
+/// element with instance parameters or a `mutual` with a multiplicity (`PARAMS`: VACASK's
+/// builtins take only their own parameters, and `mutual` no `$mfactor`).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     use ir::ElemKind as K;
     for (at, _) in design.reachable() {
@@ -73,9 +88,20 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         let span = design.span_of(at);
         let source_like = matches!(
             e.kind,
-            K::VSource | K::ISource | K::Vcvs | K::Vccs | K::Cccs | K::Ccvs | K::Coupling
+            K::VSource
+                | K::ISource
+                | K::Vcvs
+                | K::Vccs
+                | K::Cccs
+                | K::Ccvs
+                | K::Coupling
+                | K::LosslessLine
         );
         if source_like && !e.params.is_empty() {
+            diags.push(PARAMS, span, 0);
+        }
+        if e.kind == K::Coupling && !e.mult.is_none() {
+            // `MultOther` covers lines (VACASK's tline_ideal takes `$mfactor`), not `mutual`.
             diags.push(PARAMS, span, 0);
         }
         if !matches!(e.kind, K::VSource | K::ISource) {
@@ -102,14 +128,15 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
 /// `type=…`, the wave's parameters, `dc`, `mag`, `phase`.
 fn independent(w: &mut Writer<'_, '_>, s: ir::source::Source) {
     let d = w.design;
-    if !s.wave.is_none() {
-        assert!(
-            s.dc_rule == ir::source::DcRule::WaveAtZero,
-            "FEATURES lacks DcGivenWithWave"
-        );
-        wave(w, d.wave(s.wave));
-    } else {
-        param(w, "dc", s.dc);
+    match (s.wave.is_none(), s.dc_rule) {
+        (true, _) => param(w, "dc", s.dc),
+        (false, ir::source::DcRule::WaveAtZero) => wave(w, d.wave(s.wave), true),
+        (false, ir::source::DcRule::Given) => {
+            // R42: the run writer adds the `type` alters (`fold::given`).
+            w.out.push_str(" type=\"dc\" dc=");
+            write_expr(d, s.dc, w.out);
+            wave(w, d.wave(s.wave), false);
+        }
     }
     if !s.ac_mag.is_none() {
         let both = is_default(d, s.ac_mag, "0.") && is_default(d, s.ac_phase_deg, "0.");
@@ -123,8 +150,8 @@ fn independent(w: &mut Writer<'_, '_>, s: ir::source::Source) {
     }
 }
 
-/// `type="<t>"` and the wave's parameters in VD's order.
-fn wave(w: &mut Writer<'_, '_>, wave: ir::Wave) {
+/// `type="<t>"` (when `typed`) and the wave's parameters in VD's order.
+fn wave(w: &mut Writer<'_, '_>, wave: ir::Wave, typed: bool) {
     let (typ, fields): (&str, Vec<(&str, ir::ExprId)>) = match wave {
         ir::Wave::Sin(s) => (
             "sine",
@@ -186,10 +213,12 @@ fn wave(w: &mut Writer<'_, '_>, wave: ir::Wave) {
                 f.mod_index,
             ),
         ),
-        ir::Wave::Pwl(p) => return pwl(w, p),
+        ir::Wave::Pwl(p) => return pwl(w, p, typed),
         other => unreachable!("FEATURES lacks {other:?}: legalize refused it"),
     };
-    w.out.push_str(&format!(" type=\"{typ}\""));
+    if typed {
+        w.out.push_str(&format!(" type=\"{typ}\""));
+    }
     for (key, e) in fields {
         param(w, key, e);
     }
@@ -222,10 +251,12 @@ fn am_fm(
     ]
 }
 
-/// `type="pwl" wave=[…]` or `file="…"`, `delay`, `period`.
-fn pwl(w: &mut Writer<'_, '_>, p: w::Pwl) {
+/// `type="pwl"` (when `typed`), `wave=[…]` or `file="…"`, `delay`, `period`.
+fn pwl(w: &mut Writer<'_, '_>, p: w::Pwl, typed: bool) {
     let d = w.design;
-    w.out.push_str(" type=\"pwl\"");
+    if typed {
+        w.out.push_str(" type=\"pwl\"");
+    }
     if p.file != ir::NameId::NONE {
         w.out.push_str(" file=");
         string(d.str(p.file), w.out);

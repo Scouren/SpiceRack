@@ -11,7 +11,10 @@
 //! | `am` | `Am{offset sinedc, amplitude ampl, mod_offset 1, mod_index, mod_freq modfreq, carrier_freq freq, delay, phase_m modphase, phase_c tdphase, mod_time: Delay, pre: HoldDelayValue}` |
 //! | `fm` | `Sffm{offset sinedc, amplitude ampl, carrier_freq freq, mod_index, signal_freq modfreq, delay, phase_c tdphase, phase_m modphase, law: Spice3, pre: HoldDelayValue}` |
 //!
-//! Every wave is `GivenZero::AsGiven` and `DcRule::WaveAtZero` (`dc` ignored, run src-sine). A
+//! Every wave is `GivenZero::AsGiven` and `DcRule::WaveAtZero` (`dc` ignored, run src-sine),
+//! but a `type="dc"` source the R42 alternation reaches (`fold.rs`) is `DcRule::Given` with the
+//! wave its alters name, read from the line's parameters; any other `type` alter makes the
+//! line `Private` (`TYPE_ALTER`). A
 //! parameter the type does not read is dropped with the note `DORMANT` (R42; the alter-type
 //! pair that reads it is the scaffold's declare step, not here yet).
 //!
@@ -23,7 +26,9 @@ use super::common::{
     COMMON, Fail, Params, Val, at_default, build, check, head, invalid, mult, nonpositive, private,
     source_key, string, terminals, type_keys,
 };
-use super::{DORMANT, SHAPING, SPURS, UNSTATED, default_of};
+use super::{DORMANT, SHAPING, SPURS, TYPE_ALTER, UNSTATED, default_of};
+use crate::dialect::vacask::fold::Fold;
+use crate::dialect::vacask::read;
 use crate::dialect::vacask::read::Lower;
 use crate::ir;
 use crate::ir::wave as w;
@@ -71,7 +76,20 @@ pub(super) fn independent(
         Some(v) => string(l, v)?,
         None => "dc".to_string(),
     };
-    let active = type_keys(&typ).ok_or_else(invalid)?;
+    type_keys(&typ).ok_or_else(invalid)?;
+    // R42: the `type` alters reaching this source (`fold.rs`): the dc-plus-wave alternation is
+    // `DcRule::Given` with the wave its word names, read from the line's own parameters.
+    let name = read::field_name(l.cst, l.cst.ast.header(n).name);
+    let top = l.b.design().scope(l.scope).kind == ir::ScopeKind::File;
+    let wave_typ = match l.folds.of(&name, top) {
+        Some(Fold::Other) => return Err(private(TYPE_ALTER)),
+        Some(Fold::Given(word)) if typ == "dc" => word.clone(),
+        Some(Fold::Given(_)) => return Err(private(TYPE_ALTER)),
+        None => typ.clone(),
+    };
+    let wave_keys = type_keys(&wave_typ).ok_or_else(invalid)?;
+    let dc_keys = type_keys(&typ).expect("checked");
+    let active: Vec<&str> = dc_keys.iter().chain(wave_keys).copied().collect();
     if ["spur", "smag", "sphase"]
         .iter()
         .any(|k| p.get(k).is_some())
@@ -83,8 +101,8 @@ pub(super) fn independent(
     let dormant = p
         .keys()
         .any(|key| !(COMMON.contains(&key) || active.contains(&key)))
-        || (typ == "pwl" && p.get("file").is_some() && p.get("wave").is_some());
-    let plan = plan(l, p, &typ)?;
+        || (wave_typ == "pwl" && p.get("file").is_some() && p.get("wave").is_some());
+    let plan = plan(l, p, &wave_typ)?;
     let ac = (p.get("mag").is_some() || p.get("phase").is_some())
         .then(|| (p.val("mag"), p.val("phase")));
     let dc = (typ == "dc").then(|| p.val("dc"));
@@ -109,7 +127,7 @@ pub(super) fn independent(
     };
     let dc = dc.map_or(ir::ExprId::NONE, |v| build(l, v));
     let wave = push_wave(l, plan);
-    let dc_rule = match wave.is_none() {
+    let dc_rule = match typ == "dc" {
         true => ir::source::DcRule::Given,
         false => ir::source::DcRule::WaveAtZero,
     };
@@ -301,6 +319,7 @@ fn push_wave(l: &mut Lower<'_, '_, '_>, plan: Plan) -> ir::WaveRef {
                 phase_c_deg: e[7],
                 mod_time: w::AmModTime::Delay,
                 pre: hold,
+                given_zero: as_given,
             })
         }
         _ => l.b.wave(w::Sffm {
