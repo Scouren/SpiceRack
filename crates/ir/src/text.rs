@@ -48,7 +48,7 @@
 //! include "path" [section=name]
 //! global name { name }
 //! load veriloga|osdi "path" [modules=(name …)]      the loaded modules' definitions
-//! opaque name unread|private|inert|invalid|script "text"
+//! opaque name unread|private|inert|invalid|script|hint "text"
 //! subckt name (port …) { key=value }                 body below
 //! section name [library=name]                        body below
 //! if (expr)            body below; then at the same depth:  elif (expr)  …  else

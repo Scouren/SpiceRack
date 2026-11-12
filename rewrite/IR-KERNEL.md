@@ -285,6 +285,13 @@ item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
 leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
 
+**A12 K3 (2026-11-12): `OpaqueClass::Hint` (R19).** Tunes its own simulator's solver (a
+convergence aid, a step-control knob) and names no accuracy target. Appended after `Script`, so
+its code is `S0006` and no earlier code moves; IR text word `hint`. Its note says its own family
+copies it and another family leaves it out, the numbers moving at most within the solver's
+tolerance (not `Inert`'s note: an `Inert` statement moves no number). Dropping it is the spine's
+`legalize`, not the kernel's.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

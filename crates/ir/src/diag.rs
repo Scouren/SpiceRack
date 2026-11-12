@@ -274,6 +274,9 @@ fn opaque_text(c: OpaqueClass) -> (&'static str, &'static str) {
             "data-dependent control flow",
             "kept as its dialect's text; a script is not a static run plan.",
         ),
-        OpaqueClass::Hint => todo!(),
+        OpaqueClass::Hint => (
+            "a solver hint of its own simulator",
+            "kept as its dialect's text; its own family copies it, another family leaves it out: the numbers may move within the solver's tolerance.",
+        ),
     }
 }

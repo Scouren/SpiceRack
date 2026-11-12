@@ -230,3 +230,7 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `FormalReadsParam` is a `Subckt` row fact (its `features`), not a design-level hook: it depends on the row's own defaults only.
 - The generator: `Gen::enclosing_ok` filters `pick_def`'s draws; `Gen::param_reads` is cleared around a subckt's head defaults when the set lacks `FormalReadsParam`, and `leaf()` then drops `Param`.
 
+## A12 K3 applied (`OpaqueClass::Hint`)
+
+- Appended last (`S0006`), text word `hint`; no feature per class exists today, so `Feature::COUNT` does not move. The generator draws it with every other class (`OpaqueClass::ALL`).
+
