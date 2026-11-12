@@ -1,0 +1,12 @@
+pulse period equals rise+fall+width
+V1 a 0 PULSE(0 1 0 1u 1u 2u 4u)
+R1 a 0 1k
+.tran 10n 10u 0 10n
+.control
+run
+meas tran a1 find v(a) at=0.5u
+meas tran a2 find v(a) at=3.5u
+meas tran a3 find v(a) at=4.5u
+meas tran a4 find v(a) at=5.5u
+.endc
+.end

@@ -1,0 +1,15 @@
+real where int expected
+load "spice/resistor.osdi"
+load "spice/mos1.osdi"
+model res sp_resistor
+model vsource vsource
+model nm sp_mos1 type=1.
+v1 (n 0) vsource dc=1
+r1 (n 0) res r=10 noisy=0.
+m1 (n n 0 0) nm w=1u l=1u
+control
+  print instance("r1")
+  print model("nm")
+  sweep s instance="v1" parameter="dc" from=0 to=1 mode="lin" points=2.
+  analysis op1 op
+endc

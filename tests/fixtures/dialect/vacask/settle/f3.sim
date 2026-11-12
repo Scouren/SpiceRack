@@ -1,0 +1,7 @@
+mixed min max atan2 types
+load "spice/resistor.osdi"
+model res sp_resistor
+r1 (n 0) res r=1
+control
+  print ("min_ir", min(3,5.0)/2, "min_ri", min(3.0,5)/2, "max_ir", max(3,1.0)/2, "max_ri", max(3.0,1)/2, "atan2", atan2(3,1)/2, "hypot", hypot(3,4)/2, "pow", pow(3,1)/2, "neg", (-3)/2, "not", (!0)/2, "and", (3&&5)/2, "bitand", (7&3)/2, "shl", (3<<1)/4, "sinh", sinh(0)/2, "add_ir", (3+0.0)/2, "sub", (5-2)/2, "ternr", (0?3:4.0)/2)
+endc

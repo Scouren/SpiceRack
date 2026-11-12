@@ -1,0 +1,14 @@
+formals that fold to a constant are overridable
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters q=5
+subckt s(a)
+  parameters x=2*3 y=M_PI z=sqrt(4)
+  r1 (a 0) res r=x
+  r2 (a 0) res r=y
+  r3 (a 0) res r=z
+ends
+x1 (n) s x=7 y=7 z=7
+control
+  print instance("x1:r1", "x1:r2", "x1:r3")
+endc

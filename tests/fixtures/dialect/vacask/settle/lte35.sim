@@ -1,0 +1,13 @@
+lte ratio 3.5
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model vsource vsource
+v1 (a 0) vsource type="pulse" val0=0 val1=1 rise=1n width=1 
+r1 (a b) res r=1k
+c1 (b 0) cap c=1u
+control
+  options rawfile="ascii" tran_lteratio=3.5
+  analysis lt tran stop=5m step=1u
+endc

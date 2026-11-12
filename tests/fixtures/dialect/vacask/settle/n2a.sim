@@ -1,0 +1,8 @@
+builtin with no model line
+load "spice/resistor.osdi"
+model res sp_resistor
+v1 (n 0) vsource dc=1
+r1 (n 0) res r=1k
+control
+  analysis op1 op
+endc

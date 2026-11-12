@@ -1,0 +1,10 @@
+sp two ports, series 100 ohm, z0 50
+V1 a 0 dc 0 ac 1 portnum 1 z0 50
+V2 b 0 dc 0 ac 1 portnum 2 z0 50
+RM a b 100
+.sp lin 1 1k 1k
+.control
+run
+print s_1_1 s_2_1
+.endc
+.end

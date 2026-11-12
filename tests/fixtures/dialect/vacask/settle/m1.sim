@@ -1,0 +1,16 @@
+model scope and agauss nominal and hex
+load "spice/resistor.osdi"
+model vsource vsource
+parameters g=agauss(5, 1, 1) h=0x10
+subckt outer(a)
+  model res sp_resistor
+  subckt inner(b)
+    r1 (b 0) res r=1k
+  ends
+  xi (a) inner
+ends
+x1 (n) outer
+control
+  print ("g", g, "h", h)
+  print instance("x1:xi:r1")
+endc
