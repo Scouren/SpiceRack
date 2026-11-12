@@ -1,0 +1,4 @@
+file "d.sp" deck
+  param a = 2
+  param r = sqr(a - 3)
+  param s = sqr(3i)

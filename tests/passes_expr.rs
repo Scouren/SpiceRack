@@ -67,6 +67,31 @@ const RULES: &[Rule] = &[
         matches!(e, ir::Expr::Call(ir::Func::Ramp, _))
     }),
     (
+        "pow_signed_to_ternary",
+        &[
+            "pow_signed(x, y)",
+            "pow_signed(x, 3)",
+            "pow_signed(x - y, 0.5)",
+        ],
+        |e| matches!(e, ir::Expr::Call(ir::Func::PowSigned, _)),
+    ),
+    (
+        "sqrt_abs_to_sqrt",
+        &["sqrt_abs(x)", "sqrt_abs(x - y)"],
+        |e| matches!(e, ir::Expr::Call(ir::Func::SqrtAbs, _)),
+    ),
+    ("ln_abs_to_ln", &["ln_abs(x)", "ln_abs(x * y)"], |e| {
+        matches!(e, ir::Expr::Call(ir::Func::LnAbs, _))
+    }),
+    (
+        "explin14_to_ternary",
+        &["exp_lin14(x)", "exp_lin14(x * 14 + y)", "exp_lin14(x + 14)"],
+        |e| matches!(e, ir::Expr::Call(ir::Func::ExpLin14, _)),
+    ),
+    ("sqr_to_mul", &["sqr(x)", "sqr(x - y) /: 2i"], |e| {
+        matches!(e, ir::Expr::Call(ir::Func::Sqr, _))
+    }),
+    (
         "pwl_to_ternary",
         &[
             "pwl(x, -1, 2, 0.5, -3, 2.5, 7)",
@@ -210,7 +235,9 @@ fn the_powers_roundings_and_ternaries_keep_every_value() {
                     false => format!("  param r = {body}\n"),
                 };
                 let text = format!("file \"p.sp\" deck\n  param x = 1\n  param y = 1\n{field}");
-                points += keeps_boundary_values(row, &text, ANY);
+                // sqr_to_mul decides by the tag table: x's binding keeps its definition's tag
+                let tags: &[u8] = if name == "sqr_to_mul" { &[0, 2] } else { ANY };
+                points += keeps_boundary_values(row, &text, tags);
             }
             let generated = keeps_generated_values(row, hit, false);
             eprintln!("{row}: {points} boundary points, {generated} generated roots");
@@ -224,11 +251,30 @@ fn the_powers_roundings_and_ternaries_keep_every_value() {
 }
 
 #[test]
+fn sqr_to_mul_keeps_an_int_square_real() {
+    // oracle: eval_typed of sqr (Real, no 2⁵³ bound) at Int operands up to 2⁵³
+    let text = "file \"p.sp\" deck\n  param x = 1i\n  param y = 1\n  param r = sqr(x)\n";
+    for name in ["sqr_to_mul", "sqr_to_mul_dyn"] {
+        let body = text.replace(
+            "sqr(x)",
+            if name == "sqr_to_mul" {
+                "sqr(x)"
+            } else {
+                "sqr(x) + $temp * 0"
+            },
+        );
+        let points = keeps_boundary_values(name, &body, &[1, 3]);
+        eprintln!("{name} (x Int): {points} boundary points");
+    }
+}
+
+#[test]
 fn the_rules_that_cannot_convert_say_why() {
     assert_eq!(notes("pow_to_powabs", "base_may_be_negative"), [code(104)]);
     assert_eq!(notes("round_half_even_to_away", "draw"), [code(105)]);
     assert_eq!(notes("sgn_to_ternary", "draw"), [code(105)]);
     assert_eq!(notes("pwl_to_ternary", "decreasing"), [code(106)]);
+    assert_eq!(notes("pow_signed_to_ternary", "draw"), [code(105)]);
 }
 
 #[test]

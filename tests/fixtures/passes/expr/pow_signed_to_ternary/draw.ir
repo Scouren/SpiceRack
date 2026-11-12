@@ -1,0 +1,3 @@
+file "d.sp" deck
+  param a = 2
+  param r = pow_signed(draw:abs_gauss:always:reference(1, 0.1, 3), 2)
