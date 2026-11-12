@@ -33,6 +33,11 @@ const KNOWN: &[(&str, &str)] = &[(
     "A20: the ideal-line family and LosslessLine's model master wait for ir-circuit",
 )];
 
+/// Fixtures that need a bound `mutual` model (a coupling whose master is unbound counts as a
+/// core's, `CouplingCore`, which VACASK lacks): skipped by the write tests while the marker
+/// below is false, compared everywhere else.
+const NEEDS_MUTUAL_MODEL: &[&str] = &["mutual.sim", "mutual.ir"];
+
 /// Marker: the `model` statements are the devices area's (S4.1), not read on this branch yet;
 /// while false, `model` rows and the `Unread` opaques of `model` lines (and their codes) are
 /// left out of both sides of a comparison. Goes the day vc-devices' builtin models merge.
@@ -264,7 +269,8 @@ fn every_reader_fixture_reads_to_its_ir() {
 fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
     for path in files(READ, "sim") {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
-        if KNOWN.iter().any(|(k, _)| *k == name) {
+        let waits = !MODEL_LINES_READ && NEEDS_MUTUAL_MODEL.contains(&name.as_str());
+        if waits || KNOWN.iter().any(|(k, _)| *k == name) {
             continue;
         }
         let (mut once, _) = read(&deck(&path), "vacask");
@@ -278,6 +284,10 @@ fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
 fn every_writer_fixture_writes_its_text() {
     let mut failed = Vec::new();
     for ir_path in files(WRITE, "ir") {
+        let name = ir_path.file_name().unwrap().to_string_lossy().into_owned();
+        if !MODEL_LINES_READ && NEEDS_MUTUAL_MODEL.contains(&name.as_str()) {
+            continue;
+        }
         let want = std::fs::read_to_string(ir_path.with_extension("sim")).expect("a .sim beside");
         let ir_text = std::fs::read_to_string(&ir_path).unwrap();
         let ir_text: String = match MODEL_LINES_READ {

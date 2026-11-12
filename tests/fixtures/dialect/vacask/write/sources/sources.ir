@@ -1,14 +1,14 @@
 # Oracle: VD dev-builtin-src, -vcvs, -cccs, -mutual (each parameter's name and default: a field
 # at VACASK's default, the same literal the reader fills, is left out; `type` first, then the
 # wave's parameters in VD's order, then mag, phase, $mfactor); DIALECT-VACASK §4 (literals,
-# names); run src-pwl (the first point at 0 holds as VACASK holds y1).
+# names: a real whole number keeps its point, `0.`); run src-pwl (the first point at 0 holds
+# as VACASK holds y1).
 file "sources.sim" deck
   title "sources written"
   model vsource source_v
   model isource source_i
   model e vcvs
   model f cccs
-  model m mutual
   element vsource v1 (a 0) model=vsource dc=1i
   element vsource v2 (b 0) model=vsource dc=0 ac_mag=1i ac_phase_deg=0
   element vsource v3 (b 0) model=vsource dc=0 ac_mag=0 ac_phase_deg=30i
@@ -23,4 +23,3 @@ file "sources.sim" deck
   element vcvs e1 (o 0 a 0) model=e gain=1
   element vcvs e2 (o 0 a 0) model=e gain=10i
   element cccs f1 (0 o2) model=f gain=2i sense=v1
-  element coupling m1 () model=m inductors=(l1 l2) k=0.5
