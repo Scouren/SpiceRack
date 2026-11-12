@@ -249,7 +249,7 @@ pub(crate) fn state_order_features(design: &Design, out: &mut Vec<(Feature, Item
             {
                 let x = match holds {
                     Applies::FromHere => from_here,
-                    Applies::WholeRun => RunExtra::WholeRunMidRun,
+                    Applies::WholeRun => RunExtra::OptionWholeRunMidRun,
                 };
                 out.push((Feature::Run(x), item));
             }

@@ -612,8 +612,8 @@ impl RowFacts for NodeSet {
 /// The feature of each `Applies` member.
 pub(crate) const fn mode_feature(holds: Applies) -> RunExtra {
     match holds {
-        Applies::FromHere => RunExtra::StateFromHere,
-        Applies::WholeRun => RunExtra::StateWholeRun,
+        Applies::FromHere => RunExtra::OptionFromHere,
+        Applies::WholeRun => RunExtra::OptionWholeRun,
     }
 }
 

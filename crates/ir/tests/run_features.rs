@@ -147,7 +147,10 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::LoopOverOp, L, "  loop sweep (temp) (list values=[1])\n    analysis dc_inc"),
     (RunExtra::EnvMidRun, "  analysis op\n  env temp=1", "  env temp=1\n  analysis op"),
     (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),
-    (RunExtra::WholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
+    (RunExtra::OptionWholeRunMidRun, "  analysis op\n  option klu whole_run", "  option klu whole_run\n  analysis op"),
+    (RunExtra::EnvWholeRunMidRun, "  analysis op\n  env temp=1 whole_run", "  env temp=1 whole_run\n  analysis op"),
+    (RunExtra::NodeSetWholeRunMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run", "  nodeset ic transient node=(a) value=1 whole_run\n  analysis op"),
+    (RunExtra::SaveWholeRunMidRun, "  analysis op\n  save (v (out))", "  save (v (out))\n  analysis op"),
     (RunExtra::ProbeAllBranchI, "  save (all_branch_i)", P),
     (RunExtra::MeasStatAt, "  measure m tran stat min_at (v (a)) (bound) (bound)", "  measure m tran stat min (v (a)) (bound) (bound)"),
     (RunExtra::MeasUntil, "  measure m tran when (cross rise (v (a)) value=1 count=1 until=1u)", MW),
@@ -156,8 +159,12 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::PssScIter, "  analysis pss driven fundamental=1meg tstab=1u sc_iter=50", PSS),
     (RunExtra::PssSteadyCoeff, "  analysis pss driven fundamental=1meg tstab=1u steady_coeff=1m", PSS),
     (RunExtra::FourHarmonicsOption, "  option n_freqs value=10\n  analysis four fundamental=1k periods=1 (v (out))", "  option n_freqs value=10\n  analysis four fundamental=1k harmonics=9 periods=1 (v (out))"),
-    (RunExtra::StateFromHere, "  env temp=1", "  env temp=1 whole_run"),
-    (RunExtra::StateWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
+    (RunExtra::OptionFromHere, "  option klu", "  option klu whole_run"),
+    (RunExtra::OptionWholeRun, "  option klu whole_run", "  option klu"),
+    (RunExtra::EnvFromHere, "  env temp=1", "  env temp=1 whole_run"),
+    (RunExtra::EnvWholeRun, "  env temp=1 whole_run", "  env temp=1"),
+    (RunExtra::NodeSetFromHere, S, "  nodeset ic transient node=(a) value=1 whole_run"),
+    (RunExtra::NodeSetWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
     (RunExtra::DcAxisNamed, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1", D),
     (RunExtra::LoopNamed, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op", L),
     (RunExtra::SweepBodyNotOne, "  loop sweep (temp) (list values=[1])\n    option klu\n    analysis op", "  loop sweep (temp) (list values=[1])\n    comment \"c\"\n    loop sweep (param p) (list values=[1])\n      analysis op"),
@@ -242,8 +249,8 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Option(OptionKey::Klu))
         .with(Feature::Run(RunExtra::TranCapNone))
         .with(Feature::Run(RunExtra::TranUic))
-        .with(Feature::Run(RunExtra::WholeRunMidRun))
-        .with(Feature::Run(RunExtra::StateFromHere))
+        .with(Feature::Run(RunExtra::SaveWholeRunMidRun))
+        .with(Feature::Run(RunExtra::OptionFromHere))
         .with(Feature::Run(RunExtra::SaveWholeRun));
     assert_eq!(ours, want.iter().collect::<Vec<_>>());
 }
@@ -260,7 +267,7 @@ fn listed_order_reads_an_include_in_place() {
         let mut diags = Diags::new();
         parse(&text, &mut d.builder(), &mut diags);
         assert!(diags.is_empty(), "{text}: {:?}", diags.rows());
-        features_used(&d).contains(Feature::Run(RunExtra::WholeRunMidRun))
+        features_used(&d).contains(Feature::Run(RunExtra::OptionWholeRunMidRun))
     };
     assert!(used("  analysis op\n  include \"lib.sp\""));
     assert!(!used("  include \"lib.sp\"\n  analysis op"));

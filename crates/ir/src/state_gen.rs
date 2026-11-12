@@ -62,7 +62,7 @@ pub(crate) fn gen_holds(
     let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
     let modes: Vec<Applies> = [
         (Applies::FromHere, mid),
-        (Applies::WholeRun, RunExtra::WholeRunMidRun),
+        (Applies::WholeRun, RunExtra::OptionWholeRunMidRun),
     ]
     .into_iter()
     .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode(m)))
