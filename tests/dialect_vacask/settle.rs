@@ -508,3 +508,23 @@ fn ca_a_call_of_another_argument_count_is_rejected() {
         "Function 'atan2' requires at least 2 argument(s))."
     ));
 }
+
+#[test]
+fn which_a_subckt_default_is_bound_where_its_definition_stands() {
+    // which1: `u` is 2k at the top and 8k in the wrapper holding the instance; the device sees
+    // the top's (lexical, R62/A37), not the wrapper's.
+    let r = run("vacask", "which1.sim");
+    let got: Vec<f64> = resistances(&r).into_iter().map(|x| x.1).collect();
+    assert_eq!(got, [2000.0], "{}", r.out);
+    // which2: a sibling declared later, on the same line or a later one, is found.
+    for deck in ["which2a.sim", "which2b.sim"] {
+        let r = run("vacask", deck);
+        let got: Vec<f64> = resistances(&r).into_iter().map(|x| x.1).collect();
+        assert_eq!(got, [3000.0], "{deck}: {}", r.out);
+    }
+    // which3: a name only the instance's enclosing subckt has is not looked up there.
+    assert!(says(
+        &run("vacask", "which3.sim"),
+        "Variable or constant 'u' not defined."
+    ));
+}
