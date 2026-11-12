@@ -36,11 +36,6 @@ const SIZE: Size = Size {
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "l3",
-        "vacask",
-        "seeds 0..8 admit none: generated DeviceLibrary rows name families VACASK has no file for (W2002; Feature::Family is not set for DeviceLibrary) and loads whose path extension does not state the kind (W2004)",
-    ),
-    (
         "l5",
         "vacask",
         "seed 31: a formal default reading $tnom is dependent in VACASK (run c3) and reads back as a local; FormalNotConstant counts Temp but not Tnom",
@@ -212,7 +207,7 @@ fn l7_legalized_designs_use_only_the_writers_features() {
     let all = dialect::irtext::IrText.features();
     laws("l7", |_row, writer| {
         for f in all.minus(*writer.features()).iter() {
-            let removed = spicerack::passes::PASSES.iter().any(|p| p.removes == f);
+            let removed = spicerack::passes::all().any(|p| p.removes == f);
             if !removed {
                 return Err(format!("lacks {f:?}: no pass removes it, and no citation"));
             }

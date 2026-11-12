@@ -14,12 +14,12 @@ use spicerack_ir::measure::{MeasureParam, MeasureWhen};
 use spicerack_ir::periodic::{FreqAxis, Hb, HbTruncate, Pac, Pss, PssMode};
 use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
-use spicerack_ir::tran::{StepCap, Tran};
+use spicerack_ir::tran::{Four, StepCap, Tran};
 use spicerack_ir::{
-    Alter, Analysis, AnalysisKind, Applies, Builder, Design, Diags, Edge, Elaborate, Env, Event,
-    ExprId, IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId, NodeSet,
-    NodeSetKind, OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId, ScopeKind, Span,
-    Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
+    Alter, Analysis, AnalysisKind, AnalysisKinds, Applies, Builder, Design, Diags, Edge, Elaborate,
+    Env, Event, ExprId, IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId,
+    NodeSet, NodeSetKind, OptionKey, OptionRow, Probe, ProbeKind, Ref, Role, Save, ScopeId,
+    ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist, Violation, check,
 };
 
 type Fixture = (&'static str, Violation, fn(&mut Builder<'_>, ScopeId));
@@ -74,7 +74,7 @@ const BROKEN: &[Fixture] = &[
     ("driven pss with an oscillator node", Violation::FieldDomain, |b, s| {
         let (f, t) = (b.num(1e6), b.num(1e-6));
         let osc_p = b.name("out");
-        let row = Pss { mode: PssMode::Driven, uic: false, fundamental: f, tstab: t, harmonics: NO, points: NO, osc_p, osc_n: NameId::NONE };
+        let row = Pss { mode: PssMode::Driven, uic: false, fundamental: f, tstab: t, harmonics: NO, points: NO, osc_p, osc_n: NameId::NONE, sc_iter: NO, steady_coeff: NO };
         raw(b, s, AnalysisKind::Pss, row);
     }),
     ("absolute pac with a relative harmonic", Violation::FieldDomain, |b, s| {
@@ -101,11 +101,15 @@ const BROKEN: &[Fixture] = &[
         save(b, s, p);
     }),
     ("save of nothing", Violation::FieldDomain, |b, s| {
-        b.push(s, Save { analysis: AnalysisKind::Op, every_analysis: true, probes: List::EMPTY }, Span::NONE);
+        b.push(s, Save { analyses: AnalysisKinds::ALL, probes: List::EMPTY }, Span::NONE);
+    }),
+    ("save for no analysis", Violation::FieldDomain, |b, s| {
+        let probes = b.probes(&[Probe::category(ProbeKind::AllV)]);
+        b.push(s, Save { analyses: AnalysisKinds::EMPTY, probes }, Span::NONE);
     }),
     ("save list past its pool", Violation::HandleRange, |b, s| {
         let probes = List { start: 0, len: 4, pool: Default::default() };
-        b.push(s, Save { analysis: AnalysisKind::Op, every_analysis: true, probes }, Span::NONE);
+        b.push(s, Save { analyses: AnalysisKinds::ALL, probes }, Span::NONE);
     }),
     ("table loop with a partial row", Violation::FieldDomain, |b, s| {
         let columns = b.targets(&[Target::TEMP, Target::TEMP]);
@@ -185,6 +189,12 @@ const BROKEN: &[Fixture] = &[
         let process = b.varies(&[Vary { param: p, dist: VaryDist::Gauss, percent: false, mean: NO, spread: NO }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
     }),
+    ("fourier with no count and no nfreqs option", Violation::FieldDomain, |b, s| {
+        let (f, p) = (b.num(1e3), b.num(1.0));
+        let o = [b.probe_v(&["out"])];
+        let outputs = b.probes(&o);
+        raw(b, s, AnalysisKind::Four, Four { fundamental: f, harmonics: NO, periods: p, grid: NO, outputs });
+    }),
     ("elaborate of no circuit", Violation::FieldDomain, |b, s| {
         b.push(s, Elaborate { circuits: List::EMPTY }, Span::NONE);
     }),
@@ -246,6 +256,8 @@ fn pss(b: &mut Builder<'_>, s: ScopeId) {
         points: NO,
         osc_p: NameId::NONE,
         osc_n: NameId::NONE,
+        sc_iter: NO,
+        steady_coeff: NO,
     };
     b.analysis(s, None, row, Span::NONE);
 }
@@ -281,8 +293,7 @@ fn save(b: &mut Builder<'_>, s: ScopeId, p: Probe) {
     b.push(
         s,
         Save {
-            analysis: AnalysisKind::Op,
-            every_analysis: true,
+            analyses: AnalysisKinds::ALL,
             probes,
         },
         Span::NONE,
@@ -356,7 +367,7 @@ fn a_valid_run_reports_nothing() {
             Span::NONE,
         );
         let p = b.probe_v(&["out"]);
-        b.save(s, None, &[p], Span::NONE);
+        b.save(s, AnalysisKinds::ALL, &[p], Span::NONE);
         let half = b.num(0.5);
         let at = Event::cross(p, Edge::Rise, half, one);
         b.measure(
@@ -376,6 +387,19 @@ fn a_valid_run_reports_nothing() {
         }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
         b.elaborate(s, &["top2"], Span::NONE);
+        let ten = b.num(10.0);
+        b.option(s, OptionKey::NFreqs, ten, Span::NONE);
+        let (f, p) = (b.num(1e3), b.num(1.0));
+        let o = [b.probe_v(&["out"])];
+        let outputs = b.probes(&o);
+        let four = Four {
+            fundamental: f,
+            harmonics: NO,
+            periods: p,
+            grid: NO,
+            outputs,
+        };
+        b.analysis(body, None, four, Span::NONE);
     });
     assert!(got.is_empty(), "{got:?}");
 }

@@ -5,7 +5,9 @@
 //!
 //! Areas (one owner per file, `rewrite/S4-AREAS.md`): numbers (`number.rs`), names
 //! (`name.rs`), expressions (`expr_read.rs`, `expr_write.rs`), structure (`read_structure.rs`,
-//! `write_structure.rs`), devices and models (S4.1), sources (S4.2), the control block (S4.3).
+//! `write_structure.rs`), master binding (`bind.rs`), the dc-plus-`type`-alter fold shared by
+//! sources and run (`fold.rs`, R42), devices and models (S4.1), sources (S4.2), the control
+//! block (S4.3).
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §1–§4, §7; `REWRITE-PLAN.md` §4.1, §4.3.
 //!
@@ -17,6 +19,7 @@ mod codes;
 mod expr_read;
 mod expr_write;
 mod families;
+mod fold;
 mod name;
 mod number;
 mod read;
@@ -78,6 +81,8 @@ impl Write for Vacask {
     /// writer area's `admits`).
     fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
         write_structure::admits(design, diags);
+        expr_write::admits(design, diags);
+        fold::admits(design, diags);
         write_elements::admits(design, diags);
         write_models::admits(design, diags);
         write_sources::admits(design, diags);

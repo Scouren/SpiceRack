@@ -105,7 +105,9 @@ fn vacask(deck: &str) -> (String, Vec<(String, Vec<u8>)>, bool) {
         })
         .collect();
     raws.sort();
-    let error = printed.contains(") in ");
+    // A parse or elaboration error has a location line; a run-time one names the analysis.
+    let error = printed.contains(") in ")
+        || (printed.contains("Analysis '") && printed.contains("' aborted."));
     (messages(&printed), raws, error)
 }
 

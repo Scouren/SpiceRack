@@ -34,11 +34,13 @@ use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::List;
 use crate::id::{ExprId, ExprList, ScopeId};
+use crate::option_key::OptionKey;
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
 use crate::probe::{
     ProbeList, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
 };
+use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -109,12 +111,16 @@ pub enum StepCap {
 pub struct Four {
     /// The fundamental frequency, Hz; never `NONE`.
     pub fundamental: ExprId,
-    /// The number of harmonics, the fundamental included (ngspice `.options nfreqs=`, LTspice
-    /// `Nh`, default 9); never `NONE`: a reader fills its default.
+    /// The number of harmonics, the fundamental included and the DC term not (LTspice `Nh`), or
+    /// `NONE` when the deck's `OptionKey::NFreqs` gives it (ngspice, `fourier.c:69`, A16;
+    /// checked: such an option exists). `nfreqs` counts the DC term too: `nfreqs = n` is
+    /// `harmonics = n − 1`. A reader states its simulator's default count here
+    /// when the deck sets no option.
     pub harmonics: ExprId,
     /// How many periods at the end are analysed (LTspice `Np`, default 1); never `NONE`.
     pub periods: ExprId,
-    /// The interpolation grid's size (ngspice `fourgridsize`), or `NONE` for the simulator's.
+    /// The interpolation grid's size, or `NONE` for the simulator's (or the deck's
+    /// `OptionKey::FourGridSize`).
     pub grid: ExprId,
     /// The outputs analysed, at least one.
     pub outputs: ProbeList,
@@ -150,6 +156,22 @@ impl DetailFacts for Tran {
             out.push(Handle::Expr(e));
         }
         out.push(Handle::Exprs(self.segments));
+    }
+
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        for e in [
+            &mut self.stop,
+            &mut self.record_start,
+            &mut self.print_step,
+            &mut self.max_step,
+            &mut self.initial_step,
+            &mut self.noise_fmax,
+            &mut self.noise_fmin,
+            &mut self.noise_seed,
+        ] {
+            r.expr(e);
+        }
+        r.exprs(self.segments);
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
@@ -297,9 +319,22 @@ impl DetailFacts for Four {
         }
     }
 
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        for e in [
+            &mut self.fundamental,
+            &mut self.harmonics,
+            &mut self.periods,
+            &mut self.grid,
+        ] {
+            r.expr(e);
+        }
+        r.probes(self.outputs);
+    }
+
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(set, !is_one(design, self.periods), RunExtra::FourPeriods);
         flag(set, !self.grid.is_none(), RunExtra::FourGrid);
+        flag(set, self.harmonics.is_none(), RunExtra::FourHarmonicsOption);
         for p in get(&design.run.probes, self.outputs).unwrap_or(&[]) {
             probe_features(p, set);
         }
@@ -309,10 +344,15 @@ impl DetailFacts for Four {
         let Some(outputs) = get(&design.run.probes, self.outputs) else {
             return Some(Violation::HandleRange);
         };
-        let given = [self.fundamental, self.harmonics, self.periods]
-            .iter()
-            .all(|e| !e.is_none());
-        domain_unless(given && !outputs.is_empty() && outputs.iter().all(probe_valid))
+        let given = !self.fundamental.is_none() && !self.periods.is_none();
+        // An absent count is the deck's `nfreqs`: the design must set one (O(options)).
+        let count = !self.harmonics.is_none()
+            || design
+                .options
+                .rows()
+                .iter()
+                .any(|o| o.key == OptionKey::NFreqs);
+        domain_unless(given && count && !outputs.is_empty() && outputs.iter().all(probe_valid))
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -357,7 +397,20 @@ impl DetailFacts for Four {
         features: &FeatureSet,
     ) -> Option<Self> {
         let fundamental = g.expr(b, features, Reads::Constant);
-        let harmonics = g.expr(b, features, Reads::Constant);
+        // The count from the deck's option only when one is already there (looked for among
+        // the last few options: O(1) per row).
+        let options = b.design().options.rows();
+        let from_option = has(features, RunExtra::FourHarmonicsOption)
+            && options
+                .iter()
+                .rev()
+                .take(16)
+                .any(|o| o.key == OptionKey::NFreqs);
+        let harmonics = if from_option {
+            ExprId::NONE
+        } else {
+            g.expr(b, features, Reads::Constant)
+        };
         let periods = if has(features, RunExtra::FourPeriods) && g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {

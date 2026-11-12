@@ -34,12 +34,12 @@
 //! - kernel: `Design`, `ItemRow`, `DetailRow`, `Builder`, `Editor`, the handles of `id` (`NameId`, `FileId`,
 //!   `ScopeId`, `ExprId`, `DefId`, `TextId`, `NumId`, `ItemRef`, `Ref`, `List` and its aliases),
 //!   `Span`, `Table`, the kernel enums of `item` and `expr`, `Literal`, `NumForm`, `RowFacts`,
-//!   `Handle`, `Feature`, `FeatureSet`, `Extra`, `features_used`, `link`, `check`,
+//!   `Handle`, `ExprUse`, `Feature`, `FeatureSet`, `Extra`, `features_used`, `link`, `rewrite_exprs`, `check`,
 //!   `check_legal`, `Violation`, the diagnostic rows of `diag`, `eval`, `Bindings`, `Domain`,
 //!   `dump`, `parse`
 //! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
 //!   `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
-//! - run owner: `Analysis`, `AnalysisKind`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
+//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
 //!   `EventKind`, `MeasureKind`, `Stat`, `Env`, `IcScope`, `NodeSet`, `NodeSetKind`,
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
@@ -70,10 +70,12 @@ mod gen_rows;
 pub mod id;
 pub mod item;
 pub mod item_facts;
+mod item_facts_defs;
 pub mod item_text;
 pub mod link;
 pub mod literal;
 pub mod names;
+pub mod rewrite;
 pub mod scope;
 pub mod span;
 pub mod table;
@@ -92,6 +94,7 @@ mod circuit_fields;
 #[cfg(any(test, feature = "gen"))]
 mod circuit_gen;
 mod circuit_parse;
+mod circuit_tables;
 mod circuit_text;
 pub mod controlled;
 pub mod element;
@@ -131,6 +134,7 @@ mod periodic_ss_facts;
 pub mod plan;
 mod plan_facts;
 pub mod probe;
+mod run_exprs;
 pub mod run_extra;
 mod run_words;
 mod state_order;
@@ -138,7 +142,7 @@ pub mod stats;
 pub mod sweep;
 pub mod tran;
 
-pub use analysis::{Analysis, AnalysisKind, RunDetail, RunDetails};
+pub use analysis::{Analysis, AnalysisKind, AnalysisKinds, RunDetail, RunDetails};
 pub use build::Builder;
 pub use check::{Violation, check, check_legal};
 pub use class::{ExprClass, expr_class};
@@ -147,7 +151,7 @@ pub use diag::{Code, Diag, Diags, Info, Kind};
 pub use edit::Editor;
 pub use eval::{Bindings, Domain, Value, eval, eval_typed};
 pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
-pub use facts::{Handle, RowFacts};
+pub use facts::{ExprUse, Handle, RowFacts};
 pub use feature::{Extra, Feature, FeatureSet, features_used};
 pub use id::{
     BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, NumId, ParamList,
@@ -163,6 +167,7 @@ pub use plan::{
     Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
 };
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
+pub use rewrite::rewrite_exprs;
 pub use run_extra::RunExtra;
 pub use span::Span;
 pub use stats::{Statistics, Vary, VaryDist};

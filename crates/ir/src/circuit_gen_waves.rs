@@ -48,7 +48,12 @@ impl R<'_, '_> {
                     }
                     && (!matches!(
                         k,
-                        WaveKind::Pulse | WaveKind::Sin | WaveKind::Exp | WaveKind::Sffm
+                        WaveKind::Pulse
+                            | WaveKind::Sin
+                            | WaveKind::Exp
+                            | WaveKind::Sffm
+                            | WaveKind::Am
+                            | WaveKind::TrRandom
                     ) || self.has(X::GivenZeroAsGiven)
                         || self.has(X::GivenZeroSpiceDefault))
                     && (self.has(X::DcGivenWithWave) || self.has(dc_at_zero(k)))
@@ -69,7 +74,8 @@ impl R<'_, '_> {
                     (PulseLaw::Vacask, Some(X::PulseVacask)),
                 ]);
                 let given_zero = self.zero_rule();
-                let [v1, v2, delay]: [ExprId; 3] = std::array::from_fn(|_| self.ex());
+                let [v1, v2]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
+                let delay = self.defaulted(given_zero);
                 // VACASK requires `rise > 0`: a positive literal
                 let rise = if law == PulseLaw::Vacask {
                     let mantissa = 1 + i64::from(self.g.below(999));
@@ -103,7 +109,8 @@ impl R<'_, '_> {
                 let given_zero = self.zero_rule();
                 let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
                 let freq = self.defaulted(given_zero);
-                let [delay, damping, phase_deg]: [ExprId; 3] = std::array::from_fn(|_| self.ex());
+                let [delay, damping, phase_deg]: [ExprId; 3] =
+                    std::array::from_fn(|_| self.defaulted(given_zero));
                 let cycles = self.opt(X::SinCycles);
                 let tone = self.maybe(X::SinSecondTone);
                 let amplitude2 = if tone { self.ex() } else { N };
@@ -156,7 +163,7 @@ impl R<'_, '_> {
                 let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
                 let carrier_freq = self.defaulted(given_zero);
                 let [mod_index, signal_freq, delay, phase_c_deg, phase_m_deg]: [ExprId; 5] =
-                    std::array::from_fn(|_| self.ex());
+                    std::array::from_fn(|_| self.defaulted(given_zero));
                 self.b.wave(Sffm {
                     offset,
                     amplitude,
@@ -178,17 +185,17 @@ impl R<'_, '_> {
                 } else {
                     AmModTime::Delay
                 };
+                let given_zero = self.zero_rule();
+                let [offset, amplitude, mod_offset]: [ExprId; 3] =
+                    std::array::from_fn(|_| self.ex());
                 let [
-                    offset,
-                    amplitude,
-                    mod_offset,
                     mod_index,
                     mod_freq,
                     carrier_freq,
                     delay,
                     phase_m_deg,
                     phase_c_deg,
-                ]: [ExprId; 9] = std::array::from_fn(|_| self.ex());
+                ]: [ExprId; 6] = std::array::from_fn(|_| self.defaulted(given_zero));
                 self.b.wave(Am {
                     offset,
                     amplitude,
@@ -201,6 +208,7 @@ impl R<'_, '_> {
                     phase_c_deg,
                     mod_time,
                     pre,
+                    given_zero,
                 })
             }
             WaveKind::TrNoise => {
@@ -218,7 +226,9 @@ impl R<'_, '_> {
                 })
             }
             WaveKind::TrRandom => {
-                let [ts, td, p1, p2]: [ExprId; 4] = std::array::from_fn(|_| self.ex());
+                let given_zero = self.zero_rule();
+                let ts = self.ex();
+                let [td, p1, p2]: [ExprId; 3] = std::array::from_fn(|_| self.defaulted(given_zero));
                 let kind = TrRandomKind::ALL[self.g.below(4) as usize];
                 self.b.wave(TrRandom {
                     ts,
@@ -226,6 +236,7 @@ impl R<'_, '_> {
                     p1,
                     p2,
                     kind,
+                    given_zero,
                 })
             }
             WaveKind::Pattern => {

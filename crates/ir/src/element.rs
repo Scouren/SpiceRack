@@ -36,7 +36,7 @@ use crate::check::Violation;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
@@ -147,8 +147,9 @@ pub enum ElemKind {
     /// Current-controlled switch (D30). Terminals (p, n), exactly 2. `Model` master required.
     /// Detail `Switch` (`sense` the sensing element).
     ISwitch,
-    /// Lossless transmission line (D31, D84, D73). Terminals (a+, a−, b+, b−), exactly 4. No
-    /// master. Detail `Line`.
+    /// Lossless transmission line (D31, D84, D73). Terminals (a+, a−, b+, b−), exactly 4.
+    /// Optional `Model` master of `ModelFamily::TlineIdeal` (VACASK `tline_ideal`, A20). Detail
+    /// `Line`.
     LosslessLine,
     /// Lossy line, LTRA (D32, D72). Terminals (a+, a−, b+, b−), exactly 4. `Model` master
     /// required. Detail `Line`.
@@ -237,7 +238,9 @@ pub struct Element {
     /// Its model or subcircuit master; `def` `NONE` when the card names none or it is
     /// unresolved. Expected definition kind: `ElemKind::master_kind`.
     pub model: Ref,
-    /// Instance parameters with no typed field, by the master's own names, in source order.
+    /// Instance parameters with no typed field, by the master's own names, in source order. On a
+    /// kind with a detail row, no key names one of the row's own fields (its IR name, `m` or
+    /// `mult`, `temp` where the row has `temp_abs`; A19).
     pub params: ParamList,
     /// Multiplicity: the element stands for `mult` copies in parallel (INV-semantics 6.01–6.03,
     /// 5.16; B10, D7, D127). Composes multiplicatively down the hierarchy. A reader lowers
@@ -547,7 +550,8 @@ impl ElemKind {
             | ElemKind::Vcvs
             | ElemKind::Vccs
             | ElemKind::Cccs
-            | ElemKind::Ccvs => Some(DefKind::Model),
+            | ElemKind::Ccvs
+            | ElemKind::LosslessLine => Some(DefKind::Model),
             ElemKind::ChargeCapacitor
             | ElemKind::FluxInductor
             | ElemKind::Port
@@ -557,7 +561,6 @@ impl ElemKind {
             | ElemKind::Laplace
             | ElemKind::FreqTable
             | ElemKind::Delay
-            | ElemKind::LosslessLine
             | ElemKind::Unresolved => None,
         }
     }
@@ -607,6 +610,19 @@ impl RowFacts for Element {
             f(&mut row.model, kind);
         }
         design.editor().set(at.index, row);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        crate::circuit_fields::element_map_exprs(design, at.index, f)
+    }
+
+    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
+        // `map_refs`'s order
+        if let Some(kind) = self.kind.master_kind()
+            && self.model.name != NameId::NONE
+        {
+            out.push((self.model, kind));
+        }
     }
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {

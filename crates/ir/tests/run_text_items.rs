@@ -18,10 +18,10 @@ use spicerack_ir::measure::{
 use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::{
-    AcPart, AnalysisKind, Applies, BinOp, Builder, Design, Diags, Edge, Env, Event, ExprId, FileId,
-    IcScope, List, Literal, LoopEnd, NodeSet, NodeSetKind, NumForm, OptionKey, OptionRow,
-    PrintView, Probe, Ref, Role, ScopeId, Span, Stat, Statistics, SweepSpec, Target, TargetKind,
-    Vary, VaryDist, dump, link, parse,
+    AcPart, AnalysisKind, AnalysisKinds, Applies, BinOp, Builder, Design, Diags, Edge, Env, Event,
+    ExprId, FileId, IcScope, List, Literal, LoopEnd, NodeSet, NodeSetKind, NumForm, OptionKey,
+    OptionRow, PrintView, Probe, Ref, Role, ScopeId, Span, Stat, Statistics, SweepSpec, Target,
+    TargetKind, Vary, VaryDist, dump, link, parse,
 };
 
 const NO: ExprId = ExprId::NONE;
@@ -232,6 +232,7 @@ fn loops_alters_and_state() {
 fn outputs_measures_and_statistics() {
     let text = "file \"t.sp\" deck
   save (v (out)) (i mag (v1))
+  save analysis=(op dc tran) (v (b))
   save analysis=tran (all_v) (all_branch_i) (i_terminal terminal=2 (m1)) (param (m1) (gm)) (power (r1)) (expr expr=(v(a) * 2))
   print hb hb_time (v (out))
   measure tdel tran trig_targ (cross rise (v (in)) value=0.5 count=1) (cross fall last (v (out)) value=0.5 delay=1n)
@@ -249,7 +250,10 @@ fn outputs_measures_and_statistics() {
             b.probe_v(&["out"]),
             b.probe_i(&["v1"]).with_part(AcPart::Mag),
         ];
-        b.save(top, None, &p, Span::NONE);
+        b.save(top, AnalysisKinds::ALL, &p, Span::NONE);
+        let vb = b.probe_v(&["b"]);
+        let some = AnalysisKinds::of(&[AnalysisKind::Op, AnalysisKind::Dc, AnalysisKind::Tran]);
+        b.save(top, some, &[vb], Span::NONE);
         let all = Probe::category(spicerack_ir::ProbeKind::AllV);
         let branches = Probe::category(spicerack_ir::ProbeKind::AllBranchI);
         let it = b.probe_terminal(&["m1"], 2);
@@ -261,7 +265,7 @@ fn outputs_measures_and_statistics() {
         let pe = b.probe_expr(x);
         b.save(
             top,
-            Some(AnalysisKind::Tran),
+            AnalysisKinds::of(&[AnalysisKind::Tran]),
             &[all, branches, it, pp, pw, pe],
             Span::NONE,
         );

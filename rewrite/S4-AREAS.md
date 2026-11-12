@@ -63,6 +63,52 @@ the ground names, the files loads and includes name, the parameter reads to bind
 | `read_outputs.rs` | `FEATURES`, `CODES`, `save` | `save` directives (read from tokens: the CST drops a probe's parentheses) → `Save`; `ic=`/`nodeset=` lists → `NodeSet` (`next_only`, differential pairs) |
 | `write_outputs.rs` | `save` | the inverse |
 
+## Shared between S4.2 and S4.3: dc plus `type` alters (R42; `fold.rs`, the integrator's)
+
+`DcRule::Given` with a wave is VACASK's `type="dc"` source carrying the wave's parameters, plus
+`type` alters between the analyses. Proof: settle `dcw.sim` against ngspice-45's `dcw.cir`
+(Appendix A run dcw).
+
+**Reader.** `fold::folds` walks every top-level `control` block before lowering; `Lower.folds`
+holds the verdicts.
+- `l.folds.of(name, top)` for a source (its whole name; `top`: it stands at a file's top):
+  - `Some(Fold::Given(word))`: `read_sources` reads `DcRule::Given`, `dc` from `dc=`, and the
+    wave `word` names (`pulse`, `sine`, `exp`, `pwl`, `am`) from the line's own parameters.
+  - `Some(Fold::Other)`: the source line is `Private` (code: `read_sources`' own).
+  - `None`: no `type` alter reaches it; a parameter its `type` does not read is dropped with
+    `read_sources`' note (P2203).
+- `l.folds.is_framing(l.cst, n)` for an `alter`: `true` means a `Given` fold consumed it; `read_run`
+  pushes no item for it (it is accounted for as framing, like a closer). Any other `alter` that
+  sets `type` (`Fold::Other` for a source it names) is `Private` in `read_run`, under the same
+  code as its source line; ask me for a shared code if you want one.
+- A fold holds exactly when:
+  - the source line is at a file's top and has `type="dc"` or no `type`;
+  - every `type` alter naming it stands directly in the block (not in `mc` or a loop), names
+    that one source and sets `type` alone;
+  - each alter is followed by an analysis before the next alter for the source, and that
+    analysis needs the switch: `type="<wave>"` before a transient, `type="dc"` before a DC-kind
+    analysis (op, dcinc, dcxf, ac, acxf, noise, acstb, acsp);
+  - every analysis sees its side: a DC-kind one sees dc, a `tran` the wave (the line starts at
+    dc), and the block has no other analysis kind;
+  - one wave word throughout, at least one transient, and no alter of it in another block.
+
+**Writer.** `fold::admits` refuses (W2007) a `Given` source with a wave unless:
+- it stands at the entry file's top;
+- every analysis stands at the entry file's top and is DC-kind (Op, Dc, Ac, Noise, DcXf, Xf,
+  Stb, Sp, DcInc) or `Tran`;
+- at least one analysis is a `Tran`;
+- the wave has a VACASK word (`fold::wave_word`).
+
+Text, exactly:
+- `write_sources`: `<name> (<p> <n>) <master> type="dc" dc=<dc> <the wave's parameters as for
+  type="<word>">` (`mag=`/`phase=` as usual).
+- `write_run`: `fold::given(design, top)` lists the sources in item order with their words.
+  Before each analysis whose side differs from a source's current state (the state starts at
+  dc), write one line per such source, in that order, after the previous analysis's line and
+  before this analysis's `sweep` lines: `alter instance("<name>") type="<word>"` before a
+  `tran`, `alter instance("<name>") type="dc"` before a DC-kind analysis. Nothing after the last
+  analysis.
+
 ## Known gaps in the shared harness (for the spine owner)
 
 - `tests/dialect_laws.rs` writes every file of a generated design and reads the concatenation as
