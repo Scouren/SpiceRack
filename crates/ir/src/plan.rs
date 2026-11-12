@@ -27,13 +27,34 @@
 //!   `pub const LOOP_DEPTH_MAX`; on each enum: `ALL`, `COUNT`
 //! - `Target::TEMP`, `TargetKind::def_kind(self) -> Option<DefKind>`,
 //!   `Design::targets(&self, TargetList) -> &[Target]`
-//! - `RowFacts` for `Loop` and `Alter` (`todo_facts!` placeholders, A2)
+//! - the run rows' target facts: `pub(crate) TargetKind::reads_b`,
+//!   `pub(crate) TargetKind::has_path`, `pub(crate) enum TargetUse`,
+//!   `pub(crate) fn target_handles`, `pub(crate) fn target_valid`,
+//!   `pub(crate) fn target_features`, `pub(crate) fn dump_target`, `pub(crate) fn parse_target`,
+//!   `pub(crate) fn gen_target`
+//! - (`RowFacts` for `Loop` and `Alter`, and the loop details' facts: `plan_facts.rs`)
+//!
+//! IR text of a target: `(kind [option] [a] [b] [path=(…)])`: `(temp)`, `(param r)`,
+//! `(subckt_param div r)`, `(source_dc v1)`, `(element_value r1)`,
+//! `(device_param r1 r path=(x1))`, `(model_param nch vth0)`, `(option rel_tol)`,
+//! `(option private tran_rmax vacask)`.
 
+use crate::build::Builder;
 use crate::design::Design;
+use crate::diag::Diags;
+use crate::facts::Handle;
+use crate::feature::{Feature, FeatureSet};
+#[cfg(any(test, feature = "gen"))]
+use crate::r#gen::Gen;
 use crate::id::{DefId, ExprId, ExprList, List, NameId, NameList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::option_key::OptionKey;
+use crate::run_extra::RunExtra;
+use crate::run_words::{
+    close, get, open, put_name, put_names, put_ref, put_word, take_enum, take_names, word,
+};
 use crate::sweep::SweepSpec;
+use crate::text::Words;
 
 /// A loop: its body runs once per value of a sweep, row of a table, or Monte Carlo sample.
 /// Opens a `ScopeKind::Loop` scope holding run items only (analyses, alters, loops, state and
@@ -202,6 +223,17 @@ pub enum TargetKind {
 /// pool.
 pub type TargetList = List<Target>;
 
+/// Which item a target belongs to: it picks the `RunExtra` family of the target's kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TargetUse {
+    /// A DC sweep axis (`DcAxis*`; a source's DC value is the plain DC sweep).
+    Dc,
+    /// A loop (`Loop*`).
+    Loop,
+    /// An alter (`Alter*`).
+    Alter,
+}
+
 /// Deepest loop nest a design may hold (checked); the corpus nests at most 3
 /// (`DESIGN-control-epochs.md` §2).
 pub const LOOP_DEPTH_MAX: usize = 8;
@@ -245,7 +277,32 @@ impl TargetKind {
     /// The definition kind `Target::a` refers to (`Param`, `Subckt`, `Model`), or `None` when
     /// `a` is no reference (the linker leaves it alone).
     pub const fn def_kind(self) -> Option<DefKind> {
-        todo!()
+        match self {
+            TargetKind::Param => Some(DefKind::Param),
+            TargetKind::SubcktParam => Some(DefKind::Subckt),
+            TargetKind::ModelParam => Some(DefKind::Model),
+            TargetKind::Temp
+            | TargetKind::SourceDc
+            | TargetKind::ElementValue
+            | TargetKind::DeviceParam
+            | TargetKind::Option => None,
+        }
+    }
+
+    /// Whether `Target::b` names a parameter for this kind.
+    pub(crate) const fn reads_b(self) -> bool {
+        matches!(
+            self,
+            TargetKind::SubcktParam | TargetKind::DeviceParam | TargetKind::ModelParam
+        )
+    }
+
+    /// Whether `Target::path` may be non-empty for this kind.
+    pub(crate) const fn has_path(self) -> bool {
+        matches!(
+            self,
+            TargetKind::SourceDc | TargetKind::ElementValue | TargetKind::DeviceParam
+        )
     }
 }
 
@@ -280,10 +337,192 @@ impl Sampler {
 impl Design {
     /// The targets of a list. Asserts the range is inside the target pool.
     pub fn targets(&self, list: TargetList) -> &[Target] {
-        todo!()
+        get(&self.run.targets, list).expect("a target list inside the target pool")
     }
 }
 
-// run: implementation phase — replace each line with the row's `impl RowFacts` (IR-KERNEL A2)
-todo_facts!(Loop);
-todo_facts!(Alter);
+/// Appends a target's handles: `a` as a reference when its kind names a definition, else as a
+/// name; `b`; `path`.
+pub(crate) fn target_handles(t: &Target, out: &mut Vec<Handle>) {
+    if t.kind.def_kind().is_some() {
+        out.push(Handle::Ref(t.a));
+    } else {
+        out.push(Handle::Name(t.a.name));
+    }
+    out.extend([Handle::Name(t.b), Handle::Names(t.path)]);
+}
+
+/// Whether the target holds exactly the fields its kind reads (the `Target` doc; `option` is
+/// `Private` for every kind but `Option`).
+pub(crate) fn target_valid(t: &Target) -> bool {
+    let a = !t.a.name.is_none();
+    let b = !t.b.is_none();
+    let path_ok = t.path.len == 0 || t.kind.has_path();
+    let element_ref = t.kind.def_kind().is_some() || t.a.def.is_none();
+    let fields = match t.kind {
+        TargetKind::Temp => !a && !b,
+        TargetKind::Param | TargetKind::SourceDc | TargetKind::ElementValue => a && !b,
+        TargetKind::SubcktParam | TargetKind::DeviceParam | TargetKind::ModelParam => a && b,
+        TargetKind::Option => {
+            if t.option == OptionKey::Private {
+                a && b
+            } else {
+                !a && !b
+            }
+        }
+    };
+    let option_ok = t.kind == TargetKind::Option || t.option == OptionKey::Private;
+    fields && path_ok && element_ref && option_ok
+}
+
+/// Adds the target's features for its use: the use's family member of its kind, an option
+/// target's key, `TargetInInstance`.
+pub(crate) fn target_features(t: &Target, used: TargetUse, set: &mut FeatureSet) {
+    use RunExtra as X;
+    use TargetKind as K;
+    let x = match (used, t.kind) {
+        (TargetUse::Dc, K::SourceDc) => None,
+        (TargetUse::Dc, K::Temp) => Some(X::DcAxisTemp),
+        (TargetUse::Dc, K::Param) => Some(X::DcAxisParam),
+        (TargetUse::Dc, K::SubcktParam) => Some(X::DcAxisSubcktParam),
+        (TargetUse::Dc, K::ElementValue) => Some(X::DcAxisElementValue),
+        (TargetUse::Dc, K::DeviceParam) => Some(X::DcAxisDeviceParam),
+        (TargetUse::Dc, K::ModelParam) => Some(X::DcAxisModelParam),
+        (TargetUse::Dc, K::Option) => Some(X::DcAxisOption),
+        (TargetUse::Loop, K::Temp) => Some(X::LoopTemp),
+        (TargetUse::Loop, K::Param) => Some(X::LoopParam),
+        (TargetUse::Loop, K::SubcktParam) => Some(X::LoopSubcktParam),
+        (TargetUse::Loop, K::SourceDc) => Some(X::LoopSourceDc),
+        (TargetUse::Loop, K::ElementValue) => Some(X::LoopElementValue),
+        (TargetUse::Loop, K::DeviceParam) => Some(X::LoopDeviceParam),
+        (TargetUse::Loop, K::ModelParam) => Some(X::LoopModelParam),
+        (TargetUse::Loop, K::Option) => Some(X::LoopOption),
+        (TargetUse::Alter, K::Temp) => Some(X::AlterTemp),
+        (TargetUse::Alter, K::Param) => Some(X::AlterParam),
+        (TargetUse::Alter, K::SubcktParam) => Some(X::AlterSubcktParam),
+        (TargetUse::Alter, K::SourceDc) => Some(X::AlterSourceDc),
+        (TargetUse::Alter, K::ElementValue) => Some(X::AlterElementValue),
+        (TargetUse::Alter, K::DeviceParam) => Some(X::AlterDeviceParam),
+        (TargetUse::Alter, K::ModelParam) => Some(X::AlterModelParam),
+        (TargetUse::Alter, K::Option) => Some(X::AlterOption),
+    };
+    if let Some(x) = x {
+        *set = set.with(Feature::Run(x));
+    }
+    if t.kind == K::Option {
+        *set = set.with(Feature::Option(t.option));
+    }
+    if t.path.len > 0 {
+        *set = set.with(Feature::Run(X::TargetInInstance));
+    }
+}
+
+/// Appends ` (kind …)`.
+pub(crate) fn dump_target(design: &Design, t: &Target, out: &mut String) {
+    out.push_str(" (");
+    out.push_str(&word(t.kind));
+    if t.kind == TargetKind::Option {
+        put_word(out, &word(t.option));
+    }
+    if !t.a.name.is_none() {
+        put_ref(out, design, t.a);
+    }
+    put_name(out, design, "", t.b);
+    put_names(out, design, "path", t.path);
+    out.push(')');
+}
+
+/// Reads `(kind …)`; `None` after a report when it is not one.
+pub(crate) fn parse_target(
+    words: &mut Words<'_>,
+    b: &mut Builder<'_>,
+    diags: &mut Diags,
+) -> Option<Target> {
+    if !open(words, diags) {
+        return None;
+    }
+    let kind = take_enum(words, &TargetKind::ALL, diags)?;
+    let mut t = Target {
+        kind,
+        ..Target::TEMP
+    };
+    let mut reads_a = !matches!(kind, TargetKind::Temp | TargetKind::Option);
+    let mut reads_b = kind.reads_b();
+    if kind == TargetKind::Option {
+        t.option = take_enum(words, &OptionKey::ALL, diags)?;
+        reads_a = t.option == OptionKey::Private;
+        reads_b = reads_a;
+    }
+    if reads_a {
+        t.a = if kind.def_kind().is_some() {
+            words.reference(b, diags)
+        } else {
+            Ref::unresolved(words.name(b, diags))
+        };
+    }
+    if reads_b {
+        t.b = words.name(b, diags);
+    }
+    t.path = take_names(words, "path", b, diags);
+    close(words, diags).then_some(t)
+}
+
+/// A random valid target for `used` whose features are all in `features`, or `None` when the
+/// set allows none. Names are fresh; references are left unresolved.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_target(
+    g: &mut Gen,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+    used: TargetUse,
+) -> Option<Target> {
+    let keys: Vec<OptionKey> = OptionKey::ALL
+        .into_iter()
+        .filter(|&k| features.contains(Feature::Option(k)))
+        .collect();
+    let allowed: Vec<TargetKind> = TargetKind::ALL
+        .into_iter()
+        .filter(|&k| {
+            let mut one = FeatureSet::EMPTY;
+            target_features(
+                &Target {
+                    kind: k,
+                    ..Target::TEMP
+                },
+                used,
+                &mut one,
+            );
+            let ok = one
+                .iter()
+                .all(|f| matches!(f, Feature::Option(_)) || features.contains(f));
+            ok && (k != TargetKind::Option || !keys.is_empty())
+        })
+        .collect();
+    if allowed.is_empty() {
+        return None;
+    }
+    let kind = allowed[g.below(allowed.len() as u32) as usize];
+    let mut t = Target {
+        kind,
+        ..Target::TEMP
+    };
+    if kind == TargetKind::Option {
+        t.option = keys[g.below(keys.len() as u32) as usize];
+        if t.option == OptionKey::Private {
+            t.a = Ref::unresolved(g.fresh_name(b));
+            t.b = g.fresh_name(b);
+        }
+    } else if kind != TargetKind::Temp {
+        t.a = Ref::unresolved(g.fresh_name(b));
+        if kind.reads_b() {
+            t.b = g.fresh_name(b);
+        }
+    }
+    if kind.has_path() && features.contains(Feature::Run(RunExtra::TargetInInstance)) && g.chance(3)
+    {
+        let x = g.fresh_name(b);
+        t.path = b.name_ids(&[x]);
+    }
+    debug_assert!(target_valid(&t));
+    Some(t)
+}

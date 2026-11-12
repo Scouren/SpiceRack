@@ -19,10 +19,30 @@
 //!
 //! Contents: `pub struct Probe`, `pub enum ProbeKind`, `pub enum AcPart`, `pub type ProbeList`;
 //! on each enum: `ALL`, `COUNT`; `Probe::category(ProbeKind) -> Probe`,
-//! `Probe::with_part(self, AcPart) -> Probe`, `Design::probes(&self, ProbeList) -> &[Probe]`
+//! `Probe::with_part(self, AcPart) -> Probe`, `pub(crate) ProbeKind::is_category`,
+//! `Design::probes(&self, ProbeList) -> &[Probe]`
+//! - the run rows' probe facts: `pub(crate) fn probe_handles`, `pub(crate) fn probe_valid`,
+//!   `pub(crate) fn probe_features`, `pub(crate) fn dump_probe`, `pub(crate) fn parse_probe`,
+//!   `pub(crate) fn gen_probe`
+//!
+//! IR text: `(kind [part] [terminal=k] [(a …)] [(b …)] [expr=v])`, e.g. `(v (x1 out))`,
+//! `(vdiff (a) (b))`, `(i mag (v1))`, `(i_terminal terminal=2 (m1))`, `(param (m1) (gm))`,
+//! `(expr expr=(v(a) * 2))`, `(all_v)`.
 
+use crate::build::Builder;
 use crate::design::Design;
-use crate::id::{ExprId, List, NameList};
+use crate::diag::Diags;
+use crate::facts::Handle;
+use crate::feature::{Feature, FeatureSet};
+#[cfg(any(test, feature = "gen"))]
+use crate::r#gen::{Gen, Reads};
+use crate::id::{ExprId, List, NameList, ScopeId};
+use crate::run_extra::RunExtra;
+use crate::run_words::{
+    close, get, member, open, put_expr, put_names, put_word, take_enum, take_expr, take_key,
+    take_names, word,
+};
+use crate::text::Words;
 
 /// One output quantity. `a`, `b`, `terminal` and `expr` are read per [`ProbeKind`]; every field
 /// a kind does not read is empty, `u8::MAX` or `NONE` (checked).
@@ -115,12 +135,20 @@ impl Probe {
     /// A category probe (`AllV`, `AllVTop`, `AllSourceI`, `AllI`, `AllPinI`, `OutputNoise`,
     /// `InputNoise`): no path, no expression. Asserts `kind` is one of those.
     pub const fn category(kind: ProbeKind) -> Probe {
-        todo!()
+        assert!(kind.is_category(), "Probe::category takes a category kind");
+        Probe {
+            kind,
+            part: AcPart::None,
+            terminal: u8::MAX,
+            a: List::EMPTY,
+            b: List::EMPTY,
+            expr: ExprId::NONE,
+        }
     }
 
     /// The same probe reading another part.
     pub const fn with_part(self, part: AcPart) -> Probe {
-        todo!()
+        Probe { part, ..self }
     }
 }
 
@@ -144,6 +172,26 @@ impl ProbeKind {
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
+
+    /// Whether the kind is a category (no path, no expression).
+    pub(crate) const fn is_category(self) -> bool {
+        match self {
+            ProbeKind::V
+            | ProbeKind::Vdiff
+            | ProbeKind::I
+            | ProbeKind::ITerminal
+            | ProbeKind::Param
+            | ProbeKind::Power
+            | ProbeKind::Expr => false,
+            ProbeKind::AllV
+            | ProbeKind::AllVTop
+            | ProbeKind::AllSourceI
+            | ProbeKind::AllI
+            | ProbeKind::AllPinI
+            | ProbeKind::OutputNoise
+            | ProbeKind::InputNoise => true,
+        }
+    }
 }
 
 impl AcPart {
@@ -164,6 +212,214 @@ impl AcPart {
 impl Design {
     /// The probes of a list. Asserts the range is inside the probe pool.
     pub fn probes(&self, list: ProbeList) -> &[Probe] {
-        todo!()
+        get(&self.run.probes, list).expect("a probe list inside the probe pool")
     }
+}
+
+/// Appends a probe's handles in field order; its expression may read the circuit.
+pub(crate) fn probe_handles(p: &Probe, out: &mut Vec<Handle>) {
+    out.extend([
+        Handle::Names(p.a),
+        Handle::Names(p.b),
+        Handle::ExprDyn(p.expr),
+    ]);
+}
+
+/// Whether the probe holds exactly the fields its kind reads (the `Probe` doc).
+pub(crate) fn probe_valid(p: &Probe) -> bool {
+    let (a, b) = (p.a.len > 0, p.b.len > 0);
+    let expr = !p.expr.is_none();
+    let terminal = p.terminal != u8::MAX;
+    let fields = match p.kind {
+        ProbeKind::V | ProbeKind::I | ProbeKind::Power => (true, false, false, false),
+        ProbeKind::Vdiff => (true, true, false, false),
+        ProbeKind::ITerminal => (true, false, true, false),
+        ProbeKind::Param => (true, p.b.len == 1, false, false),
+        ProbeKind::Expr => (false, false, false, true),
+        ProbeKind::AllV
+        | ProbeKind::AllVTop
+        | ProbeKind::AllSourceI
+        | ProbeKind::AllI
+        | ProbeKind::AllPinI
+        | ProbeKind::OutputNoise
+        | ProbeKind::InputNoise => (false, false, false, false),
+    };
+    let b_ok = if p.kind == ProbeKind::Param {
+        fields.1
+    } else {
+        b == fields.1
+    };
+    a == fields.0 && b_ok && terminal == fields.2 && expr == fields.3
+}
+
+/// Adds the probe's `RunExtra` features.
+pub(crate) fn probe_features(p: &Probe, set: &mut FeatureSet) {
+    let mut add = |x: RunExtra| *set = set.with(Feature::Run(x));
+    let kind = match p.kind {
+        ProbeKind::V => None,
+        ProbeKind::Vdiff => Some(RunExtra::ProbeVdiff),
+        ProbeKind::I => Some(RunExtra::ProbeI),
+        ProbeKind::ITerminal => Some(RunExtra::ProbeITerminal),
+        ProbeKind::Param => Some(RunExtra::ProbeParam),
+        ProbeKind::Power => Some(RunExtra::ProbePower),
+        ProbeKind::Expr => Some(RunExtra::ProbeExpr),
+        ProbeKind::AllV => Some(RunExtra::ProbeAllV),
+        ProbeKind::AllVTop => Some(RunExtra::ProbeAllVTop),
+        ProbeKind::AllSourceI => Some(RunExtra::ProbeAllSourceI),
+        ProbeKind::AllI => Some(RunExtra::ProbeAllI),
+        ProbeKind::AllPinI => Some(RunExtra::ProbeAllPinI),
+        ProbeKind::OutputNoise | ProbeKind::InputNoise => Some(RunExtra::ProbeNoise),
+    };
+    if let Some(x) = kind {
+        add(x);
+    }
+    let part = match p.part {
+        AcPart::None => None,
+        AcPart::Re => Some(RunExtra::PartRe),
+        AcPart::Im => Some(RunExtra::PartIm),
+        AcPart::Mag => Some(RunExtra::PartMag),
+        AcPart::PhaseDeg => Some(RunExtra::PartPhaseDeg),
+        AcPart::PhaseRad => Some(RunExtra::PartPhaseRad),
+        AcPart::Db => Some(RunExtra::PartDb),
+    };
+    if let Some(x) = part {
+        add(x);
+    }
+    if p.a.len > 1 || (p.kind == ProbeKind::Vdiff && p.b.len > 1) {
+        add(RunExtra::ProbeHierarchical);
+    }
+}
+
+/// Appends ` (kind …)`.
+pub(crate) fn dump_probe(design: &Design, p: &Probe, out: &mut String) {
+    out.push_str(" (");
+    out.push_str(&word(p.kind));
+    if p.part != AcPart::None {
+        put_word(out, &word(p.part));
+    }
+    if p.terminal != u8::MAX {
+        put_word(out, &format!("terminal={}", p.terminal));
+    }
+    put_names(out, design, "", p.a);
+    put_names(out, design, "", p.b);
+    put_expr(out, design, "expr", p.expr);
+    out.push(')');
+}
+
+/// Reads `(kind …)`; `None` after a report when it is not one.
+pub(crate) fn parse_probe(
+    words: &mut Words<'_>,
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    diags: &mut Diags,
+) -> Option<Probe> {
+    if !open(words, diags) {
+        return None;
+    }
+    let kind = take_enum(words, &ProbeKind::ALL, diags)?;
+    let part = match words.peek().and_then(|w| member(&AcPart::ALL[1..], w)) {
+        Some(part) => {
+            words.next();
+            part
+        }
+        None => AcPart::None,
+    };
+    let mut terminal = u8::MAX;
+    if take_key(words, "terminal") {
+        match words.next().and_then(|w| w.parse::<u8>().ok()) {
+            Some(t) if t != u8::MAX => terminal = t,
+            _ => {
+                words.error(diags);
+                return None;
+            }
+        }
+    }
+    let a = take_names(words, "", b, diags);
+    let names_b = take_names(words, "", b, diags);
+    let expr = take_expr(words, "expr", scope, b, diags);
+    let p = Probe {
+        kind,
+        part,
+        terminal,
+        a,
+        b: names_b,
+        expr,
+    };
+    close(words, diags).then_some(p)
+}
+
+/// A random valid probe using only `features` (a node voltage needs none; `paths` limits it
+/// to the kinds with a node or element path, for analysis outputs).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_probe(
+    g: &mut Gen,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+    paths: bool,
+) -> Probe {
+    let mut kinds = vec![ProbeKind::V];
+    for k in ProbeKind::ALL.into_iter().skip(1) {
+        let mut one = FeatureSet::EMPTY;
+        probe_features(
+            &Probe {
+                kind: k,
+                ..Probe::category(ProbeKind::AllV)
+            },
+            &mut one,
+        );
+        let allowed = one.iter().all(|f| features.contains(f));
+        if allowed && (!paths || matches!(k, ProbeKind::Vdiff | ProbeKind::I)) {
+            kinds.push(k);
+        }
+    }
+    let kind = kinds[g.below(kinds.len() as u32) as usize];
+    let path = |g: &mut Gen, b: &mut Builder<'_>| {
+        let deep = features.contains(Feature::Run(RunExtra::ProbeHierarchical)) && g.chance(3);
+        let names: Vec<_> = (0..1 + deep as usize).map(|_| g.fresh_name(b)).collect();
+        b.name_ids(&names)
+    };
+    let mut p = Probe::category(ProbeKind::AllV);
+    p.kind = kind;
+    match kind {
+        ProbeKind::V | ProbeKind::I | ProbeKind::Power => p.a = path(g, b),
+        ProbeKind::Vdiff => {
+            p.a = path(g, b);
+            p.b = path(g, b);
+        }
+        ProbeKind::ITerminal => {
+            p.a = path(g, b);
+            p.terminal = g.below(4) as u8;
+        }
+        ProbeKind::Param => {
+            p.a = path(g, b);
+            let q = g.fresh_name(b);
+            p.b = b.name_ids(&[q]);
+        }
+        ProbeKind::Expr => p.expr = g.expr(b, features, Reads::Circuit),
+        ProbeKind::AllV
+        | ProbeKind::AllVTop
+        | ProbeKind::AllSourceI
+        | ProbeKind::AllI
+        | ProbeKind::AllPinI
+        | ProbeKind::OutputNoise
+        | ProbeKind::InputNoise => {}
+    }
+    let parts: Vec<AcPart> = AcPart::ALL
+        .into_iter()
+        .filter(|&part| {
+            let mut one = FeatureSet::EMPTY;
+            probe_features(
+                &Probe {
+                    part,
+                    ..Probe::category(ProbeKind::AllV)
+                },
+                &mut one,
+            );
+            one.iter()
+                .all(|f| features.contains(f) || f == Feature::Run(RunExtra::ProbeAllV))
+        })
+        .collect();
+    p.part = parts[g.below(parts.len() as u32) as usize];
+    debug_assert!(probe_valid(&p));
+    p
 }

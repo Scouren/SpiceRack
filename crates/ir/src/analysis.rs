@@ -18,7 +18,7 @@
 //!   `pub struct Analysis`, `pub struct RunDetails`
 //! - `pub trait RunDetail: DetailRow` (`RunDetail::Kind`, `RunDetail::KIND`); it and the
 //!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
-//! - `RowFacts` for `Analysis` (`todo_facts!` placeholder, A2)
+//! - (`RowFacts` for `Analysis` and every detail row's facts: `analysis_facts.rs`)
 
 use crate::dc_ac::{
     Ac, Dc, DcAxis, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf,
@@ -252,9 +252,6 @@ impl AnalysisKind {
 
     /// Whether the kind has a detail row (every kind but `Op` and `DcInc`).
     pub const fn has_detail(self) -> bool {
-        todo!()
+        !matches!(self, AnalysisKind::Op | AnalysisKind::DcInc)
     }
 }
-
-// run: implementation phase — replace this line with the row's `impl RowFacts` (IR-KERNEL A2)
-todo_facts!(Analysis);
