@@ -124,7 +124,6 @@ cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_4.sp mismatch # plots ["no
 cmcqa/hicum/hicum_noise_npn_full_subtran_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
 cmcqa/hicum/hicum_noise_npn_full_subtran_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
 cmcqa/hicum/hicum_noise_npn_full_subtran_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
-ngspice/examples/control_structs/if-batchmode.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: ALL | Simulation aborted due to error.  There are 0 MSG_FATAL err
 ngspice/examples/ddt/ddt-test3.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 ngspice/examples/hicum2/hic2_noise.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
 ngspice/examples/measure/func_cap.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: syntax error in expression {{max(icap_calc(1,2,3,4))}} | Netlist error: syntax error in expression {{max(icap_cal

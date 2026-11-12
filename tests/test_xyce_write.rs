@@ -672,3 +672,29 @@ fn p4_071_no_op_ngspice_lines_are_left_out() {
         assert!(kept, "{own:?}\n{text}");
     }
 }
+
+/// ZERO-LEDGER P1-066. ngspice's `.print tran all` and `.print dc
+/// v1#branch` stop Xyce 7.10 ("There was 1 undefined symbol in .PRINT
+/// command: ALL", `V1#BRANCH`; spice-bench `control_structs/if-batchmode.sp`,
+/// `tests/mes/subth.sp`; runs: research/impl/evidence/P1-066-xyce-print-words/).
+/// Oracle: the closed forms, met by real ngspice on the source and real
+/// Xyce on the written deck: an RC charging from 0 to 1 V is 1 - 1/e after
+/// one time constant (1e-3: both simulators' RELTOL), a 1k/1k divider 0.5.
+/// Checks: 2 + 2 + 2.
+#[test]
+fn p1_066_ngspice_print_words_run_on_xyce() {
+    let all = "* t\nv1 1 0 dc 1\nr1 1 2 1k\nc1 2 0 1u ic=0\n.tran 10u 1m uic\n\
+               .print tran all\n.end\n";
+    let branch = "* t\nv1 1 0 dc 1\nr1 1 2 1k\nr2 2 0 1k\n.dc v1 1 2 1\n\
+                  .print dc v1#branch\n.end\n";
+    let on = [Dialect::Ngspice, Dialect::Xyce];
+    let tol = Tol {
+        rel: 1e-3,
+        floor: 0.0,
+    };
+    let charged = 1.0 - (-1.0f64).exp();
+    closed_form(Dialect::Ngspice, all, &on, "2", At::Last, charged, tol);
+    closed_form(Dialect::Ngspice, branch, &on, "2", At::First, 0.5, tol);
+    assert!(write(all).contains(".print tran v(*) i(*)\n"), "all");
+    assert!(write(branch).contains(".print dc i(v1)\n"), "a branch");
+}

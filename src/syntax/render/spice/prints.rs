@@ -6,7 +6,9 @@
 //! `.PRINT`) leave the analysis "not run" (each run by hand). On ngspice
 //! such a print or output is left out (W0023), a print format
 //! (`PRECISION=`) too (W0024), and Xyce's accessors are spelled as
-//! ngspice's (`ngspice_output`); the other targets get the card as read,
+//! ngspice's (`ngspice_output`). An ngspice card on Xyce has ngspice's
+//! `all` and `v1#branch` spelled as Xyce's (`xyce_output`); the other
+//! targets get the card as read,
 //! but that HSPICE RF prints a harmonic balance as `HB` (its phasors) or
 //! `HBTRAN` (the time domain; User Guide: RF Analysis E-2010.12 pp.116,
 //! 122): Xyce's `HB_FD` and `HB_TD` (RG 7.10 §2.1.31) are those, and its
@@ -82,6 +84,8 @@ impl W<'_, '_> {
                     continue;
                 }
                 kept
+            } else if self.pair.ngspice_prints_on_xyce {
+                outs.iter().map(|o| xyce_output(o)).collect()
             } else {
                 outs.clone()
             };
@@ -316,4 +320,22 @@ fn xyce_kind(analyses: &[Ana]) -> Option<&'static str> {
         kind = Some(k);
     }
     Some(kind.unwrap_or("dc"))
+}
+
+/// An ngspice output as Xyce's `.print` reads it (RG 7.10 `.PRINT`; each
+/// run on Xyce 7.10.0): `all` is the wildcards `v(*) i(*)`, a branch
+/// vector `v1#branch` the lead current `i(v1)`; any other output as
+/// written.
+// ponytail: a subcircuit's branch (`v.x1.v1#branch`, Xyce's `i(x1:v1)`)
+// keeps ngspice's name and Xyce still stops on it; spell the path when a
+// deck prints one.
+fn xyce_output(o: &str) -> String {
+    let low = o.to_ascii_lowercase();
+    if low == "all" {
+        return "v(*) i(*)".to_string();
+    }
+    match low.strip_suffix("#branch") {
+        Some(dev) if !dev.is_empty() && !dev.contains('.') => format!("i({})", &o[..dev.len()]),
+        _ => o.to_string(),
+    }
 }
