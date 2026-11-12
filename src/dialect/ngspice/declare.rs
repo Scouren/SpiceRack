@@ -50,6 +50,9 @@ pub(super) struct Script {
     /// Whether a dot card outside the blocks (in any body: subcircuit, section, branch) runs an
     /// analysis.
     pub(super) card_analysis: bool,
+    /// Each such dot card in file order: its keyword without the dot (`tran`), and how many
+    /// script statements stand before it.
+    pub(super) card_analyses: Vec<(String, usize)>,
 }
 
 /// How much of a run an expression reads (R14), ordered.
@@ -162,6 +165,7 @@ pub(super) fn script(ast: &Ast<'_>, toks: &Tokens<'_>) -> Script {
     let src = toks.source();
     let mut s = Script::default();
     let mut found: Vec<(u32, String)> = Vec::new();
+    let mut cards: Vec<(u32, String)> = Vec::new();
     let mut blocks: Vec<(u32, u32)> = Vec::new();
     let mut stack: Vec<Node> = ast.fields(ast.root()).iter().map(|&n| Node(n)).collect();
     // Bounded: each statement is pushed once, by its container or its chain's previous branch.
@@ -175,7 +179,10 @@ pub(super) fn script(ast: &Ast<'_>, toks: &Tokens<'_>) -> Script {
             continue;
         }
         let keyword = toks.text(ast.main_token(n)).to_ascii_lowercase();
-        s.card_analysis |= ANALYSES.contains(&keyword.as_str());
+        if ANALYSES.contains(&keyword.as_str()) {
+            let at = toks.start(ast.main_token(n));
+            cards.push((at, keyword.trim_start_matches('.').to_string()));
+        }
         stack.extend(body(ast, n).iter().map(|&b| Node(b)));
         stack.extend(next(ast, n));
     }
@@ -192,6 +199,12 @@ pub(super) fn script(ast: &Ast<'_>, toks: &Tokens<'_>) -> Script {
     }
     found.sort_by_key(|f| f.0);
     (s.at, s.text) = found.into_iter().unzip();
+    cards.sort_by_key(|c| c.0);
+    s.card_analysis = !cards.is_empty();
+    s.card_analyses = cards
+        .into_iter()
+        .map(|(at, k)| (k, s.at.partition_point(|&a| a < at)))
+        .collect();
     debug_assert!(s.at.is_sorted(), "script statements in file order");
     s
 }

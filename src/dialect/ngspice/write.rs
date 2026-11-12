@@ -33,7 +33,10 @@ pub(super) struct Out<'a> {
     /// region always closes before a deck line.
     out: &'a mut String,
     /// Diagnostics.
-    #[allow(dead_code, reason = "the areas' writers note through it (S3.1-S3.4)")]
+    #[allow(
+        dead_code,
+        reason = "no area writer notes yet; a writer's note goes here"
+    )]
     pub(super) diags: &'a mut ir::Diags,
     frames: Vec<Frame<'a>>,
     /// Whether a `.control` line is open.
@@ -141,8 +144,9 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             ir::ItemKind::Load | ir::ItemKind::Loop | ir::ItemKind::Alter => {
                 write_control::admits(design, item, diags);
             }
-            // ngspice spells neither (FEATURES lacks both): nothing to refuse beyond the feature
-            ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate => {}
+            // ngspice spells none of these yet (FEATURES lacks them): nothing to refuse beyond the
+            // feature; `Reset` is the control area's when its arms land (round 6, A27)
+            ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate | ir::ItemKind::Reset => {}
         }
     }
 }
@@ -161,7 +165,6 @@ impl<'a> Out<'a> {
 
     /// [`Out::open`] for a script body (a `foreach`): `tail`'s lines are commands of the open
     /// region, not deck lines.
-    #[allow(dead_code, reason = "the control writer calls it (S3.4)")]
     pub(super) fn open_script(&mut self, scope: ir::ScopeId, tail: String) {
         let items = self.design.items(scope);
         self.frames.push(Frame {
@@ -192,10 +195,6 @@ impl<'a> Out<'a> {
 
     /// Whether this deck's run plan takes the script form (R49, A27): run items are spelled as
     /// commands through [`Out::script`].
-    #[allow(
-        dead_code,
-        reason = "the run, outputs and control writers read it (S3.4)"
-    )]
     pub(super) fn scripted(&self) -> bool {
         self.scripted
     }
@@ -238,7 +237,9 @@ fn dispatch(w: &mut Out<'_>, item: ir::ItemRef) {
         ir::ItemKind::Save => write_outputs::save(w, item),
         ir::ItemKind::Print => write_outputs::print(w, item),
         ir::ItemKind::Measure => write_outputs::measure(w, item),
-        ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate => unspelled(item),
+        ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate | ir::ItemKind::Reset => {
+            unspelled(item)
+        }
     }
 }
 

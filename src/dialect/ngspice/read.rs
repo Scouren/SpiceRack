@@ -21,7 +21,7 @@
 //! `pub(super) enum Def`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
-//! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
+//! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, deck_card_analyses, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
 //! class, subckt_formals, refer, pending, rescope, unqueue_reads, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use std::collections::HashSet;
@@ -249,7 +249,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     }
 
     /// The position of `st` (a `.control` block) in [`Lower::deck_script`].
-    #[allow(dead_code, reason = "the control area calls it (S3.4)")]
     pub(super) fn script_index(&self, st: Stmt) -> usize {
         let at = self.toks.start(self.ast.main_token(st.node));
         self.script
@@ -258,9 +257,16 @@ impl<'a, 'd> Lower<'a, 'd> {
             .expect("ngspice read: a .control block is a script statement")
     }
 
+    /// Each dot-card analysis of the file in file order ([`Lower::deck_has_card_analysis`]'s
+    /// cards): its keyword without the dot (`tran`), and how many statements of
+    /// [`Lower::deck_script`] stand before it.
+    #[allow(dead_code, reason = "the control area's script meas calls it (S3.4)")]
+    pub(super) fn deck_card_analyses(&self) -> &[(String, usize)] {
+        &self.script.card_analyses
+    }
+
     /// Whether a dot card of the file runs an analysis (`.op`, `.dc`, `.ac`, `.tran`, `.noise`,
     /// `.tf`, `.sens`, `.pz`, `.disto`, `.sp`, `.pss`), in any body, outside the blocks.
-    #[allow(dead_code, reason = "the control area calls it (S3.4)")]
     pub(super) fn deck_has_card_analysis(&self) -> bool {
         self.script.card_analysis
     }
@@ -355,7 +361,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// outward, the reader's rule (R3); left unresolved when none is found (R4). The one way an
     /// area binds a row's reference (a master or model defined later, or in a later file of
     /// the same scope chain): `Builder::bind_ref` in `bind`.
-    #[allow(dead_code, reason = "the element and model areas call it (S3.1, S3.2)")]
     pub(super) fn refer(
         &mut self,
         item: ir::ItemRef,
@@ -378,7 +383,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// step binds each to a measure of its name first, then to a parameter (ngspice-45
     /// `measure.c` `do_measure`: every other measure runs first and enters its result with
     /// `nupa_add_param`, so a measure, even a later one, hides a `.param` of its name).
-    #[allow(dead_code, reason = "the output area calls it (S3.3b)")]
     pub(super) fn measure_reads(&mut self, mark: usize) {
         assert!(
             mark <= self.pending.len(),
@@ -390,7 +394,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// The head parameter names (folded, `name::key`) of the `.subckt name` ngspice binds from
     /// `st`'s block: the nearest block outward in this file, else a top-level `.subckt` of an
     /// earlier file of the read; `None` when none is visible.
-    #[allow(dead_code, reason = "the element area calls it (S3.1a)")]
     pub(super) fn subckt_formals(&self, st: Stmt, name: &str) -> Option<Vec<String>> {
         if let Some(f) = self.declared.formals(st.container, name) {
             return Some(f.to_vec());

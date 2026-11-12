@@ -273,7 +273,14 @@ fn save(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
     let wants = probes(words, Ctx::Save)?;
     let probes: Vec<ir::Probe> = wants.iter().map(|w| build(lw, w)).collect();
     let span = lw.span(st.node);
-    lw.b.save(st.scope, ir::AnalysisKinds::ALL, &probes, span);
+    // a `.save` holds for the whole run wherever it stands, as ngspice's other dot cards (A27)
+    lw.b.save(
+        st.scope,
+        ir::AnalysisKinds::ALL,
+        ir::Applies::WholeRun,
+        &probes,
+        span,
+    );
     Ok(())
 }
 

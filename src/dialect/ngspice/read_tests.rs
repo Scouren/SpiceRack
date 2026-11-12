@@ -537,6 +537,8 @@ fn a_hash_line_is_a_script_statement_and_the_script_is_in_file_order() {
         ]
     );
     assert!(s.card_analysis, ".op is a dot-card analysis");
+    // the card, and the one script statement (`*# echo first`) standing before it
+    assert_eq!(s.card_analyses, [("op".to_string(), 1)]);
     let toks = crate::syntax::tokenize("t\n.control\nop\n.endc\n", lex);
     let ast = crate::syntax::parse(&toks, lex);
     assert!(
