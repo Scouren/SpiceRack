@@ -17,7 +17,7 @@
 //! Contents: `pub(super) type Row`, `pub(super) const CODES: &[Row]` (this area's),
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
-//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
+//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
 //! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `DEFAULT_CYCLE`, `TEXT_VALUE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
@@ -58,6 +58,9 @@ pub(super) const NEGATION: Code = Code::new(b'P', 1011);
 /// A numparam call of a two-argument function with three arguments (`limit(a, b, c)`): ngspice
 /// evaluates it on the first and the last (`xpressn.c` `formula`), and so does the IR.
 pub(super) const FIRST_LAST: Code = Code::new(b'P', 1012);
+/// A call of a `.func` in scope with another argument count than its formals: ngspice stops
+/// ("parameter mismatch for function call"): `InvalidInSource`.
+pub(super) const CALL_ARITY: Code = Code::new(b'P', 1013);
 /// A `.param` the same scope defines again later: ngspice keeps the last (INV 3.01); this one
 /// is `Inert`.
 pub(super) const DUPLICATE_PARAM: Code = Code::new(b'R', 1001);
@@ -147,6 +150,12 @@ pub(super) const CODES: &[Row] = &[
         "an expression its evaluator cannot spell",
         "ngspice-45 xpressn.c, inpptree.c",
         "a value that reads the temperature or the circuit is written for the B-source parser, which has no draw function; refused.",
+    ),
+    row(
+        CALL_ARITY,
+        "a .func call with another argument count than its formals",
+        "ngspice-45 runs (arity: \"parameter mismatch for function call\")",
+        "ngspice stops on the deck; kept as InvalidInSource text.",
     ),
     row(
         FIRST_LAST,

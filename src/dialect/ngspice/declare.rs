@@ -12,7 +12,7 @@
 //! 3.06; IR-KERNEL A10 (a head default is read from the subcircuit's body).
 //!
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
-//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::formals`, `Declared::class`,
+//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::formals`, `Declared::arity`, `Declared::class`,
 //! `pub(super) struct Script`, `pub(super) fn script(&Ast, &Tokens) -> Script`
 
 use std::collections::HashMap;
@@ -36,6 +36,8 @@ pub(super) struct Declared {
     classes: HashMap<(u32, Def, String), Class>,
     /// `(block, folded subcircuit name)` → its head parameters, folded (the first definition).
     formals: HashMap<(u32, String), Vec<String>>,
+    /// `(block, folded .func name)` → its formal count (the first definition, the winner).
+    arity: HashMap<(u32, String), usize>,
 }
 
 /// A file's script facts (R49): its script statements in file order, and whether a dot card
@@ -115,6 +117,9 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
                     let line = rest(toks, ast, s);
                     if let Some((name, formals, body)) = read_structure::func_parts(&line) {
                         put(Def::Func, &name, 0, false);
+                        d.arity
+                            .entry((block, name::key(&name)))
+                            .or_insert(formals.len());
                         texts.push(text(block, Def::Func, &name, body.to_string(), formals));
                     }
                 }
@@ -226,6 +231,22 @@ impl Declared {
             let b = at?;
             if let Some(f) = self.formals.get(&(b, key.clone())) {
                 return Some(f);
+            }
+            at = self.parent.get(&b).copied();
+        }
+        None
+    }
+
+    /// The formal count of the `.func name` visible from `block`: the nearest block outward that
+    /// defines it; `None` when this file has none there.
+    pub(super) fn arity(&self, block: Node, name: &str) -> Option<usize> {
+        let key = name::key(name);
+        let mut at = Some(block.0);
+        // Bounded by the nesting: each step moves to an enclosing block.
+        for _ in 0..=self.parent.len() {
+            let b = at?;
+            if let Some(&n) = self.arity.get(&(b, key.clone())) {
+                return Some(n);
             }
             at = self.parent.get(&b).copied();
         }

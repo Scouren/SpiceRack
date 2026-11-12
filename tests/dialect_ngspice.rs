@@ -33,6 +33,7 @@ const READ: &[&str] = &[
     "expr_ternary",
     "expr_ternary_deep",
     "func",
+    "func_arity",
     "funcs_a11",
     "global_gnd",
     "global_ground_only",

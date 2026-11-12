@@ -46,14 +46,14 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "l5",
-        "ngspice",
-        "seed 0 Untyped: a FromHere NodeSet (`nodeset every_op value=…`, no whole_run) is written as a `.nodeset` card and reads back WholeRun (run: refuse it or write the script form); with ng-run",
-    ),
-    (
         "l8",
         "ngspice",
         "seed 41 Untyped: an admitted design's IR text, one file, reads back to X0015 (a `.four` with no harmonic count and no nfreqs in the dump): the IR text or the run owner's Four row, with ir-run through spine",
+    ),
+    (
+        "l5",
+        "ngspice",
+        "seed 4 Untyped: an Env temp=-804.376meg (below absolute zero) is written as `.temp` and reads back 27, ngspice's run of an unusable .temp; the writer should refuse what its reader reads as 27 (run: ng-run)",
     ),
     (
         "l7",
