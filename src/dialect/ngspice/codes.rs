@@ -17,7 +17,7 @@
 //! Contents: `pub(super) type Row`, `pub(super) const CODES: &[Row]` (this area's),
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
-//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
+//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `WRAP`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
 //! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `DEFAULT_CYCLE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
@@ -61,6 +61,10 @@ pub(super) const FIRST_LAST: Code = Code::new(b'P', 1012);
 /// A call of a `.func` in scope with another argument count than its formals: ngspice stops
 /// ("parameter mismatch for function call"): `InvalidInSource`.
 pub(super) const CALL_ARITY: Code = Code::new(b'P', 1013);
+/// A value whose `{…}` or `'…'` ngspice rejects where numparam reads it whole (a `.param`, a
+/// model parameter): wrappers that wrap parts of it (`{a}+{b}`), or one inside another
+/// (`'a+{b}'`; settle `wrap_*.sp`): `InvalidInSource`.
+pub(super) const WRAP: Code = Code::new(b'P', 1014);
 /// A `.param` the same scope defines again later: ngspice keeps the last (INV 3.01); this one
 /// is `Inert`.
 pub(super) const DUPLICATE_PARAM: Code = Code::new(b'R', 1001);
@@ -153,6 +157,12 @@ pub(super) const CODES: &[Row] = &[
         "a .func call with another argument count than its formals",
         "ngspice-45 runs (arity: \"parameter mismatch for function call\")",
         "ngspice stops on the deck; kept as InvalidInSource text.",
+    ),
+    row(
+        WRAP,
+        "a value whose braces or quotes ngspice rejects",
+        "ngspice-45 runs (settle wrap_*.sp: '; sign expected.', 'Syntax error: letter [{]')",
+        "numparam replaces each {...} on its own and reads no wrapper inside another in a .param or a model parameter; kept as InvalidInSource text.",
     ),
     row(
         FIRST_LAST,

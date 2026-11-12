@@ -33,18 +33,19 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes `SOURCE_INVALID`, `SOURCE_DYNAMIC`, `SOURCE_EXTERNAL`, `PORT_DRIVE`, `RANDOM_TYPE`,
 //! `PWL_REPEAT`, `PORT_NUMBER`, `NO_VALUE`, `EXTRA_VALUES`, `REPLACED`, `IGNORED`;
-//! `pub(super) enum Val`, `pub(super) fn source(lw: &mut Lower<'_, '_>, st: Stmt)`,
-//! `pub(super) fn val`, `emit`, `emit_opt`, `int`, `unread`, `invalid` (the wave reader's)
+//! `pub(super) fn source(lw: &mut Lower<'_, '_>, st: Stmt)`,
+//! `pub(super) fn val`, `emit_opt`, `int`, `unread`, `invalid` (the wave reader's)
 
 mod card;
 mod wave;
 
 use super::codes::Row;
 use super::declare::Class;
-use super::expr_read::{self, Fail, Tree};
+use super::expr_read::{self, Fail};
 use super::number;
 use super::read::{Lower, Stmt};
 use super::tables::{self, Eval};
+use super::value::{Val, Wrap, emit, parens, unwrap};
 use crate::ir;
 use crate::ir::Feature as F;
 use crate::ir::circuit_extra::CircuitExtra as X;
@@ -186,15 +187,6 @@ pub(super) const CODES: &[Row] = &[
     ),
 ];
 
-/// A value read and not yet pushed.
-#[derive(Clone, Debug)]
-pub(super) enum Val {
-    /// A number and how its digits fit (`number::Fit`).
-    Lit(ir::Literal, number::Fit),
-    /// An expression numparam evaluates.
-    Tree(Tree),
-}
-
 /// A card's values, parsed: everything the push needs.
 struct Read {
     dc: Option<Val>,
@@ -238,7 +230,19 @@ pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, tok: &str) -> Result<Val, Fail> 
     if let Some(s) = number::card(tok) {
         return Ok(Val::Lit(s.literal, s.fit));
     }
-    let text = unwrap(tok);
+    let text = match unwrap(tok) {
+        // a wrapper inside the value's is a parenthesis here (settle wrap_source_3/4.sp)
+        Wrap::Whole(inner, _) => parens(inner),
+        Wrap::Bare(t) => t.to_string(),
+        // "unknown parameter (+)" (wrap_source_1/2.sp)
+        Wrap::Parts => {
+            return Err(Fail {
+                code: SOURCE_INVALID,
+                class: ir::OpaqueClass::InvalidInSource,
+            });
+        }
+    };
+    let text = text.as_str();
     if lw.class(st.container, text, &[]) != Class::Constant {
         return Err(Fail {
             code: SOURCE_DYNAMIC,
@@ -246,14 +250,6 @@ pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, tok: &str) -> Result<Val, Fail> 
         });
     }
     expr_read::parse_in(text, Eval::Numparam).map(Val::Tree)
-}
-
-/// Appends a value.
-pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
-    match v {
-        Val::Lit(lit, fit) => lw.number(*lit, fit),
-        Val::Tree(t) => lw.expr(st, t, st.scope),
-    }
 }
 
 /// Appends an optional value (`NONE` when absent).
@@ -448,16 +444,6 @@ fn pair(lw: &mut Lower<'_, '_>, st: Stmt, p: Option<&(Val, Val)>) -> (ir::ExprId
 /// parameter; ngspice rounds a fraction, which the IR's field would not).
 fn positive_integer(v: &Val) -> bool {
     matches!(v, Val::Lit(l, _) if l.value() >= 1.0 && l.value().fract() == 0.0)
-}
-
-/// `tok` without the `{…}` or `'…'` around it.
-fn unwrap(tok: &str) -> &str {
-    let wrapped = |o: char, c: char| tok.len() >= 2 && tok.starts_with(o) && tok.ends_with(c);
-    if wrapped('{', '}') || wrapped('\'', '\'') {
-        &tok[1..tok.len() - 1]
-    } else {
-        tok
-    }
 }
 
 /// A note row.

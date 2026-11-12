@@ -1,0 +1,5 @@
+file "d.sp" deck
+  subckt drv (out) v0=0 delay=1n rise=1n
+    element vsource v1 (out 0) dc=0 wave=pulse(v1=v0 v2=1 delay=delay rise=rise fall=198n width=198n period=595n)
+  element instance x1 (a) model=drv params=(v0=1)
+  analysis tran stop=100n max_step=1n

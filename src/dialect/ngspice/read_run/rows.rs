@@ -8,8 +8,8 @@
 //! Contents: `pub(in super::super) fn push(&mut Lower, Stmt, &Card)`
 
 use super::super::read::{Lower, Stmt};
+use super::super::value::emit;
 use super::analysis::{Card, Sweep, Swept};
-use super::words;
 use crate::ir;
 use crate::ir::dc_ac::{Ac, Dc, DcAxis, Disto, Noise, NoiseRef, Pz, PzInput, Sens, SensAc, Sp, Tf};
 use crate::ir::periodic::{Pss, PssMode};
@@ -33,11 +33,7 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
                     Swept::Resistor(n) => lw.b.target(ir::TargetKind::ElementValue, &[], n, None),
                     Swept::Temp => ir::Target::TEMP,
                 };
-                let (a, b, c) = (
-                    words::emit(lw, st, a),
-                    words::emit(lw, st, b),
-                    words::emit(lw, st, c),
-                );
+                let (a, b, c) = (emit(lw, st, a), emit(lw, st, b), emit(lw, st, c));
                 // ngspice's nested `.dc` starts each outer step afresh and carries inside the
                 // inner sweep (R75, latch_desc.sp); rows are innermost first
                 let afresh = !rows.is_empty();
@@ -63,11 +59,11 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             uic,
         } => {
             // in the IR text's field order, so a read and a parse intern alike
-            let stop = words::emit(lw, st, stop);
-            let record_start = start.as_ref().map_or(none, |v| words::emit(lw, st, v));
-            let print_step = words::emit(lw, st, step);
+            let stop = emit(lw, st, stop);
+            let record_start = start.as_ref().map_or(none, |v| emit(lw, st, v));
+            let print_step = emit(lw, st, step);
             let ceiling = match max {
-                Some(v) => StepCeiling::Given(words::emit(lw, st, v)),
+                Some(v) => StepCeiling::Given(emit(lw, st, v)),
                 None => StepCeiling::Rule(StepCap::NgspiceRule),
             };
             let row = Tran {
@@ -94,7 +90,7 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             let output = *out;
             let source = lw.b.name(source);
             let sweep = emit_sweep(lw, st, sweep);
-            let points_per_summary = summary.as_ref().map_or(none, |v| words::emit(lw, st, v));
+            let points_per_summary = summary.as_ref().map_or(none, |v| emit(lw, st, v));
             let row = Noise {
                 output,
                 source,
@@ -139,7 +135,7 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
         }
         Card::Disto { sweep, f2 } => {
             let sweep = emit_sweep(lw, st, sweep);
-            let f2_over_f1 = f2.as_ref().map_or(none, |v| words::emit(lw, st, v));
+            let f2_over_f1 = f2.as_ref().map_or(none, |v| emit(lw, st, v));
             lw.b.analysis(scope, None, Disto { sweep, f2_over_f1 }, span);
         }
         Card::Sp { sweep, noise } => {
@@ -156,7 +152,7 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             outs,
             default_count,
         } => {
-            let fundamental = words::emit(lw, st, fundamental);
+            let fundamental = emit(lw, st, fundamental);
             let harmonics = if *default_count {
                 lw.b.literal(plain(9))
             } else {
@@ -184,14 +180,14 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             uic,
         } => {
             // in the IR text's field order, so a read and a parse intern alike
-            let fundamental = words::emit(lw, st, fundamental);
-            let tstab = words::emit(lw, st, tstab);
-            let harmonics = words::emit(lw, st, harmonics);
-            let points = words::emit(lw, st, points);
+            let fundamental = emit(lw, st, fundamental);
+            let tstab = emit(lw, st, tstab);
+            let harmonics = emit(lw, st, harmonics);
+            let points = emit(lw, st, points);
             let osc_p = lw.b.name(osc);
             let osc_n = lw.b.name("0");
-            let sc_iter = words::emit(lw, st, sc_iter);
-            let steady_coeff = words::emit(lw, st, steady_coeff);
+            let sc_iter = emit(lw, st, sc_iter);
+            let steady_coeff = emit(lw, st, steady_coeff);
             let row = Pss {
                 mode: PssMode::Autonomous,
                 uic: *uic,
@@ -213,9 +209,9 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
 
 /// Appends a sweep: `points` per decade or octave, or `points` values in all for `lin`.
 fn emit_sweep(lw: &mut Lower<'_, '_>, st: Stmt, s: &Sweep) -> ir::SweepSpec {
-    let start = words::emit(lw, st, &s.start);
-    let stop = words::emit(lw, st, &s.stop);
-    let points = words::emit(lw, st, &s.points);
+    let start = emit(lw, st, &s.start);
+    let stop = emit(lw, st, &s.stop);
+    let points = emit(lw, st, &s.points);
     match s.kind {
         ir::SweepKind::Dec => ir::SweepSpec::dec(start, stop, points),
         ir::SweepKind::Oct => ir::SweepSpec::oct(start, stop, points),

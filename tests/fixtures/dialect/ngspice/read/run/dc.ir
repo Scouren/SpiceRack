@@ -2,6 +2,9 @@
 file "dc.sp" deck
   title "dc"
   comment " oracle: ngspice-45 inp2dot.c dot_dc (name start stop step, a second axis outer), dctrcurv.c:89-149 (a resistor, a V or I source, temp)"
+  element vsource v1 (a 0) dc=1
+  element resistor R2 (a 0) value=1k
+  element isource i1 (a 0) dc=1m
   analysis dc (source_dc v1) (lin start=0 stop=5 step=0.1)
   analysis dc (source_dc v1) (lin start=-1 stop=1 step=0.5) (element_value R2) (lin start=1k stop=2k step=1k) afresh
   analysis dc (temp) (lin start=-40 stop=85 step=25)

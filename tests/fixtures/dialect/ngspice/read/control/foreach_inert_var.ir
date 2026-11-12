@@ -2,6 +2,7 @@
 file "foreach_inert_var.sp" deck
   title "foreach_inert_var"
   comment " oracle: lead's Q3: an inert command reading the loop variable stays in the body as written"
+  element resistor r1 (a 0) value=1k
   loop sweep keep_last name=v (element_value r1) (list values=[1k, 2k])
     analysis op
     opaque ngspice inert ".control\necho $v\n.endc"

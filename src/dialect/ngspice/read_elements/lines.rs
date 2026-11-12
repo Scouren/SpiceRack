@@ -83,8 +83,8 @@ pub(super) fn line(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
         }
         if f[TD].is_none() {
             // trasetup.c: f 1e9, nl 0.25 when not given
-            f[FREQ].get_or_insert(Val::Lit(literal(1, 0, 9, NumForm::Exponent)));
-            f[NL].get_or_insert(Val::Lit(literal(25, 2, 0, NumForm::Plain)));
+            f[FREQ].get_or_insert(Val::of(literal(1, 0, 9, NumForm::Exponent)));
+            f[NL].get_or_insert(Val::of(literal(25, 2, 0, NumForm::Plain)));
         }
     }
     let h = head(lw, st, &card);

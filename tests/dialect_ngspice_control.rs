@@ -298,13 +298,18 @@ fn script_items_ngspice_cannot_spell_are_refused() {
     const REFUSED: &[(&str, &str, &str)] = &[
         ("a load naming its modules", "  load osdi \"a.osdi\" modules=(m1)", "W1405"),
         ("a Verilog-A load", "  load veriloga \"a.va\"", "W1404"),
-        ("a loop over an expression", "  param p = 1\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op", "W1402"),
+        ("a loop over an expression", "  param p = 1\n  element resistor r1 (a 0) value=1k\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op", "W1402"),
         ("a parameter alter not right before a reset", "  param p = 1\n  alter (param p) value=3 at_reset\n  analysis op", "W1401"),
         ("a parameter loop whose body does not start with a reset", "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op", "W1401"),
         ("a partial reset", "  reset values saves", "W1406"),
-        ("an element-value alter of a G", "  alter (element_value g1) value=2", "W1407"),
-        ("a G loop", "  loop sweep keep_last (element_value g1) (list values=[1])", "W1407"),
-        ("an R's source DC", "  alter (source_dc r1) value=2", "W1407"),
+        ("an element-value alter of a G", "  element vccs g1 (a 0 c 0) gain=2\n  alter (element_value g1) value=2", "W1407"),
+        ("a G loop", "  element vccs g1 (a 0 c 0) gain=2\n  loop sweep keep_last (element_value g1) (list values=[1])", "W1407"),
+        ("an R's source DC", "  element resistor r1 (a 0) value=1k\n  alter (source_dc r1) value=2", "W1407"),
+        ("F7: an alter of a device nothing holds", "  analysis op\n  alter (device_param __topinst__ a) value=2\n  analysis op", "W1408"),
+        ("an alter of a model nothing defines", "  alter (model_param nope vth0) value=2", "W1408"),
+        ("a loop over an element nothing holds", "  element resistor r1 (a 0) value=1\n  loop sweep keep_last (element_value r9) (list values=[1])", "W1408"),
+        ("a DC axis over a source nothing holds", "  analysis dc (source_dc vnope) (lin start=0 stop=1 step=1)", "W1408"),
+        ("F7: a parameter alter between two analyses", "  param a = 1\n  analysis op\n  alter (param a) value=2 at_reset\n  analysis op", "W1401"),
     ];
 
     for (why, items, code) in REFUSED {
@@ -324,7 +329,7 @@ fn a_script_reads_and_writes_in_linear_time() {
     // against 16,000); 1,000 against 4,000 hid it at 7x. The script is the
     // shape a generated sweep reaches: alterparam, reset and an analysis per pass, and alters.
     let deck = |n: usize| {
-        let mut s = String::from("scaling\n.param p=1\n.control\n");
+        let mut s = String::from("scaling\n.param p=1\nR1 a 0 1k\n.control\n");
         for k in 0..n / 4 {
             s.push_str(&format!(
                 "alterparam p={}\nreset\nalter r1 {}k\nop\n",
@@ -381,7 +386,10 @@ fn plan_text(seed: u64) -> String {
     ];
     const RESET: &str = "reset values options temp tnom saves";
     const VALUES: [&str; 6] = ["1k", "2.2k", "0.5", "10u", "-1", "3meg"];
-    let mut out = String::from("file \"g.sp\" deck\n  title \"g\"\n  param p = 1k\n");
+    // every alter target defined (W1408: ngspice runs on past an alter of what is not there)
+    let mut out = String::from(
+        "file \"g.sp\" deck\n  title \"g\"\n  param p = 1k\n  element resistor r1 (a 0) value=1k\n  element vsource v1 (a 0) dc=1\n  model nch mos1 polarity=n\n  element mosfet m1 (d g 0 0) model=nch\n",
+    );
     let item = |depth: usize, out: &mut String, next: &mut dyn FnMut(u64) -> u64| {
         let pad = "  ".repeat(depth + 1);
         match next(3) {

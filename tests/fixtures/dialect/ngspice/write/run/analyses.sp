@@ -1,4 +1,5 @@
 analyses
+v1 a 0 dc 1
 .param tstop=2u
 .op
 .dc v1 -1 1 0.5 temp 0 50 25

@@ -11,6 +11,15 @@
 //! with an analysis outside the set the widened save would drop vectors that analysis writes in
 //! the source: the save keeps its scope with a `SAVE_SET_KEPT` note.
 //!
+//! No follow-up rule scopes the save instead (a from-here save before each analysis of the set,
+//! the default restored before each other), for two facts settled by runs
+//! (`tests/passes_run/decks/save_default.{sim,sp}`, `save_script.sp`; one deck of v1, r1, l1 and a diode with
+//! `rs`): VACASK's default ac set holds each OSDI device's internal unknowns (`d1:a_int`,
+//! `d1:implicit_equation_0`; `sp_mos1` adds `implicit_equation_0..4`), which ngspice's default
+//! never writes and no IR field predicts; and an ngspice script `save all` before the ac shows
+//! up in the op that ran before it (a `v(all)` vector), and a later `delete all` with
+//! `save v(out)` does not narrow the next op back.
+//!
 //! Cites: `rewrite/AMEND-A12.md` A22, A27; R29, R43; `crates/ir/src/output.rs` (`Save`).
 //!
 //! Contents: `pub fn save_set_to_all(&mut ir::Design, &mut ir::Diags)`,

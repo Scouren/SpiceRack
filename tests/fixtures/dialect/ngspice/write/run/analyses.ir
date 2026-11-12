@@ -1,6 +1,7 @@
 # oracle: ngspice-45 inp2dot.c (each card's positional form), traninit.c:29 (the ngspice cap is the default ceiling); written by hand
 file "analyses.sp" deck
   title "analyses"
+  element vsource v1 (a 0) dc=1
   param tstop = 2u
   analysis op
   analysis dc (source_dc v1) (lin start=-1 stop=1 step=0.5) (temp) (lin start=0 stop=50 step=25) afresh

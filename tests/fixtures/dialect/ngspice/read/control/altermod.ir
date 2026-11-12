@@ -2,6 +2,7 @@
 file "altermod.sp" deck
   title "altermod"
   comment " oracle: S3-CONTROL S4: device.c:1194 com_altermod (mod p = v, mod p v, @mod[p] = v); settle/state_reset.sp"
+  model dmod diode
   alter (model_param dmod is) value=1e-10
   alter (model_param dmod bf) value=50
   alter (model_param dmod n) value=1.5

@@ -1,5 +1,6 @@
 # oracle: lead's Q3: a loop with no name gets a made-up variable; written by hand
 file "script_loop_unnamed.sp" deck
   title "script_loop_unnamed"
+  element vsource v1 (a 0) dc=1
   loop sweep keep_last (source_dc v1) (list values=[1, 2])
     analysis op

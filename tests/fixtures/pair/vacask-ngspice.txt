@@ -14,4 +14,5 @@
 alter_toplevel 2 refused:W1401 finding=F7 # R70: the reader now reads alter instance("__topinst__") a=2.0 as a design-parameter alter; the ngspice writer refuses it (W1401, a parameter alter where other script state holds) until the alter-effect feature and its rule exist
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314)
-dc_nested 2 refused:U0001:Run(SweepDcLinPoints)+Run(SweepDcList) pass=sweep_dc_lin_points_to_step # runrules' keep_nested.sim: a nested sweep (values= around points=); its rows are on step3-runrules 5c8834b8, not merged
+latch 4 mismatch finding=F8 # R75; reported as "dc: sweep grid changed (14 -> 14 points)": the outer axis (rin) has no vector in ngspice's plot to pair the grid by; the values differ too (latch_vdd shows them)
+latch_vdd 4 mismatch finding=F8 # R75: dc a at vin=2 of outer step 2 (vdd 5.1): 3.02 V VACASK vs 2.55 V ngspice

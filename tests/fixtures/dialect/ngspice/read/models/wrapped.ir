@@ -1,0 +1,10 @@
+# codes: P1203 P1203 P1014 P1014
+file "wrapped.sp" deck
+  title "wrapped"
+  comment " oracle: settle/wrap_model_{1,2,3,4}.sp ({a}+{b} and 'a'+'b': 'unrecognized parameter (+) - ignored', rsh = 1: the deck runs on the first wrapper alone, a form with no rule here; 'a+{b}' and {a+'b'}: 'Syntax error: letter [{]', fatal)"
+  param a = 1
+  param b = 2
+  opaque ngspice unread ".model rm1 r rsh={a}+{b}"
+  opaque ngspice unread ".model rm2 r rsh='a'+'b'"
+  opaque ngspice invalid ".model rm3 r rsh='a+{b}'"
+  opaque ngspice invalid ".model rm4 r rsh={a+'b'}"

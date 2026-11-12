@@ -15,7 +15,8 @@
 //! ir::NodeSetKind)`
 
 use super::super::read::{Lower, Stmt};
-use super::words::{self, Val};
+use super::super::value::{Val, emit};
+use super::words;
 use super::{OPTION_FORM, PRIVATE_OPTION, RUN_INVALID, TEMP_27, TEMP_BEATEN};
 use crate::ir::{self, OptionKey};
 
@@ -182,7 +183,7 @@ pub(super) fn options(lw: &mut Lower<'_, '_>, st: Stmt) {
     for part in &parts {
         match part {
             Part::Typed(key, v) => {
-                let value = v.as_ref().map_or(none, |v| words::emit(lw, st, v));
+                let value = v.as_ref().map_or(none, |v| emit(lw, st, v));
                 let row = ir::OptionRow {
                     key: *key,
                     private: ir::NameId::NONE,
@@ -193,8 +194,8 @@ pub(super) fn options(lw: &mut Lower<'_, '_>, st: Stmt) {
                 lw.b.push(st.scope, row, span);
             }
             Part::Env(t, n) => {
-                let temp = t.as_ref().map_or(none, |v| words::emit(lw, st, v));
-                let tnom = n.as_ref().map_or(none, |v| words::emit(lw, st, v));
+                let temp = t.as_ref().map_or(none, |v| emit(lw, st, v));
+                let tnom = n.as_ref().map_or(none, |v| emit(lw, st, v));
                 let row = ir::Env {
                     temp,
                     tnom,
@@ -241,7 +242,7 @@ pub(super) fn temp(lw: &mut Lower<'_, '_>, st: Stmt) {
         Val::Lit(lit, super::super::number::Fit::Exact)
     };
     let span = lw.span(st.node);
-    let temp = words::emit(lw, st, &v);
+    let temp = emit(lw, st, &v);
     let row = ir::Env {
         temp,
         tnom: ir::ExprId::NONE,
@@ -294,7 +295,7 @@ pub(super) fn node_sets(lw: &mut Lower<'_, '_>, st: Stmt, kind: ir::NodeSetKind)
         for n in &node {
             lw.b.name(n);
         }
-        let value = words::emit(lw, st, v);
+        let value = emit(lw, st, v);
         let node = lw.b.names(&node);
         let row = ir::NodeSet {
             kind,

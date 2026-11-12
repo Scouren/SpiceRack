@@ -42,6 +42,7 @@ const READ: &[&str] = &[
     "sffm",
     "sin",
     "unread",
+    "wrapped",
 ];
 
 /// The write fixtures, by name.

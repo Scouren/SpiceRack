@@ -20,6 +20,8 @@ use spicerack::passes;
 
 #[path = "passes_waves/am.rs"]
 mod am;
+#[path = "passes_waves/constant.rs"]
+mod constant;
 #[path = "passes_waves/inverse.rs"]
 mod inverse;
 
@@ -38,6 +40,10 @@ const TIME_ULPS: f64 = 4.0;
 
 /// Every read a fixed value; TSTEP 1 ns, TSTOP 1 µs.
 struct Run;
+
+/// [`Run`]'s bindings, but a parameter read is its definition's value: a `Param` item's, or
+/// a subcircuit formal's head default (the tests that read it pass no actual for it).
+struct Defs<'d>(&'d ir::Design);
 
 /// How many sources were compared, at how many instants, the largest difference in ulp of
 /// the value, and the largest in units of the time's rounding (`|Δv| / (ulp(t)·slope)`, the
@@ -83,6 +89,49 @@ impl ir::Bindings for Run {
     }
 }
 
+impl ir::Bindings for Defs<'_> {
+    fn param(&self, r: ir::Ref) -> Option<f64> {
+        let def = r.is_resolved().then(|| self.0.def(r.def))?;
+        let root = match def.item.kind {
+            ir::ItemKind::Param => self.0.row::<ir::item::Param>(def.item.index).value,
+            ir::ItemKind::Subckt => {
+                let s: ir::item::Subckt = self.0.row(def.item.index);
+                let head = self.0.params(s.params).iter().find(|p| p.0 == def.name);
+                head.map(|p| p.1)?
+            }
+            _ => return None,
+        };
+        ir::eval(self.0, root, self).ok()
+    }
+    fn voltage(&self, n: ir::NameId, m: ir::NameId) -> Option<f64> {
+        ir::Bindings::voltage(&Run, n, m)
+    }
+    fn current(&self, n: ir::NameId) -> Option<f64> {
+        ir::Bindings::current(&Run, n)
+    }
+    fn time(&self) -> Option<f64> {
+        ir::Bindings::time(&Run)
+    }
+    fn temp(&self) -> Option<f64> {
+        ir::Bindings::temp(&Run)
+    }
+    fn freq(&self) -> Option<f64> {
+        ir::Bindings::freq(&Run)
+    }
+    fn tstep(&self) -> Option<f64> {
+        ir::Bindings::tstep(&Run)
+    }
+    fn tstop(&self) -> Option<f64> {
+        ir::Bindings::tstop(&Run)
+    }
+    fn tnom(&self) -> Option<f64> {
+        ir::Bindings::tnom(&Run)
+    }
+    fn draw(&self, w: ir::Dist, h: ir::DrawWhen, p: ir::DrawPer, a: &[f64]) -> Option<f64> {
+        ir::Bindings::draw(&Run, w, h, p, a)
+    }
+}
+
 // ---- private ----
 
 /// The source rows of every reachable source element, by item.
@@ -99,14 +148,14 @@ fn sources(d: &ir::Design) -> Vec<(ir::ItemRef, ir::source::Source)> {
 
 /// The boundary instants of a source's wave (its fields evaluated under [`Run`]; a field with
 /// no value adds none) and a spread over twelve periods.
-fn times(d: &ir::Design, s: &ir::source::Source) -> Vec<f64> {
+fn times(d: &ir::Design, s: &ir::source::Source, env: &dyn ir::Bindings) -> Vec<f64> {
     let mut out = vec![-1e-9, 0.0, 1e-12, 0.5e-9, 1e-9, 1e-7, 1e-6];
     if s.wave.is_none() {
         return out;
     }
     let v = |e: ir::ExprId| match e.is_none() {
         true => None,
-        false => ir::eval(d, e, &Run).ok(),
+        false => ir::eval(d, e, env).ok(),
     };
     let edges: Vec<f64> = match d.wave(s.wave) {
         ir::Wave::Pulse(p) => {
@@ -165,16 +214,18 @@ fn compare(
     tally: &mut Tally,
     slope: Option<fn(&ir::Design, &ir::source::Source) -> Option<f64>>,
 ) {
-    compare_until(name, design, tally, slope, f64::INFINITY);
+    compare_until(name, design, tally, slope, f64::INFINITY, false);
 }
 
-/// [`compare`] at the instants up to `until` only (a rule exact up to the design's last stop).
+/// [`compare`] at the instants up to `until` only (a rule exact up to the design's last stop);
+/// with `follow`, a parameter read is its definition's value ([`Defs`]) instead of [`Run`]'s 1.
 fn compare_until(
     name: &str,
     mut design: ir::Design,
     tally: &mut Tally,
     slope: Option<fn(&ir::Design, &ir::source::Source) -> Option<f64>>,
     until: f64,
+    follow: bool,
 ) {
     let pass = passes::all().find(|p| p.name == name).expect("registered");
     let was = design.clone();
@@ -189,15 +240,19 @@ fn compare_until(
         }
         tally.sources += 1;
         // with a bound, the bound itself and an instant halfway to it are read too
-        let mut at = times(&was, old);
+        let (ea, eb): (Box<dyn ir::Bindings + '_>, Box<dyn ir::Bindings + '_>) = match follow {
+            true => (Box::new(Defs(&was)), Box::new(Defs(&design))),
+            false => (Box::new(Run), Box::new(Run)),
+        };
+        let mut at = times(&was, old, &*ea);
         if until.is_finite() {
             at.extend([until.next_down(), until, until * 0.5]);
         }
         let instants = at.into_iter().filter(|&t| t <= until).map(At::Time);
         for at in std::iter::once(At::OperatingPoint).chain(instants) {
             tally.points += 1;
-            let a = source_value(&was, old, at, &Run);
-            let b = source_value(&design, new, at, &Run);
+            let a = source_value(&was, old, at, &*ea);
+            let b = source_value(&design, new, at, &*eb);
             match (a, b) {
                 (Ok(x), Ok(y)) => {
                     let k = slope.and_then(|f| f(&was, old));

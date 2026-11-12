@@ -1,0 +1,2 @@
+file "a.sp" deck
+  analysis ac (lin start=(1 / (2 * 3.14)) stop=(1 / (2 * 3.14)) points=1)
