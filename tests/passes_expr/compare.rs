@@ -2,7 +2,7 @@
 //! each root it changed evaluated before and after (`ir::eval_typed`) under the same bindings.
 //!
 //! Contents: `pub const ANY`, `pub const fn code`, `pub fn pass`, `pub fn keeps_generated_values`, `pub fn keeps_values_over`,
-//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`, `pub fn pairs`, `pub fn paths`
+//! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`, `pub fn roots`, `pub fn pairs`, `pub fn paths`, `pub fn keeps_folded`
 
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
@@ -218,6 +218,20 @@ pub fn paths(design: &ir::Design, e: ir::ExprId) -> u64 {
         size.insert(r, below);
     }
     size[&e]
+}
+
+/// The points `name` folded in `text` (0 when it left the operator), each compared.
+pub fn keeps_folded(name: &str, text: &str) -> usize {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    let before = ir::features_used(&design);
+    let mut copy = design.clone();
+    (pass(name).run)(&mut copy, &mut diags);
+    match ir::features_used(&copy) == before {
+        true => 0,
+        false => keeps_boundary_values(name, text, &[0]),
+    }
 }
 
 // ---- private ----

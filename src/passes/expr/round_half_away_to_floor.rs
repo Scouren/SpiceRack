@@ -16,7 +16,7 @@
 //! `pub fn round_half_away_to_floor_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::DRAW_TWICE;
-use super::nodes::{Draws, form, func_form, note_left, plain};
+use super::nodes::{Draws, form, func_form, keep_bounded, note_left_copying, plain};
 use crate::ir;
 
 /// Rewrites `RoundHalfAway` in every root of the plain form.
@@ -33,32 +33,35 @@ pub fn round_half_away_to_floor_dyn(design: &mut ir::Design, diags: &mut ir::Dia
 
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let draws = Draws::new(design);
-    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
-        let ir::Expr::Call(ir::Func::RoundHalfAway, args) = b.design().expr(e) else {
-            return None;
-        };
-        let x = b.design().exprs(args)[0];
-        if draws.holds(b.design(), x) {
-            return None;
-        }
-        let (zero, half, one) = (plain(b, 0, 0), plain(b, 5, 1), plain(b, 1, 0));
-        let up = b.binary(ir::BinOp::Ge, x, zero);
-        let floor = b.call(ir::Func::Floor, &[x]);
-        let below = b.binary(ir::BinOp::Sub, x, floor);
-        let far = b.binary(ir::BinOp::Ge, below, half);
-        let next = b.binary(ir::BinOp::Add, floor, one);
-        let positive = b.ternary(far, next, floor);
-        let ceil = b.call(ir::Func::Ceil, &[x]);
-        let above = b.binary(ir::BinOp::Sub, ceil, x);
-        let far = b.binary(ir::BinOp::Ge, above, half);
-        let prev = b.binary(ir::BinOp::Sub, ceil, one);
-        let negative = b.ternary(far, prev, ceil);
-        Some(b.ternary(up, positive, negative))
+    let reverted = keep_bounded(design, &mut |d| {
+        ir::rewrite_exprs_in(d, form(dynamic), &mut |b, e| {
+            let ir::Expr::Call(ir::Func::RoundHalfAway, args) = b.design().expr(e) else {
+                return None;
+            };
+            let x = b.design().exprs(args)[0];
+            if draws.holds(b.design(), x) {
+                return None;
+            }
+            let (zero, half, one) = (plain(b, 0, 0), plain(b, 5, 1), plain(b, 1, 0));
+            let up = b.binary(ir::BinOp::Ge, x, zero);
+            let floor = b.call(ir::Func::Floor, &[x]);
+            let below = b.binary(ir::BinOp::Sub, x, floor);
+            let far = b.binary(ir::BinOp::Ge, below, half);
+            let next = b.binary(ir::BinOp::Add, floor, one);
+            let positive = b.ternary(far, next, floor);
+            let ceil = b.call(ir::Func::Ceil, &[x]);
+            let above = b.binary(ir::BinOp::Sub, ceil, x);
+            let far = b.binary(ir::BinOp::Ge, above, half);
+            let prev = b.binary(ir::BinOp::Sub, ceil, one);
+            let negative = b.ternary(far, prev, ceil);
+            Some(b.ternary(up, positive, negative))
+        });
     });
-    note_left(
+    note_left_copying(
         design,
         diags,
         func_form(ir::Func::RoundHalfAway, dynamic),
         DRAW_TWICE,
+        &reverted,
     );
 }

@@ -24,6 +24,19 @@
 //! (`ir::features_used`), so each rule is two rows, `<rule>` and `<rule>_dyn`, one file:
 //! `ir::rewrite_exprs_in` applies a rule to one form's roots and leaves the other's (A26).
 //!
+//! **The size bound.** A rule whose definition reads an operand more than once (`sqr_to_mul`,
+//! `pow_signed_to_ternary`, the two roundings, `sgn`, `step_half`, `ramp`, `explin14`, `pwl`'s
+//! input, `inline_funcs`' formal read twice) shares that operand's rows in the IR, but every
+//! writer spells each read in full, so nested copies grow the text exponentially, and a copy
+//! made early grows again with every later rewrite under it. So the bound is on what a root
+//! spells: each such rule runs through `nodes::keep_bounded`, which points back at its old tree
+//! every root the rule made spell more than `nodes::ROOT_PATHS_MAX` rows by paths (8192: the
+//! longest corpus expression, 132 tokens, through the two most copying rules, under 4800) and
+//! more than before; that item keeps its node with note `U0116`. Every walk of this group visits
+//! each row once, and every path count saturates. ponytail: a let-binding (the operand bound
+//! once to a new parameter, read twice) lifts the bound; it changes the design's definitions, a
+//! structure-level decision, so it is the upgrade path, not this version.
+//!
 //! Contents: `pub mod div_to_div_typed`, `pub mod div_typed_to_div`, `pub mod draws_always_to_sampling`, `pub mod draws_per_reference_to_call_site`, `pub mod explin14_to_ternary`, `pub mod fold_constant_bitops`, `pub mod inline_funcs`, `pub mod ln_abs_to_ln`, `pub mod long_literal_to_shortest`, `pub mod pow_signed_to_ternary`, `pub mod pow_to_powabs`, `pub mod powabs_to_pow`, `pub mod pwl_to_ternary`, `pub mod ramp_to_ternary`, `pub mod round_half_away_to_floor`, `pub mod round_half_even_to_away`, `pub mod sampling_draws_to_nominal`, `pub mod sgn_to_ternary`, `pub mod sgnzeropos_to_ternary`, `pub mod sqr_to_mul`, `pub mod sqrt_abs_to_sqrt`, `pub mod step_half_to_ternary`, `pub mod step_to_ternary`, `pub mod substitute_tran_leaves`, `pub mod tnom_to_env`, `pub mod toint_to_trunc`, `pub mod toreal_to_mul`, `pub(super) const PASSES: &[Pass]`
 //! (`rows.rs`), `pub(super) const CODES: &[(ir::Code, ir::Info)]` and the codes (`codes.rs`)
 

@@ -27,7 +27,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::nodes::{Draws, kids, live, note_left};
+use super::nodes::{Draws, keep_bounded, kids, live, note_left, note_left_copying};
 use super::{CALL_LEFT, FUNC_CALLED};
 use crate::ir;
 
@@ -40,20 +40,27 @@ pub fn inline_funcs(design: &mut ir::Design, diags: &mut ir::Diags) {
         .filter(|d| d.kind == ir::DefKind::Func)
         .count();
     let was = called(design);
+    let mut reverted = Vec::new();
     for _ in 0..=funcs {
         let draws = Draws::new(design);
         let ok = acyclic(design);
-        let changed = ir::rewrite_exprs(design, &mut |b, e| {
-            let ir::Expr::UserCall(r, args) = b.design().expr(e) else {
-                return None;
-            };
-            if !r.is_resolved() || !ok[r.def.index()] {
-                return None;
-            }
-            let args = b.design().exprs(args).to_vec();
-            inline(b, r.def, &args, &draws)
+        let mut changed = 0;
+        let back = keep_bounded(design, &mut |d| {
+            changed = ir::rewrite_exprs(d, &mut |b, e| {
+                let ir::Expr::UserCall(r, args) = b.design().expr(e) else {
+                    return None;
+                };
+                if !r.is_resolved() || !ok[r.def.index()] {
+                    return None;
+                }
+                let args = b.design().exprs(args).to_vec();
+                inline(b, r.def, &args, &draws)
+            });
         });
-        if changed == 0 {
+        // a round whose every change went back changes nothing more
+        let settled = changed == 0 || back.len() as u32 >= changed;
+        reverted.extend(back);
+        if settled {
             break;
         }
     }
@@ -62,11 +69,12 @@ pub fn inline_funcs(design: &mut ir::Design, diags: &mut ir::Diags) {
     let now = called(design);
     let gone: Vec<bool> = was.iter().zip(&now).map(|(&a, &b)| a && !b).collect();
     drop_uncalled(design, &gone);
-    note_left(
+    note_left_copying(
         design,
         diags,
         ir::Feature::Expr(ir::ExprTag::UserCall),
         CALL_LEFT,
+        &reverted,
     );
 }
 
@@ -194,19 +202,26 @@ fn inline(
 }
 
 /// A copy of the tree under `root` with each row `swap` names replaced; leaves are shared, every
-/// operator is built anew over its copied operands. Post-order, explicit stack, each row once.
+/// operator is built anew over its copied operands. Post-order, explicit stack, each row expanded once.
 fn copy(
     b: &mut ir::Builder<'_>,
     root: ir::ExprId,
     swap: &dyn Fn(&ir::Design, ir::ExprId) -> Option<ir::ExprId>,
 ) -> ir::ExprId {
     let mut done: HashMap<ir::ExprId, ir::ExprId> = HashMap::new();
+    let mut expanded: HashSet<ir::ExprId> = HashSet::new();
     let mut stack = vec![(root, false)];
     let mut out = Vec::new();
-    let bound = 2 * b.design().expr_count() + 2;
-    for _ in 0..bound {
-        let Some((e, ready)) = stack.pop() else { break };
-        if done.contains_key(&e) {
+    // each row is expanded once: one pop to expand, one per edge into it, one to build
+    let mut edges = 0;
+    let mut steps = 0usize;
+    while let Some((e, ready)) = stack.pop() {
+        steps += 1;
+        assert!(
+            steps <= 2 * expanded.len() + edges + 1,
+            "each row expanded once"
+        );
+        if done.contains_key(&e) || (!ready && expanded.contains(&e)) {
             continue;
         }
         if let Some(arg) = swap(b.design(), e) {
@@ -216,6 +231,8 @@ fn copy(
         out.clear();
         kids(b.design(), e, &mut out);
         if !ready && !out.is_empty() {
+            expanded.insert(e);
+            edges += out.len();
             stack.push((e, true));
             stack.extend(out.iter().map(|&k| (k, false)));
             continue;
@@ -224,7 +241,6 @@ fn copy(
         let built = rebuild(b, e, &new);
         done.insert(e, built);
     }
-    assert!(stack.is_empty(), "the copy visits each row at most twice");
     done[&root]
 }
 

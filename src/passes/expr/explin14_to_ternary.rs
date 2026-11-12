@@ -13,7 +13,7 @@
 //! `pub fn explin14_to_ternary_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::DRAW_TWICE;
-use super::nodes::{Draws, form, func_form, note_left, plain};
+use super::nodes::{Draws, form, func_form, keep_bounded, note_left_copying, plain};
 use crate::ir;
 
 /// Rewrites `ExpLin14` in every root of the plain form.
@@ -30,27 +30,30 @@ pub fn explin14_to_ternary_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
 
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let draws = Draws::new(design);
-    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
-        let ir::Expr::Call(ir::Func::ExpLin14, args) = b.design().expr(e) else {
-            return None;
-        };
-        let x = b.design().exprs(args)[0];
-        if draws.holds(b.design(), x) {
-            return None;
-        }
-        let (knee, one) = (plain(b, 14, 0), plain(b, 1, 0));
-        let below = b.binary(ir::BinOp::Le, x, knee);
-        let curve = b.call(ir::Func::Exp, &[x]);
-        let at_knee = b.call(ir::Func::Exp, &[knee]);
-        let shifted = b.binary(ir::BinOp::Add, one, x);
-        let past = b.binary(ir::BinOp::Sub, shifted, knee);
-        let line = b.binary(ir::BinOp::Mul, at_knee, past);
-        Some(b.ternary(below, curve, line))
+    let reverted = keep_bounded(design, &mut |d| {
+        ir::rewrite_exprs_in(d, form(dynamic), &mut |b, e| {
+            let ir::Expr::Call(ir::Func::ExpLin14, args) = b.design().expr(e) else {
+                return None;
+            };
+            let x = b.design().exprs(args)[0];
+            if draws.holds(b.design(), x) {
+                return None;
+            }
+            let (knee, one) = (plain(b, 14, 0), plain(b, 1, 0));
+            let below = b.binary(ir::BinOp::Le, x, knee);
+            let curve = b.call(ir::Func::Exp, &[x]);
+            let at_knee = b.call(ir::Func::Exp, &[knee]);
+            let shifted = b.binary(ir::BinOp::Add, one, x);
+            let past = b.binary(ir::BinOp::Sub, shifted, knee);
+            let line = b.binary(ir::BinOp::Mul, at_knee, past);
+            Some(b.ternary(below, curve, line))
+        });
     });
-    note_left(
+    note_left_copying(
         design,
         diags,
         func_form(ir::Func::ExpLin14, dynamic),
         DRAW_TWICE,
+        &reverted,
     );
 }

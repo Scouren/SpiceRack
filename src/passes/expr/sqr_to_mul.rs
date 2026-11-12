@@ -15,7 +15,7 @@
 //! `pub fn sqr_to_mul_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::DRAW_TWICE;
-use super::nodes::{Draws, form, func_form, note_left, plain};
+use super::nodes::{Draws, form, func_form, keep_bounded, note_left_copying, plain};
 use super::tags::{REAL, Tags};
 use crate::ir;
 
@@ -34,27 +34,35 @@ pub fn sqr_to_mul_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let draws = Draws::new(design);
     let mut tags = Tags::new(design);
-    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
-        tags.of(b.design(), e);
-        let ir::Expr::Call(ir::Func::Sqr, args) = b.design().expr(e) else {
-            return None;
-        };
-        let x = b.design().exprs(args)[0];
-        if draws.holds(b.design(), x) {
-            return None;
-        }
-        let left = match tags.of(b.design(), x) == REAL {
-            true => x,
-            false => {
-                let one = plain(b, 1, 0);
-                b.binary(ir::BinOp::Mul, one, x)
+    let reverted = keep_bounded(design, &mut |d| {
+        ir::rewrite_exprs_in(d, form(dynamic), &mut |b, e| {
+            tags.of(b.design(), e);
+            let ir::Expr::Call(ir::Func::Sqr, args) = b.design().expr(e) else {
+                return None;
+            };
+            let x = b.design().exprs(args)[0];
+            if draws.holds(b.design(), x) {
+                return None;
             }
-        };
-        let square = b.binary(ir::BinOp::Mul, left, x);
-        for n in [left, square] {
-            tags.of(b.design(), n);
-        }
-        Some(square)
+            let left = match tags.of(b.design(), x) == REAL {
+                true => x,
+                false => {
+                    let one = plain(b, 1, 0);
+                    b.binary(ir::BinOp::Mul, one, x)
+                }
+            };
+            let square = b.binary(ir::BinOp::Mul, left, x);
+            for n in [left, square] {
+                tags.of(b.design(), n);
+            }
+            Some(square)
+        });
     });
-    note_left(design, diags, func_form(ir::Func::Sqr, dynamic), DRAW_TWICE);
+    note_left_copying(
+        design,
+        diags,
+        func_form(ir::Func::Sqr, dynamic),
+        DRAW_TWICE,
+        &reverted,
+    );
 }

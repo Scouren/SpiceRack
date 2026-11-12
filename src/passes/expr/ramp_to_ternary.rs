@@ -9,7 +9,7 @@
 //! `pub fn ramp_to_ternary_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::DRAW_TWICE;
-use super::nodes::{Draws, form, func_form, note_left, plain, reads_tags};
+use super::nodes::{Draws, form, func_form, keep_bounded, note_left_copying, plain, reads_tags};
 use super::tags::{REAL, Tags};
 use crate::ir;
 
@@ -29,32 +29,35 @@ fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let draws = Draws::new(design);
     let untyped = !reads_tags(design);
     let mut tags = Tags::new(design);
-    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
-        tags.of(b.design(), e);
-        let ir::Expr::Call(ir::Func::Ramp, args) = b.design().expr(e) else {
-            return None;
-        };
-        let x = b.design().exprs(args)[0];
-        if draws.holds(b.design(), x) {
-            return None;
-        }
-        let zero = plain(b, 0, 0);
-        let above = b.binary(ir::BinOp::Gt, x, zero);
-        // `ramp` is Real; `x` passed through keeps its own tag, so an `x` that may be Int is
-        // made Real (`1 * x` is `x` exactly) while a typed division may read it
-        let pass = match untyped || tags.of(b.design(), x) == REAL {
-            true => x,
-            false => {
-                let one = plain(b, 1, 0);
-                b.binary(ir::BinOp::Mul, one, x)
+    let reverted = keep_bounded(design, &mut |d| {
+        ir::rewrite_exprs_in(d, form(dynamic), &mut |b, e| {
+            tags.of(b.design(), e);
+            let ir::Expr::Call(ir::Func::Ramp, args) = b.design().expr(e) else {
+                return None;
+            };
+            let x = b.design().exprs(args)[0];
+            if draws.holds(b.design(), x) {
+                return None;
             }
-        };
-        Some(b.ternary(above, pass, zero))
+            let zero = plain(b, 0, 0);
+            let above = b.binary(ir::BinOp::Gt, x, zero);
+            // `ramp` is Real; `x` passed through keeps its own tag, so an `x` that may be Int is
+            // made Real (`1 * x` is `x` exactly) while a typed division may read it
+            let pass = match untyped || tags.of(b.design(), x) == REAL {
+                true => x,
+                false => {
+                    let one = plain(b, 1, 0);
+                    b.binary(ir::BinOp::Mul, one, x)
+                }
+            };
+            Some(b.ternary(above, pass, zero))
+        });
     });
-    note_left(
+    note_left_copying(
         design,
         diags,
         func_form(ir::Func::Ramp, dynamic),
         DRAW_TWICE,
+        &reverted,
     );
 }

@@ -18,10 +18,25 @@
 //! `pub(super) fn leaf_literal(&ir::Design, ir::ExprId) -> Option<ir::Literal>`,
 //! `pub(super) fn binary_form(ir::BinOp, bool) -> ir::Feature`, `pub(super) fn func_form(ir::Func, bool) -> ir::Feature`,
 //! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`,
-//! `pub(super) fn form(bool) -> ir::Form`
+//! `pub(super) fn form(bool) -> ir::Form`, `pub(super) const ROOT_PATHS_MAX`,
+//! `pub(super) fn keep_bounded(&mut ir::Design, &mut dyn FnMut(&mut ir::Design)) -> Vec<ir::ItemRef>`,
+//! `pub(super) fn paths(&ir::Design, ir::ExprId) -> u32`,
+//! `pub(super) fn note_left_copying(&ir::Design, &mut ir::Diags, ir::Feature, ir::Code, &[ir::ItemRef])`
 
-use super::BOTH_FORMS;
+use super::{BOTH_FORMS, OPERAND_TOO_LARGE};
 use crate::ir;
+
+/// The most rows an expression a copying rule writes may spell, counted by paths (a row two
+/// parents share counts at each use: what a writer writes). The longest expression of the two
+/// corpora is 132 tokens (ngspice: spice-bench
+/// `kicad-test-circuits/GaN_Test/GaN_Pspice_GS66508T_L2V2.lib`, a B source; VACASK: 33,
+/// `test/test_viwfm.sim`); through the most copying rule (`round_half_away_to_floor` spells its
+/// operand 9 times) and one more (4) that is under 4800; rounded up to a power of two.
+///
+/// ponytail: no let-binding to a new parameter (a copy bound once and read twice) in this
+/// version; it lifts the bound, and it changes the design's definitions (a structure-level
+/// decision): the upgrade path.
+pub(super) const ROOT_PATHS_MAX: u32 = 8192;
 
 /// Which definitions' values may hold a draw (a parameter whose value, or a function whose
 /// body, reads one, transitively), for the design as it stood when built.
@@ -214,6 +229,100 @@ pub(super) fn reads_tags(design: &ir::Design) -> bool {
         .any(|e| matches!(design.expr(e), ir::Expr::Binary(ir::BinOp::DivTyped, ..)))
 }
 
+/// Runs `rewrite` (a copying rule's rewrite) and points back at its old tree every root it made
+/// spell more than both [`ROOT_PATHS_MAX`] rows and what it spelled before (counted by paths);
+/// returns the items whose root went back, which then keep the rule's feature. Bounds every
+/// root a copying rule writes, whatever rule wrote it first: a copy made early grows with every
+/// later rewrite under it, so the bound is on the root, not the operand.
+pub(super) fn keep_bounded(
+    design: &mut ir::Design,
+    rewrite: &mut dyn FnMut(&mut ir::Design),
+) -> Vec<ir::ItemRef> {
+    let items: Vec<ir::ItemRef> = design.reachable().into_iter().map(|(i, _)| i).collect();
+    let mut before: Vec<ir::ExprId> = Vec::new();
+    {
+        let mut editor = design.editor();
+        for &item in &items {
+            editor.map_exprs(item, &mut |e, _| before.push(*e));
+        }
+    }
+    rewrite(design);
+    let mut after: Vec<ir::ExprId> = Vec::new();
+    {
+        let mut editor = design.editor();
+        for &item in &items {
+            editor.map_exprs(item, &mut |e, _| after.push(*e));
+        }
+    }
+    assert!(after.len() == before.len(), "a rewrite keeps every root");
+    let back: Vec<bool> = before
+        .iter()
+        .zip(&after)
+        .map(|(&old, &new)| {
+            old != new
+                && !new.is_none()
+                && paths(design, new) > ROOT_PATHS_MAX.max(paths(design, old))
+        })
+        .collect();
+    let mut reverted = Vec::new();
+    let mut k = 0;
+    let mut editor = design.editor();
+    for &item in &items {
+        let mut hit = false;
+        editor.map_exprs(item, &mut |e, _| {
+            if back[k] {
+                *e = before[k];
+                hit = true;
+            }
+            k += 1;
+        });
+        if hit {
+            reverted.push(item);
+        }
+    }
+    assert!(k == before.len(), "map_exprs visits the same roots");
+    reverted
+}
+
+/// The number of rows under `e` counted by paths (what a writer spells), saturating at
+/// `u32::MAX`. Visits each row once: children before parents, by id.
+pub(super) fn paths(design: &ir::Design, e: ir::ExprId) -> u32 {
+    let mut rows = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut stack = vec![e];
+    let mut out = Vec::new();
+    while let Some(r) = stack.pop() {
+        if r.is_none() || !seen.insert(r) {
+            continue;
+        }
+        rows.push(r);
+        out.clear();
+        kids(design, r, &mut out);
+        stack.extend_from_slice(&out);
+    }
+    assert!(rows.len() <= design.expr_count(), "each row once");
+    rows.sort_unstable();
+    let mut size: std::collections::HashMap<ir::ExprId, u32> = std::collections::HashMap::new();
+    for &r in &rows {
+        out.clear();
+        kids(design, r, &mut out);
+        let below = out.iter().fold(1u32, |n, k| n.saturating_add(size[k]));
+        size.insert(r, below);
+    }
+    size.get(&e).copied().unwrap_or(0)
+}
+
+/// [`note_left`] for a copying rule: an item [`keep_bounded`] put back gets `U0116`.
+pub(super) fn note_left_copying(
+    design: &ir::Design,
+    diags: &mut ir::Diags,
+    feature: ir::Feature,
+    code: ir::Code,
+    reverted: &[ir::ItemRef],
+) {
+    note_items(design, diags, feature, code, reverted);
+}
+
 /// Puts `code` (`U0112` at a function body read in both forms) at every item that still
 /// carries `feature` (`ir::check_legal`'s items, the
 /// ones `legalize` will refuse), with the feature's index as its argument.
@@ -223,25 +332,7 @@ pub(super) fn note_left(
     feature: ir::Feature,
     code: ir::Code,
 ) {
-    let index = u32::from(feature.index());
-    // only a function's or operator's feature has a form (A26)
-    let split = matches!(
-        feature,
-        ir::Feature::Func(_)
-            | ir::Feature::FuncDyn(_)
-            | ir::Feature::Binary(_)
-            | ir::Feature::BinaryDyn(_)
-            | ir::Feature::Unary(_)
-            | ir::Feature::UnaryDyn(_)
-    );
-    for item in carrying(design, feature) {
-        let code = if split && both_forms(design, item) {
-            BOTH_FORMS
-        } else {
-            code
-        };
-        diags.push_at(code, design, item, index);
-    }
+    note_items(design, diags, feature, code, &[]);
 }
 
 /// Whether `item` is a function whose body its callers read in both forms (A28): no one-form
@@ -330,5 +421,38 @@ pub(super) fn form(dynamic: bool) -> ir::Form {
     match dynamic {
         true => ir::Form::Dynamic,
         false => ir::Form::Static,
+    }
+}
+
+// ---- private ----
+
+/// The notes of [`note_left`] and [`note_left_copying`].
+fn note_items(
+    design: &ir::Design,
+    diags: &mut ir::Diags,
+    feature: ir::Feature,
+    code: ir::Code,
+    reverted: &[ir::ItemRef],
+) {
+    let index = u32::from(feature.index());
+    // only a function's or operator's feature has a form (A26)
+    let split = matches!(
+        feature,
+        ir::Feature::Func(_)
+            | ir::Feature::FuncDyn(_)
+            | ir::Feature::Binary(_)
+            | ir::Feature::BinaryDyn(_)
+            | ir::Feature::Unary(_)
+            | ir::Feature::UnaryDyn(_)
+    );
+    for item in carrying(design, feature) {
+        let code = if split && both_forms(design, item) {
+            BOTH_FORMS
+        } else if reverted.contains(&item) {
+            OPERAND_TOO_LARGE
+        } else {
+            code
+        };
+        diags.push_at(code, design, item, index);
     }
 }

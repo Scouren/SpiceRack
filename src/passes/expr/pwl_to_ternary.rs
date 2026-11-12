@@ -16,7 +16,7 @@
 //! `pub fn pwl_to_ternary_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::PWL_POINTS;
-use super::nodes::{Draws, form, func_form, literal, note_left, plain};
+use super::nodes::{Draws, form, func_form, keep_bounded, literal, note_left_copying, plain};
 use crate::ir;
 
 /// Rewrites `Pwl` in every root of the plain form.
@@ -33,58 +33,66 @@ pub fn pwl_to_ternary_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
 
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let draws = Draws::new(design);
-    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
-        let d = b.design();
-        let ir::Expr::Call(ir::Func::Pwl, args) = d.expr(e) else {
-            return None;
-        };
-        let all = d.exprs(args).to_vec();
-        let (x, pts) = all.split_first().expect("check: pwl has arguments");
-        if pts.is_empty() || pts.len() % 2 != 0 || draws.holds(d, *x) {
-            return None;
-        }
-        let values: Option<Vec<f64>> = pts.iter().map(|&p| literal(d, p)).collect();
-        let values = values?;
-        if values
-            .chunks_exact(2)
-            .zip(values.chunks_exact(2).skip(1))
-            .any(|(a, b)| b[0] <= a[0])
-        {
-            return None;
-        }
-        // an Int point is spelled as the Real literal of its value: `pwl` is Real, and a
-        // point passed through or subtracted would keep the Int tag (and its 2⁵³ bound)
-        let pts: Vec<ir::ExprId> = pts
-            .iter()
-            .zip(&values)
-            .map(|(&p, &v)| match int_form(b.design(), p) {
-                true => plain(b, v as i64, 0),
-                false => p,
-            })
-            .collect();
-        let point = |k: usize| (pts[2 * k], pts[2 * k + 1]);
-        let n = pts.len() / 2;
-        let (x1, y1) = point(0);
-        let (xn, yn) = point(n - 1);
-        // inner first: the chain of segments (the last needs no test), then the two ends
-        let chain = match n {
-            1 => y1,
-            _ => {
-                let mut c = segment(b, *x, point(n - 2), point(n - 1));
-                for k in (0..n - 2).rev() {
-                    let s = segment(b, *x, point(k), point(k + 1));
-                    let before = b.binary(ir::BinOp::Lt, *x, point(k + 1).0);
-                    c = b.ternary(before, s, c);
-                }
-                c
+    let reverted = keep_bounded(design, &mut |d| {
+        ir::rewrite_exprs_in(d, form(dynamic), &mut |b, e| {
+            let d = b.design();
+            let ir::Expr::Call(ir::Func::Pwl, args) = d.expr(e) else {
+                return None;
+            };
+            let all = d.exprs(args).to_vec();
+            let (x, pts) = all.split_first().expect("check: pwl has arguments");
+            if pts.is_empty() || pts.len() % 2 != 0 || draws.holds(d, *x) {
+                return None;
             }
-        };
-        let high = b.binary(ir::BinOp::Ge, *x, xn);
-        let inner = b.ternary(high, yn, chain);
-        let low = b.binary(ir::BinOp::Le, *x, x1);
-        Some(b.ternary(low, y1, inner))
+            let values: Option<Vec<f64>> = pts.iter().map(|&p| literal(d, p)).collect();
+            let values = values?;
+            if values
+                .chunks_exact(2)
+                .zip(values.chunks_exact(2).skip(1))
+                .any(|(a, b)| b[0] <= a[0])
+            {
+                return None;
+            }
+            // an Int point is spelled as the Real literal of its value: `pwl` is Real, and a
+            // point passed through or subtracted would keep the Int tag (and its 2⁵³ bound)
+            let pts: Vec<ir::ExprId> = pts
+                .iter()
+                .zip(&values)
+                .map(|(&p, &v)| match int_form(b.design(), p) {
+                    true => plain(b, v as i64, 0),
+                    false => p,
+                })
+                .collect();
+            let point = |k: usize| (pts[2 * k], pts[2 * k + 1]);
+            let n = pts.len() / 2;
+            let (x1, y1) = point(0);
+            let (xn, yn) = point(n - 1);
+            // inner first: the chain of segments (the last needs no test), then the two ends
+            let chain = match n {
+                1 => y1,
+                _ => {
+                    let mut c = segment(b, *x, point(n - 2), point(n - 1));
+                    for k in (0..n - 2).rev() {
+                        let s = segment(b, *x, point(k), point(k + 1));
+                        let before = b.binary(ir::BinOp::Lt, *x, point(k + 1).0);
+                        c = b.ternary(before, s, c);
+                    }
+                    c
+                }
+            };
+            let high = b.binary(ir::BinOp::Ge, *x, xn);
+            let inner = b.ternary(high, yn, chain);
+            let low = b.binary(ir::BinOp::Le, *x, x1);
+            Some(b.ternary(low, y1, inner))
+        });
     });
-    note_left(design, diags, func_form(ir::Func::Pwl, dynamic), PWL_POINTS);
+    note_left_copying(
+        design,
+        diags,
+        func_form(ir::Func::Pwl, dynamic),
+        PWL_POINTS,
+        &reverted,
+    );
 }
 
 /// `y₀ + (y₁ − y₀) · (x − x₀) / (x₁ − x₀)`, as the evaluator computes it.
