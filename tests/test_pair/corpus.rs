@@ -1,7 +1,7 @@
 //! The corpus cells of the pair test (`--features corpus`, SPINE §8a): every deck of a corpus
 //! the old cross-sim cells run (spice-bench for `ngspice-vacask`, the VACASK corpus for
 //! `vacask-ngspice`), read leniently with every file it names, through the six steps on
-//! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash). A deck the
+//! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash) on every tenth written deck. A deck the
 //! corpus's cross-sim source list quarantines as `slow` is converted and not simulated.
 //!
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
@@ -40,6 +40,11 @@ pub struct Corpus {
     /// The cross-sim corpus name.
     pub source_list: &'static str,
 }
+
+/// Step 6 runs on every this-many-th written deck of a corpus.
+// ponytail: a sample; one job over all of spice-bench is an hour on one core. The whole set
+// when a nightly has the hour.
+const STRIDE_SIX: usize = 10;
 
 /// Every deck of `corpus` through `c`'s six steps: the census written, its table printed, and
 /// the differences from the cell's corpus list returned (empty: the list holds).
@@ -115,22 +120,29 @@ pub fn census(c: &Cell, corpus: &Corpus) -> Vec<String> {
     assert_eq!(done.len(), paths.len(), "{}: every deck ran", c.name);
     let mut seen: BTreeMap<(String, u8), Fail> = BTreeMap::new();
     let mut lines = Vec::new();
+    let mut again = Vec::new();
     for (k, v, h) in done {
         let name = rel(&paths[k]);
         lines.push(format!("{name} {}", crate::line(&v, h.is_some())));
         for (step, f) in v.fails {
             seen.insert((name.clone(), step), f);
         }
-        // Step 6: the deck converted again on one job, against the bytes `jobs` workers wrote.
         if let Some(h) = h
-            && run::convert(from, to, &load(&paths[k])).map(|w| hash(&w)) != Some(h)
+            && k % STRIDE_SIX == 0
         {
-            let said = format!("the written bytes differ between {jobs} jobs and 1");
-            seen.insert((name, 6), run::fail("nondeterministic", said));
+            again.push((k, name, h));
         }
     }
     let file = format!("{}/pair-{}-census.txt", env!("CARGO_TARGET_TMPDIR"), c.name);
     std::fs::write(&file, lines.join("\n") + "\n").unwrap_or_else(|e| panic!("{file}: {e}"));
+    // Step 6, on every STRIDE_SIX-th written deck: converted again on one job, against the
+    // bytes the workers wrote.
+    for (k, name, h) in again {
+        if run::convert(from, to, &load(&paths[k])).map(|w| hash(&w)) != Some(h) {
+            let said = format!("the written bytes differ between {jobs} jobs and 1");
+            seen.insert((name, 6), run::fail("nondeterministic", said));
+        }
+    }
     eprintln!(
         "{}: census of {} decks in {file}\n{}",
         c.name,
