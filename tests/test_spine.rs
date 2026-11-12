@@ -414,6 +414,7 @@ fn the_facade_writes_todays_message_lines_from_spans() {
     };
     let strict = |span| ir::Diag {
         code: STRICT_UNREAD,
+        item: ir::ItemRef::NONE,
         span,
         arg: 0,
     };
@@ -442,6 +443,7 @@ fn the_facade_writes_todays_message_lines_from_spans() {
 fn a_new_code_with_no_row_is_shown_by_its_verdict() {
     let d = |code| ir::Diag {
         code,
+        item: ir::ItemRef::NONE,
         span: ir::Span::NONE,
         arg: 0,
     };

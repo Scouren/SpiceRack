@@ -2,14 +2,18 @@
 //! `passes::GROUPS`, over generated designs that use the pass's `removes` feature and over ones
 //! that do not:
 //! - P1: `ir::check` is clean after it;
-//! - P2: every item still carrying `removes` has a coded note of that pass (`Pass::notes`) at
-//!   it, and every other item has lost it;
+//! - P2: every item still carrying `removes` (by `ir::check_legal`, per `Diag::item`) has a
+//!   coded note of that pass (`Pass::notes`) at that item (`Diag::item`, not the span: a
+//!   generated item has none), and every other item has lost it;
 //! - P3: its output uses nothing outside its input's features plus `requires`;
 //! - P4: running it twice equals running it once (IR text equal);
 //! - P5: on a design without the feature nothing changes (IR text equal).
 //!
 //! And each pass's fixtures, `tests/fixtures/passes/<group>/<pass>/<case>.ir` read, passed and
-//! written back equal to `<case>.out.ir`; a fixture folder naming no registered pass fails.
+//! written back equal to `<case>.out.ir`, the codes the pass appended equal, in order, to
+//! `<case>.notes` (one code a line, `#` comments; A26). A case whose pass appends a row and has
+//! no `.notes` fails, and so does a `.notes` that lists what the pass did not append; a fixture
+//! folder naming no registered pass fails.
 //!
 //! Failing passes are compared with [`KNOWN`] by name, strictly both ways; a law that ran on no
 //! generated design for a pass fails for it (a registered pass with no law run is a failure).
@@ -42,6 +46,9 @@ const SIZE: Size = Size {
 /// is not listed for fails, and so does a listed pass that passes.
 const KNOWN: &[(&str, &str, &str)] = &[];
 
+/// The leaky self-test pass's note code.
+const LEAKY: ir::Code = ir::Code::new(b'U', 399);
+
 // ---- private ----
 
 #[test]
@@ -62,24 +69,32 @@ fn p1_check_is_clean_after_the_pass() {
 
 #[test]
 fn p2_every_item_left_carrying_the_feature_has_the_passes_note() {
-    laws("p2", |pass| {
-        each_with(pass, |seed, mut design| {
-            let mut diags = ir::Diags::new();
-            (pass.run)(&mut design, &mut diags);
-            for at in carrying(&design, pass.removes) {
-                let noted = diags
-                    .rows()
-                    .iter()
-                    .any(|d| d.span == at && pass.notes.contains(&d.code));
-                if !noted {
-                    return Err(format!(
-                        "seed {seed}: an item at {at:?} keeps it with no note"
-                    ));
-                }
-            }
-            Ok(())
-        })
-    });
+    laws("p2", p2_on);
+}
+
+/// P2's self-test (A25): a pass that notes the first comment and leaves every comment fails
+/// P2 by item. By span it passed: every generated item's span is `NONE`, so one note anywhere
+/// matched every item.
+#[test]
+fn p2_by_item_catches_a_pass_that_notes_one_item_and_leaves_two() {
+    let leaky = Pass {
+        name: "leaky",
+        removes: ir::Feature::Item(ir::ItemKind::Comment),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[LEAKY],
+        run: note_first_comment,
+    };
+    let found = p2_on(&leaky).expect_err("P2 sees the comments left with no note");
+    assert!(found.contains("keeps it with no note"), "{found}");
+    let design = generate(0, &ir::FeatureSet::ALL, SIZE);
+    let spans: Vec<ir::Span> = carrying(&design, leaky.removes)
+        .iter()
+        .map(|&i| design.span_of(i))
+        .collect();
+    assert!(
+        spans.iter().all(|s| s.is_none()),
+        "generated items have no span"
+    );
 }
 
 #[test]
@@ -154,7 +169,8 @@ fn every_fixture_reads_passes_and_writes_its_expected_text() {
             for case in cases_in(&root.join(&group).join(&name)) {
                 cases += 1;
                 if let Err(m) = fixture(pass, &case) {
-                    failures.push(format!("{group}/{name}/{}: {m}", case.display()));
+                    let file = case.file_name().map(|f| f.to_string_lossy().into_owned());
+                    failures.push(format!("{group}/{name}/{}: {m}", file.unwrap_or_default()));
                 }
             }
         }
@@ -209,7 +225,7 @@ fn ran_on(ran: usize) -> Result<(), String> {
 }
 
 /// The spans of the items that carry `feature`: `check_legal` against every feature but it.
-fn carrying(design: &ir::Design, feature: ir::Feature) -> Vec<ir::Span> {
+fn carrying(design: &ir::Design, feature: ir::Feature) -> Vec<ir::ItemRef> {
     let legal = ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(feature));
     let mut rows = ir::Diags::new();
     ir::check_legal(design, &legal, &mut rows);
@@ -218,7 +234,39 @@ fn carrying(design: &ir::Design, feature: ir::Feature) -> Vec<ir::Span> {
         .rows()
         .iter()
         .filter(|d| d.code == ir::diag::UNSUPPORTED && d.arg == index);
-    rows.map(|d| d.span).collect()
+    rows.map(|d| d.item).collect()
+}
+
+/// P2 on one pass: every item still carrying `removes` after it has one of its notes at that
+/// item (`Diag::item`).
+fn p2_on(pass: &Pass) -> Result<(), String> {
+    each_with(pass, |seed, mut design| {
+        let mut diags = ir::Diags::new();
+        (pass.run)(&mut design, &mut diags);
+        for item in carrying(&design, pass.removes) {
+            let noted = diags
+                .rows()
+                .iter()
+                .any(|d| d.item == item && pass.notes.contains(&d.code));
+            if !noted {
+                return Err(format!(
+                    "seed {seed}: the item {item:?} keeps it with no note"
+                ));
+            }
+        }
+        Ok(())
+    })
+}
+
+/// The leaky self-test pass: one note, at the first comment, and no change.
+fn note_first_comment(design: &mut ir::Design, diags: &mut ir::Diags) {
+    let first = design
+        .reachable()
+        .into_iter()
+        .find(|(i, _)| i.kind == ir::ItemKind::Comment);
+    if let Some((item, _)) = first {
+        diags.push_at(LEAKY, design, item, 0);
+    }
 }
 
 /// `≅`: the canonical IR text of every file.
@@ -283,6 +331,23 @@ fn fixture(pass: &Pass, case: &Path) -> Result<(), String> {
         return Err(format!("the input does not read clean: {:?}", diags.rows()));
     }
     (pass.run)(&mut design, &mut diags);
+    let noted: Vec<String> = diags.rows().iter().map(|d| d.code.to_string()).collect();
+    let listed = match std::fs::read_to_string(case.with_extension("notes")) {
+        Ok(t) => t
+            .lines()
+            .map(|l| l.split('#').next().unwrap_or("").trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect(),
+        Err(_) if noted.is_empty() => Vec::new(),
+        Err(_) => {
+            return Err(format!(
+                "the pass noted {noted:?} and the case has no .notes"
+            ));
+        }
+    };
+    if noted != listed {
+        return Err(format!("notes {noted:?}, its .notes lists {listed:?}"));
+    }
     ir::check(&design, &mut diags);
     let refused: Vec<_> = diags
         .rows()

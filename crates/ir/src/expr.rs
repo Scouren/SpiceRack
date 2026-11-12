@@ -370,6 +370,8 @@ pub(crate) struct Exprs {
     pub(crate) calls: Vec<UserCall>,
     /// The literal side table (`NumId`).
     pub(crate) nums: Vec<Literal>,
+    /// The significands of `Long` literals as written (A18), by a `Long` literal's `mantissa`.
+    pub(crate) long: Vec<Box<str>>,
 }
 
 /// A user-function call's payload (two words do not hold a reference and a list).
