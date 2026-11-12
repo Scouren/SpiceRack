@@ -148,6 +148,8 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::PssScIter, "  analysis pss driven fundamental=1meg tstab=1u sc_iter=50", PSS),
     (RunExtra::PssSteadyCoeff, "  analysis pss driven fundamental=1meg tstab=1u steady_coeff=1m", PSS),
     (RunExtra::FourHarmonicsOption, "  option n_freqs value=10\n  analysis four fundamental=1k periods=1 (v (out))", "  option n_freqs value=10\n  analysis four fundamental=1k harmonics=9 periods=1 (v (out))"),
+    (RunExtra::StateFromHere, "  env temp=1", "  env temp=1 whole_run"),
+    (RunExtra::StateWholeRun, "  nodeset ic transient node=(a) value=1 whole_run", S),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";

@@ -288,11 +288,15 @@ pub enum RunExtra {
     /// A Fourier analysis whose harmonic count comes from the deck's `nfreqs` option
     /// (`Four::harmonics` absent).
     FourHarmonicsOption,
+    /// A state item (option, `Env`, `NodeSet`) that holds `FromHere`, wherever it stands.
+    StateFromHere,
+    /// A state item that holds `WholeRun`, wherever it stands.
+    StateWholeRun,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 132] = [
+    pub const ALL: [RunExtra; 134] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -425,6 +429,8 @@ impl RunExtra {
         RunExtra::PssScIter,
         RunExtra::PssSteadyCoeff,
         RunExtra::FourHarmonicsOption,
+        RunExtra::StateFromHere,
+        RunExtra::StateWholeRun,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
