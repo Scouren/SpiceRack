@@ -73,6 +73,9 @@ struct R<'r, 'b> {
     /// The model drawn first for this element (R48 d), named by `fitting_model` before any
     /// other: a draw among every generated model could miss it.
     drawn: Option<Ref>,
+    /// A behavioural source's output, drawn with its header (it fixes the multiplier's
+    /// member, R58) and read by `behav`.
+    behav_out: Option<crate::controlled::OutKind>,
 }
 
 /// Pushes one random element into `scope`, or returns `ItemRef::NONE` when the set allows no
@@ -89,6 +92,7 @@ pub(crate) fn generate_element(
         f: features,
         scope,
         drawn: None,
+        behav_out: None,
     };
     let kinds: Vec<ElemKind> = ElemKind::ALL.into_iter().filter(|&k| r.can(k)).collect();
     if kinds.is_empty() {
@@ -160,9 +164,21 @@ pub(crate) fn generate_element(
         } else {
             MultLaw::Parallel
         };
+    // a controlled source's multiplier member follows its output (R58)
+    if kind == ElemKind::Behav {
+        r.behav_out = Some(r.behav_output());
+    }
+    let voltage = match kind {
+        ElemKind::Vcvs | ElemKind::Ccvs | ElemKind::Delay => true,
+        ElemKind::Poly | ElemKind::Table | ElemKind::Laplace | ElemKind::FreqTable => {
+            out == Quantity::Voltage
+        }
+        ElemKind::Behav => r.behav_out == Some(crate::controlled::OutKind::Voltage),
+        _ => false,
+    };
     let mult_feature = match mult_law {
         MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
-        MultLaw::Parallel => crate::circuit_features::mult_class(kind),
+        MultLaw::Parallel => crate::circuit_tables::mult_class(kind, voltage),
     };
     let mult = if mult_law == MultLaw::NgspiceAppend || r.maybe(mult_feature) {
         r.ex()
@@ -194,6 +210,7 @@ pub(crate) fn generate_model(
         f: features,
         scope,
         drawn: None,
+        behav_out: None,
     };
     let families = r.model_families();
     if families.is_empty() {
