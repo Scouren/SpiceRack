@@ -79,7 +79,7 @@ const BROKEN: &[Fixture] = &[
         raw(b, s, AnalysisKind::Ac, Ac { sweep: sw });
     }),
     ("dc with no axis", Violation::FieldDomain, |b, s| {
-        raw(b, s, AnalysisKind::Dc, Dc { axes: List::EMPTY, restart: false });
+        raw(b, s, AnalysisKind::Dc, Dc { axes: List::EMPTY });
     }),
     ("hb with fewer harmonics than tones", Violation::FieldDomain, |b, s| {
         let t = [b.num(1e9), b.num(2e9)];

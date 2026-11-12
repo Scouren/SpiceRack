@@ -39,8 +39,8 @@
 //!
 //! let v1 = b.target(TargetKind::SourceDc, &[], "V1", None);
 //! let sweep = SweepSpec::lin_step(b.num(0.0), b.num(5.0), b.num(0.1));
-//! let axes = b.dc_axes(&[DcAxis { target: v1, sweep, name: NameId::NONE }]);
-//! b.analysis(body, None, Dc { axes, restart: false }, span);
+//! let axes = b.dc_axes(&[DcAxis { target: v1, sweep, name: NameId::NONE, afresh: false }]);
+//! b.analysis(body, None, Dc { axes }, span);
 //!
 //! let tran = Tran {
 //!     stop: b.num(1e-6), print_step: b.num(1e-9), record_start: ExprId::NONE,

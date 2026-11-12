@@ -44,7 +44,8 @@ pub enum RunExtra {
     TranSegments,
     /// A DC sweep of two or more axes.
     DcNested,
-    /// A DC sweep whose points restart from the initial guess.
+    /// A DC sweep whose innermost axis starts each point but an outer step's first from the
+    /// initial guess (`DcAxis::afresh` on `axes[0]`; ngspice in HSPICE compatibility mode).
     DcRestart,
     /// A DC axis over temperature.
     DcAxisTemp,
@@ -397,11 +398,19 @@ pub enum RunExtra {
     /// `alterparam a=2`, silently; `alter_param_reset.sp` prints 1.00000000e+00 then
     /// 2.00000000e+00 once a `reset` stands between.
     AlterParamAtReset,
+    /// A nested DC axis above the innermost whose steps start from the solve before them
+    /// (`DcAxis::afresh` false; VACASK's default, `latch.sim` in step3-runrules 8379e74f).
+    /// `DcOuterAfresh`'s twin: each axis above the innermost sets exactly one (R75).
+    DcOuterCarries,
+    /// A nested DC axis above the innermost whose steps start from the initial guess
+    /// (`DcAxis::afresh`; ngspice-45's nested `.dc`, `latch_desc.sp`: 3.490099 at outer step 2,
+    /// vin 2, against VACASK's carried 4.9734; VACASK's `continuation=0` on that axis).
+    DcOuterAfresh,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 172] = [
+    pub const ALL: [RunExtra; 174] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -574,6 +583,8 @@ impl RunExtra {
         RunExtra::PssArgumentOmitted,
         RunExtra::AlterParamAtOnce,
         RunExtra::AlterParamAtReset,
+        RunExtra::DcOuterCarries,
+        RunExtra::DcOuterAfresh,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

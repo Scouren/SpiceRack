@@ -59,6 +59,7 @@ fn pools_give_back_what_was_appended() {
         target: t[1],
         sweep,
         name: b.name("sw1"),
+        afresh: true,
     }];
     let axes = b.dc_axes(&axes_in);
     let spread = b.num(0.1);
@@ -472,22 +473,15 @@ fn statistics_and_dc_hold_their_lists() {
         target: src,
         sweep,
         name: NameId::NONE,
+        afresh: true,
     }]);
-    let dc = b.analysis(
-        top,
-        None,
-        Dc {
-            axes,
-            restart: true,
-        },
-        Span::NONE,
-    );
+    let dc = b.analysis(top, None, Dc { axes }, Span::NONE);
     assert_eq!(st.kind, ItemKind::Statistics);
     assert_eq!(d.row::<Statistics>(st.index), row);
     assert_eq!(d.varies(row.process), &v);
     let h: Analysis = d.row(dc.index);
     let got = d.detail::<Dc>(h.detail);
-    assert!(got.restart);
+    assert!(d.dc_axes(got.axes)[0].afresh);
     assert_eq!(d.dc_axes(got.axes)[0].target, src);
 }
 

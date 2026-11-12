@@ -347,3 +347,65 @@ fn a_generated_parameter_in_force_stands_before_and_is_applied() {
         "the generator drew a partial reset after an at-reset alter"
     );
 }
+
+#[test]
+fn a_nested_dc_point_is_seeded_by_the_outermost_axis_that_advanced() {
+    // R75 (F8): each DC axis says whether the solve after it advances starts from the previous
+    // solve or from the initial guess; the outermost axis that advanced decides; the first
+    // point is the initial guess. Oracle: a three-by-three grid (points 0..9, the inner axis
+    // fastest: point = 3 × outer + inner) with each point's seed written out by hand, under
+    // the four combinations (VACASK's `continuation=` per level, latch_c0_*.sim at
+    // step3-runrules 8379e74f; ngspice is inner carries, outer afresh, latch_desc.sp)
+    use spicerack_ir::dc_ac::dc_seeds;
+    type Seeds = [Option<usize>; 9];
+    let n = None;
+    let cases: [((bool, bool), Seeds); 4] = [
+        // (inner afresh, outer afresh)
+        // both carry (VACASK's default): every point from the one before
+        (
+            (false, false),
+            [
+                n,
+                Some(0),
+                Some(1),
+                Some(2),
+                Some(3),
+                Some(4),
+                Some(5),
+                Some(6),
+                Some(7),
+            ],
+        ),
+        // outer afresh only (ngspice; VACASK continuation=0 on the outer sweep): each outer
+        // step's first point starts over, the inner points carry
+        (
+            (false, true),
+            [
+                n,
+                Some(0),
+                Some(1),
+                n,
+                Some(3),
+                Some(4),
+                n,
+                Some(6),
+                Some(7),
+            ],
+        ),
+        // inner afresh only (VACASK continuation=0 on the inner sweep): an outer step's first
+        // point carries the previous step's last, every later inner point starts over
+        ((true, false), [n, n, n, Some(2), n, n, Some(5), n, n]),
+        // both afresh: every point from the initial guess
+        ((true, true), [n; 9]),
+    ];
+    for ((inner, outer), want) in cases {
+        assert_eq!(
+            dc_seeds(&[3, 3], &[inner, outer]),
+            want,
+            "inner {inner}, outer {outer}"
+        );
+    }
+    // one axis: the innermost bit alone (`DcRestart`)
+    assert_eq!(dc_seeds(&[3], &[false]), [n, Some(0), Some(1)]);
+    assert_eq!(dc_seeds(&[3], &[true]), [n, n, n]);
+}

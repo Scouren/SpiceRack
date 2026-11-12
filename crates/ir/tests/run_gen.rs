@@ -416,3 +416,40 @@ fn every_generated_parameter_alter_states_one_effect() {
         "parameter alters per set: {seen:?}"
     );
 }
+
+#[test]
+fn every_generated_outer_dc_axis_states_one_continuation() {
+    // R75: `DcOuterCarries` and `DcOuterAfresh` split the axes above the innermost exactly; a set
+    // with only one of them draws only that one (ngspice's set holds the afresh twin only)
+    use spicerack_ir::dc_ac::Dc;
+    let [carries, afresh] = [RunExtra::DcOuterCarries, RunExtra::DcOuterAfresh];
+    let without = |x: RunExtra| run_set().minus(FeatureSet::EMPTY.with(Feature::Run(x)));
+    let mut seen = [0usize; 3];
+    for (k, set) in [run_set(), without(afresh), without(carries)]
+        .iter()
+        .enumerate()
+    {
+        for seed in 0..400u64 {
+            let d = generate(seed, set, SIZE);
+            for (item, _) in d.reachable() {
+                if item.kind != ItemKind::Analysis {
+                    continue;
+                }
+                let row: spicerack_ir::Analysis = d.row(item.index);
+                if row.kind != AnalysisKind::Dc {
+                    continue;
+                }
+                let dc: Dc = d.detail(row.detail);
+                for axis in &d.dc_axes(dc.axes)[1..] {
+                    assert!(
+                        k != 1 || !axis.afresh,
+                        "seed {seed}: only the carrying twin"
+                    );
+                    assert!(k != 2 || axis.afresh, "seed {seed}: only the afresh twin");
+                    seen[k] += 1;
+                }
+            }
+        }
+    }
+    assert!(seen.iter().all(|&n| n > 10), "outer axes per set: {seen:?}");
+}
