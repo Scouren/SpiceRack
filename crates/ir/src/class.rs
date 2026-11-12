@@ -18,11 +18,11 @@
 //! `pub(crate) fn tree_class(&Design, ExprId, &[ExprClass]) -> ExprClass`,
 //! `pub(crate) fn tree_class_with(&Design, ExprId, &dyn Fn(DefId) -> ExprClass) -> ExprClass`,
 //! `pub(crate) fn class_nodes(&Design, ExprId, &mut Vec<ExprId>)`,
+//! `pub(crate) fn tree_nodes(&Design, ExprId, &mut Vec<ExprId>)`,
 //! `pub(crate) fn cycle_defs(&Design) -> Vec<usize>`,
 
 use crate::design::Design;
 use crate::expr::{Expr, Func};
-use crate::feature::ExprWalk;
 use crate::id::{DefId, ExprId, NameId};
 use crate::item::{DefKind, ItemKind};
 
@@ -82,31 +82,13 @@ pub(crate) fn tree_class_with(
 /// finding a: a call is its body with each formal read taking its argument's class, so an
 /// unread argument adds nothing). Explicit stack (C11); descends only to lower ids.
 pub(crate) fn class_nodes(design: &Design, root: ExprId, out: &mut Vec<ExprId>) {
-    let mut seen: std::collections::HashSet<u32, std::hash::BuildHasherDefault<crate::names::Fx>> =
-        Default::default();
-    let mut stack = vec![root];
-    let mut kids = Vec::new();
-    while let Some(e) = stack.pop() {
-        if e.is_none() || e.index() >= design.expr_count() || !seen.insert(e.0) {
-            continue;
-        }
-        out.push(e);
-        kids.clear();
-        design.children(e, &mut kids);
-        if let Expr::UserCall(r, _) = design.expr(e)
-            && let Some(read) = formals_read(design, r.def)
-        {
-            // only the arguments whose formal the body reads (an argument past the formals is
-            // `check`'s arity violation, and reads as unread)
-            let mut k = 0;
-            kids.retain(|_| {
-                k += 1;
-                read.get(k - 1).copied().unwrap_or(false)
-            });
-        }
-        // children have lower ids, so the walk ends on any table contents
-        stack.extend(kids.iter().copied().filter(|k| *k < e));
-    }
+    walk_small(design, root, out, true);
+}
+
+/// The rows of the tree under `root`, each once, with no table sized by the design (so a row
+/// may call it per expression: O(its tree)). Explicit stack (C11); descends only to lower ids.
+pub(crate) fn tree_nodes(design: &Design, root: ExprId, out: &mut Vec<ExprId>) {
+    walk_small(design, root, out, false);
 }
 
 /// The class of every definition, by `DefId` (`Constant` for kinds an expression does not read),
@@ -128,6 +110,38 @@ pub(crate) fn cycle_defs(design: &Design) -> Vec<usize> {
 
 // ---- private ----
 
+/// [`class_nodes`] (`read_only`: a user call's unread arguments skipped) or [`tree_nodes`]. Its
+/// seen-set grows with the tree, never with the design: a design-sized table here made every
+/// call's `formals_read` O(expressions), and `check` quadratic.
+fn walk_small(design: &Design, root: ExprId, out: &mut Vec<ExprId>, read_only: bool) {
+    let mut seen: std::collections::HashSet<u32, std::hash::BuildHasherDefault<crate::names::Fx>> =
+        Default::default();
+    let mut stack = vec![root];
+    let mut kids = Vec::new();
+    while let Some(e) = stack.pop() {
+        if e.is_none() || e.index() >= design.expr_count() || !seen.insert(e.0) {
+            continue;
+        }
+        out.push(e);
+        kids.clear();
+        design.children(e, &mut kids);
+        if read_only
+            && let Expr::UserCall(r, _) = design.expr(e)
+            && let Some(read) = formals_read(design, r.def)
+        {
+            // only the arguments whose formal the body reads (an argument past the formals is
+            // `check`'s arity violation, and reads as unread)
+            let mut k = 0;
+            kids.retain(|_| {
+                k += 1;
+                read.get(k - 1).copied().unwrap_or(false)
+            });
+        }
+        // children have lower ids, so the walk ends on any table contents
+        stack.extend(kids.iter().copied().filter(|k| *k < e));
+    }
+}
+
 /// Whether the body of user function `def` reads each of its formals, by position; `None` when
 /// `def` is no function this design defines (then every argument counts).
 fn formals_read(design: &Design, def: DefId) -> Option<Vec<bool>> {
@@ -140,8 +154,7 @@ fn formals_read(design: &Design, def: DefId) -> Option<Vec<bool>> {
     }
     let f: crate::item::Func = design.row(d.item.index);
     let mut nodes = Vec::new();
-    let mut walk = ExprWalk::new(design);
-    nodes.extend_from_slice(walk.tree(design, f.body));
+    tree_nodes(design, f.body, &mut nodes);
     let reads: Vec<NameId> = nodes
         .iter()
         .filter_map(|&e| match design.expr(e) {

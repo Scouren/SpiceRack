@@ -18,7 +18,7 @@ use crate::edit::Editor;
 use crate::element::Element;
 use crate::expr::Expr;
 use crate::facts::RowFacts;
-use crate::feature::{ExprWalk, expr_roots};
+use crate::feature::expr_roots;
 use crate::id::{ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, Subckt};
 
@@ -141,12 +141,14 @@ fn next_scope(design: &Design, scope: ScopeId, name: NameId) -> Option<ScopeId> 
 fn current_reads(design: &Design, item: ItemRef) -> Vec<(ExprId, NameId)> {
     let mut handles = Vec::new();
     design.item_handles(item, &mut handles);
-    let mut walk = ExprWalk::new(design);
     let mut seen = std::collections::HashSet::new();
+    let mut nodes = Vec::new();
     let mut out = Vec::new();
     for root in expr_roots(design, &handles) {
         // children are built before parents, left to right: ascending ids are source order
-        let mut nodes = walk.tree(design, root).to_vec();
+        // O(the item's trees), not O(the design): a pass calls this per item
+        nodes.clear();
+        crate::class::tree_nodes(design, root, &mut nodes);
         nodes.sort_unstable();
         for &e in &nodes {
             if let Expr::I(name) = design.expr(e)
