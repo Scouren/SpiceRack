@@ -355,6 +355,17 @@ fn the_kernel_code_table() {
         assert_eq!(code, Code::new(b'S', k as u16 + 1));
         assert_eq!(diag::info(code).expect("S row").kind, Kind::Note);
     }
+    // A12 K3: Hint is appended, so the codes before it keep their numbers
+    let hint = diag::info(Code::new(b'S', 6)).expect("S0006 is Hint");
+    assert_eq!(diag::opaque_code(OpaqueClass::Hint), Code::new(b'S', 6));
+    assert_eq!(hint.kind, Kind::Note);
+    assert_ne!(
+        hint.explain,
+        diag::info(diag::opaque_code(OpaqueClass::Inert))
+            .expect("S0003")
+            .explain,
+        "its own note, not Inert's"
+    );
     assert_eq!(diag::info(UNSUPPORTED).expect("U row").kind, Kind::Refusal);
     assert!(diag::info(TEXT_SYNTAX).is_some());
     assert_eq!(diag::info(Code::new(b'W', 1)), None, "another owner's code");

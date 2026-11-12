@@ -432,6 +432,7 @@ fn class_word(class: OpaqueClass) -> &'static str {
         OpaqueClass::Inert => "inert",
         OpaqueClass::InvalidInSource => "invalid",
         OpaqueClass::Script => "script",
+        OpaqueClass::Hint => todo!(),
     }
 }
 

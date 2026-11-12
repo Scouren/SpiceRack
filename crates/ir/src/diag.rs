@@ -274,5 +274,6 @@ fn opaque_text(c: OpaqueClass) -> (&'static str, &'static str) {
             "data-dependent control flow",
             "kept as its dialect's text; a script is not a static run plan.",
         ),
+        OpaqueClass::Hint => todo!(),
     }
 }
