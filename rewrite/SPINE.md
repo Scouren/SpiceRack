@@ -201,7 +201,11 @@ laws run on.
   count, and the laws run on the rest; a refusal at no item skips the seed, counted by code in
   the failure text. A law that runs on no design fails. The reach list: every `Item`, `Elem`,
   `Wave`, `Analysis` and `Family` kind of the writer's features is used by some admitted design
-  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list. So a writer's `admits`
+  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list of (row, kind, covering
+  property, why) (R55): the covering property is a seeded test in the owning area's test file
+  that builds admissible designs of the kind through the builder and checks write, read back
+  and `eq_meaning`, with floors on designs run and designs holding the kind; the law fails when
+  the name is empty or no file under `tests/` defines `fn <name>(` (a text search). So a writer's `admits`
   pushes each refusal at its item (`Diags::push_at`); a refusal at no item costs the seed. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden
