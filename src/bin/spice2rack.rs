@@ -289,7 +289,8 @@ fn convert_new(
                 dialect::legalize(&mut design, w, &mut diags);
             }
             let name = w.map_or(irtext::SUFFIX, |w| w.name);
-            let shown = facade::diags(diags.rows(), &src, stem, name);
+            let cited = w.and_then(|w| w.write).map_or(&[][..], |w| w.citations());
+            let shown = facade::diags(diags.rows(), &src, stem, name, cited);
             eprint!("{}", shown.messages);
             if diags.rows().iter().any(|d| dialect::refuses(d.code)) {
                 return fail("refused".into());

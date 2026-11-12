@@ -35,7 +35,8 @@
 //!
 //! Contents:
 //! - `pub trait Read` (`Read::references`, `Read::read`),
-//!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`)
+//!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`,
+//!   `Write::citations`), `pub struct Citation`
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
 //!   `pub const STRICT_UNBOUND: ir::Code`,
@@ -90,6 +91,26 @@ pub trait Write: Sync {
     /// not have, a name it cannot quote). Never for something a feature could state. Default:
     /// nothing. [`legalize`] calls it last, always (AMEND-A12 S1, R21).
     fn admits(&self, _design: &ir::Design, _diags: &mut ir::Diags) {}
+
+    /// The features this dialect lacks because its simulator has no exact form for them, each
+    /// with its evidence (R57, A34): law L7 counts a lacked feature cited, not missing. A
+    /// citation is never a to-do: a feature some pass could remove exactly is missing, not
+    /// cited, and a citation of a feature the writer has or that a pass makes legal fails the
+    /// law. Default: none.
+    fn citations(&self) -> &'static [Citation] {
+        &[]
+    }
+}
+
+/// Why a dialect lacks a feature (R57, A34): the evidence that its simulator has no exact form
+/// for it. The facade's refusal message for the feature ends with it.
+#[derive(Clone, Copy, Debug)]
+pub struct Citation {
+    /// The lacked feature.
+    pub feature: ir::Feature,
+    /// The manual clause, the simulator's source (file and function), or a settle deck's path
+    /// relative to the dialect's fixtures (`tests/fixtures/dialect/<row>/`, checked to exist).
+    pub evidence: &'static str,
 }
 
 /// One language. CDL and Verilog have no reader.
