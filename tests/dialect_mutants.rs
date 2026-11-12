@@ -23,12 +23,7 @@ use spicerack::ir;
 const MUTANTS: u64 = 32;
 
 /// The rows that fail today: (law, row, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "l1-mutants",
-    "ngspice",
-    "run: `.options fourgridsize=400` with `.four` pushes a key of another kind (X0015); \
-     reported to ng-run",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 /// splitmix64.
 struct Rng(u64);

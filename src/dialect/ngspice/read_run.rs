@@ -139,6 +139,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::Env),
     Feature::Run(RunExtra::WholeRunMidRun),
     Feature::Run(RunExtra::StateWholeRun),
+    // ngspice reads dot cards and element cards in any order (`inp.c` passes over the deck)
+    Feature::Run(RunExtra::RunInterleaved),
     // a run card in a `.subckt` body is the deck's (R26, run sub.cir); a `.ic` there holds each
     // instance's node (run icsub.cir); a `.lib` section's cards are its includer's
     Feature::Placed(ScopeKind::Subckt, ItemKind::Analysis),

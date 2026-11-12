@@ -33,6 +33,7 @@ const READ: &[&str] = &[
     "dc_step_zero",
     "disto",
     "four",
+    "four_gridsize",
     "four_nfreqs",
     "four_script",
     "ic",
