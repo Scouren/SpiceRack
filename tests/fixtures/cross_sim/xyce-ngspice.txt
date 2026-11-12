@@ -1,4 +1,3 @@
-ABM/ascth.cir target-fails # Unexpected format: Unexpected EOF in header
 ABM/stp.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'stp' at line 5
 ABM_ATAN_TAN/atan_tan.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(2): -1.5505144384943816 leaves the tube at t=0.0007398856841440102 (tol 1.558e-2)
 ABM_BREAK/break.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'table' at line 4
@@ -8,7 +7,6 @@ ABM_EXPLN/exp_const.cir target-fails # no raw file .cross_sim_out.raw: Formula()
 ABM_FREQ/RC_simple.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [freq]
 ABM_INT_FLOOR_CEIL/int_floor_ceil_bsrc.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'int' at line 6
 ABM_POW/abmpow2.cir target-fails # Unexpected format: Unexpected EOF in header
-ABM_POW/abmpow3.cir mismatch # dc V(5): 6.514488829943377+0i vs 6.849738914907609+0i at -2.5 (tol 1.370e-2)
 ABM_SPLINES/akima.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [sinewave]
 ABM_SPLINES/akima2.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [sinewave]
 ABM_SPLINES/barycentric.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [sinewave]
@@ -34,26 +32,18 @@ ABM_SPLINES/wodicka.cir target-fails # no raw file .cross_sim_out.raw: Undefined
 ABM_SPLINES/wodicka2.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [sinewave]
 ABM_TIME/time_param.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [time] | Formula() error. | Undefined parameter [partime]
 ACtests/SANDLER8/sandler8.cir mismatch # ac: sweep grid changed (67 -> 67 points)
-ACtests/bsim3soi/gain-stagesoi.cir mismatch # ac V(2): 0.023723918180052133-0.04187866430153707i vs 0.023607976970087905-0.042063161592426936i at 79432823.47242841 (tol 2.020e-4)
 ACtests/bsim4/gstage.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # ac V(3): -0.0006604390925003782+0.0000000005860174824115544i vs -0.0006643169744167735+0.0000000005895033723511711i at 100 (tol 3.321e-6)
 ACtests/bsim4/opamp.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # ac V(8): 0.997741591823423-0.000033139985729015444i vs 0.8589942159944693-0.012376025906705848i at 100 (tol 2.006e-3)
 ACtests/mos/gain-stage6.cir mismatch # ac V(2): 0.09999946945255755-0.00023033554385911846i vs 0.1+0i at 3981071.705534983 (tol 2.020e-4)
 AMPMOD/amp_mod.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(30): 13.005517297239802 leaves the tube at t=0.0002243761517194102 (tol 2.000e-1)
-B4SOI_450/invert_b4soi_4.5.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mn1 v
-B4SOI_450/inverter_tr.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: mn0 vs gate o
-B4SOI_450/ring_osc.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.xinv1
-B4SOI_450/test1.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test2.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test3.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test4.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate nmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test5.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate pmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test6.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate pmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test7.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate pmos1 w=1e-6 l=1e-7 soim
-B4SOI_450/test8.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source substrate pmos1 w=1e-6 l=1e-7 soim
-B4SOI_461/invert_b4soi.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: m.xinv1.mn1 vout in 0 0 0 cmosn w=4u l=0.15u as=6p ad=6p ps=7u pd=7u | Simulation interrupte
-B4SOI_461/inverter_tr.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: mn0 vs gate out vs nmos1 w=10u l=0.18u | Simulation interrupted due to error! | Error: circu
-B4SOI_461/ring_osc.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: m.xinv1.xinv1.xinv1.mn1 xinv1.xinv1.1 in ss sub nmos1 w=4u l=0.15u as=6p ad=6p ps=7u pd=7u p
-BINARYOPS/binary_funcs.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'pwrs' at line 9
+B4SOI_450/invert_b4soi_4.5.cir mismatch # tran VDDDEV#branch: -0.004150921538424679 leaves the tube at t=1.5083773420246618e-06 (tol 4.876e-05; target there -0.003277989441613449)
+B4SOI_450/inverter_tr.cir mismatch # tran VGATE#branch: -0.002481225949942353 leaves the tube at t=1.411811989374297e-10 (tol 3.375e-05; target there -0.0023086303492655625)
+B4SOI_450/ring_osc.cir mismatch # tran BUF: 0.07055074021050438 leaves the tube at t=8.605901878273634e-10 (tol 1.509e-02; target there 0.44418778524839575)
+B4SOI_450/test3.cir mismatch # dc VD#branch: -6.978103646901452e-11 vs 8.0449899842635e+26 at 0.02 (tol 9.326e-07; 180/183 points out)
+B4SOI_450/test7.cir mismatch # dc VD#branch: 6.690598311415213e-11 vs -5.542094503651548e+26 at -0.02 (tol 9.308e-07; 180/183 points out)
+B4SOI_461/invert_b4soi.cir mismatch # tran IN: 2.3278239648212327 leaves the tube at t=5.85e-11 (tol 2.345e-02; target there 2.2343076532061863)
+B4SOI_461/inverter_tr.cir mismatch # tran OUT: 1.6579135758286907 leaves the tube at t=1.2151564150877896e-10 (tol 1.711e-02; target there 1.635525404952955)
+B4SOI_461/ring_osc.cir mismatch # tran BUF: 0.0764971528126776 leaves the tube at t=8.627101990772193e-10 (tol 1.512e-02; target there 0.44418778524839575)
 BJT_OFF/bjt_off.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # op V(5): -12.467844528187145+0i vs -0.0003901058347318711+0i at 0 (tol 2.494e-2)
 BREAK/break.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [if]
 BSIM4/test1.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: -0.0012802943687932882+0i vs -0.0012729629523547516+0i at 0.34 (tol 7.305e-6)
@@ -96,62 +86,20 @@ BSIM4_rbodymod2/test7.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-
 BSIM4_rbodymod2/test8.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: 0.0006377548705301063+0i vs 0.0006341088345945861+0i at -0.32 (tol 3.644e-6)
 BSIM4_rbodymod2/test9.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: 0.0004570215678821272+0i vs 0.00045241179241321594+0i at -0.1 (tol 4.413e-6)
 BSIM4_v4p82/test1.cir simulator-differs:third-simulator reason=S-BSIM4-482-IG proof=s-bsim4-482-ig.md # dc VB#branch: 0.0000000003897007659907384+0i vs 0.00000000039463253725172804+0i at 0 (tol 3.038e-12)
-BSIM4_v4p82/test10.cir mismatch # dc VD#branch: 0.000004902537151799217+0i vs 0.0000006787565130319457+0i at -0.54 (tol 4.197e-6)
-BSIM4_v4p82/test14.cir mismatch # dc VB#branch: -0.000000000010741322246667632+0i vs -0.0000000000019144600400381225+0i at -0.86 (tol 8.800e-12)
 BSIM4_v4p82/test2.cir mismatch # dc VD#branch: -0.000006502855519505791+0i vs -0.00003662113752685598+0i at 0.02 (tol 1.455e-5)
 BSIM4_v4p82/test3.cir mismatch # dc VD#branch: -0.000013933958316252117+0i vs -0.0000018735974903101735+0i at 0.3 (tol 1.198e-5)
 BSIM4_v4p82/test4.cir simulator-differs:third-simulator reason=S-BSIM4-482-IG proof=s-bsim4-482-ig.md # dc VG#branch: -0.0000003022213384545269+0i vs -0.00000030423459969342037+0i at 0.98 (tol 1.922e-9)
 BSIM4_v4p82/test5.cir simulator-differs:third-simulator reason=S-BSIM4-482-IG proof=s-bsim4-482-ig.md # dc VB#branch: 0.00000000028683609587065034+0i vs 0.0000000002903466190325219+0i at 1.1800000000000002 (tol 3.115e-12)
 BSIM4_v4p82/test6.cir mismatch # dc VB#branch: 0.0000000000008195172562568242+0i vs 0.000000000004367499722342906+0i at 0.94 (tol 2.476e-12)
 BSIM4_v4p82/test7.cir mismatch # dc VB#branch: 0.000000000007893666877357281+0i vs 0.000000000001628247732900881+0i at 0.86 (tol 4.658e-12)
-BSIM4_v4p82/test9.cir mismatch # dc VD#branch: 0.00000039540721427983133+0i vs 0.000006000829804207352+0i at -0.54 (tol 5.544e-6)
-BSIM6/bsim6_nmos_outvars.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 drain gate source bulk nmos w=10u l=10u | Simulation interrupted due to error! | Error: c
-BSIM6/bsim6_pmos_outvars.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 drain gate source bulk pmos w=10e-6 l=10e-6 | Simulation interrupted due to error! | Erro
-BSIM6/gummel_nmos_xyce.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 drain gate source bulk nmos w=10u l=10u | Simulation interrupted due to error! | Error: c
-BSIM6/gummel_pmos_xyce.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 drain gate source bulk pmos w=10e-6 l=10e-6 | Simulation interrupted due to error! | Erro
-BSIM6/idvd_nmos_xyce.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 d g s b nmos w=10e-6 l=10e-6 | Simulation interrupted due to error! | Error: circuit not 
-BSIM6/idvd_pmos_xyce.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 d g s b pmos w=10e-6 l=10e-6 | Simulation interrupted due to error! | Error: circuit not 
-BSIM6/idvg_nmos_xyce.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 d g s b nmos w=10e-6 l=10e-6 | Simulation interrupted due to error! | Error: circuit not 
-BSIM6/idvg_pmos_xyce.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 d g s b pmos w=10e-6 l=10e-6 | Simulation interrupted due to error! | Error: circuit not 
-BSIM6/inverter_transient_xyce.cir target-fails # no raw file .cross_sim_out.raw: Error on line 7 or its substitute:: m.xinv1.mp1 1 vi supply 0 pmos w=10u l=10u | Simulation interrupted due to error! | Error: c
-BSIM6/ringosc_17_xyce.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [t2] | Undefined parameter [period]
-BSIMCMG/ac.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 vout gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=1 
-BSIMCMG/gummel_n.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG/gummel_n_outvars.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG/gummel_p.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG/inverter_transient.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mp1 1
-BSIMCMG_108/ac.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 vout gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=1 
-BSIMCMG_108/gummel_n.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_108/gummel_n_mult.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 12 or its substitute:: m1 drainsingle gatesingle sourcesingle bulksingle nmos
-BSIMCMG_108/gummel_n_outvars.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_108/gummel_p.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_108/gummel_p_mult.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 12 or its substitute:: m1 drainsingle gatesingle sourcesingle bulksingle pmos
-BSIMCMG_108/inverter_transient.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mp1 1
-BSIMCMG_110/ac.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 vout gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=1 
-BSIMCMG_110/gummel_n.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_110/gummel_n_outvars.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_110/gummel_p.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_110/gummel_p_outvars.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_110/inverter_transient.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mp1 1
-BSIMCMG_111/ac.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 vout gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=1 
-BSIMCMG_111/gummel_n.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/gummel_n_m6.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/gummel_n_m6_baseline.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/gummel_n_outvars.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk nmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/gummel_p.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/gummel_p_m6.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/gummel_p_m6_baseline.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/gummel_p_outvars.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate source bulk pmos1 tfin=15n l=30n nfin=10 
-BSIMCMG_111/inverter_transient.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mp1 1
-BSRC/Bsrc_B1.cir mismatch # tran: stop time Some(0.002) -> Some(2.5600000000000006e-5)
 BSRC/bsrc4_m.cir mismatch # dc V(3): -15+0i vs -1.5+0i at 1 (tol 3.600e-1)
 COMPARATOR/comparator.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 COMPLEX_NUM/test3.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [m] | Formula() error.
 CONNECTIVITY/connect.cir simulator-differs:self-inconsistency reason=XYCE-GLOBAL-FLOATING-NODE proof=xyce-global-floating-node.md # Xyce spikes at 1.019 ms with $G_BAD_PATH global, not local; ngspice the same either way
 Certification_Tests/BUG_1018_SON/bug1018son.cir mismatch # op ANODEOFMOSDIODE: 1.0592177780850767+0i vs 0.5180792647412922+0i at 0 (tol 2.120e-3)
 Certification_Tests/BUG_1037_SON/specials_in_dot_param.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [temp] | Formula() error. | Undefined parameter [vt] | Formula() error.
-Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale.cir target-fails # no raw file .cross_sim_out.raw: Error on line 11 or its substitute:: m1 anot a e1 e1 pmos w=3.6 l=1.2 | Simulation interrupted due to error! | Error: circuit no
-Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale2.cir target-fails # no raw file .cross_sim_out.raw: Error on line 11 or its substitute:: m1 anot a e1 e1 pmos w=3.6 l=1.2 | Simulation interrupted due to error! | Error: circuit no
+Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale.cir mismatch # tran V(1): -0.3762851594665437 leaves the tube at t=1.0954826735058434e-08 (tol 2.277e-02; target there 0.8824570593608186)
+Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale2.cir mismatch # tran V(1): 2.0394030325951755 leaves the tube at t=2.5239840023868877e-08 (tol 2.204e-02; target there 1.5735676654521173)
 Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScale2Ref.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V(1): 2.0394030325951755 leaves the tube at t=0.000000025239840023868877 (tol 2.204e-2)
 Certification_Tests/BUG_1041_SON/bsim3_comparatorBinningScaleRef.cir mismatch # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 Certification_Tests/BUG_1041_SON/mos1_invert_scale.cir mismatch # tran IN: 4.930539477883728 leaves the tube at t=0.00000150040625 (tol 5.000e-2)
@@ -180,12 +128,7 @@ Certification_Tests/BUG_1222_SON/bug_1222_son_2.cir target-fails # no raw file .
 Certification_Tests/BUG_1299_SON/bug1299son.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.9968095107021919 leaves the tube at t=0.487283156964356 (tol 1.000e-2)
 Certification_Tests/BUG_1377/test1.X.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: -0.0012802943687932882+0i vs -0.0012729629523547516+0i at 0.34 (tol 7.305e-6)
 Certification_Tests/BUG_1430/bug_1430.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v1 | Not enough parameters
-Certification_Tests/BUG_1558/bug_1558_1.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [r]
-Certification_Tests/BUG_1558/bug_1558_3.cir target-fails # no raw file .cross_sim_out.raw: 
-Certification_Tests/BUG_1558/bug_1558_4.cir target-fails # no raw file .cross_sim_out.raw: 
 Certification_Tests/BUG_1661/globalnode_expr_toplev.cir target-fails # no raw file .cross_sim_out.raw: Error in line   v1 | Not enough parameters
-Certification_Tests/BUG_1788/inv_tr_lev10.cir mismatch # tran VGATE#branch: -0.0046792939269548845 leaves the tube at t=0.00000000014737412497226637 (tol 4.679e-5)
-Certification_Tests/BUG_1788/inv_tr_lev57.cir mismatch # tran OUT: 1.6413745689387673 leaves the tube at t=0.00000000011378457333220437 (tol 1.658e-2)
 Certification_Tests/BUG_1797/one-shot_lev49.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
 Certification_Tests/BUG_1797/one-shot_lev9.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
 Certification_Tests/BUG_1826/linear_simple_global.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [table]
@@ -193,17 +136,11 @@ Certification_Tests/BUG_1826/linear_simple_param.cir target-fails # no raw file 
 Certification_Tests/BUG_1962/ic.cir mismatch # tran V(2): -0.1877024052511381 leaves the tube at t=0.0005 (tol 9.946e-3)
 Certification_Tests/BUG_1962/measure.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v] | Undefined parameter [v]
 Certification_Tests/BUG_2007/gstep.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-Certification_Tests/BUG_2039/bug_2039.cir mismatch # tran 2A: -0.01 leaves the tube at t=0 (tol 1.020e-4)
 Certification_Tests/BUG_22_SON/bug22.cir slow # quarantined
 Certification_Tests/BUG_243/bug_243_mpi.cir mismatch # tran VDDDEV#branch: -0.004749311891567535 leaves the tube at t=0.000001506632108717845 (tol 4.749e-5)
-Certification_Tests/BUG_254/atanh_tanh.cir mismatch # tran: stop time Some(0.002) -> Some(2.5600000000000006e-5)
-Certification_Tests/BUG_277_SON/ring51_srcstep1.cir mismatch # plots ["tran"] became []
-Certification_Tests/BUG_277_SON/ring51_srcstep2.cir mismatch # plots ["tran"] became []
-Certification_Tests/BUG_277_SON/ring51_trans.cir mismatch # plots ["tran"] became []
 Certification_Tests/BUG_28_SON/bug_28_son4_1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran NODE2: -4.406510656508213 leaves the tube at t=0.000007318699413764074 (tol 4.671e-2)
 Certification_Tests/BUG_28_SON/bug_28_son4_2.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran NODE2: 6.188612239949231 leaves the tube at t=0.000012489536082603444 (tol 6.247e-2)
 Certification_Tests/BUG_28_SON/bug_28_son4_3.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran XTEST:NODE5: -0.017951892213450556 leaves the tube at t=0.0000038077522187933305 (tol 2.044e-4)
-Certification_Tests/BUG_294_SON/bjt_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 Certification_Tests/BUG_307/bug_307_d.cir target-fails # no raw file .cross_sim_out.raw: Error on line 18 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 sw | Simulation interrupted due to error! | Error: circuit not parse
 Certification_Tests/BUG_307/bug_307_e.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 19 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 sw | Simulation interrupted d
 Certification_Tests/BUG_307/bug_307_f.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 21 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 x1.x1:sw | Simulation interru
@@ -218,9 +155,7 @@ Certification_Tests/BUG_318/bug_318.cir simulator-differs:self-inconsistency rea
 Certification_Tests/BUG_318/bug_318_noscope.cir simulator-differs:self-inconsistency reason=XYCE-GLOBAL-FLOATING-NODE proof=xyce-global-floating-node.md # Xyce spikes at 1.019 ms with $G_BAD_PATH global, not local; ngspice the same either way
 Certification_Tests/BUG_333_SON/bug_333_son_baseline.cir slow # quarantined
 Certification_Tests/BUG_333_SON/bug_333_son_baseline_unpacked.cir slow # quarantined
-Certification_Tests/BUG_372/invert1-sim.cir mismatch # tran VDDDEV#branch: -0.0029648003110620083 leaves the tube at t=0.0000015048960408435864 (tol 3.006e-5)
 Certification_Tests/BUG_372/invert1.cir mismatch # tran VDDDEV#branch: -0.0029692751229603753 leaves the tube at t=0.0000015049046263396088 (tol 3.013e-5)
-Certification_Tests/BUG_372/invert2-sim.cir mismatch # tran VDDDEV#branch: -0.0027033516775436866 leaves the tube at t=0.000010504857209481194 (tol 2.924e-5)
 Certification_Tests/BUG_372/invert2.cir mismatch # tran VDDDEV#branch: -0.0028887803937763224 leaves the tube at t=0.000013505000000000002 (tol 2.919e-5)
 Certification_Tests/BUG_372/invert3-sim.cir mismatch # tran VDDDEV#branch: -0.0027871422719588403 leaves the tube at t=0.000007525073772794464 (tol 2.787e-5)
 Certification_Tests/BUG_372/invert3.cir mismatch # tran VDDDEV#branch: 0.0007540852631445596 leaves the tube at t=0.0000030078630342931263 (tol 2.803e-5)
@@ -238,7 +173,6 @@ Certification_Tests/BUG_381/comparator0_7_0.cir simulator-differs:refinement rea
 Certification_Tests/BUG_381/comparator0_7_10.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.4844861862075827 leaves the tube at t=0.00000000031774842460976786 (tol 5.389e-3)
 Certification_Tests/BUG_381/comparator1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): 0.395176956785531 leaves the tube at t=0.00000000003150000000000001 (tol 1.027e-2)
 Certification_Tests/BUG_39_SON/bug39_sign.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [sign] | Formula() error. | Undefined parameter [res]
-Certification_Tests/BUG_402_SON/bug402SpiceTempOptions.cir mismatch # dc VIN#branch: -0.005851007426488897+0i vs -0.0038310272757229313+0i at 0.76 (tol 1.502e-3)
 Certification_Tests/BUG_440_SON/bug440.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [id] | Undefined parameter [ig] | Undefined parameter [is] | Undefined parameter [ib]
 Certification_Tests/BUG_440_SON/bug440a.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [i]
 Certification_Tests/BUG_456/emitter_baseline.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran OUT: -4.795814010713303 leaves the tube at t=0.000016264878205155748 (tol 4.801e-2)
@@ -248,19 +182,12 @@ Certification_Tests/BUG_524_SON/cmod_capmod.cir target-fails # no raw file .cros
 Certification_Tests/BUG_524_SON/rmod_resmod.cir mismatch # dc VIN#branch: -0.0014999999999999996+0i vs -0.0024999999999999996+0i at 1 (tol 1.500e-5)
 Certification_Tests/BUG_525_SON/bug_525.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [gmin]
 Certification_Tests/BUG_534_SON/noise_cancel_test1_rf.cir mismatch # tran VINRF: -4.755282581475788 leaves the tube at t=0.00000000039999999999999903 (tol 9.752e-2)
-Certification_Tests/BUG_54_SON/ring51.cir mismatch # dc BUF: 1.6464304145475324+0i vs 1.6501261214668441+0i at 1.8 (tol 3.461e-3)
-Certification_Tests/BUG_54_SON/ring51_loca.cir mismatch # op BUF: 1.7293965531019873+0i vs 1.736743034557111+0i at 0 (tol 3.461e-3)
-Certification_Tests/BUG_54_SON/ring51_loca_arc.cir mismatch # op BUF: 1.7293965794748205+0i vs 1.736743034557111+0i at 0 (tol 3.461e-3)
-Certification_Tests/BUG_54_SON/ring51_loca_defaults.cir mismatch # op BUF: 1.7293965531019873+0i vs 1.736743034557111+0i at 0 (tol 3.461e-3)
 Certification_Tests/BUG_654/macterminator.cir target-fails # no raw file .cross_sim_out.raw: 
 Certification_Tests/BUG_667_SON/ic_not_in_subckt.cir mismatch # tran N16997: 0.49504950495049505 leaves the tube at t=0 (tol 9.973e-3)
 Certification_Tests/BUG_681_SON/bsim4_681_1.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: -0.0011066951295070398+0i vs -0.001099903671135298+0i at 0.32 (tol 6.728e-6)
 Certification_Tests/BUG_681_SON/bsim4_681_2.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: -0.0012802943687932882+0i vs -0.0012729629523547516+0i at 0.34 (tol 7.305e-6)
 Certification_Tests/BUG_681_SON/bsim4_681_3.cir simulator-differs:self-inconsistency reason=S-BSIM4-V461 proof=s-bsim4-v461.md # dc VDS#branch: -0.0014810150481560822+0i vs -0.0014731575534409022+0i at 0.4 (tol 7.848e-6)
-Certification_Tests/BUG_746_SON/raw_file_b_e_h_sources.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-Certification_Tests/BUG_746_SON/raw_file_f_sources.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-Certification_Tests/BUG_746_SON/raw_file_g_sources.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-Certification_Tests/BUG_746_SON/raw_file_mesfet.cir mismatch # tran VDS#branch: -0.0026910218597955204 leaves the tube at t=0.0000015 (tol 5.940e-4)
+Certification_Tests/BUG_746_SON/raw_file_mesfet.cir slow # rc -9
 Certification_Tests/BUG_791_SON/bug791_expr.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_sin' at line 3
 Certification_Tests/BUG_794_SON/test2.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'table' at line 4
 Certification_Tests/BUG_805/colpitts_osc1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V(1): -0.030116656802653026 leaves the tube at t=0.0000001787617121833786 (tol 3.092e-4)
@@ -270,10 +197,7 @@ Certification_Tests/BUG_805_SON/bug805_all.cir simulator-differs:closed-form rea
 Certification_Tests/BUG_805_SON/bug805_top.cir simulator-differs:closed-form reason=S-NONPASSIVE-K proof=s-nonpassive-k.md # tran: stop time Some(0.025) -> Some(2.9536882726817453e-5)
 Certification_Tests/BUG_805_SON/bug805_top2.cir simulator-differs:closed-form reason=S-NONPASSIVE-K proof=s-nonpassive-k.md # tran: stop time Some(0.025) -> Some(2.9536882726817087e-5)
 Certification_Tests/BUG_807_SON/inverter_transient_xyce.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VIN1#branch: 0.00000003844520562446684 leaves the tube at t=0.00000015003125 (tol 3.919e-10)
-Certification_Tests/BUG_822/ring51.cir mismatch # dc BUF: 1.6464304145475324+0i vs 1.6501261214668441+0i at 1.8 (tol 3.461e-3)
-Certification_Tests/BUG_822/ring51_loca.cir mismatch # op BUF: 1.7293965531019873+0i vs 0.9988820194240572+0i at 0 (tol 3.461e-3)
 Certification_Tests/BUG_828_SON/bug_828.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [temp]
-Certification_Tests/BUG_846/ring51_loca.cir mismatch # plots ["tran"] became []
 Certification_Tests/BUG_848/topoCheck.cir target-fails # Unexpected format: Unexpected EOF in header
 Certification_Tests/BUG_920_SON/homotopy-multiple-lines.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Certification_Tests/BUG_920_SON/homotopy-no-output.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
@@ -288,7 +212,6 @@ Certification_Tests/BUG_981_SON/bug981A.cir mismatch # tran V(1): 5.160602794142
 Certification_Tests/BUG_981_SON/bug981B.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
 Certification_Tests/BUG_983_SON/mesfet.cir simulator-differs:third-simulator reason=O-NG-STOPS proof=bug983-mesfet.md # tran: stop time Some(9.999999999999999e-6) -> Some(1.0000014699384472e-9)
 Certification_Tests/BUG_983_SON/mosfet.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.00177123610662972 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
-Certification_Tests/BUG_983_SON/nsoi4.cir target-fails # no raw file .cross_sim_out.raw: Error on line 12 or its substitute:: mn1 nda ng ns ne nb cmosn l=0.258u w=19.585u | Simulation interrupted due to error! | Error
 Certification_Tests/BUG_986_SON/bug986A.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
 Certification_Tests/BUG_986_SON/bug986B.cir mismatch # tran V(1): 2.0744403019846867 leaves the tube at t=0.000015000000000000002 (tol 6.967e-2)
 Certification_Tests/BUG_988_SON/bug988.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.00177123610662972 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
@@ -313,7 +236,6 @@ Certification_Tests/ISSUE_267/test_c4.cir mismatch # op V(2): 0.0163934426229508
 Certification_Tests/ISSUE_267/test_c5.cir mismatch # op V(2): 0.016393442622950817+0i vs 0.0625+0i at 0 (tol 3.479e-5)
 Certification_Tests/ISSUE_267/test_c6.cir target-fails # no raw file .cross_sim_out.raw: 
 Certification_Tests/ISSUE_310/issue310.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [time]
-Certification_Tests/ISSUE_328/bsim4_tempC2.cir mismatch # dc VDS#branch: 0.000003851777851980319+0i vs 0.0000005351168518721788+0i at -0.36 (tol 3.309e-6)
 Certification_Tests/ISSUE_340/issue340.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [table] | Formula() error. | Undefined parameter [table_val] | Formula() error.
 Certification_Tests/ISSUE_451/issue451.cir mismatch # op V(2): 0.875+0i vs 0.7499999999999999+0i at 0 (tol 1.752e-3)
 Certification_Tests/ISSUE_451/issue451_ref.cir target-fails # Unexpected format: Unexpected EOF in header
@@ -335,7 +257,6 @@ CircuitSim90/MOS2/mux8.cir mismatch # tran V220#branch: 0.0006794012844957967 le
 CircuitSim90/MOS2/ring.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TMAX (TSTOP-TSTART)/2000 both agree (P1-012); was: tran V(10): 3.142914960606579 leaves the tube at t=0.0000000019570539291314028 (tol 3.143e-2)
 CircuitSim90/MOS2/slowlatch.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VC#branch: -0.00003208714534869549 leaves the tube at t=0.000000020004375000000005 (tol 5.669e-7)
 CircuitSim90/MOS2/toronto.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(23): 0.13259001624181715 leaves the tube at t=0.0000010021304178551478 (tol 1.757e-3)
-CircuitSim90/MOS2_LARGE/dac.cir mismatch # tran V(106): 0.008009242038937195 leaves the tube at t=0 (tol 1.005e-4)
 CircuitSim90/MOS2_LARGE/mem_plus.cir slow # quarantined
 CircuitSim90/MOS2_LARGE/sqrt.cir mismatch # tran V(174): 0.9861809899446817 leaves the tube at t=0.0000005441151506436056 (tol 1.078e-2)
 CircuitSim90/MOS2_LARGE/voter25.cir slow # quarantined
@@ -353,11 +274,9 @@ FOURIER/gilbert_cell.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES
 FOURIER/step_test.s0.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VDD#branch: -0.00029742647095745033 leaves the tube at t=0.0000000014375 (tol 4.164e-6)
 FOURIER/step_test.s1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VDD#branch: -0.00035581123597891185 leaves the tube at t=0.000000002551862142114447 (tol 5.696e-6)
 GMIN_STEPPING/gstep.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-GMIN_STEPPING/gstep2.cir mismatch # tran XN43:VB3: -0.000007700530212128144 leaves the tube at t=0.000000005 (tol 2.269e-6)
 GMIN_STEPPING/gstep_cont3a.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 GMIN_STEPPING/gstep_cont3b.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 GMIN_STEPPING/gstep_cont3c.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-GMIN_STEPPING/gstep_minconduct.cir mismatch # tran V(2): 0.99999990000001 leaves the tube at t=0 (tol 1.000e-2)
 GROUND_PATH/IndPathToGround.cir slow # quarantined
 GenCoupAPI/rlc_series_vccs_nogenext.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran L1#branch: -0.00004572797996727911 leaves the tube at t=0.0000020491505328520325 (tol 8.120e-7)
 HB/RC/simpleRC.cir simulator-differs:closed-form reason=SIMPLERC-XYCE-STEP proof=simplerc-closed-form.md # v(2): Xyce 3.8e-5 V off the closed form, ngspice 2.1e-6
@@ -368,14 +287,7 @@ HB/gilbert_cell_hbTran_copy1.cir slow # quarantined
 HB/gilbert_cell_hbTran_copy2.cir slow # quarantined
 HB/gilbert_cell_hbTran_copy3.cir slow # quarantined
 HB/gilbert_cell_hbTran_tahb.cir slow # quarantined
-HICUM/noise_npn_full_sh_ac.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 19 or its substitute:: q.x1.q1 x1.coll x1.base x1.emit x1.subs x1.therm x1:my
-HOMOTOPY/arclengthSimple.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
-HOMOTOPY/schmidt.cir mismatch # op V(1): 10+0i vs 0+0i at 0 (tol 2.000e-2)
-IC_AND_NODESET/bjt_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-IC_AND_NODESET/bjt_baseline2.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-IC_AND_NODESET/bjt_baseline3.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-IC_AND_NODESET/bjt_baseline4.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-IC_AND_NODESET/bjt_baseline5.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
+HICUM/noise_npn_full_sh_ac.cir mismatch # noise inoise_spectrum: 1.6943922214174616 vs 1.6460360661793978 at 1000.0 (tol 3.391e-03; 16/17 points out)
 IC_AND_NODESET/ic_bjt.cir mismatch # tran VIN1#branch: -0.005036889565960961 leaves the tube at t=0 (tol 5.526e-5)
 IC_AND_NODESET/ic_bjt2.cir mismatch # tran VIN1#branch: -0.005036889565960961 leaves the tube at t=0 (tol 5.526e-5)
 IC_AND_NODESET/ic_comp.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.060014165981871204 leaves the tube at t=0.00000000058855310399904 (tol 1.688e-2)
@@ -447,7 +359,6 @@ MEASURE_DC/MeasfailOptionZero.cir target-fails # no raw file .cross_sim_out.raw:
 MEASURE_DC/REMEASURE/RemeasureLeadCurrents.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v]
 MEASURE_DC/RMSTest1DC.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v]
 MEASURE_DC/TrigTargTest1DC.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [v] | Undefined parameter [v]
-MINCAPRES/mincr.cir mismatch # tran 2A: 0.9361818808315894 leaves the tube at t=0 (tol 1.000e-2)
 MINDUCTORS/cpldLMIs.cir mismatch # tran: stop time Some(0.025) -> Some(2.9536882726817453e-5)
 MODEL_BINNING/comparatorBaseline.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 MODEL_BINNING/comparatorBaseline_forGlobal.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
@@ -478,14 +389,9 @@ Nonlinear/ConvergenceTests/SearchMethod4.cir simulator-differs:third-simulator r
 Nonlinear/ConvergenceTests/XyceTests.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
 ONESHOT/one-shot.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): -0.4427572025716698 leaves the tube at t=0.0000000019589518387627285 (tol 6.750e-3)
 OP/comparator_op.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3762851594665437 leaves the tube at t=0.000000010954826735058434 (tol 2.277e-2)
-OP/gain-stagesoi_op.cir mismatch # plots ["op"] became ["ac", "op"]
 OP/sand25OpAlone.cir simulator-differs:third-simulator reason=S-XYCE-OUTLIER-3RD proof=s-xyce-outlier-3rd.md # op V(1): 0.0006592935750634707+0i vs 2.0006589630416975+0i at 0 (tol 3.319e-6)
 Output/DC/op-big-prn.cir simulator-differs:third-simulator reason=S-XYCE-OUTLIER-3RD proof=s-xyce-outlier-3rd.md # op V(1): 0.0006592935750634707+0i vs 2.0006589630416975+0i at 0 (tol 3.319e-6)
-Output/Dasho/dc.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
-Output/HOMOTOPY/arclengthSimple.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
 Output/HOMOTOPY/homotopy-csv.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
-Output/HOMOTOPY/homotopy-gnuplot.cir mismatch # op V(1): 2+0i vs 1+0i at 0 (tol 4.002e-3)
-Output/HOMOTOPY/homotopy-op-prn.cir mismatch # op V1#branch: -0.003333333333333333+0i vs -0.005+0i at 0 (tol 6.667e-6)
 Output/HOMOTOPY/homotopy-prn-noindex.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Output/HOMOTOPY/homotopy-prn.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
 Output/HOMOTOPY/homotopy-probe-defaults-to-prn.cir simulator-differs:third-simulator reason=S-GSTEP-FLOATING-EMITTER proof=s-gstep-floating-emitter.md # tran V(5): -12.467552218111747 leaves the tube at t=0 (tol 1.247e-1)
@@ -496,7 +402,6 @@ PARAMS1/params_a1.cir mismatch # tran V(1): 20 leaves the tube at t=0.001 (tol 2
 PARAMS2/Params_B3.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [r1] | Undefined parameter [r1]
 PARAMS2/Params_B4.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [r1]
 PARAM_REFACTOR/paramDep5.cir target-fails # Unexpected format: Unexpected EOF in header
-PARAM_REFACTOR/paramHomotopy.cir mismatch # op V(1): 833.3333333333334+0i vs 874.9999999999999+0i at 0 (tol 1.667e0)
 PARSER/nakedAlgebra.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 15
 PARSER/nakedAlgebraBaseline.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 9
 PARSER/nakedAlgebraGlobal.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 15
@@ -504,12 +409,7 @@ PARSER/separator3Ref.cir target-fails # Unexpected format: Unexpected EOF in hea
 POWER/power_bsim3_gear.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.3942896175760929 leaves the tube at t=0.000000005631484877982981 (tol 2.272e-2)
 POWER/power_bsim3_trap.cir simulator-differs:third-simulator reason=S-BSIM3-DEFAULT-CAPMOD proof=s-bsim3-default-capmod.md # tran V(1): -0.39612363759098895 leaves the tube at t=0.000000005629268545495938 (tol 2.279e-2)
 POWER/power_bsim4_gear.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran V(1): 1.1166378443622005 leaves the tube at t=0.000000020214387052506347 (tol 1.124e-2)
-POWER/power_bsim4_trap.cir mismatch # tran V(1): 1.0862115404376351 leaves the tube at t=0.000000020212343777919743 (tol 1.133e-2)
-POWER/power_e_gear.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-POWER/power_e_trap.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-POWER/power_g_gear.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-POWER/power_g_trap.cir mismatch # tran: stop time Some(1.0) -> Some(0.48560000000000014)
-POWER/power_nmes_gear.cir mismatch # tran VDS#branch: 0.0587457507058428 leaves the tube at t=0.0000007568406588073345 (tol 6.070e-4)
+POWER/power_nmes_gear.cir slow # rc -9
 POWER/power_nmes_trap.cir mismatch # tran VDS#branch: 0.05874577330107754 leaves the tube at t=0.0000007568406588145394 (tol 6.070e-4)
 POWER/power_polarity_b_e_f_g_h_trap.cir target-fails # no raw file .cross_sim_out.raw: Error on line 22 or its substitute:: bv1 ev1_1 0 v=   5.0000000000e+00 * sqrt ( v(bv1_1,0) ) | Simulation interrupted due to err
 POWER/power_subckt_b_e_f_g_h_trap.cir target-fails # no raw file .cross_sim_out.raw: Error on line 79 or its substitute:: bv1 ev1_1 0 v=   5.0000000000e+00 * sqrt ( v(bv1_1,0) ) | Simulation interrupted due to err
@@ -518,7 +418,6 @@ POWER/power_thermalres_gear.cir target-fails # no raw file .cross_sim_out.raw: U
 POWER/power_thermalres_trap.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [table]
 POWERNODE/sixNode.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VIN1#branch: -0.0019033154118347267 leaves the tube at t=0.000002025180494428555 (tol 1.241e-4)
 POWERNODE/sixNode_in.cir mismatch # tran VCONNECTVSS#branch: 0.000000000035662640770425025 leaves the tube at t=0 (tol 2.924e-12)
-PSP103/invert_psp.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1)
 RESISTOR/DefaultValueWarning.cir mismatch # op 2A: 0.33333333333333337+0i vs 0.0004997501249375312+0i at 0 (tol 6.687e-4) (ZERO-LEDGER P3-136: Xyce runs a model resistor with no value at 1k, ngspice at RSH times one square)
 RESISTOR/resistor_lv3.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
 RESISTOR/resistor_lv3_2.cir mismatch # dc V1#branch: -0.001+0i vs -0.0009765625+0i at 1 (tol 1.000e-5)
@@ -529,9 +428,6 @@ SANDLER22/sandler22.cir mismatch # tran V(4): 5.063378303425906 leaves the tube 
 SANDLER23/sandler23.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 20 ns ((TSTOP-TSTART)/100000) agree (worst 0.973 of the tolerance); at /20000 X1:12 is 1.61 x out
 SANDLER25/sandler25.cir mismatch # tran V(10): 10.106854603507237 leaves the tube at t=0.008250966929121743 (tol 1.031e-1)
 SANDLER28/sandler28.cir simulator-differs:self-inconsistency reason=XYCE-GLOBAL-FLOATING-NODE proof=xyce-global-floating-node.md # Xyce spikes at 1.019 ms with $G_BAD_PATH global, not local; ngspice the same either way
-SAVE_AND_LOAD/bjt_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-SAVE_AND_LOAD/bjt_default_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
-SAVE_AND_LOAD/bjt_sub_default_type_level_baseline.cir mismatch # tran XN17:VB3: 0.000000014336680083177401 leaves the tube at t=0.000000015000000000000002 (tol 2.000e-6)
 SENS/bsim4_issue694_FD.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran VIN1#branch: -0.00002333098631699986 leaves the tube at t=0.00000000016744933418562767 (tol 2.333e-7)
 SENS/fddevLevelParams_ipulse2.cir mismatch # tran V(1): 4000 leaves the tube at t=0 (tol 2.000e2)
 SENS/fdipulse2.cir mismatch # tran V(1): 4000 leaves the tube at t=0 (tol 2.000e2)
@@ -565,26 +461,9 @@ TIA/ERROROPTION/erroroption.cir simulator-differs:refinement reason=S-NUMERIC-CO
 TIA/MINORDER/capacitor.cir target-fails # no raw file .cross_sim_out.raw: Undefined parameter [pi] | Formula() error. | Undefined parameter [s] | Undefined parameter [s]
 TIA/MINORDER/invert.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.0006453328659304003 leaves the tube at t=0.000001584123304055893 (tol 6.453e-6)
 UNARYOPS/unary_funcs.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'arctan' at line 8
-VANOISE/bsimcmg_noise.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 10 or its substitute:: m1 drain gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=
-VANOISE/bsimcmg_noise_111.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 10 or its substitute:: m1 drain gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=
-VANOISE/bsimcmg_noise_111_m.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 10 or its substitute:: m1 drain gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=
-VANOISE/bsimcmg_noise_111_m_baseline.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Error on line 10 or its substitute:: m1 drain gate 0 bulk nmos1 tfin=15n l=30n nfin=10 nrs=
 VCCS/vccs_nl4_m.cir mismatch # dc V(3): -15+0i vs -1.5+0i at 1 (tol 3.600e-1)
-VERILOG_MODEL_BINNING/gummel_n_bsimcmg107.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_n_bsimcmg108.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_n_bsimcmg110.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_n_bsimcmg111.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_nmos_bsim6.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 drain gate source bulk nmos w=10u l=10u | Simulation interrupted due to error! | Error: c
-VERILOG_MODEL_BINNING/gummel_p_bsimcmg107.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_p_bsimcmg108.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_p_bsimcmg110.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_p_bsimcmg111.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 8 or its substitute:: m1 drain gate
-VERILOG_MODEL_BINNING/gummel_pmos_bsim6.cir target-fails # no raw file .cross_sim_out.raw: Error on line 8 or its substitute:: m1 drain gate source bulk pmos w=10e-6 l=10e-6 | Simulation interrupted due to error! | Erro
-VERILOG_SCALE/bsimcmg_107_inverter_transient.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mp1 1
-VERILOG_SCALE/bsimcmg_107_inverter_transientBaseline.cir target-fails # ngspice swapped the model: Level must be < 99 (Setting Level to 1) | Level must be < 99 (Setting Level to 1) | Error on line 7 or its substitute:: m.xinv1.mp1 1
 VSTARTEST/vstarTest.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.00177123610662972 leaves the tube at t=0.0000015042010524059744 (tol 1.866e-5)
 VSWITCH/Vswitch_A1.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 5 or its substitute:: s1 1 0 3 0 sw | Simulation interrupted due to error! 
-Verilog_POWER/power_bsim6_gear.cir target-fails # no raw file .cross_sim_out.raw: Error on line 5 or its substitute:: m1 anot a e1 e1 pmos w=3.6u l=1.2u | Simulation interrupted due to error! | Error: circuit n
 Verilog_POWER/power_juncap200_gear.cir mismatch # tran V(3): 0.000002880303364601999 leaves the tube at t=0.000010000097656249999 (tol 2.058e-6)
 WAMPDE/BLOCKING/simple_single_channel.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran V(1): 12.000001537961754 leaves the tube at t=0.00000511 (tol 1.200e0)
 WAMPDE/invert1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # refined to TSTOP/2000 or /20000 both agree; was: tran VDDDEV#branch: -0.0006357839607357947 leaves the tube at t=0.0000015837795147382513 (tol 6.454e-6)
