@@ -6,7 +6,8 @@
 //! Contents: `pub(super) fn sources(&ir::Design) -> Vec<(ir::ItemRef, ir::source::Source)>`,
 //! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`,
 //! `pub(super) fn note_left(&ir::Design, &mut ir::Diags, ir::Feature, ir::Code)`,
-//! `pub(super) fn may_draw(&ir::Design, ir::ExprId) -> bool`
+//! `pub(super) fn may_draw(&ir::Design, ir::ExprId) -> bool`,
+//! `pub(super) fn sffms(&ir::Design) -> Vec<u32>`
 
 use crate::ir;
 
@@ -90,4 +91,13 @@ pub(super) fn may_draw(design: &ir::Design, e: ir::ExprId) -> bool {
         }
     }
     false
+}
+
+/// The SFFM rows of the design's sources.
+pub(super) fn sffms(design: &ir::Design) -> Vec<u32> {
+    let waves = sources(design).into_iter().map(|(_, s)| s.wave);
+    waves
+        .filter(|w| !w.is_none() && w.kind == ir::WaveKind::Sffm)
+        .map(|w| w.index)
+        .collect()
 }

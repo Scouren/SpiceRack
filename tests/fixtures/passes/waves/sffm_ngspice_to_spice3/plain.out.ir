@@ -1,0 +1,3 @@
+file "d.sp" deck
+  element vsource v1 (a 0) dc=0 wave=sffm(offset=0 amplitude=1 carrier_freq=1meg mod_index=5 signal_freq=10k delay=0 phase_c_deg=0 phase_m_deg=0)
+  element vsource v2 (b 0) dc=0 wave=sffm(offset=0 amplitude=1 carrier_freq=1meg mod_index=100 signal_freq=10k delay=0 phase_c_deg=0 phase_m_deg=0)

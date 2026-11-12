@@ -121,7 +121,9 @@ fn times(d: &ir::Design, s: &ir::source::Source) -> Vec<f64> {
             }
             at
         }
-        ir::Wave::Sin(x) => vec![v(x.delay).unwrap_or(0.0)],
+        ir::Wave::Sin(x) => after(v(x.delay).unwrap_or(0.0)),
+        ir::Wave::Sffm(x) => after(v(x.delay).unwrap_or(0.0)),
+        ir::Wave::Am(x) => after(v(x.delay).unwrap_or(0.0)),
         ir::Wave::Exp(x) => {
             let (a, b) = (v(x.td1), v(x.td2));
             let sum = a.zip(b).map(|(a, b)| a + b);
@@ -133,6 +135,15 @@ fn times(d: &ir::Design, s: &ir::source::Source) -> Vec<f64> {
     };
     for t in edges.into_iter().filter(|t| t.is_finite()) {
         out.extend([t.next_down(), t, t.next_up()]);
+    }
+    out
+}
+
+/// A delay and a spread of instants past it (ns to ms).
+fn after(delay: f64) -> Vec<f64> {
+    let mut out = vec![delay];
+    for k in 1..=24 {
+        out.push(delay + 1e-9 * 1.9f64.powi(k));
     }
     out
 }
@@ -402,6 +413,46 @@ fn exp_td2_both_ways_keep_every_value() {
         generated(
             name,
             sources_only(&[ir::WaveKind::Exp], &[]),
+            &mut tally,
+            None,
+        );
+        eprintln!(
+            "{name}: {} sources, {} instants, worst {} ulp",
+            tally.sources, tally.points, tally.worst
+        );
+        assert_eq!(tally.worst, 0, "{name}: bit for bit");
+        assert!(tally.sources > 50, "{name}");
+    }
+}
+
+#[test]
+fn the_sffm_laws_both_ways_keep_every_value() {
+    // drawn SFFMs (literal index inside, at and beyond carrier/signal, and below 0) and
+    // generated ones; bit for bit: the index limit is applied to the literal, or changes
+    // nothing
+    let mut h = 0x5851_F42D_4C95_7F2Du64;
+    let mut next = move |n: u64| {
+        h ^= h << 13;
+        h ^= h >> 7;
+        h ^= h << 17;
+        h % n
+    };
+    for (name, law) in [
+        ("sffm_ngspice_to_spice3", " law=ngspice"),
+        ("sffm_spice3_to_ngspice", ""),
+    ] {
+        let mut tally = Tally::default();
+        for _ in 0..300 {
+            let (fc, fs) = (1 + next(999), 1 + next(99));
+            let mdi = next(3 * fc / fs + 2) as i64 - 1;
+            let text = format!(
+                "file \"p.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=sffm(offset=0.1 amplitude=0.9 carrier_freq={fc}k mod_index={mdi} signal_freq={fs}k delay=1u phase_c_deg=30 phase_m_deg=-45{law})\n"
+            );
+            compare(name, deck(&text), &mut tally, None);
+        }
+        generated(
+            name,
+            sources_only(&[ir::WaveKind::Sffm], &[]),
             &mut tally,
             None,
         );

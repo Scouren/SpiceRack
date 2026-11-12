@@ -16,6 +16,8 @@ pub(crate) const PASSES: &[Pass] = &[
     row("pulse_spice_to_vacask", X::Circuit(C::PulseSpice), &[X::Circuit(C::PulseVacask)], &[PULSE_LAWS_DIFFER], pulse_spice_to_vacask::pulse_spice_to_vacask),
     row("exp_td2_relative", X::Circuit(C::ExpTd2FromZero), &[X::Circuit(C::ExpTd2FromTd1), X::Expr(T::Num)], &[EXP_TD2_LEFT], exp_td2_relative::exp_td2_relative),
     row("exp_td2_absolute", X::Circuit(C::ExpTd2FromTd1), &[X::Circuit(C::ExpTd2FromZero), X::Expr(T::Binary), X::Binary(O::Add), X::BinaryDyn(O::Add)], &[EXP_TD2_LEFT], exp_td2_absolute::exp_td2_absolute),
+    row("sffm_ngspice_to_spice3", X::Circuit(C::SffmNgspice), &[X::Circuit(C::SffmSpice3), X::Expr(T::Num)], &[SFFM_LAW_LEFT], sffm_ngspice_to_spice3::sffm_ngspice_to_spice3),
+    row("sffm_spice3_to_ngspice", X::Circuit(C::SffmSpice3), &[X::Circuit(C::SffmNgspice)], &[SFFM_LAW_LEFT], sffm_spice3_to_ngspice::sffm_spice3_to_ngspice),
 ];
 
 // ---- private ----
