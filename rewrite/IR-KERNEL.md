@@ -263,6 +263,19 @@ them in the body, and a lookup from the parent would dump the common case as `r#
 4. `Builder::bind_ref(item, k, def)` sets the k-th `Ref` of `item`, in `map_refs` order (asserts `k`
    in range and the slot's kind), so a reader binds a row reference to a definition it pushes later.
 
+**A12 K1 (2026-11-12): typed arithmetic (R16).** `NumForm::Int` (a whole number of integer type:
+`frac == 0`, `exp10 == 0`; the Int zero is the second permitted zero); `BinOp::DivTyped` (both
+Int: the quotient truncated toward zero, Int; else `a / b`, Real; `Div` unchanged); `Func::ToInt`
+(`x` truncated, Int; `Trunc` stays Real); `Extra::IntLiteral`. The reference evaluator tags every
+value Int or Real (`eval::eval_typed -> Value { number, int }`; `eval` keeps returning the
+number; `Bindings::param_value` passes a typed parameter, defaulting to `param` as Real):
+`Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
+`Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
+chosen branch's; `ToInt` Int; `Sgn` Int iff its operand is (run f2 printed `sgn(-3)/2` as 0, so
+the run overrides the amendment's table, R5); everything else Real. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`. An Int
+and a real literal of one value are not `eq_value` (they mean different things).
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

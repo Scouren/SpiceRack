@@ -213,3 +213,13 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `text::parse` gives every span (an item's, a `TEXT_SYNTAX` row's) the file of the block its line sits in (`FileId::NONE` for a `file` line itself), with byte offsets into the whole text handed to `parse`. `Words` carries the line's file in a crate field, so every reader's `line_span()`/`span()` is right without a change on the owners' side.
 - `Design::entry` is total: `FileId::NONE` for a design with no file; a caller that needs a file asserts.
+
+## A12 K1 applied (typed arithmetic)
+
+- `Sgn` is Int-valued (Int iff its operand is), against AMEND-A12's table and with DIALECT-VACASK run f2 (`sgn(-3)/2` printed 0; R5, the run wins). Reported to the lead before building.
+- The evaluator keeps every numeric rule on `f64` and adds the tag in `apply` from the operator and its operands' tags; `DivTyped` is the one operator whose number depends on the tags. `eval` is `eval_typed(...).map(|v| v.number)`.
+- `Bindings::param_value` is a defaulted method (no existing `Bindings` impl breaks); a typed parameter (an instance passing `x=3` or `x=3.0`) comes through it.
+- IR text: `3i` (the suffix `i`; no scale letter is `i`), `/:` at `*`'s precedence, `to_int`.
+- The Int zero (`0i`) is a valid literal beside `Literal::ZERO`; `eq_value` separates Int from real literals of one value (also `Design::eq_meaning`).
+- `Literal` and `NumForm` moved to `literal.rs` (expr.rs passed 500 lines), re-exported from `expr`.
+- The generator makes Int literals only when the set has `Extra::IntLiteral` (`Gen::int_literals`, set by `expr`); `DivTyped` and `ToInt` follow the `Binary`/`Func` features as every member does.

@@ -30,7 +30,7 @@ use crate::circuit_extra::CircuitExtra;
 use crate::class::{ExprClass, def_classes, node_class};
 use crate::design::Design;
 use crate::element::ElemKind;
-use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, UnOp};
+use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
 use crate::id::{ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{ItemKind, ScopeKind};
@@ -413,6 +413,11 @@ pub(crate) fn item_features(
             .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
+            if let Expr::Num(n) = design.expr(e)
+                && design.num(n).form == NumForm::Int
+            {
+                *set = set.with(Feature::Extra(Extra::IntLiteral));
+            }
             let f = match design.expr(e) {
                 Expr::Call(func, _) if dynamic => Feature::FuncDyn(func),
                 Expr::Call(func, _) => Feature::Func(func),

@@ -72,6 +72,9 @@ pub struct Gen {
     pub(crate) class: ExprClass,
     pub(crate) dynamic: bool,
     pub(crate) reads: Reads,
+    /// Whether `literal` may make an `Int` literal (the set has `Extra::IntLiteral`; set by
+    /// `expr` from its feature set).
+    pub(crate) int_literals: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -119,6 +122,7 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         class: ExprClass::Constant,
         dynamic: false,
         reads: Reads::Constant,
+        int_literals: false,
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
@@ -151,6 +155,15 @@ impl Gen {
     /// trailing zeros in `frac`, so every writer's number spelling and the literal round trip are
     /// exercised.
     pub fn literal(&mut self) -> Literal {
+        if self.int_literals && self.chance(4) {
+            let n = self.below(2001) as i64 - 1000;
+            return Literal {
+                mantissa: n,
+                frac: 0,
+                exp10: 0,
+                form: NumForm::Int,
+            };
+        }
         let sign = if self.chance(4) { -1 } else { 1 };
         let mantissa = sign * (1 + self.below(999_999)) as i64;
         let frac = self.below(4) as u8;

@@ -242,7 +242,7 @@ pub fn write_literal(l: Literal, out: &mut String) {
             out.push_str(letter.0);
         }
         NumForm::Mil => out.push_str("mil"),
-        NumForm::Int => todo!(), // A12 K1: red first
+        NumForm::Int => out.push('i'),
     }
 }
 
@@ -376,7 +376,7 @@ pub(crate) fn func_text(f: Func) -> &'static str {
         Func::Ddt => "ddt",
         Func::Idt => "idt",
         Func::Pwl => "pwl",
-        Func::ToInt => todo!(), // A12 K1: red first
+        Func::ToInt => "to_int",
     }
 }
 
@@ -427,7 +427,7 @@ fn binary_text(op: BinOp) -> &'static str {
         BinOp::BitXor => " ^ ",
         BinOp::Shl => " << ",
         BinOp::Shr => " >> ",
-        BinOp::DivTyped => todo!(), // A12 K1: red first
+        BinOp::DivTyped => " /: ",
     }
 }
 

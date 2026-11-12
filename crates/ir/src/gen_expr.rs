@@ -64,6 +64,7 @@ impl Gen {
         let probes = dyn_leaves;
         let dynamic = !probes.is_empty() && self.chance(2);
         (self.dynamic, self.reads, self.class) = (dynamic, reads, ExprClass::Constant);
+        self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
         let mut need_probe = dynamic;
         let mut stack: Vec<Frame> = Vec::new();
         // depth-first, building each row after its children, left to right: a caller's order

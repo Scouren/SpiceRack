@@ -14,9 +14,9 @@
 /// The IR states the number; the double is each simulator's own arithmetic on these digits.
 ///
 /// Invariants (asserted by `Builder::literal`, checked by `check`): `|mantissa| < 10¹⁸`;
-/// `frac <= 18`; `Plain` and `Mil` have `exp10 == 0`; a `Scale` has an `exp10` some scale letter
-/// states (−18, −15, −12, −9, −6, −3, −2, 3, 6, 9, 12, 15); zero is the one literal
-/// [`Literal::ZERO`]; `value()` is finite. Equality (`==`) is field by field (law L5): `1k` and
+/// `frac <= 18`; `Plain` and `Mil` have `exp10 == 0`, `Int` has `frac == 0` and `exp10 == 0`; a `Scale` has an `exp10` some scale letter
+/// states (−18, −15, −12, −9, −6, −3, −2, 3, 6, 9, 12, 15); a zero is [`Literal::ZERO`] or the
+/// Int zero; `value()` is finite. Equality (`==`) is field by field (law L5): `1k` and
 /// `1e3` differ; [`Literal::eq_value`] compares meanings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Literal {
@@ -138,7 +138,9 @@ impl Literal {
     /// Whether the two literals state the same exact decimal number (`1k` and `1e3`; `Mil`
     /// compared after its factor). Exact: no rounding to a double.
     pub fn eq_value(self, other: Literal) -> bool {
-        self.normal() == other.normal()
+        // an Int and a real literal of one value mean different things (A12 K1)
+        let int = |l: Literal| l.form == NumForm::Int;
+        int(self) == int(other) && self.normal() == other.normal()
     }
 
     /// Whether the literal meets every invariant on [`Literal`].
@@ -170,9 +172,9 @@ impl Literal {
                 NumForm::Plain | NumForm::Mil => self.exp10 == 0,
                 NumForm::Scale => SCALES.contains(&self.exp10),
                 NumForm::Exponent => true,
-                NumForm::Int => todo!(), // A12 K1: red first
+                NumForm::Int => self.exp10 == 0 && self.frac == 0,
             }
-            && (self.mantissa != 0 || self == Literal::ZERO)
+            && (self.mantissa != 0 || self == Literal::ZERO || self.form == NumForm::Int)
     }
 }
 
@@ -185,7 +187,7 @@ impl Literal {
         match self.form {
             NumForm::Mil => (self.mantissa as i128 * 254, k - 7),
             NumForm::Plain | NumForm::Exponent | NumForm::Scale => (self.mantissa as i128, k),
-            NumForm::Int => todo!(), // A12 K1: red first
+            NumForm::Int => (self.mantissa as i128, 0),
         }
     }
 
