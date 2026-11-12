@@ -74,7 +74,13 @@ pub fn rewrite_tree(
     root: ExprId,
     rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
 ) -> ExprId {
-    todo!()
+    let n = b.design().expr_count();
+    if root.is_none() || root.index() >= n {
+        return root;
+    }
+    let mut memo = vec![ExprId::NONE; n];
+    rewrite_into(b, root, &mut memo, rule);
+    memo[root.index()]
 }
 
 // ---- private ----

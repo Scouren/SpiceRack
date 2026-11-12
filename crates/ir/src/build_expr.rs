@@ -89,7 +89,12 @@ impl Builder<'_> {
     /// A parameter read already bound to `def` (its name the definition's): the one-call form of
     /// `param_ref` then `resolve`, for a pass's rule. Asserts `def` is in range and a `Param`.
     pub fn param_ref_to(&mut self, def: DefId) -> ExprId {
-        todo!()
+        let d = self.design.def(def);
+        assert!(
+            d.kind == crate::item::DefKind::Param,
+            "a read binds a parameter"
+        );
+        self.expr_row(ExprTag::Param, 0, d.name.0, def.0)
     }
 
     /// A user-function call, unresolved.
