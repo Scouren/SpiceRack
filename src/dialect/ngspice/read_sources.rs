@@ -85,6 +85,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     F::Circuit(X::DcAtZeroPwl),
     F::Circuit(X::DcAtZeroSffm),
     F::Circuit(X::DcAtZeroAm),
+    // ngspice's AM takes any offset (A31)
+    F::Circuit(X::AmModOffset),
     F::Circuit(X::DcAtZeroTrNoise),
     F::Circuit(X::DcAtZeroTrRandom),
 ]);

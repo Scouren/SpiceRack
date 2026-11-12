@@ -46,11 +46,6 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "l8",
-        "ngspice",
-        "seed 41 Untyped: an admitted design's IR text, one file, reads back to X0015 (a `.four` with no harmonic count and no nfreqs in the dump): the IR text or the run owner's Four row, with ir-run through spine",
-    ),
-    (
         "l5",
         "ngspice",
         "seed 10 Untyped: a FromHere Env tnom={expression} is written as a script `option tnom={…}` and reads back a Private opaque (the frontend's option takes no numparam braces): control and run (ng-control, ng-run)",
