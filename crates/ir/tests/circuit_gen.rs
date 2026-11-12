@@ -144,6 +144,30 @@ mod tests {
         assert!(missing.is_empty(), "{missing:?}");
     }
 
+    /// R61/A36: a generated instance bound to a subcircuit has as many terminals as its ports
+    /// (oracle: the bound `Subckt` row), over the full set.
+    #[test]
+    fn a_generated_instance_matches_its_masters_ports() {
+        let mut bound = 0;
+        for seed in 0..400u64 {
+            let d = generate(seed, &circuit_set(), SIZE);
+            for (item, _) in d.reachable() {
+                if item.kind != ItemKind::Element {
+                    continue;
+                }
+                let e: spicerack_ir::Element = d.row(item.index);
+                if e.kind != ElemKind::Instance || e.model.def.is_none() {
+                    continue;
+                }
+                let def = d.def(e.model.def);
+                let ports = d.row::<spicerack_ir::item::Subckt>(def.item.index).ports;
+                bound += 1;
+                assert_eq!(e.terminals.len(), ports.len(), "seed {seed}");
+            }
+        }
+        assert!(bound > 20, "the property saw {bound} bound instances");
+    }
+
     /// A33 (the lead's ruling): a set without `BehavUntypedParam` but with the dynamic
     /// `ToReal` still reads parameters in behavioural expressions, every read typed: some
     /// generated behavioural source reads `to_real(…)` or `to_int(…)` of a parameter, and no
