@@ -444,31 +444,6 @@ fn a_row_reference_queued_by_an_area_binds_to_a_definition_pushed_later() {
 }
 
 #[test]
-fn a_model_name_is_known_from_any_file_before_lowering() {
-    // inp2q.c / inp2m.c: ngspice ends a Q or M card's nodes at the first word naming a model in
-    // the deck's model table, wherever the card stands; `Lower::is_model` answers that for the
-    // element area. Oracle: the model cards of the two files, by hand.
-    let mut src = Sources::new();
-    src.add("d.sp", "t\n.include \"m.lib\"\n.model NCH nmos\n");
-    src.add("m.lib", ".subckt s a\n.model pch pmos\n.ends\n");
-    let lex = crate::syntax::Lang::NGSPICE.lexicon().expect("lexicon");
-    let texts = [
-        "t\n.model NCH nmos\n".to_string(),
-        "\n.subckt s a\n.model pch pmos\n.ends\n".to_string(),
-    ];
-    let toks: Vec<_> = texts
-        .iter()
-        .map(|t| crate::syntax::tokenize(t, lex))
-        .collect();
-    let asts: Vec<_> = toks.iter().map(|t| crate::syntax::parse(t, lex)).collect();
-    let models = super::read::model_names(&asts, &toks);
-    let mut got: Vec<_> = models.into_iter().collect();
-    got.sort();
-    assert_eq!(got, ["nch", "pch"]);
-    let _ = read(&src);
-}
-
-#[test]
 fn a_read_in_a_measure_binds_to_a_measure_before_a_parameter() {
     // ngspice-45 measure.c do_measure: every other measure runs first and enters its result with
     // nupa_add_param, so inside `.meas ... param=` a measure hides a `.param` of its name; outside

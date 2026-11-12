@@ -19,18 +19,16 @@
 //!
 //! Contents: `pub(super) struct Lower<'a, 'd>`, `pub(super) struct Stmt`,
 //! `pub(super) enum Def`, `pub(super) struct RowRef`, `pub(super) fn bind_rows`,
-//! `pub(super) fn model_names`, `pub(super) fn bind_reads`,
+//! `pub(super) fn bind_reads`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, unread, note, framing, span, raw, text, rest, keyword, expr, wins,
-//! class, is_model, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
+//! class, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use super::codes;
 use super::cst::{body, extent, joined, line, next, rest, unquote};
 use super::declare::{Class, Declared, declare};
 use super::expr_read::Tree;
-use std::collections::HashSet;
-
 use super::name::{self, Folder};
 use super::{
     read_control, read_elements, read_models, read_outputs, read_run, read_sources, read_structure,
@@ -66,7 +64,6 @@ pub(super) struct Lower<'a, 'd> {
     rows: &'a mut Vec<RowRef>,
     measured: &'a mut Vec<(usize, usize)>,
     declared: &'a Declared,
-    models: &'a HashSet<String>,
     /// Bytes read before the file's own text (1 for a library file).
     shift: u32,
     frames: Vec<Frame<'a>>,
@@ -152,7 +149,6 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
         .collect();
     let toks: Vec<Tokens<'_>> = texts.iter().map(|t| tokenize(t, lex)).collect();
     let asts: Vec<_> = toks.iter().map(|t| parse(t, lex)).collect();
-    let models = model_names(&asts, &toks);
     let mut names = Folder::default();
     let mut pending = Vec::new();
     let mut rows = Vec::new();
@@ -174,7 +170,6 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             rows: &mut rows,
             measured: &mut measured,
             declared: &declared,
-            models: &models,
             shift: u32::from(roles[k] == ir::Role::Library),
             frames: Vec::new(),
             framed: false,
@@ -223,25 +218,6 @@ pub(super) fn bind_rows(b: &mut ir::Builder<'_>, rows: &[RowRef]) {
             b.bind_ref(r.item, r.k, def);
         }
     }
-}
-
-/// The folded name of every `.model` card of every file, any block.
-pub(super) fn model_names(asts: &[Ast<'_>], toks: &[Tokens<'_>]) -> HashSet<String> {
-    let mut out = HashSet::new();
-    for (ast, toks) in asts.iter().zip(toks) {
-        let mut stack: Vec<Node> = ast.fields(ast.root()).iter().map(|&n| Node(n)).collect();
-        // Bounded: each statement is visited once.
-        while let Some(n) = stack.pop() {
-            if ast.tag(n) == Tag::Model
-                && let Some(&f) = ast.fields(n).first()
-            {
-                out.insert(name::key(&joined(toks, ast, Node(f))));
-            }
-            stack.extend(next(ast, n));
-            stack.extend(body(ast, n).iter().map(|&s| Node(s)));
-        }
-    }
-    out
 }
 
 /// The bind step's read half: each pending parameter read and user call, still unresolved,
@@ -376,15 +352,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// The class of `text` read in `block` (R14, `declare.rs`), `formals` shadowing.
     pub(super) fn class(&self, block: Node, text: &str, formals: &[String]) -> Class {
         self.declared.class(block, text, formals)
-    }
-
-    /// Whether any file of the sources has a `.model` named `word` (folded; any block). ngspice
-    /// ends an element's node list at the first word that names a model (`inp2q.c`, `inp2m.c`:
-    /// `INPlookMod` on the deck's model table). ponytail: any block, not the element's scope
-    /// chain; that differs only for a word that is a net here and a model in another subcircuit.
-    #[expect(dead_code, reason = "the element area calls it (S3.1)")]
-    pub(super) fn is_model(&self, word: &str) -> bool {
-        self.models.contains(&name::key(word))
     }
 
     /// Queues slot `k` (in `RowFacts::map_refs` order) of a pushed `item` to be bound in the
