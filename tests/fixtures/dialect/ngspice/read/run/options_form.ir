@@ -1,0 +1,5 @@
+# codes: P1308
+file "options_form.sp" deck
+  title "options_form"
+  comment " oracle: ngspice-45 cktsopt.c (reltol is IF_REAL); run: .options reltol 1e-4 is bad type given, the key left out"
+  opaque ngspice unread ".options reltol 1e-4"

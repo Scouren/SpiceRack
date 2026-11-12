@@ -2,4 +2,4 @@
 file "noise_current_refused.sp" deck
   title "noise_current_refused"
   comment " oracle: ngspice-45 inp2dot.c:48 (only V(...) is an output); run: circuit not parsed"
-  opaque ngspice invalid_in_source ".noise i(v1) v1 dec 1 1 10"
+  opaque ngspice invalid ".noise i(v1) v1 dec 1 1 10"

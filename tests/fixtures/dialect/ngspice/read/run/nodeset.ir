@@ -1,0 +1,6 @@
+# codes:
+file "nodeset.sp" deck
+  title "nodeset"
+  comment " oracle: ngspice-45 inppas3.c:52-112 (.nodeset v(n)=x, all=x sets every voltage node)"
+  nodeset nodeset every_op node=(a) value=0.1
+  nodeset nodeset every_op value=0.5

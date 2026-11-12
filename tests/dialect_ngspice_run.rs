@@ -34,9 +34,14 @@ const READ: &[&str] = &[
     "disto",
     "four",
     "four_nfreqs",
+    "ic",
+    "ic_subckt",
+    "nodeset",
     "noise",
     "noise_current_refused",
     "op",
+    "options",
+    "options_form",
     "pss",
     "pz",
     "sens",
@@ -56,11 +61,11 @@ const WRITE: &[&str] = &["analyses"];
 const DECKS: &[(&str, &str)] = &[
     (
         "rc_tran",
-        "rc tran\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\nR1 a b 1k\nC1 b 0 1n\n.TRAN 0.1U 20U 1U 0.2U\n.Tran 1u 30u UIC\n.end\n",
+        "rc tran\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\nR1 a b 1k\nC1 b 0 1n\n.IC V(b)=0.5\n.OPTIONS RELTOL=1e-4 method=gear\n.TRAN 0.1U 20U 1U 0.2U\n.Tran 1u 30u UIC\n.end\n",
     ),
     (
         "rc_small_signal",
-        "rc small signal\nV1 a 0 dc 1 ac 1\nR1 a b 1k\nR2 b 0 2k\nC1 b 0 1u\n.OP\n.DC V1 0 2 0.25 R2 1K 3K 1K\n.dc temp -40 85 25\n.ac dec 5 1 1meg\n.ac lin 4 10 100\n.noise v(b) v1 oct 2 10 1k 2\n.tf v(b) v1\n.sens v(b)\n.pz a 0 b 0 vol pz\n.end\n",
+        "rc small signal\nV1 a 0 dc 1 ac 1\nR1 a b 1k\nR2 b 0 2k\nC1 b 0 1u\n.NODESET v(b)=0.6\n.options gmin=1e-11 gminfactor=5\n.OP\n.DC V1 0 2 0.25 R2 1K 3K 1K\n.dc temp -40 85 25\n.ac dec 5 1 1meg\n.ac lin 4 10 100\n.noise v(b) v1 oct 2 10 1k 2\n.tf v(b) v1\n.sens v(b)\n.pz a 0 b 0 vol pz\n.end\n",
     ),
 ];
 
@@ -93,7 +98,7 @@ fn each_read_fixture_gives_the_codes_its_ir_lists() {
 fn each_read_fixture_reads_to_its_ir() {
     for name in READ {
         let (got, _) = read_deck(&format!("{name}.sp"), &text("read", name, "sp"));
-        let want = parse_ir(&text("read", name, "ir"));
+        let want = parse_ir(name, &text("read", name, "ir"));
         assert!(
             got.eq_ignoring_spans(&want),
             "{name}: read as\n{}",
@@ -117,7 +122,7 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
 #[test]
 fn each_write_fixture_writes_to_its_text() {
     for name in WRITE {
-        let design = parse_ir(&text("write", name, "ir"));
+        let design = parse_ir(name, &text("write", name, "ir"));
         assert_eq!(write_entry(&design), text("write", name, "sp"), "{name}");
     }
 }
@@ -206,11 +211,11 @@ fn dump(design: &ir::Design) -> String {
 }
 
 /// A design from IR text.
-fn parse_ir(text: &str) -> ir::Design {
+fn parse_ir(name: &str, text: &str) -> ir::Design {
     let mut design = ir::Design::new();
     let mut diags = ir::Diags::new();
     ir::parse(text, &mut design.builder(), &mut diags);
-    assert!(diags.is_empty(), "{diags:?}");
+    assert!(diags.is_empty(), "{name}: {diags:?}");
     design
 }
 
