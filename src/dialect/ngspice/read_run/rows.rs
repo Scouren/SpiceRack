@@ -41,6 +41,7 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
                 rows.push(DcAxis {
                     target,
                     sweep: ir::SweepSpec::lin_step(a, b, c),
+                    name: ir::NameId::NONE,
                 });
             }
             let axes = lw.b.dc_axes(&rows);

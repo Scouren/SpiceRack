@@ -15,7 +15,7 @@
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
 //! `pub(super) fn analysis`, `option`, `env`, `node_set`, `statistics`
 
-use super::codes::{self, Row};
+use super::codes::Row;
 use super::expr_write;
 use super::number::{self, Grammar};
 use super::read_run;
@@ -38,6 +38,12 @@ pub(super) const CODES: &[Row] = &[
         "ngspice takes the count from the nfreqs option, not from the .four card; refused.",
     ),
     refusal(
+        READS_TEMP,
+        "a run card value that reads the temperature",
+        "ngspice-45 inpcom.c inp_fix_temper_in_param (.param only); numparam",
+        "numparam evaluates a dot card's braces once before the run, with no temper; refused.",
+    ),
+    refusal(
         CARD_FORM,
         "an analysis field ngspice's card has no position for",
         "ngspice-45 inp2dot.c dot_dc, dot_ac, dot_tran; traninit.c:29",
@@ -54,9 +60,12 @@ const FOUR_HARMONICS: ir::Code = ir::Code::new(b'W', 1300);
 /// spells (`write_outputs::probe_admits`).
 const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
 
+/// A card value that reads the temperature: numparam evaluates a dot card's `{…}` once, before
+/// the run, with no `temper` (`inpcom.c` `inp_fix_temper_in_param` rewrites `.param` only).
+const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
+
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21): a card form (`W1300`, `W1301`) or a value that reads the run (`W1005`: numparam evaluates
-/// a card's `{…}` once).
+/// (R21): a card form (`W1300`, `W1301`) or a value that reads the temperature (`W1302`).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let span = design.span_of(item);
     let mut refuse = |code| diags.push(code, span, 0);
@@ -375,12 +384,13 @@ pub(super) fn statistics(_w: &mut Out<'_>, _item: ir::ItemRef) {
 
 // ---- private ----
 
-/// Refuses a card value that reads the run (numparam evaluates a card's `{…}` once; a literal
-/// is never refused: R28).
+/// Refuses a card value that reads the temperature (numparam evaluates a dot card's `{…}` once,
+/// with no `temper`; a value that reads the circuit is `ir::check`'s `ProbeContext` in these
+/// constant fields; a literal is never refused: R28).
 fn check_values(design: &ir::Design, values: &[ir::ExprId], refuse: &mut impl FnMut(ir::Code)) {
     for &e in values.iter().filter(|e| !e.is_none()) {
-        if ir::expr_class(design, e) >= ir::ExprClass::Temp {
-            refuse(codes::READS_RUN);
+        if ir::expr_class(design, e) == ir::ExprClass::Temp {
+            refuse(READS_TEMP);
         }
     }
 }
