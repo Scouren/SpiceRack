@@ -90,6 +90,9 @@ struct Spine {
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
 
+/// The refinement oracle's step cap: a transient's span over this.
+const REFINE: f64 = 2000.0;
+
 /// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
 /// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
 /// each axis, which VACASK writes as the axis's swept vector.
@@ -191,7 +194,43 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     }
     match cmp::compare(&a, &b, tol) {
         Err(why) => {
-            fails.insert(4, fail("mismatch", why));
+            // The refinement oracle (cross-sim's `simulator-differs:refinement`): both decks
+            // with every transient's step capped at span/REFINE; agreeing there, the two
+            // simulators' step control made the difference, not the conversion.
+            let refined = sim::refined(c.from_sim, text, REFINE)
+                .zip(sim::refined(c.to_sim, &entry.1, REFINE))
+                .and_then(|(ra, rb)| {
+                    let a2 = sim::run_checked(c.from_sim, &deck.path, &ra, &[], SECS);
+                    let b2 = sim::run_checked(
+                        c.to_sim,
+                        &deck.path.with_extension(c.to_ext),
+                        &rb,
+                        rest,
+                        SECS,
+                    );
+                    match (a2, b2) {
+                        (Ran::Plots(x), Ran::Plots(y)) => Some(
+                            cmp::compare(
+                                &plots::only(x, pair.vectors.as_ref()),
+                                &plots::only(
+                                    plots::renamed(y, &spine.renames),
+                                    pair.vectors.as_ref(),
+                                ),
+                                tol,
+                            )
+                            .is_ok(),
+                        ),
+                        _ => None,
+                    }
+                });
+            let f = match refined {
+                Some(true) => fail(
+                    "simulator-differs:refinement",
+                    format!("{why}; both agree with every step capped at span/{REFINE}"),
+                ),
+                _ => fail("mismatch", why),
+            };
+            fails.insert(4, f);
         }
         Ok(()) if std::env::var_os("PAIR_MARGINS").is_some() => {
             eprintln!("margin {}: {}", deck.name, margin(&a, &b, text, &entry.1));
