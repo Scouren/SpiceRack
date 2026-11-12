@@ -12,11 +12,12 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.1; `DIALECT-NGSPICE.md` §3 (the same four steps).
 //!
 //! Contents: `Cst`, `Lower` (`Lower::span`, `Lower::text`, `Lower::start`, `Lower::body`,
-//! `Lower::comments_until`), `references`, `read`, `unread`, `opaque`,
+//! `Lower::comments_until`, `Lower::bind_master_later`), `references`, `read`, `unread`, `opaque`,
 //! `statement_text`, `field_name` (crate-private)
 
 use std::collections::HashSet;
 
+use super::bind;
 use super::codes;
 use super::{read_elements, read_models, read_run, read_sources, read_structure};
 use crate::dialect::{Reference, Sources};
@@ -61,6 +62,8 @@ pub(super) struct Lower<'a, 'b, 's> {
     pub(super) source_models: &'a HashSet<String>,
     /// Each parameter read, the scope it is read from and its statement, bound by `bind`.
     pub(super) reads: &'a mut Vec<(ir::ExprId, ir::ScopeId, ir::Span)>,
+    /// Each element whose master to bind, bound by `bind::masters` at the end.
+    pub(super) masters: &'a mut Vec<bind::Master>,
     /// `parameters` entries a subcircuit's head took (their `Assign` nodes).
     pub(super) taken: HashSet<u32>,
     /// The next token whose leading gap has not been searched for comments.
@@ -68,9 +71,6 @@ pub(super) struct Lower<'a, 'b, 's> {
     /// The end of the gaps already searched (a byte of the tokenized text).
     pub(super) gap_end: u32,
 }
-
-/// The deepest scope chain `region` walks (blocks nest at most this deep in a parsed file).
-const SCOPE_DEPTH_MAX: usize = 1 << 16;
 
 /// Which area reads an instance statement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,6 +95,21 @@ impl Lower<'_, '_, '_> {
     /// The text of statement `n`, as written.
     pub(super) fn text(&self, n: Node) -> &str {
         statement_text(self.cst, n)
+    }
+
+    /// Records that element `item` names its master by name (`Element.model`, unresolved):
+    /// `bind::masters` binds it after every file is read (a `model` may come later or from an
+    /// include), by VACASK's rule, to the definition kind the element's kind takes.
+    #[allow(
+        dead_code,
+        reason = "read_elements (S4.1) and read_sources (S4.2) call it"
+    )]
+    pub(super) fn bind_master_later(&mut self, item: ir::ItemRef) {
+        self.masters.push(bind::Master {
+            item,
+            scope: self.scope,
+            span: self.stmt,
+        });
     }
 
     /// The start byte (in the file's own text) of statement `n`.
@@ -244,6 +259,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
     }
     let (grounds, named_files, source_models) = declare(&csts);
     let mut reads = Vec::new();
+    let mut masters = Vec::new();
     for (cst, top) in &csts {
         let mut l = Lower {
             b: &mut *out,
@@ -255,6 +271,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             named_files: &named_files,
             source_models: &source_models,
             reads: &mut reads,
+            masters: &mut masters,
             taken: HashSet::new(),
             gap_token: 0,
             gap_end: 0,
@@ -263,7 +280,8 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
         l.body(*top, &root, None);
         l.comments_until(u32::MAX, true);
     }
-    bind(out, &reads, diags);
+    bind::reads(out, &reads, diags);
+    bind::masters(out, &masters, diags);
 }
 
 /// Statement `n` as an `Opaque` of `class`, its text as written: the class's `S` note and,
@@ -445,70 +463,6 @@ fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> (HashSet<String>, HashSet<String>
 fn first_string(text: &str) -> Option<String> {
     let rest = text.trim_start().strip_prefix('"')?;
     rest.find('"').map(|end| rest[..end].to_string())
-}
-
-/// Binds every recorded parameter read by VACASK's rule: the own subcircuit (its branches and
-/// sections), then the top of its file, then the top of every other file (VACASK's include is
-/// textual). A read only an enclosing subcircuit could bind stays unbound, refused (`R2003`).
-fn bind(
-    b: &mut ir::Builder<'_>,
-    reads: &[(ir::ExprId, ir::ScopeId, ir::Span)],
-    diags: &mut ir::Diags,
-) {
-    for &(e, scope, span) in reads {
-        let design = b.design();
-        let ir::Expr::Param(r) = design.expr(e) else {
-            unreachable!("a recorded read is a parameter read");
-        };
-        let (own, top) = region(design, scope);
-        let found = design.lookup(scope, ir::DefKind::Param, r.name);
-        let in_own = !found.is_none() && {
-            let at = design.def(found).scope;
-            own.contains(&at) || design.scope(at).kind == ir::ScopeKind::File
-        };
-        let def = if in_own {
-            found
-        } else {
-            let at_top = design.lookup(top, ir::DefKind::Param, r.name);
-            let other = || {
-                design
-                    .files()
-                    .map(|f| design.file(f).top)
-                    .filter(|&t| t != top)
-                    .map(|t| design.lookup(t, ir::DefKind::Param, r.name))
-                    .find(|d| !d.is_none())
-                    .unwrap_or(ir::DefId::NONE)
-            };
-            match at_top.is_none() {
-                false => at_top,
-                true => other(),
-            }
-        };
-        if !found.is_none() && !in_own && def.is_none() {
-            diags.push(read_structure::ENCLOSING, span, 0);
-        }
-        if !def.is_none() {
-            b.resolve(e, def);
-        }
-    }
-}
-
-/// The scopes of `scope`'s own region (it and its ancestors up to its subcircuit's body or its
-/// file's top) and its file's top scope.
-fn region(design: &ir::Design, scope: ir::ScopeId) -> (Vec<ir::ScopeId>, ir::ScopeId) {
-    let mut own = Vec::new();
-    let mut at = scope;
-    // Bounded: each step moves to a parent, and the scope tree is acyclic (`ir::check`).
-    for _ in 0..SCOPE_DEPTH_MAX {
-        own.push(at);
-        let s = design.scope(at);
-        if matches!(s.kind, ir::ScopeKind::Subckt | ir::ScopeKind::File) || s.parent.is_none() {
-            break;
-        }
-        at = s.parent;
-    }
-    let top = design.file(design.scope(scope).file).top;
-    (own, top)
 }
 
 #[cfg(test)]

@@ -17,7 +17,7 @@
 //! Cites: VD cir-subckt, cir-subckt-nested, cir-conditional, cir-nodes, cir-loading,
 //! input-embed, input-include.
 //!
-//! Contents: `FEATURES`, `CODES`, `REDEFINED`, `IN_BRANCH`, `ENCLOSING`, `TOP_ONLY`, and the area
+//! Contents: `PLACEMENTS`, `FEATURES`, `CODES`, `REDEFINED`, `IN_BRANCH`, `ENCLOSING`, `TOP_ONLY`, and the area
 //! functions
 //! `title`, `include`, `section`, `subckt`, `if_chain`, `param`, `global`, `ground`, `load`,
 //! `embed` (crate-private)
@@ -30,7 +30,7 @@ use crate::ir;
 use crate::syntax::ast::{Name, Node, Tag};
 
 /// What this area's rows use.
-pub(super) const FEATURES: ir::FeatureSet = families(ir::FeatureSet::EMPTY)
+pub(super) const FEATURES: ir::FeatureSet = families(PLACEMENTS)
     .with(ir::Feature::Item(ir::ItemKind::Title))
     .with(ir::Feature::Item(ir::ItemKind::Comment))
     .with(ir::Feature::Item(ir::ItemKind::Include))
@@ -42,13 +42,60 @@ pub(super) const FEATURES: ir::FeatureSet = families(ir::FeatureSet::EMPTY)
     .with(ir::Feature::Item(ir::ItemKind::Section))
     .with(ir::Feature::Item(ir::ItemKind::If))
     .with(ir::Feature::Item(ir::ItemKind::Param))
-    .with(ir::Feature::Extra(ir::Extra::NestedSubckt))
     .with(ir::Feature::Extra(ir::Extra::IncludeSection))
     .with(ir::Feature::Extra(ir::Extra::CaseSensitiveNames));
 
+/// Where VACASK takes each statement (A15 `Placed`: enclosed at any depth by a scope of that kind).
+/// A subcircuit: parameters, instances, models, nested subcircuits, `@if`, `include` (VD
+/// cir-subckt; run pl/sub). An `@if` branch: instances, models, nested `@if` (VD
+/// cir-conditional; runs pl/br, pl/brs reject `include` of parameters and `subckt`). A section:
+/// parameters, subcircuits, models, instances, `@if`, `include`, `load`, `global` (run pl/sec).
+/// Comments everywhere, and VACASK's own opaques wherever the reader keeps one. Not run, so left
+/// out (a refusal, never a wrong deck): `ground`, `embed` and `section` in a section, a section in
+/// a subcircuit or branch.
+pub(super) const PLACEMENTS: ir::FeatureSet = ir::FeatureSet::placed(
+    ir::ScopeKind::Subckt,
+    &[
+        ir::ItemKind::Param,
+        ir::ItemKind::Subckt,
+        ir::ItemKind::Model,
+        ir::ItemKind::Element,
+        ir::ItemKind::If,
+        ir::ItemKind::Include,
+        ir::ItemKind::Comment,
+        ir::ItemKind::Opaque,
+    ],
+)
+.union(ir::FeatureSet::placed(
+    ir::ScopeKind::Branch,
+    &[
+        ir::ItemKind::Element,
+        ir::ItemKind::Model,
+        ir::ItemKind::If,
+        ir::ItemKind::Comment,
+        ir::ItemKind::Opaque,
+    ],
+))
+.union(ir::FeatureSet::placed(
+    ir::ScopeKind::Section,
+    &[
+        ir::ItemKind::Param,
+        ir::ItemKind::Subckt,
+        ir::ItemKind::Model,
+        ir::ItemKind::Element,
+        ir::ItemKind::If,
+        ir::ItemKind::Include,
+        ir::ItemKind::Load,
+        ir::ItemKind::DeviceLibrary,
+        ir::ItemKind::Global,
+        ir::ItemKind::Comment,
+        ir::ItemKind::Opaque,
+    ],
+));
+
 /// A parameter defined twice in one scope.
 pub(super) const REDEFINED: ir::Code = ir::Code::new(b'R', 2001);
-/// A `parameters` statement inside an `@if` branch.
+/// A statement an `@if` branch may not hold (`parameters`, `subckt`).
 pub(super) const IN_BRANCH: ir::Code = ir::Code::new(b'P', 2005);
 /// A name only an enclosing subcircuit defines.
 pub(super) const ENCLOSING: ir::Code = ir::Code::new(b'R', 2003);
@@ -87,9 +134,9 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     (
         IN_BRANCH,
         ir::Info {
-            title: "parameters inside an @if branch",
+            title: "a statement an @if branch may not hold",
             cite: "VD cir-conditional (Allowed contents)",
-            explain: "An @if branch holds instances, models and nested @if blocks only; VACASK rejects a parameters statement there.",
+            explain: "An @if branch holds instances, models and nested @if blocks only; VACASK rejects `parameters` and `subckt` there (runs pl/br, pl/brs).",
             kind: ir::Kind::Refusal,
         },
     ),
@@ -111,6 +158,11 @@ pub(super) fn title(l: &mut Lower<'_, '_, '_>, n: Node) {
 /// `include "path" [section=name]`: an `Include` of the file `src` holds at that path
 /// (resolved against the including file), else of the path as written.
 pub(super) fn include(l: &mut Lower<'_, '_, '_>, n: Node) {
+    // VACASK reads an include in a branch as its text there (run pl/br): valid only for what a
+    // branch holds, which the reader cannot see; kept as VACASK's own text.
+    if in_branch(l) {
+        return read::opaque(l, n, ir::OpaqueClass::Private, Some(codes::PRIVATE));
+    }
     let fields = l.cst.ast.fields(n).to_vec();
     let Some(&path) = fields.first() else {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(codes::PRIVATE));
@@ -138,6 +190,9 @@ pub(super) fn include(l: &mut Lower<'_, '_, '_>, n: Node) {
 
 /// `section name` … `endsection`: a `Section` and its body.
 pub(super) fn section(l: &mut Lower<'_, '_, '_>, n: Node) {
+    if l.b.design().scope(l.scope).kind != ir::ScopeKind::File {
+        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(TOP_ONLY));
+    }
     let ast = &l.cst.ast;
     let Some(&name) = ast.fields(n).first() else {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(codes::PRIVATE));
@@ -155,6 +210,9 @@ pub(super) fn section(l: &mut Lower<'_, '_, '_>, n: Node) {
 /// `subckt name (ports)` … `ends`: a `Subckt` whose head holds the constant `parameters`
 /// entries of its body (in order), then the body with the other entries as local `Param`s.
 pub(super) fn subckt(l: &mut Lower<'_, '_, '_>, n: Node) {
+    if in_branch(l) {
+        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(IN_BRANCH));
+    }
     let ast = &l.cst.ast;
     let fields = ast.fields(n).to_vec();
     let Some((&name, ports)) = fields.split_first() else {
@@ -260,7 +318,7 @@ pub(super) fn if_chain(l: &mut Lower<'_, '_, '_>, n: Node) {
 
 /// `parameters a=e b=e …` outside a subcircuit's head: one `Param` per entry, in order.
 pub(super) fn param(l: &mut Lower<'_, '_, '_>, n: Node) {
-    if l.b.design().scope(l.scope).kind == ir::ScopeKind::Branch {
+    if in_branch(l) {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(IN_BRANCH));
     }
     let fields = l.cst.ast.fields(n).to_vec();
@@ -498,6 +556,24 @@ fn top_level(l: &Lower<'_, '_, '_>) -> bool {
         ir::ScopeKind::Section => design.scope(s.parent).kind == ir::ScopeKind::File,
         _ => false,
     }
+}
+
+/// Whether the current scope is in an `@if` branch, at any depth.
+fn in_branch(l: &Lower<'_, '_, '_>) -> bool {
+    let design = l.b.design();
+    let mut at = l.scope;
+    // Bounded: each step moves to a parent, and the scope tree is acyclic.
+    for _ in 0..1 << 16 {
+        if at.is_none() {
+            return false;
+        }
+        let s = design.scope(at);
+        if s.kind == ir::ScopeKind::Branch {
+            return true;
+        }
+        at = s.parent;
+    }
+    false
 }
 
 /// The names of statement `n`'s fields, groups opened (`global (a b)`).

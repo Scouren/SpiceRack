@@ -34,7 +34,7 @@
 //! Cites: `REWRITE-PLAN.md` §2.1–§2.4, §3.4, §4.1; `rewrite/SPINE.md` §2–§3.
 //!
 //! Contents:
-//! - `pub trait Read` (`Read::references`, `Read::read`, `Read::names_its_files`),
+//! - `pub trait Read` (`Read::references`, `Read::read`),
 //!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`)
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
@@ -71,12 +71,6 @@ pub trait Read: Sync {
     /// first, even when the text is empty (the facade anchors diagnostics by that order, and
     /// `transpile` writes the entry).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags);
-
-    /// Whether one text of this dialect can hold several files, each named in the text (the IR
-    /// text's `file` blocks). Default: no; each file is its own text, at its own path.
-    fn names_its_files(&self) -> bool {
-        false
-    }
 }
 
 /// The IR → text of one dialect.

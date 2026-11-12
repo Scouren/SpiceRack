@@ -1,0 +1,12 @@
+is a formal of $tnom overridable
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt s(a)
+  parameters x=$tnom+1
+  r1 (a 0) res r=x
+ends
+x1 (n) s x=7
+x2 (m) s
+control
+  print instance("x1:r1", "x2:r1")
+endc
