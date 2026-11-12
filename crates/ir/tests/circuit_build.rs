@@ -673,4 +673,89 @@ mod tests {
         let item = b.instance(top, ElemKind::Instance, head, Span::NONE);
         assert!(b.design().row::<Element>(item.index).model.is_resolved());
     }
+
+    /// A15 C4 (R33): the first bin of a group also defines the group's name, bound to that bin;
+    /// a later bin defines only itself; an instance naming the group binds to it.
+    #[test]
+    fn a_bin_group_is_defined_by_its_first_bin() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        let push_bin = |b: &mut spicerack_ir::Builder<'_>, name: &str| {
+            let name = b.name(name);
+            let bin_of = b.name("nch");
+            let row = spicerack_ir::Model {
+                bin_of,
+                ..model(name, ModelFamily::Bsim4, Polarity::N)
+            };
+            b.model(top, row, Span::NONE)
+        };
+        let first = push_bin(&mut b, "nch.1");
+        push_bin(&mut b, "nch.2");
+        let h = b.head("m1", &["d", "g", "s", "b"], Some("nch"), &[], ExprId::NONE);
+        let m1 = b.semi(top, ElemKind::Mosfet, h, semi(), Span::NONE);
+        let design = b.design();
+        let names: Vec<&str> = design
+            .definitions()
+            .iter()
+            .map(|d| design.str(d.name))
+            .collect();
+        assert_eq!(names, ["nch.1", "nch", "nch.2"]);
+        let group = design.definitions()[1];
+        assert_eq!((group.kind, group.item), (DefKind::Model, first));
+        let mut diags = spicerack_ir::Diags::new();
+        spicerack_ir::link(&mut d, &mut diags);
+        let element = d.row::<Element>(m1.index);
+        assert_eq!(
+            element.model.def,
+            spicerack_ir::DefId(1),
+            "the instance binds to the group"
+        );
+        let mut diags = spicerack_ir::Diags::new();
+        spicerack_ir::check(&d, &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+    }
+
+    #[test]
+    fn spice_letters_of_a_behavioural_source_and_a_port() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        let mut b = d.builder();
+        let one = n(&mut b, 1);
+        let h = b.head("e4", &["o", "0"], None, &[], ExprId::NONE);
+        let v = b.behav(
+            top,
+            ElemKind::Behav,
+            h,
+            behav(one, OutKind::Voltage),
+            Span::NONE,
+        );
+        let h = b.head("g3", &["o", "0"], None, &[], ExprId::NONE);
+        let i = b.behav(
+            top,
+            ElemKind::Behav,
+            h,
+            behav(one, OutKind::Current),
+            Span::NONE,
+        );
+        let h = b.head("b2", &["o", "0"], None, &[], ExprId::NONE);
+        let r = b.behav(
+            top,
+            ElemKind::Behav,
+            h,
+            behav(one, OutKind::Resistance),
+            Span::NONE,
+        );
+        let design = b.design();
+        let letters = |x: spicerack_ir::ItemRef| {
+            spicerack_ir::spice_letters(design, &design.row::<Element>(x.index))
+        };
+        assert_eq!(letters(v), b"BE");
+        assert_eq!(letters(i), b"BG");
+        assert_eq!(letters(r), b"B");
+        assert_eq!(
+            spicerack_ir::spice_letter(design, &design.row::<Element>(v.index)),
+            Some(b'B')
+        );
+    }
 }

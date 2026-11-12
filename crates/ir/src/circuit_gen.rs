@@ -166,11 +166,25 @@ pub(crate) fn generate_model(
             .map(|l| l.family)
             .collect()
     };
+    // and only a family the set has (A15 K5)
+    let families: Vec<ModelFamily> = families
+        .into_iter()
+        .filter(|&f| r.f.contains(Feature::Family(f)))
+        .collect();
     if families.is_empty() {
         return ItemRef::NONE;
     }
     let family = families[r.g.below(families.len() as u32) as usize];
-    let name = r.g.fresh_name(r.b);
+    // a bin is `<group>.<n>` of a fresh group (A15 C4): the name is interned first, the group
+    // where `dump` writes `bin_of`
+    let group = r.maybe(X::ModelBin).then(|| r.g.fresh());
+    let name = match &group {
+        Some(base) => {
+            let text = format!("{base}.1");
+            r.b.name(&text)
+        }
+        None => r.g.fresh_name(r.b),
+    };
     let polarity = if has_polarity(family) {
         if r.g.chance(2) {
             Polarity::N
@@ -200,10 +214,9 @@ pub(crate) fn generate_model(
         let borrowed: Vec<(&str, ExprId)> = pairs.iter().map(|(k, v)| (k.as_str(), *v)).collect();
         r.b.params(&borrowed)
     };
-    let bin_of = if r.maybe(X::ModelBin) {
-        r.g.fresh_name(r.b)
-    } else {
-        NameId::NONE
+    let bin_of = match &group {
+        Some(base) => r.b.name(base),
+        None => NameId::NONE,
     };
     let ako = if r.maybe(X::ModelAko) {
         r.reference(DefKind::Model)

@@ -83,7 +83,8 @@
 //!   `Builder::source`, `Builder::controlled`, `Builder::poly`, `Builder::table_source`,
 //!   `Builder::behav`, `Builder::laplace`, `Builder::freq_table`, `Builder::delay`,
 //!   `Builder::semi`, `Builder::switch`, `Builder::line`, `Builder::instance`
-//! - `Builder::model(&mut self, ScopeId, Model, Span) -> ItemRef`
+//! - `Builder::model(&mut self, ScopeId, Model, Span) -> ItemRef`; crate:
+//!   `Builder::define_model`
 
 use crate::build::Builder;
 use crate::circuit_check::{model_ok, verdict};
@@ -422,7 +423,8 @@ impl Builder<'_> {
         self.element(scope, kind, head, NO_ROW, span)
     }
 
-    /// A model; defines `DefKind::Model` `row.name` in `scope`. Asserts `word` is set exactly
+    /// A model; defines `DefKind::Model` `row.name` in `scope`, and for the first bin of a group
+    /// (`bin_of` not yet defined there) the group's name too, bound to this bin (A15 C4). Asserts `word` is set exactly
     /// for `CodeModel` and `Other`, `module` named exactly for `Module`.
     pub fn model(&mut self, scope: ScopeId, row: Model, span: Span) -> ItemRef {
         let code = matches!(row.family, ModelFamily::CodeModel | ModelFamily::Other);
@@ -442,7 +444,27 @@ impl Builder<'_> {
             row.family
         );
         let item = self.push(scope, row, span);
-        self.define(DefKind::Model, row.name, scope, item);
+        self.define_model(scope, item, row.name, row.bin_of);
         item
+    }
+
+    /// Defines a pushed model's name and, for the first bin of a group in `scope`, the group's
+    /// name bound to that bin (A15 C4, R33). Shared by `model` and the IR-text reader.
+    pub(crate) fn define_model(
+        &mut self,
+        scope: ScopeId,
+        item: ItemRef,
+        name: NameId,
+        bin_of: NameId,
+    ) {
+        self.define(DefKind::Model, name, scope, item);
+        if bin_of != NameId::NONE
+            && !self
+                .design
+                .def_index
+                .contains_key(&(scope, DefKind::Model, bin_of))
+        {
+            self.define(DefKind::Model, bin_of, scope, item);
+        }
     }
 }

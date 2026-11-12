@@ -33,8 +33,11 @@ field and say which dialect needs it in its doc.
 
 Header as IR-KERNEL §6, with A13 (R23): `name` is the element's whole name as its dialect
 spells it (ngspice: letter included, folded), unique in its scope across kinds; the SPICE card
-letter is the neutral fact `letter::spice_letter(design, element)`, and a name that does not
-begin with it is `CircuitExtra::NameWithoutLetter` (a SPICE-card writer lacks it; a pass
+letter is the neutral fact `letter::spice_letter(design, element)` (the canonical letter, which a
+rename pass uses); `letter::spice_letters` lists every letter a SPICE card may give the element
+(a voltage `Behav` B or E and a current one B or G, as ngspice and HSPICE read `E … vol=` and
+`G … cur=`; a `Port` P or V), and a name that begins with none of them is
+`CircuitExtra::NameWithoutLetter` (a SPICE-card writer lacks it; a pass
 renames). Two elements of one name in one scope are `Violation::DuplicateElement`
 (`element::design_check`). For every `ElemKind` document the terminal roles in order, the allowed
 terminal count (fixed or a range), whether `model` is required, and its detail row.
@@ -59,21 +62,26 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 never to a parameter named `m`. How it multiplies is the header's `mult_law` (AMEND-A12 A15 C1,
 R31): `MultLaw::Parallel` (every kind: `mult` whole copies in parallel; through the hierarchy
 multiplicities compose by multiplication) or, on an `Instance` with a `mult` only,
-`MultLaw::NgspiceAppend` (ngspice's `m` on an X line, `inpcom.c:4124-4198`): the instance's
-`mult` is given to every element of the subcircuit's body whose kind ngspice multiplies,
-replacing that element's own `mult`, and is passed on the same way to nested `Instance`s. By
-kind, ngspice leaves these as they are (their own `mult` stays): `VSource` and `Port` (V cards),
-`Vcvs` and `Delay` and a voltage-output `Poly`, `Table`, `Laplace` or `FreqTable` (E cards),
-`Ccvs` and a voltage-output current-controlled `Poly` (H cards), `Behav` with
-`OutKind::Voltage` (a V-valued B card), `CodeModel` (A), `Coupling` (K), `ModuleModel` (N), the
-line kinds (`LosslessLine`, `LossyLine`, `RcLine`, `SingleLossyLine`, `CoupledLines`) and the
-switches (`VSwitch`, `ISwitch`). Every other kind takes it: R, C, L and their charge- and
-flux-defined forms, `ISource`, `Vccs`, `Cccs` and their `Poly`/`Table`/`Laplace`/`FreqTable`
-current-output forms, a `Behav` of any other output, the semiconductors. This list is A15's
-reading of the exclusion list; the exact list by card letter (with the B source split by
-output) comes from the ngspice elements slice, and a difference is a change of this paragraph
-only, with its run. Features: `MultInstanceParallel`, `MultInstanceNgspiceAppend` (they
-replace `MultInstance`).
+`MultLaw::NgspiceAppend` (ngspice's `m` on an X line, ngspice-45 `inpcom.c:4124-4198`
+`inp_fix_subckt_multiplier` and `4208-4250`; exact list and runs from the ngspice elements
+slice): when the subcircuit does not declare `m`, the instance's `mult` is appended as `m={m}`
+to every element of the body, after its own `m=`, so it replaces that element's own `mult` (the
+last one wins: an inner `R1 p q 1k m=5` under `X … m=2` runs as 500 Ω, v(f) = 0.6667), and
+nested `Instance`s pass it on the same way. ngspice leaves untouched the cards whose letter is
+in "vehaknopstuwy" and a B card whose output is `v=`: by kind `VSource` and `Port` (V), `Vcvs`,
+`Delay` and the voltage-output `Poly`, `Table`, `Laplace`, `FreqTable` (E), `Ccvs` and the
+voltage-output current-controlled `Poly` (H), `CodeModel` (A), `Coupling` (K), `ModuleModel`
+(N), `LossyLine` (O), `CoupledLines` (P), `VSwitch` (S), `LosslessLine` (T), `RcLine` (U),
+`ISwitch` (W), `SingleLossyLine` (Y), and `Behav` with `OutKind::Voltage`. Every other kind is
+multiplied: R, C, L (with the charge- and flux-defined forms and a circuit-valued R), `ISource`
+(`i` is not in the list), `Vccs`, `Cccs` and every current-output G/F form, a current `Behav`,
+D, Q, M, J, Z (`Mesfet`, `Igbt`), and nested `Instance`s (X). `Module` and `Unresolved` are no
+ngspice cards. Runs (ngspice-45): `X1 … m=2` over `R1 p q 1k` gives v(b) = 0.6667 (500 Ω). A
+subcircuit that declares `m` in its head (`params: m=1`) triggers nothing: `m` is an ordinary
+parameter (v(d) = 0.5, R stays 1k), so the ngspice reader puts it in the instance's `params`
+and leaves `mult` `NONE`. HSPICE compatibility mode (`newcompat.hs`) writes `m={m*<old>}`, a
+product: that is `Parallel`, not this law. Features: `MultInstanceParallel`,
+`MultInstanceNgspiceAppend` (they replace `MultInstance`).
 
 ## 3. Waveforms (`wave.rs`)
 
@@ -104,11 +112,25 @@ Ref }`.
   `Module`, …: fix the list from `INV-constructs` §F and D68). A level number is a dialect's
   spelling of a family: readers map (type word, level) → family, writers map back. There is no
   "neutral level".
+- Every model sets `Feature::Family(family)` (A15 K5, R32): a target that has no such family
+  lacks the feature, so its refusal is a feature, not an `admits` check; a version of a family
+  a target lacks stays the dialect's own check.
 - `ModelFamily::Other` carries the type word as written for a family the IR does not know; a
   writer of another dialect refuses it.
 - Parameter names in `params` are lowercase and are the family's own names (the model's
   published names); a dialect's renames live in that dialect's tables, not here.
 - Bins: one `Model` per bin, `bin_of` naming the base; a Spectre model group is a run of them.
+  A bin group has a definition (AMEND-A12 A15 C4, R33): pushing the first `Model` with
+  `bin_of = X` into a scope where no `DefKind::Model` `X` exists also defines `X` there, its
+  `Def.item` the first bin's row (`Builder::model` and the IR-text reader both do it, so the round
+  trip holds). An instance that names the group (`nch`, where only `nch.1`, `nch.2`, … exist)
+  binds to that definition, and the simulator picks the bin by geometry. A consumer tells a group
+  from a plain model by its definition: `design.row::<Model>(def.item.index).name != def.name` (the
+  row it points at is a bin whose `bin_of` is the definition's name). A plain model of the
+  group's name in the same scope is a duplicate definition: a reader keeps its simulator's
+  winner before it pushes.
+- `ModelFamily::Mesa` (A15 C3): ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet` levels 2 to 4,
+  `inpdomod.c`); the level is a parameter of the device.
 
 ## 4a. Device libraries (`library.rs`, AMEND-A12 C5, R17)
 
