@@ -24,9 +24,6 @@ pub(super) struct Writer<'d, 'o> {
     pub(super) depth: usize,
     /// The directory of the file being written (`""` for none), which its paths are relative to.
     pub(super) dir: String,
-    /// The writer's notes (a name the writer gave, DIALECT-VACASK §4).
-    #[allow(dead_code, reason = "write_run (S4.3) pushes W2301/W2302")]
-    pub(super) diags: &'o mut ir::Diags,
 }
 
 /// One step of the walk: an item, a branch head of an `If`, or a block's closing line.
@@ -72,12 +69,7 @@ impl Writer<'_, '_> {
 }
 
 /// Appends file `file` of `design` (legal for `FEATURES`) to `out`.
-pub(super) fn write(
-    design: &ir::Design,
-    file: ir::FileId,
-    out: &mut String,
-    diags: &mut ir::Diags,
-) {
+pub(super) fn write(design: &ir::Design, file: ir::FileId, out: &mut String) {
     let top = design.file(file).top;
     let path = design.str(design.file(file).path);
     let dir = std::path::Path::new(path)
@@ -88,7 +80,6 @@ pub(super) fn write(
         out,
         depth: 0,
         dir,
-        diags,
     };
     if design.file(file).role == ir::Role::Deck {
         let title = design
