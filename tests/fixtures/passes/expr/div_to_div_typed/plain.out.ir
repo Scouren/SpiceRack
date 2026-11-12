@@ -1,0 +1,6 @@
+file "d.sp" deck
+  param a = 3i
+  param r = 1 /: 3
+  param s = 1 * a /: 2i
+  param t = a /: 2.5
+  element behav b1 (n 0) expr=(v(n) / a)

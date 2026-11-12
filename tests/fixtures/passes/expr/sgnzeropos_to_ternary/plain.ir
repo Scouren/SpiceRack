@@ -1,0 +1,4 @@
+file "d.sp" deck
+  param a = 3i
+  param r = sgn_zero_pos(a - 4i)
+  param s = sgn_zero_pos(2.5)
