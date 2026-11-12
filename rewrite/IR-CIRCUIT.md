@@ -266,3 +266,5 @@ in `build_circuit.rs`, read accessors), bodies `todo!()`, your `Extra` features 
 `feature.rs`, and `rewrite/COVERAGE-circuit.md`: one line per row of `INV-constructs.md` §D, §E,
 §F and of `INV-semantics.md` categories 5, 6, 7, naming the field, variant, feature or `Opaque`
 class that holds it (or `gap: <why>`). A row with no home is a finding, not a failure: list it.
+
+- Recursive hierarchy (the lead's finding on `dialect_laws` l5 seed 19): an instance whose subcircuit reaches the subcircuit holding it (itself, or through a cycle) is `Violation::InstanceCycle` (X0024), reported at every instance on the cycle, used or not (`hierarchy.rs`, Tarjan over the instance graph); the generator never draws one. Runs: ngspice-45 "unknown subckt: x0.x1.x1…", VACASK "Hierarchical recursion detected." (`crates/ir/tests/fixtures/hierarchy/`).

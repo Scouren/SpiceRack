@@ -252,6 +252,7 @@ fn each_kernel_invariant_has_its_fixture() {
         Violation::DetailRow,
         Violation::DuplicateElement,
         Violation::InstancePortCount,
+        Violation::InstanceCycle,
         // run-owned (run_check.rs has its fixtures)
         Violation::RunArgumentClass,
     ];
