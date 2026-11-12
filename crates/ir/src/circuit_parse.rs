@@ -171,7 +171,7 @@ pub(crate) fn parse_model(
         return ItemRef::NONE;
     }
     let item = b.push(scope, m, span);
-    b.define(DefKind::Model, name, scope, item);
+    b.define_model(scope, item, name, m.bin_of);
     item
 }
 

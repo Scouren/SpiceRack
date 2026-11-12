@@ -109,6 +109,17 @@ Ref }`.
 - Parameter names in `params` are lowercase and are the family's own names (the model's
   published names); a dialect's renames live in that dialect's tables, not here.
 - Bins: one `Model` per bin, `bin_of` naming the base; a Spectre model group is a run of them.
+  A bin group has a definition (AMEND-A12 A15 C4, R33): pushing the first `Model` with
+  `bin_of = X` into a scope where no `DefKind::Model` `X` exists also defines `X` there, its
+  `Def.item` the first bin's row (`Builder::model` and the IR-text reader both do it, so the round
+  trip holds). An instance that names the group (`nch`, where only `nch.1`, `nch.2`, … exist)
+  binds to that definition, and the simulator picks the bin by geometry. A consumer tells a group
+  from a plain model by its definition: `design.row::<Model>(def.item.index).name != def.name` (the
+  row it points at is a bin whose `bin_of` is the definition's name). A plain model of the
+  group's name in the same scope is a duplicate definition: a reader keeps its simulator's
+  winner before it pushes.
+- `ModelFamily::Mesa` (A15 C3): ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet` levels 2 to 4,
+  `inpdomod.c`); the level is a parameter of the device.
 
 ## 4a. Device libraries (`library.rs`, AMEND-A12 C5, R17)
 
