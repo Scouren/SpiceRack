@@ -1,0 +1,10 @@
+# Oracle: VD expr-functions (Monte Carlo: the nominal outside an `mc` loop); DIALECT-VACASK
+# Appendix A run g2 (`agauss(5,1,1)` is 5 outside `mc`); INV-semantics 12.01, 12.03 (one sample
+# per call site).
+# codes:
+file "draws.sim" deck
+  title "draws"
+  param a = draw:abs_gauss:sampling:call_site(5, 1, 1)
+  param b = draw:rel_gauss:sampling:call_site(5, 0.1, 3)
+  param c = draw:abs_unif:sampling:call_site(5, 1)
+  param d = draw:rel_unif:sampling:call_site(5, 0.1)

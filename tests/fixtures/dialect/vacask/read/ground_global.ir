@@ -1,0 +1,9 @@
+# Oracle: VD cir-nodes (`ground` ties its names to node 0, top level only; ground nodes are
+# global); INV-semantics 11.01 (`gnd` is no ground by default). A statement with no meaning
+# left is an Inert opaque (R15).
+# codes: S0003 S0003
+file "ground_global.sim" deck
+  title "ground and global nodes"
+  opaque vacask inert "ground gnd agnd"
+  global vdd vss
+  opaque vacask inert "global (agnd)"

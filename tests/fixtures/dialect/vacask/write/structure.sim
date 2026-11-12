@@ -1,0 +1,28 @@
+structure
+// one line
+/* two
+ lines */
+parameters a=1
+parameters 'q.r'=a + 2
+include "lib.inc" section=tt
+include "plain.inc"
+load "mydev.osdi"
+load "nl2.va"
+global vdd vss
+section corner
+  parameters c=3
+endsection
+subckt s (p n)
+  parameters x=2 * 3 y=7
+  parameters w=x + 1
+  subckt inner (c)
+  ends
+ends
+@if a == 1
+  r1 (n 0) res r=1k
+@elseif a
+  r2 (n 0) res r=2k
+@else
+  r3 (n 0) res r=3k
+@end
+parameters v=[1, 2]

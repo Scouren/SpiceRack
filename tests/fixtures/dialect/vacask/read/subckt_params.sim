@@ -1,0 +1,10 @@
+formals and locals
+parameters q=5
+subckt s (a b)
+  parameters x=2*3 y=M_PI z=sqrt(4)
+  parameters w=q*2 v=x+1
+  parameters u=7
+  subckt inner (c)
+    parameters k=1
+  ends
+ends

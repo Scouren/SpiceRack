@@ -1,0 +1,11 @@
+binding
+parameters top=1
+parameters early=late*2
+parameters late=3
+subckt outer (a)
+  parameters p=7
+  parameters own=p+top
+  subckt inner (b)
+    parameters k=p+top
+  ends
+ends

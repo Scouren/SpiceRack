@@ -39,7 +39,8 @@
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`
-//! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`
+//! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
+//!   `pub mod vacask`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
 //! - `pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)`
@@ -50,6 +51,7 @@
 pub mod facade;
 pub mod irtext;
 mod sources;
+pub mod vacask;
 
 pub use sources::{DEPTH_MAX, Reference, Sources};
 
@@ -95,12 +97,20 @@ pub struct DialectRow {
 }
 
 /// Every built-in language: the IR's own text first; each dialect slice appends its row.
-pub static BUILTIN: &[DialectRow] = &[DialectRow {
-    name: "ir",
-    text_family: ANY_FAMILY,
-    read: Some(&irtext::IrText),
-    write: Some(&irtext::IrText),
-}];
+pub static BUILTIN: &[DialectRow] = &[
+    DialectRow {
+        name: "ir",
+        text_family: ANY_FAMILY,
+        read: Some(&irtext::IrText),
+        write: Some(&irtext::IrText),
+    },
+    DialectRow {
+        name: "vacask",
+        text_family: "vacask",
+        read: Some(&vacask::VACASK),
+        write: Some(&vacask::VACASK),
+    },
+];
 
 /// The `text_family` of a writer whose text holds an `Opaque` of any dialect (the IR text,
 /// which is lossless).
@@ -299,7 +309,9 @@ pub fn info(code: ir::Code) -> Option<ir::Info> {
         .iter()
         .find(|(c, _)| *c == code)
         .map(|(_, i)| *i);
-    spine.or_else(|| ir::diag::info(code))
+    spine
+        .or_else(|| vacask::info(code))
+        .or_else(|| ir::diag::info(code))
 }
 
 /// Whether `code` refuses a deck: its row is a refusal, or no catalogue holds it (a missing

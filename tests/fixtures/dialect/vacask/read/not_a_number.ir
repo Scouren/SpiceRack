@@ -1,0 +1,9 @@
+# Oracle: VD input-numbers; INV-semantics 1.05-1.07 (`1k5`, `1e3k` are no VACASK numbers);
+# `inf` is a value VACASK reads that the IR refuses (C9). Each statement is kept as text.
+# codes: P2001 P2001 P2002 S0004 S0004 S0004
+file "not_a_number.sim" deck
+  title "numbers VACASK does not read"
+  opaque vacask invalid "parameters a=1k5"
+  opaque vacask invalid "parameters b=1e3k"
+  opaque vacask invalid "parameters c=inf"
+  param d = 2

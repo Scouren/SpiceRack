@@ -1,0 +1,9 @@
+conditional blocks
+parameters a=1 b=0
+@if a==1
+  r1 (n 0) res r=1k
+@elseif b
+  r2 (n 0) res r=2k
+@else
+  parameters c=1
+@end

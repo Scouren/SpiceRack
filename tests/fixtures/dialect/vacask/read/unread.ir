@@ -1,0 +1,8 @@
+# Oracle: DIALECT-VACASK §2 (S4.1–S4.3 are later sub-slices: their statements are Unread
+# opaques of their text, the control block one statement).
+# codes: P2004 P2004 P2004 S0001 S0001 S0001
+file "unread.sim" deck
+  title "statements of later areas"
+  opaque vacask unread "model res sp_resistor"
+  opaque vacask unread "r1 (a 0) res r=1k"
+  opaque vacask unread "control\n  analysis op1 op\nendc"

@@ -1,0 +1,24 @@
+# Oracle: VD input-numbers (prefixes; `M`, `x`, `X`, `meg` mega; letters after a prefix
+# ignored; hex); DIALECT-VACASK Appendix A run f1 (`1M` 1e6, `2x` 2e6, `1mil` 2.54e-5,
+# `0x10/3` 5). Literals as written (IR-KERNEL A3). Until A12 K1 an integer literal is Plain and
+# `2.` is stored as `2.0` (src/dialect/vacask/a12.rs).
+# codes:
+file "numbers.sim" deck
+  title "numbers"
+  param a = 1
+  param b = 2.5
+  param c = 1e-3
+  param d = 100u
+  param e = 1meg
+  param f = 1meg
+  param g = 2meg
+  param h = 1mil
+  param i = 16
+  param j = 0.5
+  param k = 2.0
+  param l = 5k
+  param m = 3g
+  param n = 1t
+  param o = 1.5e3
+  param p = 10k
+  param q = 0.050000

@@ -1,0 +1,4 @@
+ground and global nodes
+ground gnd agnd
+global vdd gnd vss
+global (agnd)

@@ -1,0 +1,6 @@
+a parameter defined twice
+parameters a=1
+parameters a=2
+subckt s (p)
+  parameters x=1 x=2
+ends

@@ -1,0 +1,5 @@
+functions
+parameters x=1 y=2
+parameters f1=log(x) f2=ln(x) f3=log10(x) f4=round(x) f5=integer(x) f6=int(x) f7=pow(x,y)
+parameters f8=min(x,y) f9=max(x,y) f10=fmod(x,y) f11=atan2(y,x) f12=hypot(x,y) f13=abs(x)
+parameters f14=sgn(x) f15=sign(x,y) f16=sqrt(x)+exp(x)+floor(x)+ceil(x)+sinh(x)+atanh(x)

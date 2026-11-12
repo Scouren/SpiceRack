@@ -1,0 +1,11 @@
+# Oracle: VACASK's line 1 is the title (INV-semantics 14.12; lib/dfllexer.l L159); `//` and
+# `/* */` are comments (VD input-overview; INV-semantics 14.02). A comment is kept, its marker
+# stripped; one after a statement on its line follows the statement's item.
+# codes:
+file "title_comment.sim" deck
+  title "A title line, whatever it holds: (1)"
+  comment " a line comment"
+  param a = 1
+  comment " a trailing comment"
+  comment " a block\n   comment "
+  param b = 2

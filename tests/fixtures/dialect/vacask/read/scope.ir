@@ -1,0 +1,14 @@
+# Oracle: VD cir-hier (Scope: own subcircuit, then the top; then variables, constants);
+# DIALECT-VACASK Appendix A runs n1 (an enclosing subcircuit's parameter: "Variable or constant
+# 'p' not defined"), n5 (a forward reference is legal). The read of `p` in `inner` stays unbound
+# and is refused (R2003).
+# codes: R2003
+file "scope.sim" deck
+  title "binding"
+  param top = 1
+  param early = late * 2
+  param late = 3
+  subckt outer (a) p=7
+    param own = p + top
+    subckt inner (b)
+      param k = p? + top

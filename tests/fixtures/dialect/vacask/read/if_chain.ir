@@ -1,0 +1,13 @@
+# Oracle: VD cir-conditional (`@if`/`@elseif`/`@else`/`@end`; a branch holds instances, models
+# and nested blocks only: a `parameters` there is refused, P2005). Instances are S4.1's (Unread).
+# codes: P2004 P2004 P2005 S0001 S0001 S0004
+file "if_chain.sim" deck
+  title "conditional blocks"
+  param a = 1
+  param b = 0
+  if (a == 1)
+    opaque vacask unread "r1 (n 0) res r=1k"
+  elif (b)
+    opaque vacask unread "r2 (n 0) res r=2k"
+  else
+    opaque vacask invalid "parameters c=1"

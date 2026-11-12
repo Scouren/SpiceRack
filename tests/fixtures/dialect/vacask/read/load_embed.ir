@@ -1,0 +1,12 @@
+# Oracle: VD cir-loading (`load` of `.osdi` or `.va`, `map=`), dev-spice (the shipped library
+# files: the device library, A12 C5, an Unread opaque until it lands: a12.rs), input-embed (an
+# embed a load names is the module's text: Private; one nothing names: Inert, C A20).
+# codes: P2003 P2003 P2004 S0001 S0002 S0002 S0003
+file "load_embed.sim" deck
+  title "loads and embedded files"
+  opaque vacask unread "load \"spice/resistor.osdi\""
+  load osdi "mydev.osdi"
+  load veriloga "nl2.va"
+  opaque vacask private "load \"all.osdi\" map=[\"*\", \"lib_*\"]"
+  opaque vacask private "embed \"nl2.va\" <<<FILE\nmodule nl2(a); inout a; endmodule\n>>>FILE"
+  opaque vacask inert "embed \"plot.py\" <<<FILE\nprint(1)\n>>>FILE"

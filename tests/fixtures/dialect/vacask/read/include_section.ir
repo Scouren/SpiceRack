@@ -1,0 +1,15 @@
+# Oracle: VD input-include (`include "file"`, `section=` selects one section; `section` …
+# `endsection`); a library file has no title line (INV-semantics 14.12). A missing file is
+# included by the path as written.
+# codes:
+file "include_section.sim" deck
+  title "include and sections"
+  include "include_section--models.lib" section=tt
+  include "missing.inc"
+  section local
+    param c = 3
+file "include_section--models.lib" library
+  section tt
+    param vth = 0.4
+  section ff
+    param vth = 0.3

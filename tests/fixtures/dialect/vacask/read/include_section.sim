@@ -1,0 +1,6 @@
+include and sections
+include "include_section--models.lib" section=tt
+include "missing.inc"
+section local
+  parameters c=3
+endsection

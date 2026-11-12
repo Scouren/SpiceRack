@@ -1,0 +1,26 @@
+# Oracle: VD input-include, cir-subckt, cir-subckt-nested, cir-nodes, cir-conditional,
+# cir-loading (each statement's syntax); the expected text was written by hand from them and
+# runs on VACASK (tests/dialect_vacask/write.rs).
+file "structure.sim" deck
+  title "structure"
+  comment " one line"
+  comment " two\n lines "
+  param a = 1
+  param 'q.r' = a + 2
+  include "lib.inc" section=tt
+  include "plain.inc"
+  load osdi "mydev.osdi"
+  load veriloga "nl2.va"
+  global vdd vss
+  section corner
+    param c = 3
+  subckt s (p n) x=(2 * 3) y=7
+    param w = x + 1
+    subckt inner (c)
+  if (a == 1)
+    opaque vacask unread "r1 (n 0) res r=1k"
+  elif (a)
+    opaque vacask unread "r2 (n 0) res r=2k"
+  else
+    opaque vacask unread "r3 (n 0) res r=3k"
+  opaque vacask private "parameters v=[1, 2]"

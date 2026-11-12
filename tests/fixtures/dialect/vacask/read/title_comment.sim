@@ -1,0 +1,6 @@
+A title line, whatever it holds: (1)
+// a line comment
+parameters a=1 // a trailing comment
+/* a block
+   comment */
+parameters b=2

@@ -1,0 +1,10 @@
+# Oracle: VD expr-constants (the documented values, INV-semantics 2.22: a constant is the
+# literal of its source simulator's value), VD expr-special (`$temp`, `$tnom`).
+# codes:
+file "constants_special.sim" deck
+  title "constants and special identifiers"
+  param a = 3.141592653589793
+  param b = 1.3806226e-23
+  param c = $temp + 1
+  param d = $tnom
+  param e = 1.4142135623730951

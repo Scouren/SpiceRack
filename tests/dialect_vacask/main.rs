@@ -10,4 +10,6 @@
 //! Contents: tests only.
 
 mod probe;
+mod read;
 mod settle;
+mod write;

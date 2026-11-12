@@ -1,0 +1,23 @@
+# Oracle: VD expr-operators (precedence: unary tighter than `**`, `**` right, the rest left,
+# `? :` loosest and right), expr-functions, expr-special; DIALECT-VACASK Appendix A run e1. The
+# text reads back as the same trees (the reader fixtures' rules).
+file "expressions.sim" deck
+  title "expressions"
+  param a = 1
+  param b = 2
+  param p1 = pow(-2, 2)
+  param p2 = pow(2, pow(3, 2))
+  param p3 = pow(pow(2, 3), 2)
+  param p4 = -pow(a, 2)
+  param p5 = pow(-a, 2)
+  param p6 = a - (b - a)
+  param p7 = (a + b) * a
+  param p8 = a ? (b ? 1 : 2) : 3
+  param p9 = (a ? b : 1) ? 2 : 3
+  param p10 = a - -2
+  param p11 = -(2)
+  param p12 = ln(a) + log10(b) + round_half_away(a) + trunc(b) + min(a, b) + fmod(a, b)
+  param p13 = draw:abs_gauss:sampling:call_site(5, 1, 1)
+  param p14 = $temp - $tnom
+  param p15 = 1.5e-3 + 100u + 1meg + 2mil + 0.050000
+  param p16 = !a && ~b | a ^ b & a << 1
