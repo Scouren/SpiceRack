@@ -69,3 +69,42 @@ fn p1_066_an_ngspice_level_xyce_has_no_device_for_is_refused() {
         );
     }
 }
+
+/// ZERO-LEDGER P1-066. Oracle: Xyce 7.10.0 on these very card pairs over
+/// the same RC (research/impl/evidence/P1-066-xyce-one-analysis/results.txt):
+/// `.dc` then `.tran` writes the transient plot alone (104 points), `.tran`
+/// then `.ac` the AC plot alone, two `.dc` cards one plot of 9 points for
+/// sweeps of 3 and 3, `.ac` then `.noise` the noise plot alone; an `.op`
+/// before a `.tran` is not run (RG `.OP`), which stays a note. Checks: 5 + 3.
+#[test]
+fn p1_066_a_second_analysis_for_xyce_is_refused() {
+    let cite = "Xyce 7.10.0 run: of two analysis cards the last alone is run";
+    let (ng, xy) = (Dialect::Ngspice, Dialect::Xyce);
+    let rc = "* t\nv1 1 0 dc 1 ac 1 sin(0 1 1k)\nr1 1 2 1k\nc1 2 0 1u\n";
+    let deck = |cards: &str| format!("{rc}{cards}\n.end\n");
+    for cards in [
+        ".dc v1 0 1 0.5\n.tran 10u 1m",
+        ".tran 10u 1m\n.ac dec 2 1 100",
+        ".dc v1 0 1 0.5\n.dc v1 2 4 1",
+    ] {
+        spec_refusal(cite, &deck(cards), ng, xy, &[Code::W0321]);
+    }
+    // Beside a note (W0052: the `.noise` integrals, the `.op`).
+    for cards in [
+        ".ac dec 2 1 100\n.noise v(2) v1 dec 2 1 100",
+        ".op\n.dc v1 0 1 0.5\n.tran 10u 1m",
+    ] {
+        let codes = oracle::refusal(&deck(cards), ng, xy);
+        assert!(codes.contains(&Code::W0321), "{cards}: {codes:?}");
+    }
+    // One sweeping analysis is written: alone, with an `.op` (noted), with
+    // its `.four`, and a two-source `.dc` (one card).
+    for cards in [
+        ".op\n.tran 10u 1m",
+        ".tran 10u 1m\n.four 1k v(2)",
+        ".dc v1 0 1 0.5 v1 0 1 1",
+    ] {
+        let w = oracle::write(&deck(cards), ng, xy);
+        assert!(w.contains(".end"), "{cards}: {w}");
+    }
+}

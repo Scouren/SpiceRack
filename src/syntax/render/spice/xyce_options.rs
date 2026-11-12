@@ -15,7 +15,9 @@
 //! `.op` beside another analysis (RG `.OP`: "no additional operating point
 //! will be calculated"), the integrated noise (RG `.NOISE`: the total noise
 //! integrals go to stdout only), ngspice's `@dev[param]` vectors (no Xyce
-//! name; RG `.PRINT` device lead currents and power only).
+//! name; RG `.PRINT` device lead currents and power only). A deck of
+//! another language with two or more sweeping analyses is refused (W0321):
+//! Xyce 7.10 runs the last card alone (run, ZERO-LEDGER P1-066).
 //!
 //! Contents:
 //! - `W::xyce_options(&mut self, tb: &Tb) -> Vec<String>`, `W::xyce_drops(&mut self, tb: &Tb)`
@@ -23,6 +25,7 @@
 
 use super::W;
 use super::bench::Tb;
+use crate::syntax::behaviour::AnalysisForm;
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::Construct;
 use crate::syntax::render::read::Ana;
@@ -54,8 +57,38 @@ const LISTING: &[&str] = &[
 impl W<'_, '_> {
     /// The notes of `tb`'s outputs Xyce writes no vector for: an `.op`
     /// beside another analysis, each `.noise`'s integrated noise, a saved
-    /// or printed ngspice `@dev[param]` (W0052).
+    /// or printed ngspice `@dev[param]` (W0052). A second sweeping analysis
+    /// (`.dc`, `.ac`, `.sp`, `.tran`, `.noise`) of a deck that is not
+    /// Xyce's own is refused (W0321): Xyce runs the last card alone.
     pub(super) fn xyce_drops(&mut self, tb: &Tb) {
+        assert_eq!(
+            tb.plan.runs.len(),
+            tb.plan.run_tok.len(),
+            "a token per analysis"
+        );
+        let sweeps = |a: &Ana| {
+            matches!(
+                a,
+                Ana::Dc(..)
+                    | Ana::DcAxes(..)
+                    | Ana::Ac(..)
+                    | Ana::Sp(..)
+                    | Ana::Tran { .. }
+                    | Ana::Noise { .. }
+            )
+        };
+        // A Xyce deck is written as read: what its cards run is Xyce's.
+        if self.rd.b.analysis_form != AnalysisForm::Xyce
+            && let Some((_, tok)) = tb
+                .plan
+                .runs
+                .iter()
+                .zip(&tb.plan.run_tok)
+                .filter(|&(a, _)| sweeps(a))
+                .nth(1)
+        {
+            self.refuse(Code::W0321, *tok);
+        }
         for (a, tok) in tb.plan.runs.iter().zip(&tb.plan.run_tok) {
             match a {
                 Ana::Op if tb.plan.runs.len() > 1 => self.note(Code::W0052, *tok),

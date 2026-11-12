@@ -125,7 +125,10 @@ On VACASK a stepped result holds every step's points one after another on the
 analysis's own axis (`dc.sweep`, `ac.frequency`), with the stepped parameter a
 vector beside them (`dc["step_r"]`); an `OperatingPoint` holds one point, so
 reading a stepped one raises `ValueError`. LTspice runs one analysis a deck, so
-`tb.run()` on LTspice runs each queued analysis in a deck of its own.
+`tb.run()` on LTspice runs each queued analysis in a deck of its own. Xyce runs
+one analysis a deck too, and silently only the last of several: a bench with
+more than one of `add_dc`, `add_ac`, `add_s_param`, `add_transient`,
+`add_noise` is refused for Xyce (`W0321`); queue one per bench.
 
 ### ngspice compatibility mode
 
