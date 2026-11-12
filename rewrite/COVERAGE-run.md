@@ -99,7 +99,7 @@ result-side fact (backend, harness), outside the netlist IR.
 - H11 → Private (HSPICE raw output words); `.net` → `AnalysisKind::Net`.
 - H12 → `Save` with `ProbeKind::{I, ITerminal, Vdiff, Power, AllI}`; the 0 V sources are the writer's.
 - H13 → `ProbeKind::Expr`.
-- H14 → `MeasureKind::{TrigTarg, When, Find, Stat, Param, Deriv}`, `measure::Stat::{Avg, Min, Max, Pp, Rms, Integ}`; one failing measure fails alone: RUN.
+- H14 (A15 R2: `MIN_AT`/`MAX_AT` → `Stat::{MinAt, MaxAt}`, `TO=` on a crossing → `Event::until`, the default crossing → `Event::skip_initial`) → `MeasureKind::{TrigTarg, When, Find, Stat, Param, Deriv}`, `measure::Stat::{Avg, Min, Max, Pp, Rms, Integ}`; one failing measure fails alone: RUN.
 - H15 → `AnalysisKind::Net`.
 - H16 → `AnalysisKind::Four`; LTspice's +90° phase report: RUN (result convention).
 - H17 → gap G-FFT.
@@ -230,7 +230,7 @@ result-side fact (backend, harness), outside the netlist IR.
 
 - 9.01 → `Probe::a`/`b` and `NodeSet::node` are name paths; IC scope by the item's scope.
 - 9.02 → `ProbeKind::{I, ITerminal}` with the sign pinned "positive into the device"; `Probe::terminal` index.
-- 9.03 → the save set is explicit: `Save` rows of categories (`AllV`, `AllVTop`, `AllSourceI`, `AllI`, `AllPinI`); each reader expands its default.
+- 9.03 → categories `AllV`, `AllVTop`, `AllSourceI`, `AllBranchI`, `AllI`, `AllPinI`; the save set of a deck that names none: gap G-DEFAULTSAVE (R29, open until S12).
 - 9.04 → `Save` vs `Opaque` Private for state checkpoints; categories are union members.
 - 9.05 → `ProbeKind::{AllI, AllPinI}`.
 - 9.06 → `ProbeKind::Param` named as the source spelled it: gap G-OPQUANT (canonical quantity ids).
@@ -284,6 +284,8 @@ result-side fact (backend, harness), outside the netlist IR.
 - 5.21 → circuit owner (`distof1`/`distof2` on the source); `Disto` reads them.
 
 ## Gaps and proposals
+
+- G-DEFAULTSAVE (9.03, R29): what a deck saves when it names nothing. Open until the run side (S12); the IR is silent and the target's default applies.
 
 - G-SENS (G10, G12, 8.12): Spectre `sens … to … for …` and Xyce `.SENS` (objective, parameter list, analyses) are Private. Proposal: a `SensSpec` row `{ outputs: ProbeList, params: TargetList (empty = all), of: AnalysisKind }` replacing `Sens`/`SensAc` when a second dialect's form is typed.
 - G-SAMPLING (G17, G52): Xyce `.SAMPLING`/`.EMBEDDEDSAMPLING`/`.PCE` are Private. Proposal: `.SAMPLING` reads into `Statistics` (`Vary` with `mean`) + `LoopKind::MonteCarlo`; uniform bounds need `VaryDist::UnifBounds { lo = mean, hi = spread }` or two fields; PCE stays Private.

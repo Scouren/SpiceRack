@@ -97,6 +97,14 @@ Decisions:
   Paths are name lists (no separator character in the IR). The sign convention of a current probe
   is pinned in its doc (positive into the first terminal).
 - `Save { probes }`, `Print { analysis: AnalysisKind or none, probes }`.
+- Known gap (R29): what a deck saves when it names nothing. Today the IR is silent and the
+  target's default applies; whether a reader writes out its simulator's default set is decided
+  with the run side (S12).
+- Measures (A15 R2): `Stat::{MinAt, MaxAt}` (where the extremum is); a crossing's `until` (the
+  search stops there; ngspice `TO=`); `skip_initial`, the crossing ngspice takes when no
+  `RISE`/`FALL`/`CROSS` is given (it skips one in the first interval; never read as `CROSS=1`,
+  R30). Probes: `AllBranchI`, every element's branch current (ngspice's `all` is `AllV` plus
+  these).
 - `Measure { name, analysis, kind, … }` typed: trigger/target, when, find-at, the statistics over
   a window (`avg min max pp rms integ`), `param` (an expression of other measures), derivative.
   A measure form you cannot type is an `Opaque` of class `Private` naming its dialect. Thresholds

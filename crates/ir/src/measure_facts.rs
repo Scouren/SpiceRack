@@ -9,9 +9,11 @@
 //! measure <name> <analysis kind> trig_targ <event> <event>
 //! measure <name> <analysis kind> when <event>
 //! measure <name> <analysis kind> find|deriv <probe> <event>
-//! measure <name> <analysis kind> stat avg|min|max|pp|rms|integ <probe> <event> <event>
+//! measure <name> <analysis kind> stat avg|min|max|pp|rms|integ|min_at|max_at <probe> <event>
+//!         <event>
 //! measure <name> <analysis kind> param value=v
-//! event = (cross rise|fall|cross [last] <probe> value=v [count=v] [delay=v]) | (at value=v)
+//! event = (cross rise|fall|cross [last] [skip_initial] <probe> value=v [count=v] [delay=v]
+//!         [until=v]) | (at value=v)
 //!       | (bound)
 //! ```
 //!
@@ -365,6 +367,11 @@ impl DetailFacts for MeasureStat {
         event_handles(&self.to, out);
     }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
+        flag(
+            set,
+            matches!(self.stat, Stat::MinAt | Stat::MaxAt),
+            RunExtra::MeasStatAt,
+        );
         probe_features(&self.signal, set);
         event_features(design, &self.from, set);
         event_features(design, &self.to, set);
@@ -404,7 +411,12 @@ impl DetailFacts for MeasureStat {
         if !has(features, RunExtra::MeasStat) {
             return None;
         }
-        let stat = Stat::ALL[g.below(Stat::COUNT as u32) as usize];
+        let n = if has(features, RunExtra::MeasStatAt) {
+            Stat::COUNT
+        } else {
+            6
+        };
+        let stat = Stat::ALL[g.below(n as u32) as usize]; // the last two are `MeasStatAt`'s
         let signal = gen_probe(g, b, features, true);
         let from = gen_event(g, b, features, true);
         Some(MeasureStat {
