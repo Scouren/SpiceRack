@@ -1,0 +1,9 @@
+file "a.sp" deck
+  comment "R53 run which4 (ng-scaffold, ngspice-45): v(n1) = 2 at 1 mA, the top f: a call in a default is the definition's"
+  func f(x) = x * 2
+  subckt s (a b) t=(@f(1k))
+    element resistor r1 (a b) value=t
+  subckt w (a b)
+    func f(x) = x * 8
+    element instance xs (a b) model=s
+  element instance xw (n1 0) model=w

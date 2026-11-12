@@ -1,0 +1,14 @@
+file "a.sp" deck
+  model resistor resistor
+  model capacitor capacitor
+  element resistor r1 (a 0) model=resistor value=1
+  subckt s (x y)
+    param w = 1
+    if (w > 0)
+      element resistor r2 (x y) model=resistor value=2
+    else
+      element capacitor c2 (x y) model=capacitor value=1p
+  section tt library=lib1
+    model resistor resistor
+    model rs resistor params=(r=1)
+    element resistor r3 (a 0) model=resistor value=3

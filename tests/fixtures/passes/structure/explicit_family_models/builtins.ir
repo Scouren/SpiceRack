@@ -1,0 +1,7 @@
+file "a.sp" deck
+  element inductor l1 (a 0) value=1u
+  element inductor l2 (b 0) value=1u
+  element coupling k1 () inductors=(l1 l2) k=0.5
+  element cccs f1 (o 0) gain=2 sense=v1
+  element vsource v1 (a 0) dc=0
+  element lossless_line t1 (a 0 b 0) z0=50 td=1n

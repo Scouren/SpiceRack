@@ -1,0 +1,8 @@
+file "a.sp" deck
+  subckt top1 (a) k=1
+    subckt mid (b)
+      subckt low (c)
+        element resistor r1 (c 0) value=k
+      element instance x1 (b) model=low
+    element instance x2 (a) model=mid
+  element instance x3 (n) model=top1

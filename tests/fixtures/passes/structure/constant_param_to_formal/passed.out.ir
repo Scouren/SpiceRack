@@ -1,0 +1,5 @@
+file "a.sp" deck
+  subckt s (a b)
+    param k = 2
+    element resistor r1 (a b) value=k
+  element instance x1 (n 0) model=s params=(k=5)

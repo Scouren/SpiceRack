@@ -1,0 +1,4 @@
+file "a.sp" deck
+  param ts = 1n
+  analysis tran stop=1u print_step=ts max_step=(min(ts, 1u / 50))
+  analysis tran stop=2u record_start=1u print_step=1n max_step=(min(1n, (2u - 1u) / 50))

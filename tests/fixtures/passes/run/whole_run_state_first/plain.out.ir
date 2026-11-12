@@ -1,0 +1,10 @@
+file "a.sp" deck
+  title "t"
+  option rel_tol value=2m whole_run
+  element resistor r1 (a 0) value=1k
+  option rel_tol value=1m whole_run
+  save (v (a))
+  env temp=50 whole_run
+  analysis op
+  option abs_tol value=1p
+  analysis op

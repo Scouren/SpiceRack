@@ -1,0 +1,3 @@
+file "a.sp" deck
+  element resistor RLoad (b 0) value=2k
+  element resistor load (a 0) value=1k

@@ -1,0 +1,5 @@
+file "a.sp" deck
+  param u = 1
+  subckt s (a b) t=(u * draw:abs_gauss:always:reference(1, 0.1, 3))
+    element resistor r1 (a b) value=t
+  element instance x1 (n 0) model=s

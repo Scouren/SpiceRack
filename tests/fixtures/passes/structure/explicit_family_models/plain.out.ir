@@ -1,0 +1,11 @@
+file "a.sp" deck
+  title "plain"
+  model resistor resistor
+  model capacitor capacitor
+  model source_v source_v
+  element resistor r1 (a 0) model=resistor value=1k
+  element capacitor c1 (a 0) model=capacitor value=1p
+  element vsource v1 (a 0) model=source_v dc=1
+  element resistor r2 (a b) model=resistor value=2k
+  model dmod diode
+  element diode d1 (a 0) model=dmod

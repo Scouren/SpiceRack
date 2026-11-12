@@ -1,0 +1,6 @@
+file "a.sp" deck
+  param u = 1
+  subckt s (a b) t=(2 * u?)
+    element resistor r1 (a b) value=t
+  element instance x1 (n 0) model=s
+  element unresolved u1 (n 0) model=s?

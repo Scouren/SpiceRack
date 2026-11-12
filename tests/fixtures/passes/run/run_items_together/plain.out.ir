@@ -1,0 +1,9 @@
+file "a.sp" deck
+  title "t"
+  param p = 1
+  element resistor r1 (a 0) value=p
+  model rm resistor
+  analysis op
+  comment "kept"
+  save (v (a))
+  analysis op

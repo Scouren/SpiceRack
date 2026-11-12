@@ -1,0 +1,8 @@
+file "a.sp" deck
+  title "t"
+  model dmod diode
+  model nch bsim4 polarity=n version="4.8"
+  model v source_v
+  model dmod2 diode
+  element diode d1 (a 0) model=dmod
+  element vsource v1 (a 0) model=v dc=1

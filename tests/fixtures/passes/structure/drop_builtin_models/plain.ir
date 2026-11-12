@@ -1,0 +1,12 @@
+file "a.sp" deck
+  model source_v source_v
+  model mutual mutual
+  model tl tline_ideal
+  model resistor resistor
+  element vsource v1 (a 0) model=source_v dc=1
+  element vsource v2 (b 0) model=source_v dc=2
+  element inductor l1 (a 0) value=1u
+  element inductor l2 (b 0) value=1u
+  element coupling k1 () model=mutual inductors=(l1 l2) k=0.5
+  element lossless_line t1 (a 0 b 0) model=tl z0=50 td=1n
+  element resistor r1 (a 0) model=resistor value=1k

@@ -1,0 +1,3 @@
+file "a.sp" deck
+  section tt library=lib1
+    element resistor r1 (a 0) value=3

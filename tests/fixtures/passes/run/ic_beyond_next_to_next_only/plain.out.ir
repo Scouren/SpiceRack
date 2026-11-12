@@ -1,0 +1,10 @@
+file "a.sp" deck
+  nodeset ic every_op next_only node=(a) value=1
+  analysis op
+  nodeset ic every_op next_only node=(b) value=2
+  nodeset ic every_op next_only node=(a) value=1
+  nodeset nodeset every_op next_only node=(b) value=0.5
+  analysis op
+  nodeset ic every_op next_only node=(a) value=1
+  nodeset nodeset every_op next_only node=(b) value=0.5
+  analysis op

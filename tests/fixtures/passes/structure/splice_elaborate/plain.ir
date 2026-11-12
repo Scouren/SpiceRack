@@ -1,0 +1,7 @@
+file "a.sp" deck
+  title "t"
+  subckt top () r=1k
+    element vsource v1 (a 0) dc=1
+    element resistor r1 (a 0) value=r
+  elaborate (top)
+  analysis op

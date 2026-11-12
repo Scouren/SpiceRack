@@ -1,0 +1,6 @@
+file "a.sp" deck
+  param r = 1k
+  loop sweep (param r) (list values=[1k, 2k])
+    analysis op
+  alter (param r) value=2k
+  analysis op

@@ -1,0 +1,5 @@
+file "a.sp" deck
+  analysis op
+  subckt s ()
+    analysis op
+  analysis op

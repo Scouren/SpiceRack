@@ -1,0 +1,8 @@
+file "a.sp" deck
+  subckt top1 (a) k=1
+    element instance x2 (a) model=mid params=(k=k)
+  subckt mid (b) k
+    element instance x1 (b) model=low params=(k=k)
+  subckt low (c) k
+    element resistor r1 (c 0) value=k
+  element instance x3 (n) model=top1

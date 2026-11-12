@@ -1,0 +1,5 @@
+file "a.sp" deck
+  option rel_tol value=1m
+  env temp=50
+  nodeset nodeset every_op node=(a) value=0.5
+  analysis op

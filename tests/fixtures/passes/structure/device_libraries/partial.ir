@@ -1,0 +1,6 @@
+file "a.sp" deck
+  include "m.lib"
+file "m.lib" library
+  device_library diode path="spice/sn/diode.osdi"
+  model dmod diode
+  model rm resistor

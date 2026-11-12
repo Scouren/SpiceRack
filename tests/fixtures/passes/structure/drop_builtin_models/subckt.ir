@@ -1,0 +1,7 @@
+file "a.sp" deck
+  model v source_v
+  element vsource v1 (a 0) model=v dc=1
+  subckt s (x y)
+    model v source_v
+    element isource i1 (x y) dc=1
+    element vsource v2 (x y) model=v dc=3

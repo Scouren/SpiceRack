@@ -1,0 +1,7 @@
+file "a.sp" deck
+  subckt c1 ()
+    element resistor r1 (a 0) value=1k
+  subckt w ()
+    element instance x1 () model=c1
+  elaborate (c1 w)
+  analysis op
