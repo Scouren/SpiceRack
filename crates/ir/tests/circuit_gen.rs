@@ -367,7 +367,7 @@ mod tests {
         let grouped = (0..4000u64).any(|seed| {
             let d = generate(seed, &set, SIZE);
             let groups: Vec<spicerack_ir::DefId> = d
-                .definitions()
+                .definitions_all()
                 .iter()
                 .enumerate()
                 .filter(|(_, def)| def.kind == spicerack_ir::DefKind::Model)

@@ -225,13 +225,6 @@ fn formal_count(d: &Design, def: DefId) -> Option<usize> {
     })
 }
 
-/// Whether the definition index holds `def` under its own key (round 7b: a definition a pass
-/// removed through `Editor::remove_item` is not held).
-fn in_index(d: &Design, def: DefId) -> bool {
-    let row = d.defs[def.index()];
-    d.def_index.get(&(row.scope, row.kind, row.name)) == Some(&def)
-}
-
 /// `ProbeContext` through reads (A15 K3): a constant-in-time field (`Handle::Expr`, a list or
 /// head default) whose expression is of class `Circuit` by a parameter or function it reads.
 /// A direct probe in it was reported by `expression`; this pass sees only valid designs.
@@ -415,7 +408,7 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
                 out.report(Violation::HandleRange, item, r.def.0);
             } else if d.defs[r.def.index()].kind != kind || d.defs[r.def.index()].name != r.name {
                 out.report(Violation::RefTarget, item, r.def.0);
-            } else if !in_index(d, r.def) {
+            } else if !d.def_is_live(r.def) {
                 out.report(Violation::StaleDefinition, item, r.def.0);
             }
         }
@@ -495,7 +488,7 @@ fn typed_roots(out: &mut Out<'_>, item: ItemRef, h: Handle, strings: &[ExprId]) 
         return; // a value of any type (`Extra::StringValue`, `ListValue`)
     }
     for &e in roots {
-        if e.is_none() || e.index() >= d.expr_count() {
+        if e.is_none() || e.index() >= d.expr_count_all() {
             continue;
         }
         let (string, list) = match d.expr(e) {
@@ -562,7 +555,7 @@ fn expression(
                 out.report(Violation::RefTarget, item, r.def.0)
             }
             Expr::Param(r) | Expr::UserCall(r, _)
-                if r.is_resolved() && def_ok(d, r.def) && !in_index(d, r.def) =>
+                if r.is_resolved() && def_ok(d, r.def) && !d.def_is_live(r.def) =>
             {
                 out.report(Violation::StaleDefinition, item, r.def.0)
             }

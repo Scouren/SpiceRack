@@ -295,7 +295,7 @@ impl Gen {
         kind: DefKind,
     ) -> DefId {
         let seen: usize = self.by_kind.iter().map(Vec::len).sum();
-        for (k, def) in design.definitions().iter().enumerate().skip(seen) {
+        for (k, def) in design.definitions_all().iter().enumerate().skip(seen) {
             self.by_kind[def.kind as usize].push(DefId(k as u32));
         }
         let mut chain = Vec::new();

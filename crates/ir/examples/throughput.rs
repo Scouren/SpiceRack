@@ -153,7 +153,7 @@ fn measure(items: u32, set: &FeatureSet) -> Phases {
         check,
         mb: text.len() as f64 / 1e6,
         lines: text.lines().count(),
-        exprs: d.expr_count(),
+        exprs: d.expr_count_all(),
     }
 }
 

@@ -546,7 +546,7 @@ impl ExprWalk {
     /// A walker sized for `design`'s expression rows.
     pub(crate) fn new(design: &Design) -> ExprWalk {
         ExprWalk {
-            stamp: vec![0; design.expr_count()],
+            stamp: vec![0; design.expr_count_all()],
             epoch: 0,
             nodes: Vec::new(),
             stack: Vec::new(),

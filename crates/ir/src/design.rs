@@ -50,8 +50,8 @@
 //!   `Design::branches(&self, BranchList) -> &[Branch]`, `Design::text(&self, TextId) -> &str`,
 //!   `Design::detail<D: DetailRow>(&self, u32) -> D`,
 //!   `Design::expr(&self, ExprId) -> Expr`, `Design::num(&self, NumId) -> Literal`,
-//!   `Design::expr_count(&self) -> usize`, `Design::class_computes(&self) -> u32` (gen),
-//!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
+//!   `Design::expr_count_all(&self) -> usize`, `Design::class_computes(&self) -> u32` (gen),
+//!   `Design::definitions_all(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
 //!   `Design::eq_ignoring_spans(&self, &Design) -> bool`,
 //!   `Design::eq_meaning(&self, &Design) -> bool`, `Design::children(&self, ExprId, &mut Vec<ExprId>)`
 
@@ -435,13 +435,17 @@ impl Design {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Expression row count; ids `0..expr_count()` are valid.
-    pub fn expr_count(&self) -> usize {
+    /// Expression row count, dead rows included (the table is append-only: a rewrite leaves
+    /// the row it replaced); ids `0..expr_count_all()` are valid. Size a table by it; decide
+    /// from `Design::live_exprs` (`live.rs`).
+    pub fn expr_count_all(&self) -> usize {
         self.exprs.tags.len()
     }
 
-    /// Every definition, in definition order (a kit's model of what it defines).
-    pub fn definitions(&self) -> &[Def] {
+    /// Every definition row, in definition order, indexed by `DefId`, dead rows included (a
+    /// removed item's definition stays, out of the index: `Editor::remove_item`). Index by it;
+    /// decide from `Design::live_definitions` (`live.rs`).
+    pub fn definitions_all(&self) -> &[Def] {
         &self.defs
     }
 

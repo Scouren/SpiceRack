@@ -248,7 +248,7 @@ impl R<'_, '_> {
     fn visible_model(&mut self, family: ModelFamily) -> Option<Ref> {
         let design = self.b.design();
         let found: Vec<Ref> = design
-            .definitions()
+            .definitions_all()
             .iter()
             .enumerate()
             .filter(|(_, d)| d.kind == DefKind::Model)
@@ -268,7 +268,7 @@ impl R<'_, '_> {
     /// Whether a model of `family` is visible here (as `visible_model`, without drawing).
     pub(super) fn has_visible(&self, family: ModelFamily) -> bool {
         let design = self.b.design();
-        design.definitions().iter().enumerate().any(|(k, d)| {
+        design.definitions_all().iter().enumerate().any(|(k, d)| {
             d.kind == DefKind::Model
                 && design.row::<Model>(d.item.index).family == family
                 && design.lookup(self.scope, DefKind::Model, d.name) == DefId(k as u32)

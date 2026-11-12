@@ -123,7 +123,7 @@ fn every_tag_round_trips() {
     for (e, tag) in &built {
         assert_eq!(d.expr(*e).tag(), *tag, "{e:?}");
     }
-    for k in 0..d.expr_count() {
+    for k in 0..d.expr_count_all() {
         let e = ExprId(k as u32);
         for c in children(&d, e) {
             assert!(c < e, "child {c:?} below parent {e:?}");
@@ -285,7 +285,7 @@ fn design_children_are_the_decoders_operands() {
     let mut out = Vec::new();
     for seed in 0..50u64 {
         let d = generate(seed, &spicerack_ir::FeatureSet::ALL, size);
-        for k in 0..d.expr_count() {
+        for k in 0..d.expr_count_all() {
             let e = ExprId(k as u32);
             out.clear();
             d.children(e, &mut out);

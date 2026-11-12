@@ -128,8 +128,8 @@ fn an_identity_rule_changes_no_id() {
         let changed = rewrite_exprs(&mut after, &mut |_, _| None);
         assert_eq!(changed, 0, "seed {seed}");
         assert_eq!(
-            after.expr_count(),
-            d.expr_count(),
+            after.expr_count_all(),
+            d.expr_count_all(),
             "seed {seed}: nothing appended"
         );
         assert!(after.eq_ignoring_spans(&d), "seed {seed}");
@@ -238,7 +238,7 @@ fn a_deep_tree_rewrites_without_recursion() {
         }
         b.param(top, "deep", e, spicerack_ir::Span::NONE);
     }
-    let before = d.expr_count();
+    let before = d.expr_count_all();
     let mut calls = 0u32;
     let changed = rewrite_exprs(&mut d, &mut |b, _| {
         calls += 1;
@@ -246,7 +246,7 @@ fn a_deep_tree_rewrites_without_recursion() {
     });
     assert_eq!((changed, calls), (1, 10_001));
     assert_eq!(
-        d.expr_count(),
+        d.expr_count_all(),
         before + 1 + 10_000,
         "the new leaf and a new spine"
     );
@@ -368,9 +368,13 @@ fn one_tree_is_rewritten_alone() {
             .collect();
         let Some(&root) = roots.first() else { continue };
         let before = d.clone();
-        let n = d.expr_count();
+        let n = d.expr_count_all();
         let same = rewrite_tree(&mut d.builder(), root, &mut |_, _| None);
-        assert_eq!((same, d.expr_count()), (root, n), "seed {seed}: identity");
+        assert_eq!(
+            (same, d.expr_count_all()),
+            (root, n),
+            "seed {seed}: identity"
+        );
         let new = rewrite_tree(&mut d.builder(), root, &mut |b, e| {
             let one = b.num(1.0);
             Some(b.ternary(one, e, e))
@@ -407,4 +411,27 @@ fn a_bound_read_in_one_call() {
         spicerack_ir::Expr::Param(r) => assert_eq!((r.def, b.design().str(r.name)), (def, "p")),
         other => panic!("{other:?}"),
     }
+}
+
+#[test]
+fn the_live_rows_leave_out_what_a_rewrite_replaced() {
+    // the `passes` agent's finding: a replaced row stays in the append-only table, so a rule
+    // deciding from `0..expr_count_all()` counts it as a reader. Oracle: ids worked by hand:
+    // rows 0, 1 (the literals) and 2 (the sum) are replaced by row 3
+    let mut d = Design::new();
+    let sum = {
+        let mut b = d.builder();
+        let (_, top) = b.file("t.sp", spicerack_ir::Role::Deck);
+        let (one, two) = (b.num(1.0), b.num(2.0));
+        let sum = b.binary(spicerack_ir::BinOp::Add, one, two);
+        b.param(top, "p", sum, spicerack_ir::Span::NONE);
+        sum
+    };
+    // root first, then its children from the stack (the last pushed first)
+    assert_eq!(sum, ExprId(2));
+    assert_eq!(d.live_exprs(), vec![ExprId(2), ExprId(1), ExprId(0)]);
+    let changed = rewrite_exprs(&mut d, &mut |b, e| (e == sum).then(|| b.num(3.0)));
+    assert_eq!(changed, 1);
+    assert_eq!(d.expr_count_all(), 4, "the replaced rows stay");
+    assert_eq!(d.live_exprs(), vec![ExprId(3)], "only the new root lives");
 }
