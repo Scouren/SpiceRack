@@ -333,8 +333,19 @@ fn element_of(design: &ir::Design, t: ir::Target) -> Option<ir::Element> {
         })
     };
     // VACASK's include is textual: the top of every file is the one top level.
-    let tops: Vec<ir::ScopeId> = design.files().map(|f| design.file(f).top).collect();
-    let mut scopes = tops;
+    let mut scopes: Vec<ir::ScopeId> = design.files().map(|f| design.file(f).top).collect();
+    // An elaborated subcircuit's instances stand at the top level too (VD cir-elaboration).
+    for (at, _) in design.reachable() {
+        if at.kind == ir::ItemKind::Elaborate {
+            let row: ir::Elaborate = design.row(at.index);
+            for r in design.refs(row.circuits) {
+                if !r.def.is_none() && design.def(r.def).kind == ir::DefKind::Subckt {
+                    let sub: ir::item::Subckt = design.row(design.def(r.def).item.index);
+                    scopes.push(sub.body);
+                }
+            }
+        }
+    }
     // Bounded by the path's length.
     for &inst in design.names(t.path) {
         let at = scopes.iter().find_map(|&sc| named(sc, inst))?;

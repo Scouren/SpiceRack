@@ -32,6 +32,10 @@ pub(in crate::dialect::vacask) struct Declared {
     /// `(holder, instance name)` → its master's name (`None`: a behavioural source) and its
     /// `type="…"` word, if given.
     instances: HashMap<(Holder, String), Inst>,
+    /// The subcircuits an `elaborate circuit("…")` of a control block names: their instances
+    /// join the top level (VD cir-elaboration; corpus demo/bsim3-ptm/amp.sim sweeps `vin` of
+    /// the elaborated `namp`).
+    elaborated: Vec<String>,
 }
 
 /// What an instance of a `vsource` or `isource` model is, for a sweep of its `dc` (R64).
@@ -140,6 +144,18 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
                     out.defs.entry(key).or_insert(master);
                     todo.extend(ast.body(n).iter().map(|&b| (b, own)));
                 }
+                Tag::Control => {
+                    for &b in ast.body(n) {
+                        let b = Node(b);
+                        let head = cst.tokens.text(ast.main_token(b));
+                        if ast.tag(b) == Tag::Card && head == "elaborate" {
+                            let names = ast.fields(b).iter().skip(1);
+                            let strings = names.filter(|&&f| ast.tag(Node(f)) == Tag::Str);
+                            out.elaborated
+                                .extend(strings.map(|&f| read::field_name(cst, f)));
+                        }
+                    }
+                }
                 Tag::Section | Tag::If | Tag::Else => {
                     todo.extend(ast.body(n).iter().map(|&b| (b, holder)));
                     if let Some(next) = ast.next(n) {
@@ -215,8 +231,19 @@ impl Declared {
                 .iter()
                 .find_map(|&h| self.bodies.get(&(h, m.to_string())))?;
         }
-        let entry = self.instances.get(&(at, element.to_string()))?;
-        Some((at, entry))
+        if let Some(entry) = self.instances.get(&(at, element.to_string())) {
+            return Some((at, entry));
+        }
+        // An elaborated subcircuit's instances stand at the top level too.
+        if !path.is_empty() || at != Holder::Top {
+            return None;
+        }
+        self.elaborated.iter().find_map(|sub| {
+            let own = *self.bodies.get(&(Holder::Top, sub.clone()))?;
+            self.instances
+                .get(&(own, element.to_string()))
+                .map(|e| (own, e))
+        })
     }
 
     /// The master `name` seen from `at`: the holder's own, then the top's.
