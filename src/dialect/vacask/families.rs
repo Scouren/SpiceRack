@@ -11,5 +11,5 @@
 use crate::ir;
 
 /// `(module word, family, library file)` rows (S4.1 fills it).
-#[expect(dead_code, reason = "read_models and write_models (S4.1) read it")]
+#[allow(dead_code, reason = "read_models and write_models (S4.1) read it")]
 pub(super) const FAMILIES: &[(&str, ir::ModelFamily, &str)] = &[];

@@ -21,7 +21,7 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[];
 /// A `save` statement.
 ///
 /// Stub (S4.3): an `Unread` opaque of the statement.
-#[expect(dead_code, reason = "read_run (S4.3) calls it")]
+#[allow(dead_code, reason = "read_run (S4.3) calls it")]
 pub(super) fn save(l: &mut Lower<'_, '_, '_>, n: Node) {
     read::unread(l, n);
 }

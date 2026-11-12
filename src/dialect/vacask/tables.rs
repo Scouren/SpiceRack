@@ -6,7 +6,7 @@
 //! Cites: VD expr-constants (the values); the store's `lib/vacask/mod` listing (36be560);
 //! `rewrite/DIALECT-VACASK.md` §3.2 (load), §4.
 //!
-//! Contents: `CONSTANTS`, `STATIC_FUNCS`, `DYNAMIC_LACKS`, `DYNAMIC_FUNCS`, `DYNAMIC_BINARY`,
+//! Contents: `CONSTANTS`, `SOURCE_MODULES`, `STATIC_FUNCS`, `DYNAMIC_LACKS`, `DYNAMIC_FUNCS`, `DYNAMIC_BINARY`,
 //! `SPICE_FILES`, `OWN_FILES`, `library`, `default_file` (crate-private)
 
 use crate::ir;
@@ -120,6 +120,19 @@ pub(super) const DYNAMIC_BINARY: &[ir::BinOp] = &[
     ir::BinOp::Ge,
     ir::BinOp::And,
     ir::BinOp::Or,
+];
+
+/// The modules whose instances the sources area reads (S4.2): VACASK's builtins (VD
+/// cir-loading, Builtin devices) and `tline_ideal` (VD dev-builtin; DIALECT-VACASK §3.2).
+pub(super) const SOURCE_MODULES: &[&str] = &[
+    "vsource",
+    "isource",
+    "vcvs",
+    "vccs",
+    "ccvs",
+    "cccs",
+    "mutual",
+    "tline_ideal",
 ];
 
 /// The SPICE device files VACASK ships under `spice/` (and the `spice/sn/`, `spice/full/`

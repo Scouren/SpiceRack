@@ -10,7 +10,7 @@
 //!
 //! Contents: `Writer` (`Writer::line`), `write` (crate-private)
 
-use super::{write_elements, write_models, write_run, write_structure};
+use super::{write_elements, write_models, write_run, write_sources, write_structure};
 use crate::ir;
 
 /// The text being written and where it is.
@@ -92,6 +92,23 @@ pub(super) fn write(
 
 // ---- private ----
 
+/// Whether the sources area writes an element of `kind` (the kinds of `tables::SOURCE_MODULES`'
+/// modules), the devices area every other.
+fn source_like(kind: ir::ElemKind) -> bool {
+    use ir::ElemKind as K;
+    matches!(
+        kind,
+        K::VSource
+            | K::ISource
+            | K::Vcvs
+            | K::Vccs
+            | K::Ccvs
+            | K::Cccs
+            | K::Coupling
+            | K::LosslessLine
+    )
+}
+
 /// The items of `scope` at `depth`, reversed for the stack (the title is line 1's).
 fn items(design: &ir::Design, scope: ir::ScopeId, depth: usize) -> Vec<Task> {
     design
@@ -136,7 +153,13 @@ fn item(w: &mut Writer<'_, '_>, todo: &mut Vec<Task>, at: ir::ItemRef) {
             }
         }
         ir::ItemKind::Model => write_models::model(w, at),
-        ir::ItemKind::Element => write_elements::element(w, at),
+        ir::ItemKind::Element => {
+            let row: ir::Element = d.row(at.index);
+            match source_like(row.kind) {
+                true => write_sources::source(w, at),
+                false => write_elements::element(w, at),
+            }
+        }
         ir::ItemKind::Func | ir::ItemKind::Statistics => {
             unreachable!("FEATURES lacks {:?}: legalize refused it", at.kind)
         }

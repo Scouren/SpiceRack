@@ -5,7 +5,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD dev-builtin-src.
 //!
-//! Contents: `source` (crate-private)
+//! Contents: `admits`, `source` (crate-private)
 
 use super::write::Writer;
 use crate::ir;
@@ -13,8 +13,16 @@ use crate::ir;
 /// The parameters of one source-like `Element`.
 ///
 /// Stub (S4.2): `FEATURES` lacks every row this writes, so `legalize` refused the design first.
-#[expect(dead_code, reason = "write_elements (S4.1) calls it")]
 pub(super) fn source(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let _ = w;
     unreachable!("S4.2: no VACASK writer yet for {at:?} (FEATURES lacks it)");
+}
+
+/// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
+/// states (R21: a parameter its module lacks, a name no quoting spells). `legalize` calls it
+/// through `Vacask::admits`, always.
+///
+/// Stub (S4.2): nothing to refuse while `FEATURES` holds none of this area's rows.
+pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
+    let _ = (design, diags);
 }

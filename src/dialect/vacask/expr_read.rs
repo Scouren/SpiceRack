@@ -29,7 +29,7 @@ pub(super) enum Context {
     /// A parameter, a model or instance parameter, a condition, a formal's default.
     Param,
     /// A behavioural source's `v=`/`i=` (S4.1).
-    #[expect(dead_code, reason = "read_elements (S4.1) reads behavioural sources")]
+    #[allow(dead_code, reason = "read_elements (S4.1) reads behavioural sources")]
     Behavioural,
 }
 

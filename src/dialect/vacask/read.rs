@@ -18,7 +18,7 @@
 use std::collections::HashSet;
 
 use super::codes;
-use super::{read_elements, read_models, read_run, read_structure};
+use super::{read_elements, read_models, read_run, read_sources, read_structure};
 use crate::dialect::{Reference, Sources};
 use crate::ir;
 use crate::syntax::ast::{Ast, Name, Node, Tag};
@@ -56,6 +56,9 @@ pub(super) struct Lower<'a, 'b, 's> {
     pub(super) grounds: &'a HashSet<String>,
     /// Every path a `load` or an `include` names, as written (an `embed` of one is `Private`).
     pub(super) named_files: &'a HashSet<String>,
+    /// Every model name declared with a source-like module (`tables::SOURCE_MODULES`): an
+    /// instance of one is the sources area's (S4.2), every other instance the devices area's.
+    pub(super) source_models: &'a HashSet<String>,
     /// Each parameter read, the scope it is read from and its statement, bound by `bind`.
     pub(super) reads: &'a mut Vec<(ir::ExprId, ir::ScopeId, ir::Span)>,
     /// `parameters` entries a subcircuit's head took (their `Assign` nodes).
@@ -68,6 +71,15 @@ pub(super) struct Lower<'a, 'b, 's> {
 
 /// The deepest scope chain `region` walks (blocks nest at most this deep in a parsed file).
 const SCOPE_DEPTH_MAX: usize = 1 << 16;
+
+/// Which area reads an instance statement.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Area {
+    /// `read_sources`: an instance of a model of a source-like module.
+    Sources,
+    /// `read_elements`: every other instance, a behavioural source (no master) included.
+    Devices,
+}
 
 impl Lower<'_, '_, '_> {
     /// The span of statement `n` (its first token to its last, a block's closer included).
@@ -230,7 +242,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             top,
         ));
     }
-    let (grounds, named_files) = declare(&csts);
+    let (grounds, named_files, source_models) = declare(&csts);
     let mut reads = Vec::new();
     for (cst, top) in &csts {
         let mut l = Lower {
@@ -241,6 +253,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             stmt: ir::Span::NONE,
             grounds: &grounds,
             named_files: &named_files,
+            source_models: &source_models,
             reads: &mut reads,
             taken: HashSet::new(),
             gap_token: 0,
@@ -314,7 +327,10 @@ fn statement(l: &mut Lower<'_, '_, '_>, n: Node) {
         Tag::Param => read_structure::param(l, n),
         Tag::Global => read_structure::global(l, n),
         Tag::Model => read_models::model(l, n),
-        Tag::Instance => read_elements::instance(l, n),
+        Tag::Instance => match instance_area(l.cst, n, l.source_models) {
+            Area::Sources => read_sources::source(l, n),
+            Area::Devices => read_elements::instance(l, n),
+        },
         Tag::Control => read_run::control(l, n),
         Tag::Card => match l.cst.tokens.text(ast.main_token(n)) {
             "load" => read_structure::load(l, n),
@@ -323,6 +339,16 @@ fn statement(l: &mut Lower<'_, '_, '_>, n: Node) {
             _ => unread(l, n),
         },
         _ => unread(l, n),
+    }
+}
+
+/// The area of instance `n`: by its master's name, against the models declared with a
+/// source-like module (in any scope: a name declared both ways is the sources area's).
+fn instance_area(cst: &Cst<'_>, n: Node, source_models: &HashSet<String>) -> Area {
+    let master = cst.ast.header(n).master;
+    match master != crate::syntax::ast::NONE && source_models.contains(&field_name(cst, master)) {
+        true => Area::Sources,
+        false => Area::Devices,
     }
 }
 
@@ -373,10 +399,11 @@ fn line_end(tokens: &Tokens<'_>, first: u32) -> u32 {
     end
 }
 
-/// The ground names and the named files of every file.
-fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> (HashSet<String>, HashSet<String>) {
+/// The ground names, the named files and the source-like model names of every file.
+fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> (HashSet<String>, HashSet<String>, HashSet<String>) {
     let mut grounds = HashSet::new();
     let mut named = HashSet::new();
+    let mut sources = HashSet::new();
     for (cst, _) in csts {
         let ast = &cst.ast;
         let mut todo: Vec<u32> = ast.fields(ast.root()).to_vec();
@@ -387,6 +414,14 @@ fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> (HashSet<String>, HashSet<String>
             match (ast.tag(n), head) {
                 (Tag::Card, "ground") => {
                     grounds.extend(ast.fields(n).iter().map(|&f| field_name(cst, f)));
+                }
+                (Tag::Model, _) => {
+                    if let [name, module, ..] = ast.fields(n)
+                        && super::tables::SOURCE_MODULES
+                            .contains(&field_name(cst, *module).as_str())
+                    {
+                        sources.insert(field_name(cst, *name));
+                    }
                 }
                 (Tag::Card, "load") | (Tag::Include, _) => {
                     if let Some(&f) = ast.fields(n).first() {
@@ -403,7 +438,7 @@ fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> (HashSet<String>, HashSet<String>
             }
         }
     }
-    (grounds, named)
+    (grounds, named, sources)
 }
 
 /// The first `"…"` string of `text`, its quotes taken off.
@@ -474,4 +509,49 @@ fn region(design: &ir::Design, scope: ir::ScopeId) -> (Vec<ir::ScopeId>, ir::Sco
     }
     let top = design.file(design.scope(scope).file).top;
     (own, top)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Oracle: DIALECT-VACASK §2 and S4-AREAS (an instance of a model of a builtin module or
+    /// `tline_ideal` is the sources area's; every other, a behavioural source too, the devices
+    /// area's); VD cir-instance (`name (nodes) master params`).
+    #[test]
+    fn an_instance_routes_by_its_masters_module() {
+        let text = "routes\nmodel vs vsource\nmodel res sp_resistor\nv1 (a 0) vs dc=1\n\
+                    r1 (a 0) res r=1\nb1 (a 0) v=1\nx1 (a) sub\n";
+        let lex = Lang::VACASK.lexicon().expect("a lexicon");
+        let tokens = tokenize(text, lex);
+        let ast = parse(&tokens, lex);
+        let cst = Cst {
+            tokens,
+            ast,
+            shift: 0,
+            file: ir::FileId::NONE,
+        };
+        let sources: HashSet<String> = ["vs".to_string()].into();
+        let areas: Vec<(String, Area)> = cst
+            .ast
+            .fields(cst.ast.root())
+            .iter()
+            .map(|&s| Node(s))
+            .filter(|&n| cst.ast.tag(n) == Tag::Instance)
+            .map(|n| {
+                (
+                    statement_text(&cst, n).to_string(),
+                    instance_area(&cst, n, &sources),
+                )
+            })
+            .collect();
+        let want = [
+            ("v1 (a 0) vs dc=1", Area::Sources),
+            ("r1 (a 0) res r=1", Area::Devices),
+            ("b1 (a 0) v=1", Area::Devices),
+            ("x1 (a) sub", Area::Devices),
+        ];
+        let got: Vec<(&str, Area)> = areas.iter().map(|(t, a)| (t.as_str(), *a)).collect();
+        assert_eq!(got, want);
+    }
 }
