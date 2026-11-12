@@ -100,6 +100,17 @@ frequencies in hertz, phases in degrees.
 | `TrNoise`, `TrRandom` | ngspice's fields | time domain only, superposed on a given DC value; a `TrRandom` before its first draw and at the operating point is its offset (A17) |
 | `Pattern` | `bits levels delay rise fall sample repeats repeat_start` | 5.22 |
 
+**The reference evaluator** (AMEND-A12 A30, `wave_eval.rs`): `source_value(design, source,
+At::{OperatingPoint, Time(t)}, bindings)` and `wave_value(design, wave, t, bindings)` give a
+source's value by its wave's law and modes, on `eval`'s `Bindings` (`TSTEP`/`TSTOP` for the
+`SpiceDefault` defaults, `temp`/`tnom` for the source's temperature factor), or a
+`WaveDomain` (a field's `eval` domain, `Unbound`, `Random` after t = 0, `File`, `Undefined`).
+`wave_value`'s doc is the specification of every law below, each boundary written out; a law
+no run pins is marked unmeasured there (the LTspice ramp join and sine cycles, the Spectre
+ramp width, the bit pattern). Its proof is the areas' runs: 48 ngspice-45 values
+(`dialect-ngspice` read/sources decks) and 205 VACASK 36be560 values (`vc-sources` settle
+`src_*`, `dcw`) reproduced to 1e-12 (`tests/wave_eval.rs`). Writers and readers never call it.
+
 **The zero rule** (AMEND-A12 A17, R35). `Pulse`, `Sin`, `Exp`, `Sffm`, `Am` and `TrRandom`
 carry `given_zero: GivenZero::{AsGiven, SpiceDefault}` (features `GivenZeroAsGiven`,
 `GivenZeroSpiceDefault`). Under `AsGiven` every field below is present and means what it holds.

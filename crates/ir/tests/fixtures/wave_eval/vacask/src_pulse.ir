@@ -1,0 +1,10 @@
+# The IR of vc-sources:tests/fixtures/dialect/vacask/settle/src_pulse.sim, written by hand by the
+# mapping of the VACASK reader's fixture read/sources/pulse.ir (VD dev-builtin-src defaults:
+# val0 0, val1 1, delay 0, rise 1n, fall 0, width 0, period 0; `dc` on a wave type dropped, R42).
+file "src_pulse.sim" deck
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=0 width=0 period=0 law=vacask) dc_rule=wave_at_zero
+  element vsource v2 (b 0) model=vsource wave=pulse(v1=0 v2=1 delay=0 rise=1u fall=1u width=1u period=0 law=vacask) dc_rule=wave_at_zero
+  element vsource v3 (c 0) model=vsource wave=pulse(v1=0 v2=1 delay=0 rise=1u fall=-1 width=1u period=4u law=vacask) dc_rule=wave_at_zero
+  element vsource v4 (d 0) model=vsource wave=pulse(v1=0 v2=1 delay=-1u rise=2u fall=1u width=1u period=0 law=vacask) dc_rule=wave_at_zero
+  element vsource v5 (e 0) model=vsource wave=pulse(v1=2 v2=3 delay=0 rise=1n fall=0 width=0 period=0 law=vacask) dc_rule=wave_at_zero

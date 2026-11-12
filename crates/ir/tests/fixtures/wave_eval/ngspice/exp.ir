@@ -1,0 +1,9 @@
+# Verbatim from dialect-ngspice:tests/fixtures/dialect/ngspice/read/sources/exp.ir (ng-sources), the IR its exp.sp reads to; the values its run printed are in tests/wave_eval.rs.
+# codes: P1001
+file "exp.sp" deck
+  title "exp"
+  comment " oracle: vsrcload.c EXP (TD1, TAU1, TAU2 zero or omitted are TSTEP, TD2 is TD1 + TSTEP); run `exp(0 1 0 0 0 0)` under .tran 1u: 0.632 at 2u"
+  element vsource V1 (a 0) wave=exp(v1=0 v2=1 td1=0 tau1=0 td2=0 tau2=0 given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V2 (b 0) wave=exp(v1=1 v2=2 given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource V3 (c 0) wave=exp(v1=0 v2=1 td1=1u tau1=1u td2=3u tau2=1u given_zero=spice_default) dc_rule=wave_at_zero
+  opaque ngspice unread ".control\nop\nprint v(a) v(b) v(c)\ntran 1u 6u\nprint v(a)[20] v(b)[20] v(c)[20]\n.endc"
