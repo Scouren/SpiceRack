@@ -1,0 +1,6 @@
+file "a.sp" deck
+  title "t"
+  model rm resistor
+  element resistor r1 (a 0) model=rm value=1
+file "m.lib" library
+  model dmod diode

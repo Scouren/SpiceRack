@@ -1,0 +1,9 @@
+file "a.sp" deck
+  title "t"
+  device_library resistor
+  device_library bsim4 path="spice/sn/bsim4.osdi"
+  model rm resistor
+  element resistor r1 (a 0) model=rm value=1
+file "m.lib" library
+  device_library diode
+  model dmod diode

@@ -1,0 +1,5 @@
+file "a.sp" deck
+  element vsource v1 (a 0) dc=1
+  subckt s (x y)
+    element isource i1 (x y) dc=1
+    element vsource v2 (x y) dc=3

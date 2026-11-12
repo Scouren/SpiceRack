@@ -19,7 +19,13 @@ use spicerack::passes;
 
 /// The structure passes whose simulator proof (a pair deck naming it in `proves =`,
 /// `rewrite/SPINE.md` §8a) is still to come: compared by name with the decks, both ways.
-const PENDING_PAIRS: &[&str] = &["deck_title", "explicit_family_models", "device_libraries"];
+const PENDING_PAIRS: &[&str] = &[
+    "deck_title",
+    "explicit_family_models",
+    "device_libraries",
+    "drop_builtin_models",
+    "drop_device_libraries",
+];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
 
@@ -158,6 +164,98 @@ fn device_libraries_adds_a_library_exactly_for_the_families_the_ir_says_lack_one
         assert_eq!(libraries, usize::from(missing), "{family:?}");
         assert!(!ir::features_used(&design).contains(gap), "{family:?}");
     }
+}
+
+#[test]
+fn drop_builtin_models_unbinds_only_parameterless_builtins_and_keeps_every_other_reference() {
+    let mut ran = 0;
+    for seed in SEEDS {
+        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        if !ir::features_used(&design).contains(feature(ir::CircuitExtra::BuiltinMaster)) {
+            continue;
+        }
+        ran += 1;
+        let before = refs(&design);
+        let mut diags = ir::Diags::new();
+        passes::structure::drop_builtin_models::drop_builtin_models(&mut design, &mut diags);
+        let mut found = ir::Diags::new();
+        ir::check(&design, &mut found);
+        assert!(found.is_empty(), "seed {seed}: {:?}", found.rows());
+        let after = refs(&design);
+        for (item, refs_before) in &before {
+            let Some((_, refs_after)) = after.iter().find(|(i, _)| i == item) else {
+                // a dropped item: a parameterless builtin model
+                assert_eq!(
+                    item.kind,
+                    ir::ItemKind::Model,
+                    "seed {seed}: {item:?} dropped"
+                );
+                let m = design.row::<ir::Model>(item.index);
+                assert!(m.params.is_empty(), "seed {seed}: a parameterless model");
+                continue;
+            };
+            if refs_after == refs_before {
+                continue;
+            }
+            // an unbound element: its old master was a parameterless model, now it names none
+            assert_eq!(
+                item.kind,
+                ir::ItemKind::Element,
+                "seed {seed}: {item:?} rebound"
+            );
+            let e = design.row::<ir::Element>(item.index);
+            assert_eq!(e.model.name, ir::NameId::NONE, "seed {seed}");
+            let old = refs_before[0].0;
+            let m = design.row::<ir::Model>(design.def(old.def).item.index);
+            assert!(
+                m.params.is_empty(),
+                "seed {seed}: a builtin has no parameters"
+            );
+        }
+    }
+    assert!(ran > 0, "no generated design had a builtin master");
+    eprintln!("drop_builtin_models: {ran} generated designs");
+}
+
+/// A metamorphic pair: dropping the builtin masters after adding them gives each source,
+/// coupling and line back its bare form.
+#[test]
+fn drop_builtin_models_undoes_explicit_family_models_on_sources() {
+    let text = "file \"a.sp\" deck\n  element vsource v1 (a 0) dc=1\n  element inductor l1 (a 0) value=1u\n  element inductor l2 (b 0) value=1u\n  element coupling k1 () inductors=(l1 l2) k=0.5\n  element vcvs e1 (o 0 a 0) gain=2\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    passes::structure::explicit_family_models::explicit_family_models(&mut design, &mut diags);
+    passes::structure::drop_builtin_models::drop_builtin_models(&mut design, &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    let mut out = String::new();
+    ir::dump(&design, design.entry(), &mut out);
+    let expected = "file \"a.sp\" deck\n  device_library inductor\n  model inductor inductor\n  element vsource v1 (a 0) dc=1\n  element inductor l1 (a 0) model=inductor value=1u\n  element inductor l2 (b 0) model=inductor value=1u\n  element coupling k1 () inductors=(l1 l2) k=0.5\n  element vcvs e1 (o 0 a 0) gain=2\n";
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn drop_device_libraries_drops_only_libraries() {
+    let mut ran = 0;
+    for seed in SEEDS {
+        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        let library = ir::Feature::Item(ir::ItemKind::DeviceLibrary);
+        if !ir::features_used(&design).contains(library) {
+            continue;
+        }
+        ran += 1;
+        let before: Vec<_> = refs(&design)
+            .into_iter()
+            .filter(|(i, _)| i.kind != ir::ItemKind::DeviceLibrary)
+            .collect();
+        let mut diags = ir::Diags::new();
+        passes::structure::drop_device_libraries::drop_device_libraries(&mut design, &mut diags);
+        assert!(diags.is_empty(), "seed {seed}: no note");
+        assert!(!ir::features_used(&design).contains(library), "seed {seed}");
+        assert_eq!(refs(&design), before, "seed {seed}: only libraries go");
+    }
+    assert!(ran > 0, "no generated design had a library");
+    eprintln!("drop_device_libraries: {ran} generated designs");
 }
 
 #[test]

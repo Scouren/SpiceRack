@@ -17,11 +17,14 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod deck_title`, `pub mod device_libraries`, `pub mod explicit_family_models`,
+//! Contents: `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
+//! `pub mod drop_device_libraries`, `pub mod explicit_family_models`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod deck_title;
 pub mod device_libraries;
+pub mod drop_builtin_models;
+pub mod drop_device_libraries;
 pub mod explicit_family_models;
 mod libraries;
 
@@ -55,6 +58,22 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[],
         run: device_libraries::device_libraries,
     },
+    Pass {
+        name: "drop_builtin_models",
+        removes: ir::Feature::Circuit(ir::CircuitExtra::BuiltinMaster),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Circuit(ir::CircuitExtra::ElementWithoutModel)),
+        notes: &[drop_builtin_models::UNBOUND_MASTER],
+        run: drop_builtin_models::drop_builtin_models,
+    },
+    Pass {
+        name: "drop_device_libraries",
+        removes: ir::Feature::Item(ir::ItemKind::DeviceLibrary),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Circuit(ir::CircuitExtra::ModelWithoutLibrary)),
+        notes: &[],
+        run: drop_device_libraries::drop_device_libraries,
+    },
 ];
 
 /// The group's catalogue rows (`U0300..=U0399`).
@@ -74,6 +93,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an element in a library section the design places no model in",
             cite: "rewrite/IR-CIRCUIT.md §4a; rewrite/AMEND-A12.md A15 K1, C5",
             explain: "The target instantiates every device through a model. A section is read alone, so the element's model must stand in the section; the design places no model in a section, so the target may lack that placement, and the element is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        drop_builtin_models::UNBOUND_MASTER,
+        ir::Info {
+            title: "a source whose model name binds no definition",
+            cite: "rewrite/IR-CIRCUIT.md §4a; rewrite/AMEND-A12.md C5",
+            explain: "The target's source names no model. This one names a model no definition in the design binds (its kit is absent), so nothing says it is the builtin device the bare source means, and the element is refused.",
             kind: ir::Kind::Note,
         },
     ),

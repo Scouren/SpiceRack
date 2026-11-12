@@ -1,0 +1,2 @@
+file "a.sp" deck
+  element vsource v1 (a 0) model=vkit dc=1
