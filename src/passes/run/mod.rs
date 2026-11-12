@@ -250,16 +250,21 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
 
 // ---- private ----
 
-/// What a ceiling row's expression may add: the given ceiling and its operators.
+/// What a ceiling row's expression may add: the given ceiling, its operators and their tags.
 const fn ceiling(ops: &[ir::BinOp], min: bool) -> ir::FeatureSet {
     let mut set = ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranMaxStep));
+    if !ops.is_empty() {
+        set = set.with(ir::Feature::Expr(ir::ExprTag::Binary));
+    }
     let mut k = 0;
     while k < ops.len() {
         set = set.with(ir::Feature::Binary(ops[k]));
         k += 1;
     }
     if min {
-        set = set.with(ir::Feature::Func(ir::Func::Min));
+        set = set
+            .with(ir::Feature::Func(ir::Func::Min))
+            .with(ir::Feature::Expr(ir::ExprTag::Call));
     }
     set
 }
