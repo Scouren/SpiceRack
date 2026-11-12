@@ -77,7 +77,28 @@ Each line: question → choice → why.
 5. `Design::reachable() -> Vec<(ItemRef, ScopeId)>`: asked of the kernel owner; swap the span rule of
    decision 9 when it lands.
 
+## The IR bodies at 79af0b3b, against the spine's assumptions
+
+Merged into `ir-spine`; the kernel's kinds behave as the spine assumed in signature and verdict
+(`check_legal` reports one `U0001` per (item, feature) at the item's span, `arg` the feature
+index; `ir::diag::info` answers the kernel's codes). Differences found:
+
+1. `ir::parse` leaves every span's `file` at `NONE` (items and `P9001` rows alike); the offsets are
+   into the text handed to `parse`, which may hold several `file` blocks. The facade then prints
+   `name:0:0:` for every row read from IR text. Request: `parse` sets `span.file` to the file block
+   the line is in (or the spine needs the text's index to map it).
+2. `TEXT_SYNTAX` (`P9001`) is a `Refusal`: one malformed IR line refuses a lenient read. Its span is
+   the word that failed (or an empty span at the end of the line), not the line.
+3. `ir::parse` of an `opaque … unread` line pushes no `S0001` note: in IR text the class is data,
+   not a reader finding. The spine's strict rule scans the `Opaque` table, so it is unaffected.
+4. A text with no `file` line yields a design with no file: `Design::entry` then panics ("a design
+   with a file has an entry"). `transpile` is safe only because the `P9001` refusal stops it before
+   `entry`; a dialect reader must create a file even for an empty text.
+5. A repeated port (`subckt s (a a)`) is a `P9001` with nothing pushed, as `item_text.rs` says; an
+   unresolved name (`param p = q + 1`) is no row (legal, C8).
+
 ## Open
 
-- The gate item "`spice2rack --dialect ir --to ir` is a fixpoint on the worked example" cannot run until
-  the IR bodies land (the test `the_worked_example_is_a_fixpoint_of_the_ir_dialect` carries the marker).
+- The gate item "`spice2rack --dialect ir --to ir` is a fixpoint on the worked example" waits for the
+  circuit and run rows (`the_worked_example_is_a_fixpoint_of_the_ir_dialect` carries the marker); the
+  kernel-kinds twin `kernel_kinds_are_a_fixpoint_of_the_ir_dialect` passes.

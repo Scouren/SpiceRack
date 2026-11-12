@@ -11,11 +11,16 @@
 //! Contents: `pub enum Violation`, `Violation::ALL`, `Violation::COUNT`,
 //! `pub fn check(&Design, &mut Diags)`, `pub fn check_legal(&Design, &FeatureSet, &mut Diags)`
 
-use crate::design::Design;
-use crate::diag::Diags;
-#[cfg(doc)]
-use crate::facts::Handle;
-use crate::feature::FeatureSet;
+use std::collections::HashSet;
+
+use crate::design::{Design, ItemRow};
+use crate::diag::{Diags, UNSUPPORTED, violation_code};
+use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
+use crate::facts::{Handle, RowFacts};
+use crate::feature::{ExprWalk, Extra, Feature, FeatureSet, case_clash, item_features};
+use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
+use crate::item::{DefKind, ItemKind, ScopeKind};
+use crate::span::Span;
 
 /// One invariant of a well-formed design. Each has its `X` code (`diag::violation_code`); the
 /// span is the offending item's (or `Span::NONE` for a non-item row) and `arg` is stated per
@@ -68,6 +73,12 @@ pub enum Violation {
     FieldDomain,
 }
 
+/// The design under check and where its rows go.
+struct Out<'a> {
+    design: &'a Design,
+    diags: &'a mut Diags,
+}
+
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
     pub const ALL: [Violation; 15] = [
@@ -96,11 +107,422 @@ impl Violation {
 /// lists in `RowFacts::handles`; each row's own invariants are its `RowFacts::check` (one
 /// exhaustive dispatch over `ItemKind`).
 pub fn check(design: &Design, diags: &mut Diags) {
-    todo!()
+    let mut out = Out { design, diags };
+    files_and_scopes(&mut out);
+    definitions(&mut out);
+    let bad = expression_rows(&mut out);
+    items(&mut out, &bad);
 }
 
 /// Appends one `UNSUPPORTED` row per item that uses a feature outside `legal` (span: the item;
 /// `arg`: `Feature::index`). Assumes `check` passed. O(rows).
 pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
-    todo!()
+    let mut walk = ExprWalk::new(design);
+    for (item, scope) in design.reachable() {
+        let mut used = FeatureSet::EMPTY;
+        item_features(design, item, scope, &mut walk, &mut used);
+        for f in used.minus(*legal).iter() {
+            diags.push(UNSUPPORTED, design.span_of(item), f.index() as u32);
+        }
+    }
+    let clash = Feature::Extra(Extra::CaseSensitiveNames);
+    if !legal.contains(clash) && case_clash(design) {
+        diags.push(UNSUPPORTED, Span::NONE, clash.index() as u32);
+    }
+}
+
+// ---- private ----
+
+impl Out<'_> {
+    fn report(&mut self, v: Violation, span: Span, arg: u32) {
+        self.diags.push(violation_code(v), span, arg);
+    }
+}
+
+/// Files, scopes and item lists: handle ranges, the tree's shape, each scope's owner.
+fn files_and_scopes(out: &mut Out<'_>) {
+    let d = out.design;
+    let n_scopes = d.scopes.len();
+    for (k, f) in d.files.iter().enumerate() {
+        if f.path.index_checked(d.names.len()).is_none() {
+            out.report(Violation::HandleRange, Span::NONE, f.path.0);
+        }
+        let top_ok = f.top.0 < n_scopes as u32
+            && d.scopes[f.top.index()].kind == ScopeKind::File
+            && d.scopes[f.top.index()].file.0 as usize == k;
+        if !top_ok {
+            out.report(Violation::ScopeTree, Span::NONE, f.top.0);
+        }
+    }
+    let mut listed: HashSet<ItemRef> = HashSet::new();
+    for (k, s) in d.scopes.iter().enumerate() {
+        let id = k as u32;
+        let parent_ok = s.parent.is_none() || s.parent.index() < n_scopes;
+        let owner_ok =
+            s.owner == ItemRef::NONE || (s.owner.index as usize) < table_len(d, s.owner.kind);
+        if !parent_ok || (s.file.0 as usize) >= d.files.len() || !owner_ok {
+            out.report(Violation::HandleRange, Span::NONE, id);
+            continue;
+        }
+        if !reaches_a_file(d, ScopeId(id)) {
+            out.report(Violation::ScopeTree, Span::NONE, id);
+            continue;
+        }
+        for &item in &d.scope_items[k] {
+            if (item.index as usize) >= table_len(d, item.kind) {
+                out.report(Violation::HandleRange, Span::NONE, item.index);
+            } else if !listed.insert(item) {
+                out.report(Violation::ScopeTree, d.span_of(item), id);
+            }
+        }
+        if s.kind != ScopeKind::File && !owner_matches(d, ScopeId(id)) {
+            out.report(Violation::ScopeOwner, Span::NONE, id);
+        }
+    }
+}
+
+/// Whether the parent chain of a valid-ranged scope ends at a file scope with no parent, owner
+/// `NONE` and its file's top, without a cycle.
+fn reaches_a_file(d: &Design, scope: ScopeId) -> bool {
+    let mut at = scope;
+    for _ in 0..=d.scopes.len() {
+        let s = d.scopes[at.index()];
+        if s.kind == ScopeKind::File {
+            let file = d.files.get(s.file.index());
+            return s.parent.is_none()
+                && s.owner == ItemRef::NONE
+                && file.is_some_and(|f| f.top == at);
+        }
+        if s.parent.is_none() || s.parent.index() >= d.scopes.len() {
+            return false;
+        }
+        at = s.parent;
+    }
+    false
+}
+
+/// Whether a non-file scope's owner has the scope's kind, names it as a body, and is listed in
+/// the scope's parent.
+fn owner_matches(d: &Design, scope: ScopeId) -> bool {
+    let s = d.scopes[scope.index()];
+    let kind_ok = match s.kind {
+        ScopeKind::Subckt => s.owner.kind == ItemKind::Subckt,
+        ScopeKind::Section => s.owner.kind == ItemKind::Section,
+        ScopeKind::Branch => s.owner.kind == ItemKind::If,
+        ScopeKind::Loop => s.owner.kind == ItemKind::Loop,
+        ScopeKind::File => false,
+    };
+    if !kind_ok || !d.scope_items[s.parent.index()].contains(&s.owner) {
+        return false;
+    }
+    let mut handles = Vec::new();
+    for_kind!(s.owner.kind, R => d.row::<R>(s.owner.index).handles(d, &mut handles));
+    handles.contains(&Handle::Scope(scope))
+}
+
+/// Definitions: handle ranges, one per (scope, kind, name).
+fn definitions(out: &mut Out<'_>) {
+    let d = out.design;
+    let mut seen = HashSet::new();
+    for (k, def) in d.defs.iter().enumerate() {
+        let item_ok = (def.item.index as usize) < table_len(d, def.item.kind);
+        if def.scope.index_checked(d.scopes.len()).is_none()
+            || def.name.index_checked(d.names.len()).is_none()
+            || !item_ok
+        {
+            out.report(Violation::HandleRange, Span::NONE, k as u32);
+        } else if !seen.insert((def.scope, def.kind, def.name)) {
+            out.report(Violation::DuplicateDef, d.span_of(def.item), k as u32);
+        }
+    }
+}
+
+/// Every expression row: handle ranges, child order, arities, literals. Returns the rows that
+/// may not be decoded (the item pass skips them).
+fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
+    let d = out.design;
+    let x = &d.exprs;
+    let n = x.tags.len();
+    let mut bad = vec![false; n];
+    let mut kids = Vec::new();
+    for (i, &tag) in x.tags.iter().enumerate() {
+        let (sub, a, b) = (x.subs[i] as usize, x.a[i], x.b[i]);
+        let names = d.names.len() as u32;
+        let in_pool = |start: u32, len: u32| start as usize + len as usize <= d.expr_pool.len();
+        let (range_ok, arity_ok) = match tag {
+            ExprTag::Num => (
+                match x.nums.get(a as usize) {
+                    Some(l) => {
+                        if !l.shape_ok() {
+                            out.report(Violation::LiteralShape, Span::NONE, i as u32);
+                        } else if !l.value().is_finite() {
+                            out.report(Violation::NonFinite, Span::NONE, i as u32);
+                        }
+                        true
+                    }
+                    None => false,
+                },
+                true,
+            ),
+            ExprTag::Str | ExprTag::I => (a < names, true),
+            ExprTag::Param => (a < names && def_ok(d, DefId(b)), true),
+            ExprTag::V => (a < names && (NameId(b).is_none() || b < names), true),
+            ExprTag::Call => match Func::ALL.get(sub) {
+                Some(f) => (in_pool(a, b), arity(f.arity(), b)),
+                None => (false, true),
+            },
+            ExprTag::Draw => {
+                let dist = Dist::ALL.get(sub & 0xF);
+                // bits 4-6 hold DrawWhen and DrawPer, whose widths expr.rs asserts; bit 7 is zero
+                let shape = sub >> 7 == 0;
+                match dist {
+                    Some(dist) if shape => (in_pool(a, b), arity(dist.arity(), b)),
+                    Some(_) | None => (false, true),
+                }
+            }
+            ExprTag::List => (in_pool(a, b), true),
+            ExprTag::UserCall => match x.calls.get(a as usize) {
+                Some(c) => (
+                    c.func.name.0 < names
+                        && def_ok(d, c.func.def)
+                        && in_pool(c.args.start, c.args.len),
+                    true,
+                ),
+                None => (false, true),
+            },
+            ExprTag::Unary => (sub < UnOp::COUNT && (a as usize) < n, true),
+            ExprTag::Binary => (
+                sub < BinOp::COUNT && (a as usize) < n && (b as usize) < n,
+                true,
+            ),
+            ExprTag::Ternary => ((a as usize) < n, in_pool(b, 2)),
+            ExprTag::Time
+            | ExprTag::Temp
+            | ExprTag::Freq
+            | ExprTag::TStep
+            | ExprTag::TStop
+            | ExprTag::Tnom => (true, true),
+        };
+        if !range_ok {
+            out.report(Violation::HandleRange, Span::NONE, i as u32);
+            bad[i] = true;
+            continue;
+        }
+        if !arity_ok {
+            out.report(Violation::ExprArity, Span::NONE, i as u32);
+            bad[i] = true;
+            continue;
+        }
+        kids.clear();
+        d.children(ExprId(i as u32), &mut kids);
+        if kids.iter().any(|k| k.index_checked(n).is_none()) {
+            out.report(Violation::HandleRange, Span::NONE, i as u32);
+            bad[i] = true;
+        } else if kids.iter().any(|k| k.0 >= i as u32) {
+            out.report(Violation::ExprOrder, Span::NONE, i as u32);
+            bad[i] = true;
+        }
+    }
+    bad
+}
+
+/// Reachable items: the row's handles, its references, its expressions' contexts and its own
+/// invariants (`RowFacts::check`).
+fn items(out: &mut Out<'_>, bad: &[bool]) {
+    let d = out.design;
+    let mut walk = ExprWalk::new(d);
+    let mut handles = Vec::new();
+    for (item, _) in d.reachable() {
+        if (item.index as usize) >= table_len(d, item.kind) {
+            continue; // reported with the scope's list
+        }
+        handles.clear();
+        let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
+        for_kind!(item.kind, R => {
+            let mut row: R = d.row(item.index);
+            row.handles(d, &mut handles);
+            row.map_refs(&mut |r, kind| refs.push((*r, kind)));
+            row.check(d, item, out.diags);
+        });
+        let span = d.span_of(item);
+        for (r, kind) in refs {
+            if !r.is_resolved() {
+                continue;
+            }
+            if !def_ok(d, r.def) {
+                out.report(Violation::HandleRange, span, r.def.0);
+            } else if d.defs[r.def.index()].kind != kind || d.defs[r.def.index()].name != r.name {
+                out.report(Violation::RefTarget, span, r.def.0);
+            }
+        }
+        for h in handles.clone() {
+            handle(out, item, span, h, bad, &mut walk);
+        }
+    }
+}
+
+/// One handle of a reachable item.
+fn handle(
+    out: &mut Out<'_>,
+    item: ItemRef,
+    span: Span,
+    h: Handle,
+    bad: &[bool],
+    walk: &mut ExprWalk,
+) {
+    let d = out.design;
+    let in_pool = |start: u32, len: u32, pool: usize| start as usize + len as usize <= pool;
+    match h {
+        Handle::Name(n) => name(out, span, n),
+        Handle::Names(l) => {
+            if !in_pool(l.start, l.len, d.name_pool.len()) {
+                return out.report(Violation::HandleRange, span, l.start);
+            }
+            for &n in d.names(l) {
+                name(out, span, n);
+            }
+        }
+        Handle::Params(l) => {
+            if !in_pool(l.start, l.len, d.param_pool.len()) {
+                return out.report(Violation::HandleRange, span, l.start);
+            }
+            for &(n, v) in d.params(l) {
+                name(out, span, n);
+                expression(out, item, span, v, false, bad, walk);
+            }
+        }
+        Handle::Exprs(l) => {
+            if !in_pool(l.start, l.len, d.expr_pool.len()) {
+                return out.report(Violation::HandleRange, span, l.start);
+            }
+            for &e in d.exprs(l) {
+                expression(out, item, span, e, false, bad, walk);
+            }
+        }
+        Handle::Expr(e) => expression(out, item, span, e, false, bad, walk),
+        Handle::ExprDyn(e) => expression(out, item, span, e, true, bad, walk),
+        Handle::Ref(_) => {} // references are reached through `map_refs`
+        Handle::Scope(s) => {
+            if !s.is_none() && s.index() >= d.scopes.len() {
+                out.report(Violation::HandleRange, span, s.0);
+            }
+        }
+        Handle::Text(t) => {
+            if !t.is_none() && t.index() >= d.texts.len() {
+                out.report(Violation::HandleRange, span, t.0);
+            }
+        }
+        Handle::Branches(l) => {
+            if !in_pool(l.start, l.len, d.branch_pool.len()) {
+                out.report(Violation::HandleRange, span, l.start);
+            }
+        }
+    }
+}
+
+/// A name handle: in range, and non-empty.
+fn name(out: &mut Out<'_>, span: Span, n: NameId) {
+    if n.is_none() {
+        return;
+    }
+    if n.index() >= out.design.names.len() {
+        out.report(Violation::HandleRange, span, n.0);
+    } else if out.design.str(n).is_empty() {
+        out.report(Violation::EmptyName, span, n.0);
+    }
+}
+
+/// An expression handle: in range, its references, and (when constant in time) no circuit read.
+#[allow(clippy::too_many_arguments)]
+fn expression(
+    out: &mut Out<'_>,
+    item: ItemRef,
+    span: Span,
+    e: ExprId,
+    dynamic: bool,
+    bad: &[bool],
+    walk: &mut ExprWalk,
+) {
+    let d = out.design;
+    if e.is_none() {
+        return;
+    }
+    if e.index() >= bad.len() {
+        return out.report(Violation::HandleRange, span, e.0);
+    }
+    for &node in walk.tree(d, e) {
+        if bad[node.index()] {
+            continue;
+        }
+        match d.expr(node) {
+            Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq if !dynamic => {
+                out.report(Violation::ProbeContext, span, node.0)
+            }
+            Expr::Call(f, _) if f.reads_circuit() && !dynamic => {
+                out.report(Violation::ProbeContext, span, node.0)
+            }
+            Expr::Param(r) if r.is_resolved() && !param_target_ok(d, item, r) => {
+                out.report(Violation::RefTarget, span, r.def.0)
+            }
+            Expr::UserCall(r, _) if r.is_resolved() && !same(d, r, DefKind::Func) => {
+                out.report(Violation::RefTarget, span, r.def.0)
+            }
+            Expr::Num(_)
+            | Expr::Str(_)
+            | Expr::Param(_)
+            | Expr::Call(..)
+            | Expr::UserCall(..)
+            | Expr::Unary(..)
+            | Expr::Binary(..)
+            | Expr::Ternary(..)
+            | Expr::V(..)
+            | Expr::I(_)
+            | Expr::Time
+            | Expr::Temp
+            | Expr::Freq
+            | Expr::TStep
+            | Expr::TStop
+            | Expr::Tnom
+            | Expr::Draw(..)
+            | Expr::List(_) => {}
+        }
+    }
+}
+
+/// What a parameter read may bind to: a `Param`; a `Func` whose formal arguments hold the name;
+/// a `Measure` only from a `Measure` item (A7).
+fn param_target_ok(d: &Design, item: ItemRef, r: crate::Ref) -> bool {
+    let def = d.defs[r.def.index()];
+    match def.kind {
+        DefKind::Param => def.name == r.name,
+        DefKind::Measure => def.name == r.name && item.kind == ItemKind::Measure,
+        // a formal argument: bound to its function, whose name is not the argument's
+        DefKind::Func => {
+            def.item.kind == ItemKind::Func
+                && d.names(d.row::<crate::item::Func>(def.item.index).args)
+                    .contains(&r.name)
+        }
+        DefKind::Subckt | DefKind::Model | DefKind::Section | DefKind::Module => false,
+    }
+}
+
+/// Whether a resolved reference names a definition of `kind` with its name.
+fn same(d: &Design, r: crate::Ref, kind: DefKind) -> bool {
+    let def = d.defs[r.def.index()];
+    def.kind == kind && def.name == r.name
+}
+
+/// Whether `def` is `NONE` or a definition in range (`HELD` never is: it is parse-internal).
+fn def_ok(d: &Design, def: DefId) -> bool {
+    def.is_none() || def.index_checked(d.defs.len()).is_some()
+}
+
+/// Whether a count lies in an arity range (`max == u8::MAX`: unbounded).
+fn arity((min, max): (u8, u8), n: u32) -> bool {
+    n >= min as u32 && (max == u8::MAX || n <= max as u32)
+}
+
+/// The row count of `kind`'s table.
+fn table_len(d: &Design, kind: ItemKind) -> usize {
+    for_kind!(kind, R => R::table(d).len())
 }

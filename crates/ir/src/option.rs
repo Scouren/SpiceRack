@@ -10,11 +10,14 @@
 //!
 //! Where an initial condition applies is a field, because simulators disagree
 //! (`INV-semantics.md` 8.21): ngspice forces a `.ic` node in the transient's operating point
-//! only, Xyce also in `.op` and every `.dc` point. A `NodeSet` inside a subcircuit body applies
-//! to every instance of it; at the top its `node` path may reach into an instance (9.01).
+//! only, Xyce also in `.op` and every `.dc` point. A `NodeSet` is legal in a subcircuit body
+//! (LTspice, Xyce: `INV-constructs.md` D88, I25): it then applies to every instance, and its
+//! `node` path is relative to that body. At the top its path may reach into an instance (9.01).
+//! A device's own initial state (VACASK has no capacitor `ic=` parameter: the value is an entry
+//! of the transient's `ic` list; Xyce `.INITCOND`) is a `NodeSetKind::Device` row.
 //!
 //! Cites: `rewrite/IR-RUN.md` §3; `rewrite/INV-constructs.md` I1, I7–I11, I15, I20, I25, G63;
-//! `rewrite/INV-semantics.md` 4.01–4.03, 8.21, 9.01.
+//! D6, D88; `rewrite/INV-semantics.md` 4.01–4.03, 8.21, 9.01.
 //!
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
 //! `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
@@ -63,13 +66,15 @@ pub struct NodeSet {
     /// Whether it applies to the next analysis only (VACASK's analysis-line `ic=[…]` and
     /// `nodeset=[…]`), instead of to every analysis after it.
     pub next_only: bool,
-    /// The node: the instance path then the net. Empty only for `Nodeset` with every node
-    /// (ngspice `.nodeset all=v`).
+    /// The node: the instance path then the net, relative to the item's scope (a subcircuit
+    /// body: each instance's own nodes). `Device`: the element's path. Empty only for
+    /// `Nodeset` with every node (ngspice `.nodeset all=v`).
     pub node: NameList,
     /// The second node of a voltage across two nodes (VACASK `ic=["1";"2";1.0]`), or empty for
-    /// a node voltage to ground.
+    /// a node voltage to ground; always empty for `Device`.
     pub reference: NameList,
-    /// The voltage, V; never `NONE`. May be an expression of parameters (Xyce
+    /// The voltage, V (`Device`: the state in its own unit: a capacitor's voltage, an
+    /// inductor's current); never `NONE`. May be an expression of parameters (Xyce
     /// `.ic v(1)={V1}`).
     pub value: ExprId,
 }
@@ -83,6 +88,10 @@ pub enum NodeSetKind {
     Ic,
     /// The value is a starting guess for the operating point (`.nodeset`, `nodeset=`).
     Nodeset,
+    /// The element's own state starts at the value (VACASK's transient `ic` entry for a
+    /// device, Xyce `.INITCOND`); held per `applies` like `Ic`. An instance's `IC=` parameter is
+    /// the circuit owner's field; a reader whose simulator states it here uses this.
+    Device,
 }
 
 /// Which operating points a `.ic` holds its node in.
@@ -101,7 +110,7 @@ const _: () = assert!(size_of::<NodeSet>() == 24);
 
 impl NodeSetKind {
     /// Every kind, in declaration order.
-    pub const ALL: [NodeSetKind; 2] = [NodeSetKind::Ic, NodeSetKind::Nodeset];
+    pub const ALL: [NodeSetKind; 3] = [NodeSetKind::Ic, NodeSetKind::Nodeset, NodeSetKind::Device];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();
 }

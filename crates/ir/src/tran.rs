@@ -28,7 +28,7 @@ pub struct Tran {
     pub record_start: ExprId,
     /// The output interval, s (ngspice `tstep`, Spectre `step`); `NONE` = the simulator
     /// chooses (Xyce and LTspice step 0; ngspice has no such thing: its writer lacks
-    /// `Extra::TranSimulatorStep`).
+    /// `RunExtra::TranSimulatorStep`).
     pub print_step: ExprId,
     /// The time-step ceiling, s (SPICE `tmax`, Spectre and VACASK `maxstep`, Xyce's fourth
     /// field; a Xyce `schedule()` is its smallest nonzero step); `NONE` = `cap` decides.

@@ -32,8 +32,8 @@ pub struct Probe {
     pub kind: ProbeKind,
     /// Which part of a complex (small-signal) value; `None` for the value itself.
     pub part: AcPart,
-    /// `ITerminal`: the terminal's index in the element kind's terminal order (circuit owner's
-    /// `ElemKind` doc; HSPICE `I3(M1)` is index 2, ngspice `i(m1:s)` the index of `s`).
+    /// `ITerminal`: the terminal's role index in the element kind's terminal order (the
+    /// circuit owner's per-`ElemKind` doc in `element.rs`; HSPICE `I3(M1)` is index 2, ngspice `i(m1:s)` the index of `s`).
     /// `u8::MAX` otherwise.
     pub terminal: u8,
     /// `V`, `Vdiff`: the node path. `I`, `ITerminal`, `Param`, `Power`: the element path.
@@ -61,7 +61,9 @@ pub enum ProbeKind {
     /// `M1:s`).
     ITerminal,
     /// A device's operating-point quantity (ngspice `@m1[gm]`, Xyce `N(m1:x)`, VACASK
-    /// `p(m1,i_d)`, Spectre `m1:gm`), named as the source spelled it.
+    /// `p(m1,i_d)`, Spectre `m1:gm`). The reader canonicalises the name where a canonical
+    /// quantity table exists (gap G-OPQUANT, `INV-semantics.md` 9.06); until then it is the
+    /// name its simulator spells.
     Param,
     /// The power the element absorbs, W (`p(dev)`, Spectre `dev:pwr`).
     Power,

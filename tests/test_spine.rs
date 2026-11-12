@@ -3,14 +3,15 @@
 //! feature a stub writer lacks, `Policy::Strict` refusing an `Unread`, the facade's message
 //! format and code map, the route override, and `Sources::load`'s walk.
 //!
-//! Oracles: the IR text grammar's worked example (`crates/ir/src/text.rs`) read and written
-//! back is the same text (a fixpoint); hand-computed line and column of a byte offset; the old
+//! Oracles: canonical IR text read and written back is the same text (a fixpoint): the
+//! kernel's kinds today (`KERNEL`), the grammar's worked example (`crates/ir/src/text.rs`) when
+//! the circuit and run rows land; hand-computed line and column of a byte offset; the old
 //! catalogue's own titles; the route rules of `rewrite/SPINE.md` §5 written out as a table; a
 //! hand-built include graph with its expected breadth-first order.
 //!
-//! Tests that reach the IR crate's `todo!()` bodies carry the marker
+//! Tests that still reach an IR stub (the circuit and run owners' rows) carry the marker
 //! `#[should_panic(expected = "not yet implemented")]`: they fail (an unexpected pass) the day
-//! the bodies land, until the marker goes.
+//! the rows land, until the marker goes.
 //!
 //! Contents: tests only.
 
@@ -37,6 +38,31 @@ file \"rc.sp\" deck
   element instance x1 (a b 0) model=div
   element vsource v1 (a 0) dc=1.8
   analysis op
+";
+
+/// The kernel's own kinds only (title, comment, global, include, param, func, subckt, if,
+/// section, opaque), in canonical form: what the IR bodies landed so far can read and write.
+const KERNEL: &str = "\
+file \"kit.sp\" deck
+  title \"kernel kinds\"
+  comment \"a note\"
+  global vdd vss
+  include \"models.lib\" section=tt
+  param w = 2u
+  param l = w / 2
+  func area(a, b) = a * b
+  subckt cell (a b) r=w
+    param k = r * 2
+  if (w > 1u)
+    param m = 1
+  elif (w > 0)
+    param m = 2
+  else
+    param m = 3
+  opaque ngspice inert \".width out=80\"
+file \"models.lib\" library
+  section tt
+    param vth = 0.4
 ";
 
 /// A writer that spells every feature but subcircuits.
@@ -110,7 +136,34 @@ fn ir_row() -> &'static DialectRow {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
+fn kernel_kinds_are_a_fixpoint_of_the_ir_dialect() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(&src, ir_row(), Policy::Strict, &mut design, &mut diags);
+    assert!(
+        diags.is_empty(),
+        "no row on canonical text: {:?}",
+        diags.rows()
+    );
+    let written: String = design
+        .files()
+        .map(|f| dialect::write(&design, f, ir_row(), &mut diags))
+        .collect();
+    assert_eq!(written, KERNEL);
+    let out = dialect::transpile(&src, ir_row(), ir_row(), Policy::Strict)
+        .unwrap_or_else(|d| panic!("refused: {:?}", d.rows()));
+    assert_eq!(
+        out.text,
+        KERNEL
+            .split("file \"models.lib\"")
+            .next()
+            .expect("the deck")
+    );
+}
+
+#[test]
+// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
 #[should_panic(expected = "not yet implemented")]
 fn the_worked_example_is_a_fixpoint_of_the_ir_dialect() {
     let src = Sources::one("rc.ir", WORKED);
@@ -125,7 +178,23 @@ fn the_worked_example_is_a_fixpoint_of_the_ir_dialect() {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
+fn a_feature_no_pass_removes_is_refused_at_its_item() {
+    let src = Sources::one("kit.ir", KERNEL);
+    let refused = dialect::transpile(&src, ir_row(), &NO_SUBCKT, Policy::Lenient)
+        .expect_err("no pass removes subcircuits");
+    let subckt = u32::from(ir::Feature::Item(ir::ItemKind::Subckt).index());
+    let rows: Vec<(ir::Code, u32)> = refused.rows().iter().map(|d| (d.code, d.arg)).collect();
+    assert_eq!(rows, [(ir::diag::UNSUPPORTED, subckt)]);
+    let at = refused.rows()[0].span;
+    assert_eq!(
+        &KERNEL[at.start as usize..][..6],
+        "subckt",
+        "the row is at the subckt's line"
+    );
+}
+
+#[test]
+// marker: waits for the circuit and run owners' rows (`element`, `analysis` dump/parse)
 #[should_panic(expected = "not yet implemented")]
 fn a_feature_no_pass_removes_is_refused_with_its_index() {
     let src = Sources::one("rc.ir", WORKED);
@@ -137,8 +206,6 @@ fn a_feature_no_pass_removes_is_refused_with_its_index() {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
-#[should_panic(expected = "not yet implemented")]
 fn strict_refuses_an_unread_statement_and_lenient_keeps_it() {
     let text = "file \"o.sp\" deck\n  opaque ngspice unread \".foo bar\"\n";
     let src = Sources::one("o.ir", text);
@@ -155,8 +222,6 @@ fn strict_refuses_an_unread_statement_and_lenient_keeps_it() {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
-#[should_panic(expected = "not yet implemented")]
 fn legalize_drops_a_foreign_inert_and_refuses_a_foreign_private_once() {
     let mut design = ir::Design::new();
     let mut diags = ir::Diags::new();
@@ -184,8 +249,6 @@ fn legalize_drops_a_foreign_inert_and_refuses_a_foreign_private_once() {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
-#[should_panic(expected = "not yet implemented")]
 fn after_one_clean_legalize_each_file_is_written_once() {
     let mut design = ir::Design::new();
     let mut diags = ir::Diags::new();
@@ -249,8 +312,6 @@ fn the_facade_writes_todays_message_lines_from_spans() {
 }
 
 #[test]
-// marker: IR bodies (slice S1 implementation); remove when they land
-#[should_panic(expected = "not yet implemented")]
 fn a_new_code_with_no_row_is_shown_by_its_verdict() {
     let d = |code| ir::Diag {
         code,

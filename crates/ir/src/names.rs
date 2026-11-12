@@ -13,14 +13,14 @@
 //!
 //! Contents:
 //! - `pub(crate) struct Names`: `Names::new() -> Names`, `Names::intern(&mut self, &str) -> NameId`,
-//!   `Names::get(&self, &str) -> NameId`, `Names::str(&self, NameId) -> &str`,
+//!   `Names::intern_any(&mut self, &str) -> NameId`, `Names::get(&self, &str) -> NameId`, `Names::str(&self, NameId) -> &str`,
 //!   `Names::len(&self) -> usize`, `Names::is_empty(&self) -> bool`
 //! - `pub(crate) struct Texts`: `Texts::new() -> Texts`, `Texts::push(&mut self, &str) -> TextId`,
 //!   `Texts::str(&self, TextId) -> &str`, `Texts::len(&self) -> usize`
 
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
-#[cfg(doc)]
 use crate::id::{BYTES_MAX, NAMES_MAX};
 use crate::id::{NameId, TextId};
 
@@ -50,54 +50,118 @@ pub(crate) struct Texts {
 impl Names {
     /// An interner holding only `"0"` (id 0, [`NameId::GROUND`]).
     pub(crate) fn new() -> Names {
-        todo!()
+        let mut names = Names {
+            bytes: String::new(),
+            ends: Vec::new(),
+            buckets: HashMap::new(),
+            next: Vec::new(),
+        };
+        let ground = names.intern("0");
+        assert!(ground == NameId::GROUND, "ground is the first name");
+        names
     }
 
     /// The id of `name`, interning it when new. Asserts `name` is non-empty, and the
     /// [`NAMES_MAX`] and [`BYTES_MAX`] capacities.
     pub(crate) fn intern(&mut self, name: &str) -> NameId {
-        todo!()
+        assert!(!name.is_empty(), "a name is non-empty");
+        self.intern_any(name)
+    }
+
+    /// The id of `name`, interning it when new, empty included (a `Str` value may be `""`;
+    /// only names are non-empty). Asserts the capacities.
+    pub(crate) fn intern_any(&mut self, name: &str) -> NameId {
+        let found = self.get(name);
+        if !found.is_none() {
+            return found;
+        }
+        assert!(self.ends.len() < NAMES_MAX, "at most NAMES_MAX names");
+        assert!(
+            self.bytes.len() + name.len() <= BYTES_MAX,
+            "name bytes within BYTES_MAX"
+        );
+        let id = NameId(self.ends.len() as u32);
+        self.bytes.push_str(name);
+        self.ends.push(self.bytes.len() as u32);
+        let older = self.buckets.insert(hash(name), id).unwrap_or(NameId::NONE);
+        self.next.push(older);
+        debug_assert_eq!(self.ends.len(), self.next.len(), "parallel columns");
+        id
     }
 
     /// The id of `name` if it was interned, else `NONE`. Never interns.
     pub(crate) fn get(&self, name: &str) -> NameId {
-        todo!()
+        let mut at = self
+            .buckets
+            .get(&hash(name))
+            .copied()
+            .unwrap_or(NameId::NONE);
+        // bounded by the name count: each step moves to an older name
+        for _ in 0..=self.ends.len() {
+            if at.is_none() || self.str(at) == name {
+                return at;
+            }
+            at = self.next[at.index()];
+        }
+        unreachable!("a collision chain is acyclic")
     }
 
     /// The bytes of `id`. Asserts `id` is in range (not `NONE`).
     pub(crate) fn str(&self, id: NameId) -> &str {
-        todo!()
+        let i = id.index();
+        assert!(i < self.ends.len(), "a name id in range");
+        let start = if i == 0 { 0 } else { self.ends[i - 1] as usize };
+        &self.bytes[start..self.ends[i] as usize]
     }
 
     /// Interned name count (at least 1: ground).
     pub(crate) fn len(&self) -> usize {
-        todo!()
+        self.ends.len()
     }
 
     /// Always false: ground is interned at construction. Here for clippy's `len` rule.
     pub(crate) fn is_empty(&self) -> bool {
-        todo!()
+        self.ends.is_empty()
     }
 }
 
 impl Texts {
     /// An empty pool.
     pub(crate) fn new() -> Texts {
-        todo!()
+        Texts::default()
     }
 
     /// Appends `text` (may be empty) and returns its id. Asserts [`BYTES_MAX`].
     pub(crate) fn push(&mut self, text: &str) -> TextId {
-        todo!()
+        assert!(
+            self.bytes.len() + text.len() <= BYTES_MAX,
+            "text bytes within BYTES_MAX"
+        );
+        assert!(self.ends.len() < u32::MAX as usize, "a text id fits u32");
+        self.bytes.push_str(text);
+        self.ends.push(self.bytes.len() as u32);
+        TextId((self.ends.len() - 1) as u32)
     }
 
     /// The bytes of `id`. Asserts `id` is in range.
     pub(crate) fn str(&self, id: TextId) -> &str {
-        todo!()
+        let i = id.index();
+        assert!(i < self.ends.len(), "a text id in range");
+        let start = if i == 0 { 0 } else { self.ends[i - 1] as usize };
+        &self.bytes[start..self.ends[i] as usize]
     }
 
     /// Text count.
     pub(crate) fn len(&self) -> usize {
-        todo!()
+        self.ends.len()
     }
+}
+
+// ---- private ----
+
+/// The lookup key of a name's bytes (SipHash with fixed keys: deterministic across runs).
+fn hash(name: &str) -> u64 {
+    let mut h = DefaultHasher::new();
+    name.hash(&mut h);
+    h.finish()
 }
