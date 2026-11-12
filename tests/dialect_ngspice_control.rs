@@ -324,7 +324,9 @@ fn script_items_ngspice_cannot_spell_are_refused() {
 #[test]
 fn a_script_reads_and_writes_in_linear_time() {
     // Oracle: a scaling law (the IR's scaling gate): a script four times as long reads and
-    // writes within eight times the time (linear is 4x, quadratic 16x). The script is the
+    // writes within eight times the time (linear is 4x, quadratic 16x). At 2,000 against
+    // 8,000 commands the quadratic admits walk this replaced measured above 8x (13x at 4,000
+    // against 16,000); 1,000 against 4,000 hid it at 7x. The script is the
     // shape a generated sweep reaches: alterparam, reset and an analysis per pass, and alters.
     let deck = |n: usize| {
         let mut s = String::from("scaling\n.param p=1\n.control\n");
@@ -338,27 +340,28 @@ fn a_script_reads_and_writes_in_linear_time() {
         s.push_str(".endc\n.end\n");
         s
     };
-    let time = |n: usize| {
-        let text = deck(n);
-        (0..3)
-            .map(|_| {
-                let start = std::time::Instant::now();
-                let (design, diags) = read_deck("s.sp", &text);
-                assert!(
-                    diags.rows().iter().all(|d| d.code.number != 1405),
-                    "a long script read as written is no unroll"
-                );
-                let written = write_entry(&design);
-                assert!(written.len() > text.len() / 2, "written whole");
-                start.elapsed()
-            })
-            .min()
-            .expect("three runs")
+    let once = |text: &str| {
+        let start = std::time::Instant::now();
+        let (design, diags) = read_deck("s.sp", text);
+        assert!(
+            diags.rows().iter().all(|d| d.code.number != 1405),
+            "a long script read as written is no unroll"
+        );
+        let written = write_entry(&design);
+        assert!(written.len() > text.len() / 2, "written whole");
+        start.elapsed()
     };
-    let (small, large) = (time(1000), time(4000));
+    // the two sizes measured in turn, the fastest of seven of each: a load on the machine
+    // (the other test binaries) slows both alike, and the minimum is the cost itself
+    let (small_text, large_text) = (deck(2000), deck(8000));
+    let (mut small, mut large) = (std::time::Duration::MAX, std::time::Duration::MAX);
+    for _ in 0..7 {
+        small = small.min(once(&small_text));
+        large = large.min(once(&large_text));
+    }
     assert!(
         large <= small * 8,
-        "1000 commands in {small:?}, 4000 in {large:?}: not linear"
+        "2000 commands in {small:?}, 8000 in {large:?}: not linear"
     );
 }
 
