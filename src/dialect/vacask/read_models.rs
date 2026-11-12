@@ -129,6 +129,14 @@ pub(super) fn model(l: &mut Lower<'_, '_, '_>, n: Node) {
         }
         entries.push((read::field_name(l.cst, ast.lhs(Node(f))), ast.rhs(Node(f))));
     }
+    if super::read_elements::repeated(&entries) {
+        return read::opaque(
+            l,
+            n,
+            ir::OpaqueClass::InvalidInSource,
+            Some(super::read_elements::REPEATED),
+        );
+    }
     // Validate the whole statement before the first push (A1, A2).
     let mut polarity = match families::has_polarity(family) {
         true => ir::Polarity::N,

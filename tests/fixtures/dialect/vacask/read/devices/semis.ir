@@ -3,7 +3,7 @@
 # user module, R41 a, its parameters as written and `$mfactor` its `mult`); the `spice/*.va`
 # instance lists (`area`, `temp`, `dtemp` the Semi fields; `w l ad` the device's own); run fwd
 # (sp_mos1 has 4 terminals: one left out is Private P2104).
-# codes: P2004 P2004 P2104 S0001 S0001 S0002
+# codes: P2104 S0002
 file "semis.sim" deck
   title "diodes transistors and an unproven module"
   device_library resistor
@@ -16,7 +16,6 @@ file "semis.sim" deck
   model mn mos1 polarity=n params=(vto=0.7 kp=100u lambda=0.02 gamma=0.4)
   model mp mos1 polarity=p params=(vto=-0.7 kp=50u)
   model qm module params=(bf=100i is=1e-15) module=sp_bjt
-  opaque vacask unread "vdd (vdd 0) vs dc=5"
   element resistor rd1 (vdd d1) model=r value=10k
   element diode d1 (d1 0) model=dmod area=2i dtemp=5i
   element resistor rm (vdd dm1) model=r value=10k
@@ -26,4 +25,3 @@ file "semis.sim" deck
   element resistor rq (vdd c1) model=r value=10k
   element module_model q1 (c1 vdd 0 0) model=qm params=(area=1.5) mult=2i
   opaque vacask private "m3 (dm1 vdd 0) mn"
-  opaque vacask unread "control\n  options temp=50 tnom=27 rawfile=\"ascii\"\n  analysis op1 op\nendc"

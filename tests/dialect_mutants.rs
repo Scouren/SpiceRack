@@ -23,13 +23,7 @@ use spicerack::ir;
 const MUTANTS: u64 = 32;
 
 /// The rows that fail today: (law, row, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "l1-mutants",
-    "vacask",
-    "read_elements (S4.1) pushes an instance whose parameter list repeats a name \
-     (`r9 (a 0) libres r=2k r=2k`): Builder::params asserts distinct names; reported to \
-     vc-devices",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 /// splitmix64.
 struct Rng(u64);
