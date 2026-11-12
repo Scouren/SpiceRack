@@ -247,3 +247,56 @@ fn a_non_canonical_empty_list_is_a_handle_range() {
     b.d.editor().set(sub.index, row);
     assert_eq!(violations(&b.d), vec![Violation::HandleRange]);
 }
+
+#[test]
+fn a_title_or_comment_with_a_line_break_is_a_field_domain() {
+    // A15 K3: a statement's text is one line; each break beside its one-line neighbour
+    for (text, want) in [
+        ("a\nb", vec![Violation::FieldDomain]),
+        ("a\rb", vec![Violation::FieldDomain]),
+        ("a b", vec![]),
+    ] {
+        let mut d = Design::new();
+        {
+            let mut b = d.builder();
+            let (_, top) = b.file("t.sp", Role::Deck);
+            b.title(top, text, Span::NONE);
+            b.comment(top, text, Span::NONE);
+        }
+        let got = violations(&d);
+        let want: Vec<Violation> = want.iter().flat_map(|v| [*v, *v]).collect();
+        assert_eq!(got, want, "{text:?}: the title and the comment");
+    }
+}
+
+#[test]
+fn probe_context_follows_the_class() {
+    // A15 K3: a constant-in-time field reading the circuit through a function is a
+    // ProbeContext, as one holding v(out) itself is; reading a constant function is not
+    let build = |probe: bool| {
+        let mut d = Design::new();
+        {
+            let mut b = d.builder();
+            let (_, top) = b.file("t.sp", Role::Deck);
+            let x = b.param_ref("x");
+            let body = if probe {
+                let v = b.v("out", None);
+                b.binary(crate::expr::BinOp::Add, v, x)
+            } else {
+                b.call(Func::Exp, &[x])
+            };
+            b.func(top, "h", &["x"], body, Span::NONE);
+            let one = b.num(1.0);
+            let call = b.user_call("h", &[one]);
+            b.param(top, "k", call, Span::NONE);
+        }
+        link(&mut d, &mut Diags::new());
+        violations(&d)
+    };
+    assert_eq!(
+        build(true),
+        vec![Violation::ProbeContext],
+        "k = h(1), h reads v(out)"
+    );
+    assert_eq!(build(false), vec![], "k = h(1), h = exp(x)");
+}

@@ -106,8 +106,8 @@ pub mod wave;
 
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
-pub use element::{DetailKind, ElemKind, Element, NO_ROW};
-pub use letter::spice_letter;
+pub use element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
+pub use letter::{spice_letter, spice_letters};
 pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};
 pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
@@ -133,6 +133,7 @@ mod plan_facts;
 pub mod probe;
 pub mod run_extra;
 mod run_words;
+mod state_order;
 pub mod stats;
 pub mod sweep;
 pub mod tran;
@@ -155,7 +156,7 @@ pub use id::{
 pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
 pub use link::link;
 pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
-pub use option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
+pub use option::{Applies, Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 pub use option_key::{OptionClass, OptionKey};
 pub use output::{Measure, Print, PrintView, Save};
 pub use plan::{

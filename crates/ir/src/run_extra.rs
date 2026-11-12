@@ -167,7 +167,8 @@ pub enum RunExtra {
     McNominal,
     /// A Monte Carlo loop that varies mismatch (`variations` other than `Process`).
     McMismatch,
-    /// An option set after the first run item.
+    /// A `FromHere` option after a run item (A14: exactly this; a `WholeRun` one there is
+    /// `WholeRunMidRun`).
     OptionMidRun,
     /// An initial condition held in every operating point (Xyce).
     IcEveryOp,
@@ -258,11 +259,31 @@ pub enum RunExtra {
     /// A sweep loop whose body is exactly one operating point (VACASK's spelling of a DC
     /// sweep; R20: a `Dc` is another meaning, one result over the grid, each point continued).
     LoopOverOp,
+    /// A `FromHere` `Env` after a run item (A14).
+    EnvMidRun,
+    /// A `FromHere` `NodeSet` after a run item (A14).
+    NodeSetMidRun,
+    /// A `WholeRun` state item (option, `Env`, `NodeSet`) after a run item in listed order: a
+    /// target whose state is positional cannot spell it in place (A14; a pass moves it before
+    /// the first run item when both are in one file).
+    WholeRunMidRun,
+    /// An analysis, option or `Env` listed inside a subcircuit or section body (R26: it is
+    /// still its deck's).
+    RunItemNested,
+    /// A probe of every element's branch current (`ProbeKind::AllBranchI`).
+    ProbeAllBranchI,
+    /// A statistic measure that reports where the extremum is (`Stat::MinAt`, `Stat::MaxAt`).
+    MeasStatAt,
+    /// A measure crossing searched only up to a position (`Event::until`).
+    MeasUntil,
+    /// A measure crossing picked by ngspice's default, skipping the first interval
+    /// (`Event::skip_initial`).
+    MeasSkipInitial,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 120] = [
+    pub const ALL: [RunExtra; 128] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -383,6 +404,14 @@ impl RunExtra {
         RunExtra::VaryPercent,
         RunExtra::VaryMean,
         RunExtra::LoopOverOp,
+        RunExtra::EnvMidRun,
+        RunExtra::NodeSetMidRun,
+        RunExtra::WholeRunMidRun,
+        RunExtra::RunItemNested,
+        RunExtra::ProbeAllBranchI,
+        RunExtra::MeasStatAt,
+        RunExtra::MeasUntil,
+        RunExtra::MeasSkipInitial,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

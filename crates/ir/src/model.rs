@@ -149,6 +149,9 @@ pub enum ModelFamily {
     Mesfet,
     /// Spectre `gaas` (DC as `Mesfet`, its own capacitances, 7.18).
     Gaas,
+    /// ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet` levels 2 to 4, `inpdomod.c`; the
+    /// level is a parameter of the device, not a family; AMEND-A12 A15 C3).
+    Mesa,
     /// HFET level 5 (ng `nhfet`/`phfet` level 5; D28).
     Hfet1,
     /// HFET level 6 (ng `nhfet`/`phfet` level 6; D28).
@@ -263,7 +266,7 @@ const _: () = assert!(size_of::<Model>() == 44);
 
 impl ModelFamily {
     /// Every member, in declaration order.
-    pub const ALL: [ModelFamily; 77] = [
+    pub const ALL: [ModelFamily; 78] = [
         ModelFamily::Resistor,
         ModelFamily::ResistorMultiplier,
         ModelFamily::Capacitor,
@@ -315,6 +318,7 @@ impl ModelFamily {
         ModelFamily::JfetHspice2,
         ModelFamily::Mesfet,
         ModelFamily::Gaas,
+        ModelFamily::Mesa,
         ModelFamily::Hfet1,
         ModelFamily::Hfet2,
         ModelFamily::Igbt,

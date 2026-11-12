@@ -62,7 +62,7 @@ impl Gen {
             dyn_leaves.push(ExprTag::Temp);
         }
         let probes = dyn_leaves;
-        let dynamic = !probes.is_empty() && self.chance(2);
+        let dynamic = !self.constant_only && !probes.is_empty() && self.chance(2);
         (self.dynamic, self.reads, self.class) = (dynamic, reads, ExprClass::Constant);
         self.int_literals = features.contains(Feature::Extra(crate::feature::Extra::IntLiteral));
         let mut need_probe = dynamic;
@@ -176,12 +176,23 @@ impl Gen {
         }
     }
 
+    /// Whether a read of `def` keeps the tree within its class: a constant tree reads only
+    /// constant definitions, a dynamic one under `Reads::Constant` none of class `Circuit`
+    /// (A15 K3: `ProbeContext` follows the class).
+    fn may_read(&self, def: DefId) -> bool {
+        let class = self.class_of(def);
+        match (self.dynamic, self.reads) {
+            (false, _) => class == ExprClass::Constant,
+            (true, Reads::Constant) => class <= ExprClass::Temp,
+            (true, Reads::Circuit) => true,
+        }
+    }
+
     /// A parameter read: a visible definition, a formal of the function being generated, or a
     /// fresh name no definition has.
     fn param_read(&mut self, b: &mut Builder<'_>) -> ExprId {
         let def = self.pick_def(b.design(), self.scope, DefKind::Param);
-        let readable =
-            !def.is_none() && (self.dynamic || self.class_of(def) == ExprClass::Constant);
+        let readable = !def.is_none() && self.may_read(def);
         match self.below(3) {
             0 if readable => {
                 self.class = self.class.max(self.class_of(def));
@@ -251,12 +262,11 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::UserCall)) {
             let def = self.pick_def(b.design(), self.scope, DefKind::Func);
-            let def =
-                if !def.is_none() && (self.dynamic || self.class_of(def) == ExprClass::Constant) {
-                    def
-                } else {
-                    DefId::NONE
-                };
+            let def = if !def.is_none() && self.may_read(def) {
+                def
+            } else {
+                DefId::NONE
+            };
             let name = if def.is_none() {
                 self.fresh()
             } else {
