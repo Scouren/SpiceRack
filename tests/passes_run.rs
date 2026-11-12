@@ -13,6 +13,8 @@ mod memcap;
 
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
+#[path = "passes_run/first_step.rs"]
+mod first_step;
 #[path = "passes_run/loops.rs"]
 mod loops;
 #[path = "passes_run/names.rs"]
@@ -57,6 +59,8 @@ const PENDING_PAIRS: &[&str] = &[
     "dc_axis_name_given",
     "loop_name_given",
     "tran_print_step_to_simulator",
+    "tran_simulator_step_to_print",
+    "tran_first_step_to_print",
     "loop_restore_to_keep_last",
     "loop_keep_last_to_restore",
 ];

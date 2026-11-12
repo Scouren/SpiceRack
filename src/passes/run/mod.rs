@@ -19,7 +19,7 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod tran_ceiling_given`, `pub mod tran_print_step`,
+//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
@@ -29,6 +29,7 @@ pub mod names_dropped;
 pub mod names_given;
 pub mod run_items_together;
 pub mod tran_ceiling_given;
+pub mod tran_first_step_to_print;
 pub mod tran_print_step;
 pub mod whole_run_state_first;
 
@@ -36,6 +37,7 @@ use super::Pass;
 use crate::ir;
 use crate::ir::RunExtra;
 use tran_ceiling_given as tc;
+use tran_first_step_to_print as fs;
 use whole_run_state_first as wr;
 
 /// The group's passes, in the order `legalize` tries them.
@@ -122,6 +124,21 @@ pub(super) const PASSES: &[Pass] = &[
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranSimulatorStep)),
         notes: &[tran_print_step::PRINT_STEP_READ],
         run: tran_print_step::tran_print_step_to_simulator,
+    },
+    // after the ceiling rows: a ceiling rule reads the print step (R73)
+    Pass {
+        name: "tran_simulator_step_to_print",
+        removes: ir::Feature::Run(ir::RunExtra::TranSimulatorStep),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranPrintStep)),
+        notes: &[fs::FIRST_STEP_KEPT, fs::NO_STEP_VALUE],
+        run: fs::tran_first_step_to_print,
+    },
+    Pass {
+        name: "tran_first_step_to_print",
+        removes: ir::Feature::Run(ir::RunExtra::TranInitialStep),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranPrintStep)),
+        notes: &[fs::FIRST_STEP_KEPT, fs::NO_STEP_VALUE],
+        run: fs::tran_first_step_to_print,
     },
     Pass {
         name: "ic_beyond_next_to_next_only",
@@ -274,6 +291,33 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a transient's print step something still reads",
             cite: "rewrite/RULINGS.md R67; rewrite/AMEND-A12.md A24, A41",
             explain: "The target has no output interval, but this one is read: by ngspice's default step ceiling (min of the interval and a fiftieth of the span), by a $tstep in an expression, or by further segments of their own intervals. Dropping it would change the run, so the item is refused; the rules that write the ceiling and substitute $tstep run first.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        fs::FIRST_STEP_MOVED,
+        ir::Info {
+            title: "a transient's first step moved into its print step",
+            cite: "rewrite/RULINGS.md R73",
+            explain: "The target has no first-step field and needs a print step; this transient gave a first step and no print step, so the first step became the print step and the first step is the target's own rule, which takes one no larger (R73). The note's argument is the value.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        fs::FIRST_STEP_KEPT,
+        ir::Info {
+            title: "a transient's first step that cannot move",
+            cite: "rewrite/RULINGS.md R73",
+            explain: "The target has no first-step field. This one cannot become the print step: the transient already has one, its step ceiling is still a simulator's rule that would read it, or a $tstep in an expression would read it. The ceiling rules and the $tstep substitution run first; otherwise the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        fs::NO_STEP_VALUE,
+        ir::Info {
+            title: "a transient with neither a print step nor a first step",
+            cite: "rewrite/RULINGS.md R73",
+            explain: "The target needs a print step, and nothing in the deck determines one: no print step and no first step to move into it (R13: no invented value). The item is refused.",
             kind: ir::Kind::Note,
         },
     ),
