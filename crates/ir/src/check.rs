@@ -43,7 +43,8 @@ pub enum Violation {
     /// `arg`: the item row.
     DetailRow,
     /// A resolved `Ref` names a definition of a kind the referring field does not accept, or
-    /// whose name differs. `arg`: the definition.
+    /// whose name differs; also a `Param`-tag expression bound to a `Measure` definition outside
+    /// a `Measure` item (A7). `arg`: the definition.
     RefTarget,
     /// A literal's value is not finite (`1e400`). `arg`: the expression.
     NonFinite,

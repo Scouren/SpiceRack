@@ -111,6 +111,9 @@ pub enum DefKind {
     Section,
     /// A Verilog-A module (or an OSDI device); item the `Load` that brings it in.
     Module,
+    /// A named measurement; item a `Measure` (A7). Read only by a later measure's expression
+    /// (`.meas … param='m1/m2'`), as a `Param`-tag expression bound to it.
+    Measure,
 }
 
 /// What a file is to the design.
@@ -334,13 +337,14 @@ impl ScopeKind {
 
 impl DefKind {
     /// Every kind, in declaration order.
-    pub const ALL: [DefKind; 6] = [
+    pub const ALL: [DefKind; 7] = [
         DefKind::Subckt,
         DefKind::Model,
         DefKind::Param,
         DefKind::Func,
         DefKind::Section,
         DefKind::Module,
+        DefKind::Measure,
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();

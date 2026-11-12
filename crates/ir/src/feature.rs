@@ -3,15 +3,15 @@
 //! out (`features_used`, one scan); legalization compares that set with the target's.
 //!
 //! Every kind is a feature (`Item`, `Elem`, `Wave`, `Analysis`, `Expr`, `Func`, `Binary`,
-//! `Unary`, `Dist`, and a draw's `DrawWhen` and `DrawPer`); a function or operator used inside an expression that holds a `V`, `I`,
-//! `Time` or `Freq` leaf is its `*Dyn` feature instead (Addendum A1: legality is per context);
+//! `Unary`, `Dist`, a draw's `DrawWhen` and `DrawPer`, and each portable `Option` key, A7); a
+//! function or operator used inside an expression that holds a `V`, `I`, `Time` or `Freq` leaf is its `*Dyn` feature instead (Addendum A1: legality is per context);
 //! `Extra` lists the features that are fields, not kinds. Feature indices are dense, in that
 //! order, so a set is `Feature::COUNT` bits.
 //!
 //! `Extra` has three regions. The kernel's is fixed; the circuit and the run owner each append
 //! only in their marked region, in the enum and in `Extra::ALL`, so their edits merge.
 //!
-//! Cites: `rewrite/IR-KERNEL.md` §8, Addendum A1; `REWRITE-PLAN.md` §3.5, §4.4.
+//! Cites: `rewrite/IR-KERNEL.md` §8, Addenda A1, A2, A7; `REWRITE-PLAN.md` §3.5, §4.4.
 //!
 //! Contents:
 //! - `pub enum Feature`, `Feature::COUNT`, `Feature::index(self) -> u16`,
@@ -29,6 +29,7 @@ use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, ExprTag, Func, UnOp};
 use crate::item::ItemKind;
+use crate::option_key::OptionKey;
 use crate::wave::WaveKind;
 
 /// A feature: one kind, one context-qualified operator, or one field.
@@ -62,11 +63,17 @@ pub enum Feature {
     DrawWhen(DrawWhen),
     /// How often a draw samples (Addendum A2).
     DrawPer(DrawPer),
+    /// An option key (A7). `OptionKey::Private` is one feature: a writer that has it spells
+    /// only its own dialect's private options, and that dialect check is the writer's, not the
+    /// feature set's.
+    Option(OptionKey),
     /// A field-level feature.
     Extra(Extra),
 }
 
-/// The features that are fields or placements, not kinds.
+/// The features that are fields or placements, not kinds. `#[repr(u8)]` holds 256 members
+/// (202 today: kernel 8, circuit 76, run 118); passing 256 needs `#[repr(u16)]`, and
+/// `Feature::index` is already `u16`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Extra {
@@ -515,6 +522,7 @@ impl Feature {
         + Dist::COUNT
         + DrawWhen::COUNT
         + DrawPer::COUNT
+        + OptionKey::COUNT
         + Extra::COUNT) as u16;
 
     /// The dense index: the variant's offset (the counts of the variants before it, in

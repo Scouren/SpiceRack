@@ -20,7 +20,8 @@ use crate::edit::Editor;
 
 /// Binds every still-unresolved reference by `Design::lookup` from the scope of the item (or the
 /// expression's item) that holds it, innermost scope first, exact names, with the kind the field
-/// expects. A reference it cannot bind stays unresolved and gets no diagnostic: unresolved is
+/// expects. A `Param`-tag expression reached from a `Measure` item's handles tries
+/// `DefKind::Param` first, then `DefKind::Measure` (A7). A reference it cannot bind stays unresolved and gets no diagnostic: unresolved is
 /// legal. A bound reference and a held one (IR text `name?`, held by a crate-private sentinel) are never changed.
 /// Works through an [`Editor`] (`Editor::map_refs`, `Builder::resolve`). Deterministic: items in
 /// scope order, fields in `map_refs` order. O(references × scope depth). `diags` is not appended

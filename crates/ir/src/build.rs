@@ -345,7 +345,8 @@ impl<'d> Builder<'d> {
     }
 
     /// Binds the [`Ref`] of a `Param` or `UserCall` expression to `def`. Asserts the tag, and
-    /// that `def` has the name and the kind (`Param`/`Func`) the expression expects.
+    /// that `def` has the name and a kind the expression accepts: `Param` (or `Measure`, for a
+    /// measure reading an earlier measure, A7) for a `Param` tag, `Func` for a `UserCall`.
     pub fn resolve(&mut self, expr: ExprId, def: DefId) {
         todo!()
     }

@@ -118,3 +118,10 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Circuit: the circuit-local `DetailRow` trait and its `Design::detail`/`Editor::set_detail`/`Builder::detail` are deleted; `element.rs`'s `detail_rows!` now implements the kernel trait through `design.circuit.<field>`; `wave.rs`'s `WaveRow: DetailRow` names the kernel trait. `DetailKind` and every typed accessor are unchanged.
 - Run: `Detail` became `RunDetail: DetailRow { type Kind; const KIND }` (the name says it is the run owner's sub-trait), with `table`/`table_mut` removed; `analysis.rs`'s `details!` implements both traits through `design.run.<field>`; `build_run.rs`'s three typed pushes bound on `RunDetail<Kind = …>`. Its duplicate `Design::detail`/`Editor::set_detail` are deleted.
 - `lib.rs` re-exports `DetailRow` from `design` (kernel group) instead of `element`, and `RunDetail` instead of `Detail`; its header names every run re-export.
+
+## Addendum A7 (requests from the run owner)
+
+- `Feature::Option(OptionKey)` comes after `DrawPer` in index order and counts `OptionKey::COUNT` (49); `OptionKey::Private` is one feature, and whether a private option belongs to the writer's own dialect is the writer's check.
+- `DefKind::Measure` is appended last (no earlier `DefKind` moves). `Builder::resolve` accepts a `Param`-tag expression bound to a `Measure`; `link` tries `Param`, then `Measure`, for `Param`-tag expressions reached from a `Measure` item's handles; `check`'s `RefTarget` reports a `Param`-tag expression bound to a `Measure` anywhere outside a `Measure` item.
+- **Note for the run owner (Implementation phase):** `Builder::measure` (`build_run.rs`) is a defining push: it must call `define(DefKind::Measure, name, scope, item)` for the measure it pushes. Not edited by the kernel.
+- `Extra` is `#[repr(u8)]` with 202 members (8 + 76 + 118); its doc says passing 256 needs `#[repr(u16)]` (`Feature::index` is already `u16`).
