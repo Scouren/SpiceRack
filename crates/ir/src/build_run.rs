@@ -72,7 +72,7 @@ use crate::option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 use crate::option_key::OptionKey;
 use crate::output::{Measure, Print, PrintView, Save};
 use crate::plan::{Alter, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList};
-use crate::probe::{Probe, ProbeKind, ProbeList, probe_valid};
+use crate::probe::{Probe, ProbeKind, ProbeList};
 use crate::run_words::{loop_depth, pool};
 use crate::span::Span;
 use crate::stats::{Correlation, CorrelationList, Statistics, Vary, VaryList};
@@ -80,12 +80,9 @@ use crate::stats::{Correlation, CorrelationList, Statistics, Vary, VaryList};
 impl Builder<'_> {
     // ---- pools ----
 
-    /// Appends a list of probes. Asserts each probe's fields match its kind.
+    /// Appends a list of probes. Like `push`, it does not check the probes' fields (`check`'s
+    /// `FieldDomain` does); the probe constructors below assert them.
     pub fn probes(&mut self, probes: &[Probe]) -> ProbeList {
-        assert!(
-            probes.iter().all(probe_valid),
-            "each probe's fields match its kind"
-        );
         pool(&mut self.design.run.probes, probes)
     }
 
@@ -94,9 +91,9 @@ impl Builder<'_> {
         pool(&mut self.design.run.targets, targets)
     }
 
-    /// Appends a DC sweep's axes, innermost first. Asserts at least one.
+    /// Appends a DC sweep's axes, innermost first (fields unchecked, as `probes`; a sweep with
+    /// no axis is `check`'s `FieldDomain`).
     pub fn dc_axes(&mut self, axes: &[DcAxis]) -> DcAxisList {
-        assert!(!axes.is_empty(), "a DC sweep has at least one axis");
         pool(&mut self.design.run.dc_axes, axes)
     }
 
@@ -105,12 +102,8 @@ impl Builder<'_> {
         pool(&mut self.design.run.varies, varies)
     }
 
-    /// Appends a list of correlations. Asserts each pair names two parameters.
+    /// Appends a list of correlations (fields unchecked, as `probes`).
     pub fn correlations(&mut self, correlations: &[Correlation]) -> CorrelationList {
-        assert!(
-            correlations.iter().all(|c| c.a.name != c.b.name),
-            "a correlation pairs two parameters"
-        );
         pool(&mut self.design.run.correlations, correlations)
     }
 
