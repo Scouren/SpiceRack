@@ -543,6 +543,7 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Ddt | Func::Idt => unreachable!("refused before their arguments are evaluated"),
         Func::Pwl => return pwl(xs).ok_or(out),
         Func::ToInt => x.trunc(),
+        Func::ToReal => todo!(),
         Func::SgnZeroPos => {
             if x < 0.0 {
                 -1.0
