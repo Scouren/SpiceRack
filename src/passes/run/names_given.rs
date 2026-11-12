@@ -11,9 +11,11 @@
 //!   holds an opaque statement, which may read a name the new one shadows (`LOOP_NAME_UNREAD`).
 //!
 //! The count runs from 1 per word over the design in listed order and skips every name the
-//! design already gives a statement of that kind (analyses, axes, loops), compared without
-//! case: no two of one kind share a name, as VACASK asks (settle `dup_name.sim`, `names*.sim`;
-//! its names are case-sensitive, ngspice's are not).
+//! design already gives a statement of that kind, compared without case: no two analyses
+//! share a name (VACASK refuses that: settle `dup_name.sim`), and no DC axis or loop shares
+//! one with another axis or loop: VACASK writes both as sweeps and refuses one name twice in a
+//! sweep chain (settle `names_chain.sim`), while an analysis and a sweep may share one
+//! (`names.sim`). VACASK's names are case-sensitive, ngspice's are not.
 //!
 //! Exact: a name labels a result, never a number; no row of the IR reads an analysis, axis or
 //! loop by its name.
@@ -63,16 +65,7 @@ pub fn dc_axis_name_given(design: &mut ir::Design, diags: &mut ir::Diags) {
         .map(|i| (i, design.row::<ir::Analysis>(i.index)))
         .filter(|(_, a)| a.kind == ir::AnalysisKind::Dc)
         .collect();
-    let axes_of = |design: &ir::Design, a: &ir::Analysis| {
-        let dc = design.detail::<ir::dc_ac::Dc>(a.detail);
-        design.dc_axes(dc.axes).to_vec()
-    };
-    let taken: Vec<ir::NameId> = dcs
-        .iter()
-        .flat_map(|(_, a)| axes_of(design, a))
-        .map(|x| x.name)
-        .collect();
-    let mut names = Names::new(design, taken.into_iter());
+    let mut names = Names::new(design, sweep_names(design).into_iter());
     for (item, a) in dcs {
         let mut axes = axes_of(design, &a);
         if axes.iter().all(|x| x.name != ir::NameId::NONE) {
@@ -94,7 +87,7 @@ pub fn loop_name_given(design: &mut ir::Design, diags: &mut ir::Diags) {
     let reachable = design.reachable();
     let items = of_kind(design, ir::ItemKind::Loop);
     let rows: Vec<ir::plan::Loop> = items.iter().map(|i| design.row(i.index)).collect();
-    let mut names = Names::new(design, rows.iter().map(|l| l.name));
+    let mut names = Names::new(design, sweep_names(design).into_iter());
     for (item, mut l) in items.into_iter().zip(rows) {
         if l.name != ir::NameId::NONE {
             continue;
@@ -159,4 +152,25 @@ fn snake(kind: ir::AnalysisKind) -> String {
         out.push(c.to_ascii_lowercase());
     }
     out
+}
+
+/// The names of every reachable DC axis and loop: one set, as both are sweeps on VACASK.
+fn sweep_names(design: &ir::Design) -> Vec<ir::NameId> {
+    let mut out = Vec::new();
+    for item in of_kind(design, ir::ItemKind::Analysis) {
+        let a = design.row::<ir::Analysis>(item.index);
+        if a.kind == ir::AnalysisKind::Dc {
+            out.extend(axes_of(design, &a).iter().map(|x| x.name));
+        }
+    }
+    for item in of_kind(design, ir::ItemKind::Loop) {
+        out.push(design.row::<ir::plan::Loop>(item.index).name);
+    }
+    out
+}
+
+/// The axes of a DC analysis, innermost first.
+fn axes_of(design: &ir::Design, a: &ir::Analysis) -> Vec<ir::dc_ac::DcAxis> {
+    let dc = design.detail::<ir::dc_ac::Dc>(a.detail);
+    design.dc_axes(dc.axes).to_vec()
 }
