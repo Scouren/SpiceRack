@@ -144,6 +144,54 @@ mod tests {
         assert!(missing.is_empty(), "{missing:?}");
     }
 
+    /// A33 (the lead's ruling): a set without `BehavUntypedParam` but with the dynamic
+    /// `ToReal` still reads parameters in behavioural expressions, every read typed: some
+    /// generated behavioural source reads `to_real(…)` or `to_int(…)` of a parameter, and no
+    /// design states the feature (oracle: the IR text and `features_used`).
+    #[test]
+    fn a_behavioural_source_reads_typed_parameters_without_the_feature() {
+        let set = circuit_set()
+            .minus(FeatureSet::EMPTY.with(Feature::Circuit(CircuitExtra::BehavUntypedParam)));
+        let mut typed = 0;
+        for seed in 0..600u64 {
+            let d = generate(seed, &set, SIZE);
+            assert!(
+                !features_used(&d).contains(Feature::Circuit(CircuitExtra::BehavUntypedParam)),
+                "seed {seed}"
+            );
+            let mut text = String::new();
+            for f in d.files() {
+                dump(&d, f, &mut text);
+            }
+            typed += text
+                .lines()
+                .filter(|l| l.trim_start().starts_with("element behav "))
+                .filter(|l| typed_read(l))
+                .count();
+        }
+        assert!(
+            typed > 10,
+            "{typed} behavioural sources read a typed parameter"
+        );
+    }
+
+    /// Whether `line` holds `to_real(name)` or `to_int(name)` of a bare name: a typed
+    /// parameter read.
+    fn typed_read(line: &str) -> bool {
+        ["to_real(", "to_int("].iter().any(|call| {
+            line.match_indices(call).any(|(at, _)| {
+                let rest = &line[at + call.len()..];
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .collect();
+                !name.is_empty()
+                    && !name.starts_with(|c: char| c.is_ascii_digit())
+                    && rest[name.len()..].starts_with(')')
+            })
+        })
+    }
+
     /// A28 item 5: under `Params::TypedOnly` every generated element has an empty instance
     /// parameter list and every model an empty parameter list, over the full feature set, and the
     /// designs still check clean (oracle: the rows themselves and `check`).
