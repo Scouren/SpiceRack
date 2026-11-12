@@ -69,12 +69,11 @@ pub mod feature;
 pub mod form;
 #[cfg(any(test, feature = "gen"))]
 mod gen_expr;
-#[cfg(any(test, feature = "gen"))]
-mod gen_rows;
 pub mod id;
 pub mod item;
 pub mod item_facts;
 mod item_facts_defs;
+mod item_facts_scopes;
 pub mod item_text;
 pub mod link;
 pub mod literal;
