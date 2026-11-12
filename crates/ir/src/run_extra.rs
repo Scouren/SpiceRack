@@ -161,8 +161,6 @@ pub enum RunExtra {
     LoopModelParam,
     /// A loop over an option.
     LoopOption,
-    /// An alter of temperature.
-    AlterTemp,
     /// An alter of a parameter.
     AlterParam,
     /// An alter of a subcircuit's parameter default.
@@ -175,8 +173,6 @@ pub enum RunExtra {
     AlterDeviceParam,
     /// An alter of a model parameter.
     AlterModelParam,
-    /// An alter of an option.
-    AlterOption,
     /// An alter to a string value (VACASK `type="dc"`).
     AlterString,
     /// A loop, alter or DC target inside a subcircuit instance (`path` non-empty).
@@ -335,11 +331,29 @@ pub enum RunExtra {
     /// An autonomous PSS whose oscillator reference node is not ground (`Pss::osc_n`; ngspice's
     /// `.pss` names one node only; A24).
     PssOscDiff,
+    /// A reset of the values class (`Restorable::Values`; ngspice `reset`; A27).
+    ResetValues,
+    /// A reset of the options class (`Restorable::Options`).
+    ResetOptions,
+    /// A reset of the temperature (`Restorable::Temp`).
+    ResetTemp,
+    /// A reset of the nominal temperature (`Restorable::Tnom`).
+    ResetTnom,
+    /// A reset of the saves (`Restorable::Saves`; VACASK `clear saves`).
+    ResetSaves,
+    /// A save that holds from where it stands (`Save::holds` `FromHere`: VACASK `save`, an
+    /// ngspice script `save`; A27).
+    SaveFromHere,
+    /// A save that holds for the whole run (`Save::holds` `WholeRun`: a `.save` card).
+    SaveWholeRun,
+    /// A `FromHere` save after a run item in listed order (a `WholeRun` one there is
+    /// `WholeRunMidRun`).
+    SaveMidRun,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 151] = [
+    pub const ALL: [RunExtra; 157] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -412,14 +426,12 @@ impl RunExtra {
         RunExtra::LoopDeviceParam,
         RunExtra::LoopModelParam,
         RunExtra::LoopOption,
-        RunExtra::AlterTemp,
         RunExtra::AlterParam,
         RunExtra::AlterSubcktParam,
         RunExtra::AlterSourceDc,
         RunExtra::AlterElementValue,
         RunExtra::AlterDeviceParam,
         RunExtra::AlterModelParam,
-        RunExtra::AlterOption,
         RunExtra::AlterString,
         RunExtra::TargetInInstance,
         RunExtra::McSeed,
@@ -491,6 +503,14 @@ impl RunExtra {
         RunExtra::IcBeyondNext,
         RunExtra::SaveAnalysisSet,
         RunExtra::PssOscDiff,
+        RunExtra::ResetValues,
+        RunExtra::ResetOptions,
+        RunExtra::ResetTemp,
+        RunExtra::ResetTnom,
+        RunExtra::ResetSaves,
+        RunExtra::SaveFromHere,
+        RunExtra::SaveWholeRun,
+        RunExtra::SaveMidRun,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

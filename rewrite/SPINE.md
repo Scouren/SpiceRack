@@ -118,9 +118,17 @@ header. `mod.rs` chains the four in `GROUPS`.
 
 **Order is meaning.** `legalize` loops: the features the design uses and the target lacks;
 every pass in `GROUPS` order, then the group's own order, that removes one of them and whose
-`requires` the target has, runs (the first such pass per feature per round), then `ir::check`;
+`requires` are legal for the target, runs (the first such pass per feature per round), then `ir::check`;
 repeat until nothing is missing or a round changes nothing (bounded by the pass count + 1,
-asserted). Then `ir::check_legal` reports what is left: one `U0001` row per item that carries
+asserted). A feature is legal for the target (A32, `passes::legal`) when the target has it, or
+a registered pass removes it and that pass's `requires` are legal in turn: the least fixed
+point, computed once per call, so a chain (`round_half_even_to_away` then
+`round_half_away_to_floor`) runs for a target with neither rounding, an inverse pair
+(`powabs_to_pow`, `pow_to_powabs`) supports nothing for a target with neither, and a chain whose
+last link the target cannot take runs nothing (no half-converted design). The bound holds: each
+link of a chain is one pass, the fixed point admits no cycle, so the missing set settles within
+one round per link. P3 is unchanged: a pass still states every feature its output adds. Then
+`ir::check_legal` reports what is left: one `U0001` row per item that carries
 a feature. A pass may produce input for the passes after it, never rely on one after it:
 `structure` first (every other pass walks the scopes, names and definitions it settles), then
 `expr` (wave and run passes read fields it has substituted, such as the transient leaves), then

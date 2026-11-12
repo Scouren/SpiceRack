@@ -404,6 +404,19 @@ listed in a `Subckt` body whose value is a constant (no parameter read, no `$tno
 `Constant`; VACASK reads it as a formal). The generator lists no `Param` in a subcircuit body
 unless the set has it.
 
+**A28 (2026-11-12): forms of bodies and draws; dead scopes (R50, R51).** A function body has no
+evaluator of its own: it counts its functions, operators and draws in the forms of the roots
+that call it, transitively through calls; a body nothing calls counts static, one called from
+both counts in both (`Form::Both`, which `root_form` answers for such a body and
+`rewrite_exprs_in` never rewrites). The body's field still may read the circuit (the probe
+rule); its form is a separate fact. The forms are computed once per design state beside the
+class table (`Design::forms`, cleared with it through `Design::derived_changed`; `form.rs`). A
+draw's distribution is two features by form (`Dist`, `DistDyn`). `check` walks the live scopes
+only: a file's top and the bodies of items listed in a live scope, so a body a pass dropped is
+dead, not wrong. The generator builds a function body from operators its set allows in both
+forms. Property (`form_tests`): inlining every call adds no feature, whenever no inlined call
+drops an argument of class `Temp` or above (one that does changes its caller's form).
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

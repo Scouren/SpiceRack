@@ -178,6 +178,15 @@ Each line: question → choice → why.
     VACASK seeds failed on id order alone (vacask-plan's finding). Request for ir-kernel: an
     order-insensitive `eq_meaning`, or the normal form as a kernel function, then this goes.
 
+40. A32 → `passes::legal(passes, target)`, the least fixed point of "in the target, or removed by a
+    pass whose `requires` are legal", computed once per `legalize`; a pass runs when its
+    `requires` are legal. `legalize` is `legalize_with(registry)`, the tests drive stubs (a
+    comment → global → param chain; an inverse pair; a chain the target cannot finish). Planted:
+    `requires ⊆ target` again turns the chain test red.
+41. A28 in the laws → the generated laws and the reach list run under both `ir::gen::Params`
+    (`Untyped`, `TypedOnly`; `cases()`), the reach list over their union; the failure text names
+    the setting. The `ScopeOwner` workaround is gone (kernel 7100faa1: check walks live scopes).
+
 ## Requests (ruled by the lead)
 
 1. Strict code: the spine's own (`S0101`). Done.
