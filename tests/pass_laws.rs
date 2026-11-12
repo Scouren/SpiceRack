@@ -68,6 +68,12 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// A pass's own generation set, for a feature the generator does not reach over every feature
+/// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
+/// comes from the pass's row (its `removes`, the kinds that hold it, `Expr(Num)`, without the
+/// competing features), as the IR owner who knows the generator states it; (pass name, set).
+const GEN_SETS: &[(&str, ir::FeatureSet)] = &[];
+
 /// The leaky self-test pass's note code.
 const LEAKY: ir::Code = ir::Code::new(b'U', 399);
 
@@ -221,19 +227,26 @@ fn laws(name: &str, law: impl Fn(&Pass) -> Result<(), String>) {
     );
 }
 
-/// `law` on every generated design that uses `pass.removes`; an error when none does.
+/// `law` on every generated design that uses `pass.removes`, over every feature and then over
+/// the pass's own [`GEN_SETS`] set if it has one; an error when none does.
 fn each_with(
     pass: &Pass,
     law: impl Fn(u64, ir::Design) -> Result<(), String>,
 ) -> Result<(), String> {
     let mut ran = 0;
-    for seed in SEEDS {
-        let design = generate(seed, &ir::FeatureSet::ALL, SIZE);
-        if !ir::features_used(&design).contains(pass.removes) {
-            continue;
+    let own = GEN_SETS
+        .iter()
+        .find(|(name, _)| *name == pass.name)
+        .map(|(_, set)| *set);
+    for set in std::iter::once(ir::FeatureSet::ALL).chain(own) {
+        for seed in SEEDS {
+            let design = generate(seed, &set, SIZE);
+            if !ir::features_used(&design).contains(pass.removes) {
+                continue;
+            }
+            ran += 1;
+            law(seed, design)?;
         }
-        ran += 1;
-        law(seed, design)?;
     }
     ran_on(ran)
 }
@@ -266,8 +279,10 @@ fn p2_on(pass: &Pass) -> Result<(), String> {
         let mut diags = ir::Diags::new();
         (pass.run)(&mut design, &mut diags);
         for item in carrying(&design, pass.removes) {
-            // A design-level feature (`check_legal` reports it at no item, e.g. a state item
-            // mid-run) is noted by any note of the pass, at whichever items the pass names.
+            // interim, until `check_legal` reports the run owner's design-level features at
+            // their items (ir-run `feature_items`, the kernel's switch): a feature reported at
+            // no item is noted by any note of the pass. Remove with that hash: P2 by item then
+            // covers them.
             let design_level = item.index == u32::MAX;
             let noted = diags
                 .rows()

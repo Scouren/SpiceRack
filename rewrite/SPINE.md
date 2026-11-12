@@ -152,7 +152,11 @@ clean after it (so a pass that drops a defining item through `items_mut` instead
 pass at it, every other has lost it (a feature `check_legal` reports at no item, design-level, is noted by any note of the pass); P3 the output uses nothing outside the input's features
 plus `requires`; P4 running it twice equals running it once (IR text equal); P5 on a design
 without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
-simulator on both forms) is each pass's own test.
+simulator on both forms) is each pass's own test. A pass whose feature the generator does not
+reach over every feature (a competing feature always wins) gets its own generation set in the
+laws' `GEN_SETS` (pass name, set: its `removes`, the kinds that hold it, `Expr(Num)`, without the
+competing features, as the IR owner of the generator states it); the laws then also run on
+`generate(seed, set)`.
 
 **Files and rows.** A pass registry row is one `Pass`; a rule whose rows share their code (12
 rows for `fold_constant_bitops`, one per operator; two for `substitute_tran_leaves`, `TStep` and
