@@ -94,7 +94,7 @@ frequencies in hertz, phases in degrees.
 | `Pulse` | `v1 v2 delay rise fall width period cycles law given_zero` | `cycles` above 0 is a count, `NONE` or any other value unlimited (A17); a zero `rise` under `AsGiven` is an ideal edge (5.04, 5.05); `law: PulseLaw::{Spice, Vacask}` (A12 C1: VACASK needs `rise > 0`, `fall <= 0` is no falling edge, `period <= 0` one pulse) |
 | `Sin` | `offset amplitude freq delay damping phase_deg cycles pre given_zero` | `phase_deg` is the phase at `t = delay`; `pre` says what the source is before the delay: ngspice `HoldDelayValue` (A17, from `vsrcload.c`); Xyce and HSPICE as their slices confirm (5.06, 5.07) |
 | `Exp` | `v1 v2 td1 tau1 td2 tau2 td2_from given_zero` | `td2` counts from `td2_from: TdFrom::{Zero, Td1}` (A12 C2: SPICE from 0, VACASK from `td1`; the reader no longer adds) (5.08) |
-| `Pwl` | `points` (t, v pairs, absolute times), `delay`, `repeat_from`, `repeat_join` | relative times are accumulated by the reader; a deck with no `t = 0` point gets the one its simulator implies (HSPICE ramps from the DC value, ngspice holds the first value: the reader writes the point) (5.09–5.11) |
+| `Pwl` | `points` (t, v pairs, absolute times), `delay`, `repeat_from`, `repeat_join` | relative times are accumulated by the reader; before the first point the first value holds, after the last the last value, unless `repeat` says otherwise; no reader writes a point (A22, R42: it would repeat an operand and give two t = 0 points when the first time evaluates to 0); a simulator with another rule before the first point gets a mode member when its slice shows it (none today); `PwlJoin::Extrapolate` (VACASK `period=`): on [xN, period) and on [0, x1) of the wrapped time τ, the line through (xN, yN) and (period + x1, y1) evaluated at τ itself (VACASK 36be560, `src_pwl.sim`: (1u, 1) (2u, 3) with period 4u gives 4.333 at 0, 3.833 at 0.75u, 1 at 1u, 2.667 at 2.5u, 1.733 at 3.9u, 4.267 at 4.1u; (0, 0) (1u, 1) with period 2u gives 0.5 at 1.5u and 3.5u; a delay shifts τ and the operating point reads the line at τ = 0; VACASK refuses x1 = 0 with xN = period and y1 ≠ yN, and xN > period: its writer's refusals) (5.09–5.11) |
 | `Sffm` | `offset amplitude carrier_freq mod_index signal_freq delay phase_c_deg phase_m_deg law pre given_zero` | named, never positional; `law` as §1 states the clamp and the defaults only; what it is before the delay is `pre: PreDelay` as for `Sin` and `Am` (A12 C3: VACASK holds its value at `delay`, ngspice is 0 for t ≤ delay, the delay included) (5.01, 5.02) |
 | `Am` | the general formula of 5.03 with every term a field, `pre` | each dialect's AM is a restriction of it |
 | `TrNoise`, `TrRandom` | ngspice's fields | time domain only, superposed on a given DC value; a `TrRandom` before its first draw and at the operating point is its offset (A17) |
@@ -166,6 +166,21 @@ Ref }`.
 - `ModelFamily::Mesa` (A15 C3): ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet` levels 2 to 4,
   `inpdomod.c`); the level is a parameter of the device.
 
+## 3a. Invariants every simulator holds (AMEND-A12 A19, R38)
+
+`check` reports `FieldDomain` (the generator never makes one): a passive with no value and no
+model; `ac` on a capacitor or inductor; `noisy == false` on a capacitor or inductor whose value
+does not read the circuit; an instance parameter whose key names one of the row's own typed
+fields (`circuit_check::typed_key`: the detail row's IR field names from the field table, `m`
+and `mult`, and `temp` where the row has `temp_abs`; a kind without a detail row, such as a
+subcircuit instance with a declared `m`, has none); a model parameter `level`, `type` or
+`version` on a family that fixes it (all but `Other`, `Module`, `CodeModel`, and `level` on
+`Mesa`); a lossless line outside `Line`'s forms (no `z0`; not exactly one of `td`,
+`freq`+`nl`, `length`+`vel`; half of a pair); a `version` on a family with one version everywhere
+(`circuit_check::versioned`). A model value that reads the circuit is the kernel's
+`ProbeContext` (model values are fields constant in time). "Reads the circuit" is
+`expr_class == Circuit` (A11): through a parameter or user function too.
+
 ## 4a. Device libraries (`library.rs`, AMEND-A12 C5, R17)
 
 `ItemKind::DeviceLibrary` with row `DeviceLibrary { family: ModelFamily, path: NameId }`: the
@@ -189,9 +204,14 @@ only its builtin (a coupling may also name a core, and a coupling bound to `Mutu
 `CouplingCore`); a builtin model has no parameters and no polarity. A builtin family needs no
 `DeviceLibrary`, so it never sets `ModelWithoutLibrary` (confirmed by the VACASK agent: the builtins `vsource isource vcvs vccs ccvs cccs mutual` need a
 `model` line and no `load`, VD cir-loading, run n2; VACASK has no port module and its `b` source
-takes no model, VD dev-builtin-behavioral; model names are the deck's choice). Features: `ElementWithoutModel`
-(an element with no master: VACASK lacks it) and `BuiltinMaster` (a source or linear controlled
-source naming a model, or a coupling bound to `Mutual`: ngspice lacks it). The two conversions
+takes no model, VD dev-builtin-behavioral; model names are the deck's choice). The ideal transmission line (A20, R39) is one more builtin: `ModelFamily::TlineIdeal`
+(VACASK `tline_ideal`, a loaded OSDI module), parameterless and without polarity, the optional
+master of a `LosslessLine` (`master_kind` says so; `check` accepts only that family). Unlike
+the others a target may need a `DeviceLibrary` for it, so it is not exempt from
+`ModelWithoutLibrary` (`circuit_tables::library_free`). Features: `ElementWithoutModel`
+(an element with no master: VACASK lacks it) and `BuiltinMaster` (a source, linear controlled
+source or lossless line naming a model, or a coupling bound to `Mutual`: ngspice lacks it; its
+T card names none). The two conversions
 are the dialect slices' neutral passes (`src/passes/`), not this crate's; the rule they follow:
 one model per scope and family, in the scope that first needs it, named by the family's
 IR-text word (`source_v`, `vcvs`, …) and renamed on a collision; the reverse pass drops the

@@ -13,10 +13,11 @@ use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, Variations};
 use spicerack_ir::stats::Correlation;
 use spicerack_ir::tran::{StepCap, Tran};
 use spicerack_ir::{
-    AcPart, Alter, Analysis, AnalysisKind, Applies, Builder, DefKind, Design, Edge, Env, Event,
-    ExprId, IcScope, ItemKind, ItemRef, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind,
-    NodeSet, NodeSetKind, OptionKey, OptionRow, Print, PrintView, ProbeKind, Ref, Role, Save,
-    ScopeId, ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary, VaryDist,
+    AcPart, Alter, Analysis, AnalysisKind, AnalysisKinds, Applies, Builder, DefKind, Design, Edge,
+    Env, Event, ExprId, IcScope, ItemKind, ItemRef, List, Loop, LoopEnd, LoopKind, Measure,
+    MeasureKind, NameId, NodeSet, NodeSetKind, OptionKey, OptionRow, Print, PrintView, ProbeKind,
+    Ref, Role, Save, ScopeId, ScopeKind, Span, Statistics, SweepSpec, Target, TargetKind, Vary,
+    VaryDist,
 };
 
 // ---- private ----
@@ -57,6 +58,7 @@ fn pools_give_back_what_was_appended() {
     let axes_in = [DcAxis {
         target: t[1],
         sweep,
+        name: b.name("sw1"),
     }];
     let axes = b.dc_axes(&axes_in);
     let spread = b.num(0.1);
@@ -320,14 +322,19 @@ fn outputs_hold_their_probes() {
         b.probe_v(&["out"]),
         b.probe_i(&["v1"]).with_part(AcPart::Mag),
     ];
-    let all = b.save(top, None, &p, Span::NONE);
-    let tr = b.save(top, Some(AnalysisKind::Tran), &p[..1], Span::NONE);
+    let all = b.save(top, AnalysisKinds::ALL, &p, Span::NONE);
+    let tr = b.save(
+        top,
+        AnalysisKinds::of(&[AnalysisKind::Tran]),
+        &p[..1],
+        Span::NONE,
+    );
     let pr = b.print(top, AnalysisKind::Hb, PrintView::HbTime, &p, Span::NONE);
     let s: Save = d.row(all.index);
-    assert!(s.every_analysis);
+    assert_eq!(s.analyses, AnalysisKinds::ALL);
     assert_eq!(d.probes(s.probes), &p);
     let s: Save = d.row(tr.index);
-    assert_eq!((s.every_analysis, s.analysis), (false, AnalysisKind::Tran));
+    assert_eq!(s.analyses.iter().collect::<Vec<_>>(), [AnalysisKind::Tran]);
     let q: Print = d.row(pr.index);
     assert_eq!((q.analysis, q.view), (AnalysisKind::Hb, PrintView::HbTime));
     assert_eq!(d.probes(q.probes), &p);
@@ -337,7 +344,27 @@ fn outputs_hold_their_probes() {
 #[should_panic(expected = "no probe")]
 fn a_save_of_nothing_asserts() {
     let (mut d, top) = deck();
-    d.builder().save(top, None, &[], Span::NONE);
+    d.builder().save(top, AnalysisKinds::ALL, &[], Span::NONE);
+}
+
+#[test]
+#[should_panic(expected = "no analysis")]
+fn a_save_for_no_analysis_asserts() {
+    let (mut d, top) = deck();
+    let mut b = d.builder();
+    let p = b.probe_v(&["out"]);
+    b.save(top, AnalysisKinds::EMPTY, &[p], Span::NONE);
+}
+
+#[test]
+fn an_analysis_kind_set_holds_its_members_in_declaration_order() {
+    use AnalysisKind::{Ac, Dc, Op, Tran};
+    let s = AnalysisKinds::of(&[Tran, Op, Dc, Op]);
+    assert_eq!(s.iter().collect::<Vec<_>>(), [Op, Dc, Tran]);
+    assert_eq!((s.len(), s.contains(Ac), s.contains(Dc)), (3, false, true));
+    assert_eq!(AnalysisKinds::ALL.len() as usize, AnalysisKind::COUNT);
+    assert_eq!(AnalysisKinds::of(&AnalysisKind::ALL), AnalysisKinds::ALL);
+    assert!(AnalysisKinds::EMPTY.is_empty() && AnalysisKinds::EMPTY.iter().next().is_none());
 }
 
 #[test]
@@ -423,7 +450,11 @@ fn statistics_and_dc_hold_their_lists() {
     let st = b.statistics(top, row, Span::NONE);
     let sweep = SweepSpec::dec(b.num(1.0), b.num(1e3), b.num(10.0));
     let src = b.target(TargetKind::SourceDc, &[], "v1", None);
-    let axes = b.dc_axes(&[DcAxis { target: src, sweep }]);
+    let axes = b.dc_axes(&[DcAxis {
+        target: src,
+        sweep,
+        name: NameId::NONE,
+    }]);
     let dc = b.analysis(
         top,
         None,

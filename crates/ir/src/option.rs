@@ -30,14 +30,15 @@
 //!
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
 //! `pub enum Applies`, `pub enum NodeSetKind`, `pub enum IcScope`; on each enum: `ALL`, `COUNT`; `RowFacts` for
-//! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`)
+//! `OptionRow`, `Env` and `NodeSet` (where state items stand: `state_order.rs`); crate:
+//! `pub(crate) fn gen_nfreqs`
 
 use crate::analysis_facts::report;
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
@@ -75,10 +76,12 @@ pub struct OptionRow {
     pub holds: Applies,
 }
 
-/// The circuit temperature and the nominal temperature, °C. An `Env` sets what it names (A14):
-/// either may be `NONE`, not both (checked). A reader fills its simulator's defaults into the
-/// deck's first `Env` (HSPICE 25/25, the others 27/27), so every run sees both; a change
-/// between runs is an `Alter` of `Target::TEMP` or a `FromHere` `Env`.
+/// The circuit temperature and the nominal temperature, °C. An `Env` sets what it names (A14,
+/// R24): either may be `NONE`, not both (checked), and each source card is its own item (a
+/// `.temp` card is an `Env` naming `temp`). What a run sees where no `Env` names one is the
+/// simulator's default (HSPICE 25/25, the others 27/27); a reader that must state it adds its
+/// own `Env` for it. A change between runs is an `Alter` of `Target::TEMP` or a `FromHere`
+/// `Env`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Env {
     /// The circuit temperature, or `NONE` when this item does not set it. May be an expression
@@ -191,11 +194,22 @@ impl RowFacts for OptionRow {
         ]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: OptionRow = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        holds_feature(self.holds, set);
         *set = set.with(Feature::Option(self.key));
         // `OptionMidRun` and `WholeRunMidRun` are facts of the listed order: `state_order_features`.
     }
@@ -258,6 +272,9 @@ impl RowFacts for OptionRow {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -309,11 +326,23 @@ impl RowFacts for Env {
         out.extend([Handle::Expr(self.temp), Handle::Expr(self.tnom)]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: Env = design.row(at.index);
+        f(&mut row.temp, ExprUse::Constant);
+        f(&mut row.tnom, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        holds_feature(self.holds, set);
         // placement is the kernel's `Placed` (A15 K1)
     }
 
@@ -350,6 +379,9 @@ impl RowFacts for Env {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
@@ -381,11 +413,22 @@ impl RowFacts for NodeSet {
         ]);
     }
 
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        let mut row: NodeSet = design.row(at.index);
+        f(&mut row.value, ExprUse::Constant);
+        design.editor().set(at.index, row);
+    }
+
     fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         let _ = (design, at, f); // no reference
     }
 
+    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
+        // no reference field
+    }
+
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        holds_feature(self.holds, set);
         let held = self.kind != NodeSetKind::Nodeset;
         flag(
             set,
@@ -393,6 +436,7 @@ impl RowFacts for NodeSet {
             RunExtra::IcEveryOp,
         );
         flag(set, self.next_only, RunExtra::IcNextOnly);
+        flag(set, !self.next_only, RunExtra::IcBeyondNext);
         flag(set, self.reference.len > 0, RunExtra::IcDifferential);
         flag(
             set,
@@ -463,8 +507,18 @@ impl RowFacts for NodeSet {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !crate::state_order::run_append_ok(b.design(), scope, features) {
+            return ItemRef::NONE; // no `RunInterleaved` outside the set (A22)
+        }
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
+        let (next, beyond) = (
+            has(features, RunExtra::IcNextOnly),
+            has(features, RunExtra::IcBeyondNext),
+        );
+        if !next && !beyond {
+            return ItemRef::NONE;
         }
         let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun) else {
             return ItemRef::NONE;
@@ -481,7 +535,7 @@ impl RowFacts for NodeSet {
         } else {
             IcScope::Transient
         };
-        let next_only = has(features, RunExtra::IcNextOnly) && g.chance(3);
+        let next_only = next && (!beyond || g.chance(3));
         let all =
             kind == NodeSetKind::Nodeset && has(features, RunExtra::NodesetAll) && g.chance(3);
         let node = if all {
@@ -513,6 +567,38 @@ impl RowFacts for NodeSet {
     }
 }
 
+/// Pushes an `nfreqs` option into `scope` for a Fourier analysis about to follow it (its count
+/// then comes from the option, A16), when the set allows one there. Whether it pushed.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_nfreqs(
+    g: &mut Gen,
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+) -> bool {
+    let allowed = features.contains(Feature::Item(crate::item::ItemKind::Option))
+        && features.contains(Feature::Option(OptionKey::NFreqs))
+        && crate::r#gen::placeable(b.design(), scope, crate::item::ItemKind::Option, features)
+        && g.items_left > 1;
+    let Some(holds) = allowed
+        .then(|| gen_holds(g, b, scope, features, RunExtra::OptionMidRun))
+        .flatten()
+    else {
+        return false;
+    };
+    let value = g.expr(b, features, Reads::Constant);
+    let row = OptionRow {
+        key: OptionKey::NFreqs,
+        private: NameId::NONE,
+        dialect: NameId::NONE,
+        value,
+        holds,
+    };
+    b.push(scope, row, Span::NONE);
+    g.items_left -= 1;
+    true
+}
+
 // ---- private ----
 
 /// `whole_run` when it is the next word.
@@ -542,8 +628,21 @@ fn gen_holds(
         (Applies::WholeRun, RunExtra::WholeRunMidRun),
     ]
     .into_iter()
-    .filter(|&(_, x)| !after || has(features, x))
+    .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode_feature(m)))
     .map(|(m, _)| m)
     .collect();
     (!modes.is_empty()).then(|| modes[g.below(modes.len() as u32) as usize])
+}
+
+/// Adds the feature of a state item's mode (`StateFromHere`, `StateWholeRun`).
+fn holds_feature(holds: Applies, set: &mut FeatureSet) {
+    flag(set, true, mode_feature(holds));
+}
+
+/// The feature of each `Applies` member.
+const fn mode_feature(holds: Applies) -> RunExtra {
+    match holds {
+        Applies::FromHere => RunExtra::StateFromHere,
+        Applies::WholeRun => RunExtra::StateWholeRun,
+    }
 }

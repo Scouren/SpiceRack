@@ -105,7 +105,8 @@ pub struct Passive {
     pub parasitics: u32,
     /// When `ic` applies; `IcMode::None` exactly when `ic` is `NONE`.
     pub ic_mode: IcMode,
-    /// Whether the element adds its thermal noise. `false` for lt `noiseless`, ng `noisy=0`,
+    /// Whether the element adds its thermal noise; `false` only on a resistor or a
+    /// circuit-valued element, the rows that have thermal noise to switch off (A19). `false` for lt `noiseless`, ng `noisy=0`,
     /// sp `isnoisy=no`, hs `NOISE=0`, and for an ngspice behavioural R/C/L without `noisy=1`
     /// (6.14). Evidence: D82, 6.17.
     pub noisy: bool,
