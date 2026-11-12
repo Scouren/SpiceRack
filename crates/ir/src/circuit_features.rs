@@ -9,7 +9,7 @@
 //!
 //! Contents (crate-private): `pub(crate) fn element_features`, `pub(crate) fn model_features`,
 //! `pub(crate) fn reads_circuit`, `pub(crate) fn dc_at_zero`, `pub(crate) fn library_features`,
-//! `pub(crate) fn mult_class`
+//! (`mult_class` and `voltage_output`: `circuit_tables.rs`)
 
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_tables::{bound_family, library_free};
@@ -72,7 +72,10 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     if some(e.mult) {
         add(match e.mult_law {
             MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
-            MultLaw::Parallel => mult_class(e.kind),
+            MultLaw::Parallel => crate::circuit_tables::mult_class(
+                e.kind,
+                crate::circuit_tables::voltage_output(design, e),
+            ),
         });
     }
     match e.kind.detail() {
@@ -263,43 +266,6 @@ pub(crate) fn library_features(design: &Design, set: &mut FeatureSet) {
     });
     if missing {
         *set = set.with(Feature::Circuit(X::ModelWithoutLibrary));
-    }
-}
-
-/// The multiplicity member of a kind's class.
-pub(crate) fn mult_class(kind: ElemKind) -> X {
-    use ElemKind as E;
-    match kind {
-        E::Resistor => X::MultResistor,
-        E::Capacitor => X::MultCapacitor,
-        E::Inductor => X::MultInductor,
-        E::VSource => X::MultVSource,
-        E::ISource => X::MultISource,
-        E::Vcvs
-        | E::Vccs
-        | E::Cccs
-        | E::Ccvs
-        | E::Poly
-        | E::Table
-        | E::Behav
-        | E::Laplace
-        | E::FreqTable
-        | E::Delay => X::MultControlled,
-        E::Diode | E::Bjt | E::Mosfet | E::Jfet | E::Mesfet | E::Igbt => X::MultSemi,
-        E::Instance => X::MultInstanceParallel, // the law's own member: `element_features`
-        E::CodeModel | E::ModuleModel | E::Module => X::MultModule,
-        E::ChargeCapacitor
-        | E::FluxInductor
-        | E::Coupling
-        | E::Port
-        | E::VSwitch
-        | E::ISwitch
-        | E::LosslessLine
-        | E::LossyLine
-        | E::RcLine
-        | E::SingleLossyLine
-        | E::CoupledLines
-        | E::Unresolved => X::MultOther,
     }
 }
 

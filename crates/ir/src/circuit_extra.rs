@@ -25,8 +25,16 @@ pub enum CircuitExtra {
     MultVSource,
     /// `mult` on a current source (Xyce ignores it, 5.16).
     MultISource,
-    /// `mult` on a controlled source (linear, `Poly`, `Table`, `Behav`, `Laplace`, `FreqTable`, `Delay`).
-    MultControlled,
+    /// `mult` on a controlled source with a current output (`Vccs`, `Cccs`, a current `Poly`,
+    /// `Table`, `Laplace` or `FreqTable`, a `Behav` of any output but a voltage): parallel
+    /// copies. R58's evidence: ngspice holds it (G, F, a current B take `m`) and lacks
+    /// `MultControlledVoltage` (its writer's admit refuses `m` on E, H, a voltage POLY, table
+    /// or B: ngspice's `m` multiplies a voltage, `controlled.rs` runs); VACASK holds both
+    /// (`$mfactor`).
+    MultControlledCurrent,
+    /// `mult` on a controlled source with a voltage output (`Vcvs`, `Ccvs`, `Delay`, a voltage
+    /// `Poly`, `Table`, `Laplace`, `FreqTable` or `Behav`). `MultControlledCurrent`'s split.
+    MultControlledVoltage,
     /// `mult` on a diode, BJT, MOSFET, JFET, MESFET or IGBT.
     MultSemi,
     /// `mult` on a subcircuit instance under `MultLaw::Parallel` (ESPice ignores it, B10, 6.01).
@@ -264,13 +272,14 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 108] = [
+    pub const ALL: [CircuitExtra; 109] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
         CircuitExtra::MultVSource,
         CircuitExtra::MultISource,
-        CircuitExtra::MultControlled,
+        CircuitExtra::MultControlledCurrent,
+        CircuitExtra::MultControlledVoltage,
         CircuitExtra::MultSemi,
         CircuitExtra::MultInstanceParallel,
         CircuitExtra::MultInstanceNgspiceAppend,

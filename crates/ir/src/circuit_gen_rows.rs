@@ -5,7 +5,7 @@
 //!
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator, round trip); `circuit_gen.rs`.
 //!
-//! Contents: `R::passive`, `R::source`, `R::behav`, `R::line` (`pub(super)`),
+//! Contents: `R::passive`, `R::source`, `R::behav_output`, `R::behav`, `R::line` (`pub(super)`),
 //! `pub(crate) fn generate_library` (re-exported by `circuit_gen`)
 
 use super::{N, R};
@@ -248,6 +248,20 @@ impl R<'_, '_> {
         }
     }
 
+    /// A behavioural source's output, as the set allows.
+    pub(super) fn behav_output(&mut self) -> OutKind {
+        self.pick(&[
+            (OutKind::Voltage, None),
+            (OutKind::Current, None),
+            (OutKind::Resistance, Some(X::BehavResistance)),
+            (OutKind::Conductance, Some(X::BehavConductance)),
+            (OutKind::Capacitance, Some(X::BehavCapacitance)),
+            (OutKind::CapacitanceCharge, Some(X::BehavCapacitanceCharge)),
+            (OutKind::Inductance, Some(X::BehavInductance)),
+            (OutKind::Power, Some(X::BehavPower)),
+        ])
+    }
+
     pub(super) fn behav(&mut self, kind: ElemKind) -> Behav {
         // A33: without `BehavUntypedParam` a behavioural source's parameter reads are typed
         // (`ToReal`/`ToInt` built at the leaf, or none when the set has neither)
@@ -286,16 +300,10 @@ impl R<'_, '_> {
         let output = match kind {
             ElemKind::ChargeCapacitor => OutKind::Charge,
             ElemKind::FluxInductor => OutKind::Flux,
-            _ => self.pick(&[
-                (OutKind::Voltage, None),
-                (OutKind::Current, None),
-                (OutKind::Resistance, Some(X::BehavResistance)),
-                (OutKind::Conductance, Some(X::BehavConductance)),
-                (OutKind::Capacitance, Some(X::BehavCapacitance)),
-                (OutKind::CapacitanceCharge, Some(X::BehavCapacitanceCharge)),
-                (OutKind::Inductance, Some(X::BehavInductance)),
-                (OutKind::Power, Some(X::BehavPower)),
-            ]),
+            // drawn with the header: it fixes the multiplier's member (R58)
+            _ => self
+                .behav_out
+                .expect("a behavioural source's output is drawn first"),
         };
         Behav {
             expr,
