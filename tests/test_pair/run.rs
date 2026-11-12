@@ -76,17 +76,24 @@ pub type Written = Vec<(String, String)>;
 pub const JOBS: usize = 8;
 
 /// What the spine made of one deck: the legalized design, the written files, the rename map
-/// (new name → source name, lower case) and the names of its devices (every element but a
-/// subcircuit instance, under both names, lower case).
+/// (new name → source name, lower case), the names of its devices (every element but a
+/// subcircuit instance, under both names, lower case) and the statement names the target cannot
+/// spell (`NAME_DROPPED`, lower case: a DC axis's is its swept vector in VACASK's output).
 struct Spine {
     legal: ir::Design,
     files: Written,
     renames: HashMap<String, String>,
     devices: BTreeSet<String>,
+    axes: BTreeSet<String>,
 }
 
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
+
+/// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
+/// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
+/// each axis, which VACASK writes as the axis's swept vector.
+const NAME_DROPPED: ir::Code = ir::Code::new(b'U', 407);
 
 /// `name_with_letter`'s note at a renamed element, `arg` the old name (the pass's `RENAMED`,
 /// `src/passes/structure/name_with_letter.rs`; the passes are not public items).
@@ -179,7 +186,7 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         }
         Ok(()) => {}
     }
-    if let Err(why) = plots::names(&a, &b, &spine.devices) {
+    if let Err(why) = plots::names(&a, &b, &spine.devices, &spine.axes) {
         fails.insert(5, fail("missing-vector", why));
     }
     Done {
@@ -314,6 +321,11 @@ fn spine(
             (new, design.str(ir::NameId(d.arg)).to_ascii_lowercase())
         })
         .collect();
+    let axes = diags.rows()[read..]
+        .iter()
+        .filter(|d| d.code == NAME_DROPPED)
+        .map(|d| design.str(ir::NameId(d.arg)).to_ascii_lowercase())
+        .collect();
     let files = guard(3, || laws::write_all(&design, to).files().to_vec())?;
     let mut devices = BTreeSet::new();
     for (item, _) in design.reachable() {
@@ -332,6 +344,7 @@ fn spine(
         files,
         renames,
         devices,
+        axes,
     })
 }
 
