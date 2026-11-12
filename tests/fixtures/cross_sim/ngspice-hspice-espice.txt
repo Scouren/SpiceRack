@@ -2531,7 +2531,6 @@ ngspice/tests/bsim3soipd/t3.sp simulator-fails # no raw file .cross_sim_out.raw:
 ngspice/tests/bsim3soipd/t4.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: model 'n1' (nmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/tests/bsim3soipd/t5.sp simulator-fails # no raw file .cross_sim_out.raw: error: m1: model 'n1' (nmos) is not a device this card can use | Error: .cross_sim_deck.sp: UnsupportedDevice
 ngspice/tests/general/diffpair.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # op v(Transfer_function): -87.8474 vs -0.110341 at 0 (tol 1.757e-01)
-ngspice/tests/general/fourbitadder.sp simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=harness # tran v(x1.x1.x1.x7.8): -0.00005005538400863936 leaves the tube at t=0.0000000058977435765459996 (tol 2.996e-6)
 ngspice/tests/general/mosamp.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(20): 6.806149801673942 leaves the tube at t=0.000001245530780694989 (tol 6.835e-2)
 ngspice/tests/hfet/inverter.sp simulator-differs:source reason=S-TARGET-ON-SOURCE proof=harness # tran v(3): -0.2754497983604225 leaves the tube at t=0 (tol 2.757e-3)
 ngspice/tests/mesa/mesa15.sp simulator-fails # no raw file .cross_sim_out.raw: error: z1: unknown instance parameter 'ts' | Error: .cross_sim_deck.sp: UnknownParameter
