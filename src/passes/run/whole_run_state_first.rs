@@ -8,8 +8,9 @@
 //!   `Run(RunInterleaved)`: a moved item may land after a circuit item that follows an earlier
 //!   output item (`run_items_together` removes it). An item not listed in its walk's top scope,
 //!   or a walk whose first run item is not, keeps the feature with `STATE_ELSEWHERE` (a move
-//!   across files or out of a body would change what includes it), and so does a next-only
-//!   node set (it holds for the analysis after it: a move would change which).
+//!   across files or out of a body would change what includes it), a next-only node set (it
+//!   holds for the analysis after it: a move would change which), and an item a kept one of
+//!   the same thing stands before (the move would make the kept one the last).
 //! - `whole_run_to_from_here` removes `Run(StateWholeRun)` and `whole_run_save_to_from_here`
 //!   removes `Run(SaveWholeRun)`: a `WholeRun` option, `Env` or node set (or save) standing before
 //!   every run item becomes `FromHere` (requires `Run(StateFromHere)`, `Run(SaveFromHere)`).
@@ -53,6 +54,7 @@ pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
         };
         let in_place = order[first].1 == top;
         let mut moved = Vec::new();
+        let mut kept: Vec<ir::ItemRef> = Vec::new();
         for &(item, scope) in &order[first + 1..] {
             if holds(design, item) != Some(ir::Applies::WholeRun) {
                 continue;
@@ -60,9 +62,14 @@ pub fn whole_run_state_first(design: &mut ir::Design, diags: &mut ir::Diags) {
             // a next-only condition holds for the analysis after it: a move would change which
             let next_only = item.kind == ir::ItemKind::NodeSet
                 && design.row::<ir::NodeSet>(item.index).next_only;
-            match in_place && scope == top && !next_only {
+            // a move past a kept item of the same thing would change which is the last
+            let past = kept.iter().any(|&k| same_thing(design, k, item));
+            match in_place && scope == top && !next_only && !past {
                 true => moved.push(item),
-                false => diags.push_at(STATE_ELSEWHERE, design, item, 0),
+                false => {
+                    diags.push_at(STATE_ELSEWHERE, design, item, 0);
+                    kept.push(item);
+                }
             }
         }
         if moved.is_empty() {
