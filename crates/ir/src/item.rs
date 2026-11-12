@@ -147,6 +147,10 @@ pub enum OpaqueClass {
     InvalidInSource,
     /// Data-dependent control flow (a script).
     Script,
+    /// Tunes its own simulator's solver (a convergence aid, a step-control knob) and names no
+    /// accuracy target (A12 K3, R19): its own family copies it; another family leaves it out
+    /// with this class's note, since the numbers may move within the solver's tolerance.
+    Hint,
 }
 
 /// What a `Load` brings in.
@@ -363,12 +367,13 @@ impl Role {
 
 impl OpaqueClass {
     /// Every class, in declaration order (the order of the `S` codes).
-    pub const ALL: [OpaqueClass; 5] = [
+    pub const ALL: [OpaqueClass; 6] = [
         OpaqueClass::Unread,
         OpaqueClass::Private,
         OpaqueClass::Inert,
         OpaqueClass::InvalidInSource,
         OpaqueClass::Script,
+        OpaqueClass::Hint,
     ];
     /// Class count.
     pub const COUNT: usize = Self::ALL.len();

@@ -11,15 +11,23 @@
 //! Typed access to a row of any kind is generic over [`ItemRow`] (`design.row::<Subckt>(i)`,
 //! `builder.push(scope, row, span)`, `editor.set(i, row)`): one accessor per kind, written once.
 //!
-//! ```ignore
+//! ```
+//! use spicerack_ir::{Design, Diags, ItemKind, item::Subckt, parse};
+//!
+//! let mut design = Design::new();
+//! let text = "file \"a.sp\" deck\n  subckt div (a b)\n    param k = 1\n";
+//! parse(text, &mut design.builder(), &mut Diags::new());
+//! let mut ports = 0;
 //! for file in design.files() {
 //!     for &item in design.items(design.file(file).top) {
-//!         match item.kind {
-//!             ItemKind::Subckt => { let s: Subckt = design.row(item.index); /* … */ }
-//!             // one arm per kind, no `_` arm
+//!         // a writer matches every kind with no `_` arm; this example reads one
+//!         if item.kind == ItemKind::Subckt {
+//!             let s: Subckt = design.row(item.index);
+//!             ports += design.names(s.ports).len();
 //!         }
 //!     }
 //! }
+//! assert_eq!(ports, 2);
 //! ```
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §4, C3, C4, C5, C13; `REWRITE-PLAN.md` §3.2.
