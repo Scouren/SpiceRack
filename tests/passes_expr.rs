@@ -18,7 +18,9 @@ mod compare;
 
 use spicerack::ir;
 
-use compare::{ANY, code, keeps_boundary_values, keeps_generated_values, notes, typed};
+use compare::{
+    ANY, code, keeps_boundary_values, keeps_generated_values, keeps_values_over, notes, typed,
+};
 
 /// Each rule of the powers, roundings and ternaries: its rows, the texts whose roots it
 /// rewrites (operands `x` and `y`), and the node it removes.
@@ -261,4 +263,115 @@ fn pwl_to_ternary_keeps_every_value_on_drawn_points() {
         points += keeps_boundary_values("pwl_to_ternary", &text, ANY);
     }
     eprintln!("pwl_to_ternary: {points} drawn points");
+}
+
+#[test]
+fn fold_constant_bitops_keeps_every_value() {
+    // oracle: eval_typed of the operator itself on integer literals (both signs, the 2⁵² and
+    // 2⁵³ edges, shifts across 0..64), against the folded literal
+    let ints = [
+        "0",
+        "1",
+        "-1",
+        "2",
+        "3",
+        "-3",
+        "5i",
+        "-6i",
+        "12",
+        "255",
+        "4503599627370495",
+        "4503599627370496",
+        "-4503599627370497",
+        "9007199254740992",
+        "63",
+        "64",
+        "1.5",
+    ];
+    let ops = [
+        ("&", "fold_constant_bitand"),
+        ("|", "fold_constant_bitor"),
+        ("^", "fold_constant_bitxor"),
+        ("<<", "fold_constant_shl"),
+        (">>", "fold_constant_shr"),
+    ];
+    let mut points = 0;
+    for (op, name) in ops {
+        for a in ints {
+            for b in ints {
+                let text =
+                    format!("file \"p.sp\" deck\n  param x = 1\n  param r = ({a} {op} {b}) + x\n");
+                points += keeps_folded(name, &text);
+            }
+        }
+    }
+    for a in ints {
+        let text = format!("file \"p.sp\" deck\n  param x = 1\n  param r = ~{a} + x\n");
+        points += keeps_folded("fold_constant_bitnot", &text);
+    }
+    eprintln!("fold_constant_bitops: {points} folded points");
+    assert!(points > 1000);
+    for (_, name) in ops {
+        let hit = |e| matches!(e, ir::Expr::Binary(o, ..) if format!("{o:?}").starts_with("Bit") || matches!(o, ir::BinOp::Shl | ir::BinOp::Shr));
+        keeps_generated_values(name, hit, false);
+        keeps_generated_values(&format!("{name}_dyn"), hit, false);
+    }
+}
+
+/// The points `name` folded in `text` (0 when it left the operator), each compared.
+fn keeps_folded(name: &str, text: &str) -> usize {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    let before = ir::features_used(&design);
+    let mut copy = design.clone();
+    (compare::pass(name).run)(&mut copy, &mut diags);
+    match ir::features_used(&copy) == before {
+        true => 0,
+        false => keeps_boundary_values(name, text, &[0]),
+    }
+}
+
+#[test]
+fn the_leaves_take_the_one_value_or_say_why() {
+    assert_eq!(notes("tnom_to_env", "plain"), []);
+    assert_eq!(notes("tnom_to_env", "no_env"), [code(108)]);
+    assert_eq!(notes("tnom_to_env", "two_envs"), [code(108)]);
+    assert_eq!(notes("tnom_to_env", "from_here"), [code(108)]);
+    assert_eq!(notes("substitute_tstep", "two_transients"), [code(108)]);
+    assert_eq!(
+        notes("fold_constant_bitand", "not_literal"),
+        [code(107), code(107)]
+    );
+    assert_eq!(
+        notes("fold_constant_bitand", "typed_division_left"),
+        [code(107)]
+    );
+}
+
+#[test]
+fn the_draw_rules_keep_the_nominal_run_and_say_what_changes() {
+    // oracle: eval_typed under bindings whose draw reads its nominal (every Dist is centred on
+    // its first argument), over designs with no sampling loop
+    let no_loops = ir::FeatureSet::ALL
+        .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(ir::ItemKind::Loop)));
+    let draw = |e| matches!(e, ir::Expr::Draw(..));
+    for name in [
+        "draws_always_to_sampling",
+        "draws_per_reference_to_call_site",
+        "sampling_draws_to_nominal",
+    ] {
+        let n = keeps_values_over(name, draw, true, no_loops);
+        eprintln!("{name}: {n} generated roots");
+        assert!(n > 0, "{name}");
+    }
+    assert_eq!(notes("draws_always_to_sampling", "plain"), [code(109)]);
+    assert_eq!(
+        notes("draws_per_reference_to_call_site", "always"),
+        [code(110)]
+    );
+    assert_eq!(
+        notes("sampling_draws_to_nominal", "monte_carlo"),
+        [code(110)]
+    );
 }

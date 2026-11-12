@@ -1,0 +1,4 @@
+file "d.sp" deck
+  param a = 4503599627370496 + 3
+  param b = 1 << 64
+  param c = 1 << 54

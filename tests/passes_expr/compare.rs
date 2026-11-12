@@ -1,7 +1,7 @@
 //! How the expression passes' proofs compare: a pass run on generated designs or on a text, and
 //! each root it changed evaluated before and after (`ir::eval_typed`) under the same bindings.
 //!
-//! Contents: `pub const ANY`, `pub const fn code`, `pub fn pass`, `pub fn keeps_generated_values`,
+//! Contents: `pub const ANY`, `pub const fn code`, `pub fn pass`, `pub fn keeps_generated_values`, `pub fn keeps_values_over`,
 //! `pub fn keeps_boundary_values`, `pub fn notes`, `pub fn typed`
 
 use spicerack::ir;
@@ -24,6 +24,10 @@ const SIZE: Size = Size {
 /// Seeds of the generated designs.
 const SEEDS: std::ops::Range<u64> = 0..200;
 
+/// The rules that stop reading some operands (their doc states it: R12, an operand's error is
+/// not carried once the operand is no longer read).
+const DROPS: &[&str] = &["sampling_draws_to_nominal"];
+
 /// Bindings per generated design.
 const TRIALS: u64 = 8;
 
@@ -42,10 +46,20 @@ pub fn pass(name: &str) -> &'static passes::Pass {
 /// Runs `name` on generated designs and compares every root it changed, under [`TRIALS`]
 /// bindings each; returns how many changed roots held a node `hit` accepts.
 pub fn keeps_generated_values(name: &str, hit: fn(ir::Expr) -> bool, follow: bool) -> usize {
+    keeps_values_over(name, hit, follow, ir::FeatureSet::ALL)
+}
+
+/// [`keeps_generated_values`] over designs generated from `features`.
+pub fn keeps_values_over(
+    name: &str,
+    hit: fn(ir::Expr) -> bool,
+    follow: bool,
+    features: ir::FeatureSet,
+) -> usize {
     let p = pass(name);
     let mut compared = 0;
     for seed in SEEDS {
-        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        let mut design = generate(seed, &features, SIZE);
         let before = roots(&design);
         let mut diags = ir::Diags::new();
         (p.run)(&mut design, &mut diags);
@@ -63,11 +77,11 @@ pub fn keeps_generated_values(name: &str, hit: fn(ir::Expr) -> bool, follow: boo
                     follow,
                     depth: std::cell::Cell::new(0),
                 };
-                let got = differ(
-                    &design,
-                    ir::eval_typed(&design, old, &env),
-                    ir::eval_typed(&design, new, &env),
-                );
+                let was = ir::eval_typed(&design, old, &env);
+                if DROPS.contains(&name) && dropped(&design, was, new) {
+                    continue;
+                }
+                let got = differ(&design, was, ir::eval_typed(&design, new, &env));
                 assert!(got.is_none(), "{name} seed {seed} trial {trial}: {got:?}");
             }
         }
@@ -145,6 +159,38 @@ pub fn typed(name: &str, hit: fn(ir::Expr) -> bool) -> usize {
 }
 
 // ---- private ----
+
+/// Whether `was` is an error raised at a row the new tree no longer reads.
+fn dropped(design: &ir::Design, was: Result<ir::Value, ir::Domain>, new: ir::ExprId) -> bool {
+    let at = match was {
+        Ok(_) => return false,
+        Err(
+            ir::Domain::DivideByZero(e)
+            | ir::Domain::OutOfDomain(e)
+            | ir::Domain::Unbound(e)
+            | ir::Domain::CallDepth(e)
+            | ir::Domain::NotANumber(e),
+        ) => e,
+    };
+    let mut stack = vec![new];
+    for _ in 0..=design.expr_count() * 4 {
+        let Some(e) = stack.pop() else { return true };
+        if e == at {
+            return false;
+        }
+        match design.expr(e) {
+            ir::Expr::Call(_, l)
+            | ir::Expr::UserCall(_, l)
+            | ir::Expr::Draw(_, _, _, l)
+            | ir::Expr::List(l) => stack.extend_from_slice(design.exprs(l)),
+            ir::Expr::Unary(_, a) => stack.push(a),
+            ir::Expr::Binary(_, a, b) => stack.extend([a, b]),
+            ir::Expr::Ternary(c, a, b) => stack.extend([c, a, b]),
+            _ => {}
+        }
+    }
+    panic!("the walk outgrew the table")
+}
 
 /// Whether `e` may compute an Int (the operators of A12 K1's table that keep one).
 fn int_capable(e: ir::Expr) -> bool {
