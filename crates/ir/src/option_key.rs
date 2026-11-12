@@ -90,7 +90,8 @@ pub enum OptionKey {
     GminTran,
     /// Resistance from every node to ground, Ω. ngspice `rshunt`.
     Rshunt,
-    /// Conductance from every node to ground, S. HSPICE, VACASK `gshunt`.
+    /// Conductance from every node to ground, S. ngspice (`cktsopt.c:260`), HSPICE, VACASK
+    /// `gshunt`.
     Gshunt,
     /// Capacitance from every node to ground, F. ngspice, LTspice `cshunt`.
     Cshunt,
@@ -150,6 +151,13 @@ pub enum OptionKey {
     KeepOpInfo,
     /// Flag: suppress the initialisation report. ngspice `noinit`.
     NoInit,
+    /// The row count of every Fourier analysis that names no count: the DC term included, so
+    /// `nfreqs = n` is DC, the fundamental and the harmonics up to the (n − 1)-th (ngspice
+    /// `nfreqs`, `fourier.c:69`; A16). Under it a count-less `Four` has `Four::harmonics` = n − 1.
+    NFreqs,
+    /// The size of the Fourier analysis's interpolation grid, count. ngspice `fourgridsize`
+    /// (A16).
+    FourGridSize,
     /// A simulator's own option, kept by name with its dialect (`OptionRow::private`,
     /// `OptionRow::dialect`); only that dialect's writer spells it.
     Private,
@@ -174,7 +182,7 @@ const _: () = assert!(size_of::<OptionKey>() == 1);
 
 impl OptionKey {
     /// Every key, in declaration order.
-    pub const ALL: [OptionKey; 49] = [
+    pub const ALL: [OptionKey; 51] = [
         OptionKey::RelTol,
         OptionKey::AbsTol,
         OptionKey::VnTol,
@@ -223,6 +231,8 @@ impl OptionKey {
         OptionKey::NoRefValue,
         OptionKey::KeepOpInfo,
         OptionKey::NoInit,
+        OptionKey::NFreqs,
+        OptionKey::FourGridSize,
         OptionKey::Private,
     ];
     /// Key count.
@@ -277,7 +287,9 @@ impl OptionKey {
             | K::MaxWarns
             | K::NoRefValue
             | K::KeepOpInfo
-            | K::NoInit => OptionClass::Output,
+            | K::NoInit
+            | K::NFreqs
+            | K::FourGridSize => OptionClass::Output,
         }
     }
 
@@ -333,6 +345,8 @@ impl OptionKey {
             | K::Seed
             | K::Search
             | K::MaxWarns
+            | K::NFreqs
+            | K::FourGridSize
             | K::Private => false,
         }
     }
