@@ -25,8 +25,8 @@
 //! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn case_clash(&Design) -> bool`, `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`,
-//!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; `pub enum Form`,
-//!   `pub fn root_form(&Design, ExprId, ExprUse) -> Form`
+//!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; re-exported from
+//!   `form`: `pub enum Form`, `pub fn root_form(&Design, ExprId, ExprUse) -> Form`
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
@@ -35,6 +35,8 @@ use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{ExprUse, Handle, RowFacts};
+use crate::form::{DYNAMIC, STATIC, body_forms, form_feature, form_of};
+pub use crate::form::{Form, root_form};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{ItemKind, Role, ScopeKind};
 use crate::model::ModelFamily;
@@ -95,20 +97,6 @@ pub enum Feature {
     /// A statistical draw's distribution, in an expression of the dynamic form (A28): its
     /// static twin is `Dist`.
     DistDyn(Dist),
-}
-
-/// Which of a function's or operator's two features a root counts (`Func` or `FuncDyn`, and so
-/// on: R14, A19, A26): a pass that removes one feature rewrites only the roots of its form.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Form {
-    /// The root stands in a constant-in-time field and reads nothing of class `Temp` or above.
-    Static,
-    /// The root stands in a field that may read the circuit, or it or what it reads is of class
-    /// `Temp` or above.
-    Dynamic,
-    /// A function body called from roots of both forms (A28, R51): it counts in both, and no
-    /// one-form pass rewrites it.
-    Both,
 }
 
 /// The kernel's features that are fields or placements, not kinds. The circuit and run owners'
@@ -502,7 +490,14 @@ pub(crate) fn item_features(
             .map(|&e| node_class(design, e, table))
             .max()
             .unwrap_or(ExprClass::Constant);
-        let dynamic = form_of(use_, class) == Form::Dynamic;
+        // A28 (R51): a function body counts in its callers' forms, every other root in its own
+        let forms = if item.kind == ItemKind::Func {
+            let bits = body_forms(design).get(&root).copied().unwrap_or(0);
+            [bits & STATIC != 0 || bits == 0, bits & DYNAMIC != 0]
+        } else {
+            let dynamic = form_of(use_, class) == Form::Dynamic;
+            [!dynamic, dynamic]
+        };
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
             if let Expr::Num(n) = design.expr(e) {
@@ -512,40 +507,19 @@ pub(crate) fn item_features(
                     NumForm::Plain | NumForm::Exponent | NumForm::Scale | NumForm::Mil => {}
                 }
             }
-            let f = match design.expr(e) {
-                Expr::Call(func, _) if dynamic => Feature::FuncDyn(func),
-                Expr::Call(func, _) => Feature::Func(func),
-                Expr::Binary(op, ..) if dynamic => Feature::BinaryDyn(op),
-                Expr::Binary(op, ..) => Feature::Binary(op),
-                Expr::Unary(op, _) if dynamic => Feature::UnaryDyn(op),
-                Expr::Unary(op, _) => Feature::Unary(op),
-                Expr::Draw(dist, when, per, _) => {
-                    *set = set
-                        .with(Feature::DrawWhen(when))
-                        .with(Feature::DrawPer(per));
-                    // A28: the distribution counts in its root's form, as a function does
-                    if dynamic {
-                        Feature::DistDyn(dist)
-                    } else {
-                        Feature::Dist(dist)
-                    }
+            if let Expr::Draw(_, when, per, _) = design.expr(e) {
+                *set = set
+                    .with(Feature::DrawWhen(when))
+                    .with(Feature::DrawPer(per));
+            }
+            for dynamic in [false, true] {
+                if let Some(f) = forms[dynamic as usize]
+                    .then(|| form_feature(design.expr(e), dynamic))
+                    .flatten()
+                {
+                    *set = set.with(f);
                 }
-                Expr::Num(_)
-                | Expr::Str(_)
-                | Expr::Param(_)
-                | Expr::UserCall(..)
-                | Expr::Ternary(..)
-                | Expr::V(..)
-                | Expr::I(_)
-                | Expr::Time
-                | Expr::Temp
-                | Expr::Freq
-                | Expr::TStep
-                | Expr::TStop
-                | Expr::Tnom
-                | Expr::List(_) => continue,
-            };
-            *set = set.with(f);
+            }
         }
     }
 }
@@ -647,34 +621,7 @@ pub(crate) fn chain_kinds(design: &Design, scope: ScopeId) -> [bool; ScopeKind::
     kinds
 }
 
-/// The form a root counts its functions and operators in, given how its field reads (`use`, as
-/// `RowFacts::map_exprs` reports it): `Dynamic` for a field that may read the circuit or a tree of
-/// class `Temp` or above (A19, R14), else `Static`. The one decision: `features_used` makes it
-/// through the same rule. O(the tree) once the definitions' classes are cached.
-pub fn root_form(design: &Design, root: ExprId, use_: ExprUse) -> Form {
-    form_of(
-        use_,
-        crate::class::tree_class(design, root, def_classes(design)),
-    )
-}
-
-/// The forms each function body counts in (A28, R51), by body expression: bit 1 static, bit 2
-/// dynamic; a body nothing calls has none and counts static. Cached on the design with the
-/// class table.
-pub(crate) fn body_forms(design: &Design) -> &crate::names::FxMap<ExprId, u8> {
-    todo!()
-}
-
 // ---- private ----
-
-/// The form decision itself, shared by `root_form` and `features_used` (A26).
-fn form_of(use_: ExprUse, class: ExprClass) -> Form {
-    if use_ == ExprUse::Circuit || class >= ExprClass::Temp {
-        Form::Dynamic
-    } else {
-        Form::Static
-    }
-}
 
 /// The index of a group's first feature: the member counts of the groups before it.
 const fn offset(group: usize) -> usize {

@@ -141,8 +141,9 @@ fn features_of_a_hand_built_deck() {
         Feature::Expr(ExprTag::Draw),
         Feature::Func(Func::Exp),
         Feature::Binary(BinOp::Mul),
-        Feature::FuncDyn(Func::Abs),
-        Feature::UnaryDyn(UnOp::Neg),
+        // A28 (R51): f's body reads the circuit but nothing calls it, so it counts static
+        Feature::Func(Func::Abs),
+        Feature::Unary(UnOp::Neg),
         Feature::Dist(Dist::AbsGauss),
         Feature::DrawWhen(DrawWhen::Always),
         Feature::DrawPer(DrawPer::Reference),

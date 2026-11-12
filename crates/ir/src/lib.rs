@@ -64,8 +64,7 @@ pub mod edit;
 pub mod eval;
 pub mod expr;
 pub mod feature;
-#[cfg(test)]
-mod form_tests;
+pub mod form;
 #[cfg(any(test, feature = "gen"))]
 mod gen_expr;
 #[cfg(any(test, feature = "gen"))]
@@ -186,3 +185,5 @@ pub mod r#gen;
 // `check`'s fixtures need the crate-private tables; last, after `gen`, for check_style.py
 #[cfg(test)]
 mod check_tests;
+#[cfg(test)]
+mod form_tests;

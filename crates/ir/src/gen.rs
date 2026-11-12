@@ -91,6 +91,9 @@ pub struct Gen {
     /// Whether the expression being built lies in a `Handle::ExprDyn` field generated with
     /// `Reads::Constant` (a measure's threshold): its operators take the dynamic form (A19).
     pub(crate) dyn_form: bool,
+    /// Whether the expression being built is a function body (A28): its forms are its callers',
+    /// unknown while it is built, so each operator must be allowed in both forms.
+    pub(crate) both_forms: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -299,6 +302,7 @@ impl Gen {
             case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
             constant_only: false,
             dyn_form: false,
+            both_forms: false,
         }
     }
 

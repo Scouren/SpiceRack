@@ -40,7 +40,7 @@
 //!   `Design::files(&self) -> impl Iterator<Item = FileId>`, `Design::file(&self, FileId) -> File`,
 //!   `Design::scope(&self, ScopeId) -> Scope`, `Design::items(&self, ScopeId) -> &[ItemRef]`,
 //!   `Design::row<R: ItemRow>(&self, u32) -> R`, `Design::span_of(&self, ItemRef) -> Span`,
-//!   `Design::item_handles(&self, ItemRef, &mut Vec<Handle>)`,
+//!   `Design::item_handles(&self, ItemRef, &mut Vec<Handle>)`; crate: `Design::derived_changed(&mut self)`;
 //!   `Design::literal_value(&self, Literal) -> f64`, `Design::literal_eq(&self, Literal, Literal) -> bool`,
 //!   `Design::long_digits(&self, Literal) -> Option<(&str, NumForm)>`,
 //!   `Design::item_refs(&self, ItemRef, &mut Vec<(Ref, DefKind)>)`,
@@ -546,6 +546,15 @@ impl Default for Design {
     }
 }
 
+impl Design {
+    /// Forgets what is derived from the expressions and definitions (the class and form caches):
+    /// every door and every mutation that can change a class calls it.
+    pub(crate) fn derived_changed(&mut self) {
+        self.classes.take();
+        self.forms.take();
+    }
+}
+
 // ---- private ----
 
 impl Design {
@@ -583,13 +592,6 @@ impl Design {
 }
 
 impl Design {
-    /// Forgets what is derived from the expressions and definitions (the class and form caches):
-    /// every door and every mutation that can change a class calls it.
-    pub(crate) fn derived_changed(&mut self) {
-        self.classes.take();
-        self.forms.take();
-    }
-
     /// A `Long` literal's significand. Asserts the form and the pool index.
     fn long_text(&self, l: Literal) -> &str {
         assert!(l.form == NumForm::Long, "a Long literal");

@@ -254,25 +254,28 @@ impl Gen {
         let has = |f| features.contains(f);
         // A19: a field that may read the circuit counts the dynamic form whatever the class
         let form = dynamic || self.reads == Reads::Circuit || self.dyn_form;
+        // a member is allowed in its form, or in both for a function body (A28)
+        let both = self.both_forms;
+        let allowed = |stat: Feature, dyn_: Feature| {
+            if both {
+                has(stat) && has(dyn_)
+            } else if form {
+                has(dyn_)
+            } else {
+                has(stat)
+            }
+        };
         let mut nodes: Vec<(Node, usize)> = Vec::new();
         if has(Feature::Expr(ExprTag::Unary)) {
             for op in UnOp::ALL {
-                if has(if form {
-                    Feature::UnaryDyn(op)
-                } else {
-                    Feature::Unary(op)
-                }) {
+                if allowed(Feature::Unary(op), Feature::UnaryDyn(op)) {
                     nodes.push((Node::Unary(op), 1));
                 }
             }
         }
         if has(Feature::Expr(ExprTag::Binary)) {
             for op in BinOp::ALL {
-                if has(if form {
-                    Feature::BinaryDyn(op)
-                } else {
-                    Feature::Binary(op)
-                }) {
+                if allowed(Feature::Binary(op), Feature::BinaryDyn(op)) {
                     nodes.push((Node::Binary(op), 2));
                 }
             }
@@ -282,13 +285,8 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::Call)) {
             for f in Func::ALL {
-                let member = if form {
-                    Feature::FuncDyn(f)
-                } else {
-                    Feature::Func(f)
-                };
-                if has(member) && ((dynamic && self.reads == Reads::Circuit) || !f.reads_circuit())
-                {
+                let member = allowed(Feature::Func(f), Feature::FuncDyn(f));
+                if member && ((dynamic && self.reads == Reads::Circuit) || !f.reads_circuit()) {
                     nodes.push((Node::Call(f), f.arity().0 as usize));
                 }
             }
@@ -310,13 +308,7 @@ impl Gen {
         if has(Feature::Expr(ExprTag::Draw)) {
             let dists: Vec<Dist> = Dist::ALL
                 .into_iter()
-                .filter(|d| {
-                    has(if form {
-                        Feature::DistDyn(*d)
-                    } else {
-                        Feature::Dist(*d)
-                    })
-                })
+                .filter(|d| allowed(Feature::Dist(*d), Feature::DistDyn(*d)))
                 .collect();
             let whens: Vec<DrawWhen> = DrawWhen::ALL
                 .into_iter()
