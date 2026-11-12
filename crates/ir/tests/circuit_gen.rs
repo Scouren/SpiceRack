@@ -120,6 +120,30 @@ mod tests {
         }
     }
 
+    /// Without `ElementWithoutModel` the generator still draws every masterless kind (they name
+    /// no model and so need no feature), and no generated element of a kind with a master is bare.
+    #[test]
+    fn masterless_kinds_need_no_bare_feature() {
+        let set = circuit_set()
+            .minus(FeatureSet::EMPTY.with(Feature::Circuit(CircuitExtra::ElementWithoutModel)));
+        let mut seen = FeatureSet::EMPTY;
+        for seed in 0..2000u64 {
+            let d = generate(seed, &set, SIZE);
+            let used = features_used(&d);
+            assert!(
+                !used.contains(Feature::Circuit(CircuitExtra::ElementWithoutModel)),
+                "seed {seed}"
+            );
+            seen = seen.union(used);
+        }
+        let missing: Vec<ElemKind> = ElemKind::ALL
+            .into_iter()
+            .filter(|k| k.master_kind().is_none() && *k != ElemKind::Unresolved)
+            .filter(|k| !seen.contains(Feature::Elem(*k)))
+            .collect();
+        assert!(missing.is_empty(), "{missing:?}");
+    }
+
     /// A25: given a set without `Family(F)`, the generator makes no library of F.
     #[test]
     fn no_library_of_a_family_the_set_lacks() {
