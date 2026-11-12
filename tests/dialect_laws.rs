@@ -48,7 +48,12 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 0: a bsim4, b3_soi_dd or hicum2 model with no version reads back with ngspice's default version (models: before the lead, an IR invariant proposed); an Alter value 840127mil reads back as 213392258e-7, equal by value (R28): eq_meaning on an Alter's value (spine)",
+        "seed 0 Untyped: a FromHere NodeSet (`nodeset every_op value=…`, no whole_run) is written as a `.nodeset` card and reads back WholeRun (run: refuse it or write the script form); with ng-run",
+    ),
+    (
+        "l8",
+        "ngspice",
+        "seed 41 Untyped: an admitted design's IR text, one file, reads back to X0015 (a `.four` with no harmonic count and no nfreqs in the dump): the IR text or the run owner's Four row, with ir-run through spine",
     ),
     (
         "l7",

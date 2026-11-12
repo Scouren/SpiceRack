@@ -7,7 +7,7 @@
 //! Cites: `rewrite/IR-KERNEL.md` §7, C7, C9, Addenda A1–A3.
 //!
 //! Contents: `Builder::literal`, `Builder::long_literal`, `Builder::num`, `Builder::string`, `Builder::param_ref`,
-//! `Builder::call`, `Builder::user_call`, `Builder::unary`, `Builder::binary`,
+//! `Builder::param_ref_to`, `Builder::call`, `Builder::user_call`, `Builder::unary`, `Builder::binary`,
 //! `Builder::ternary`, `Builder::v`, `Builder::i`, `Builder::time`, `Builder::temp`,
 //! `Builder::freq`, `Builder::tstep`, `Builder::tstop`, `Builder::tnom`, `Builder::draw`,
 //! `Builder::list` (each `-> ExprId`); crate: `Builder::rebuild`, `Builder::expr_row`, `Builder::assert_expr`
@@ -84,6 +84,17 @@ impl Builder<'_> {
         );
         let list = self.exprs(args);
         self.expr_row(ExprTag::Call, func as u8, list.start, list.len)
+    }
+
+    /// A parameter read already bound to `def` (its name the definition's): the one-call form of
+    /// `param_ref` then `resolve`, for a pass's rule. Asserts `def` is in range and a `Param`.
+    pub fn param_ref_to(&mut self, def: DefId) -> ExprId {
+        let d = self.design.def(def);
+        assert!(
+            d.kind == crate::item::DefKind::Param,
+            "a read binds a parameter"
+        );
+        self.expr_row(ExprTag::Param, 0, d.name.0, def.0)
     }
 
     /// A user-function call, unresolved.

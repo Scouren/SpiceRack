@@ -206,7 +206,8 @@ pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool {
 
 // ---- private ----
 
-/// Drops the items `rows` name from their listing scopes; `Err` with the code of a row that
+/// Drops the items `rows` name from their listing scopes (`Editor::remove_item`, so their
+/// definitions leave the index too); `Err` with the code of a row that
 /// names none, or one `design` does not list.
 fn drop_named(design: &mut ir::Design, rows: &[ir::Diag]) -> Result<(), String> {
     let listing = design.reachable();
@@ -214,7 +215,12 @@ fn drop_named(design: &mut ir::Design, rows: &[ir::Diag]) -> Result<(), String> 
     for d in rows {
         let at = listing.iter().find(|(i, _)| *i == d.item);
         match at {
-            Some(&found) if d.item.index != u32::MAX => drop.push(found),
+            Some(&found) if d.item.index != u32::MAX => {
+                // Two rows may name one item: it is removed once.
+                if !drop.contains(&found) {
+                    drop.push(found);
+                }
+            }
             _ => return Err(d.code.to_string()),
         }
     }
@@ -224,7 +230,7 @@ fn drop_named(design: &mut ir::Design, rows: &[ir::Diag]) -> Result<(), String> 
     );
     let mut editor = design.editor();
     for (item, scope) in &drop {
-        editor.items_mut(*scope).retain(|i| i != item);
+        editor.remove_item(*scope, *item);
     }
     Ok(())
 }

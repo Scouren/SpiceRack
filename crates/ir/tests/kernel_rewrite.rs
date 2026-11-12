@@ -14,7 +14,7 @@ use spicerack_ir::r#gen::{Size, generate};
 use spicerack_ir::{
     Bindings, Design, Diags, Dist, DrawPer, DrawWhen, ExprId, ExprUse, Feature, FeatureSet, Form,
     Handle, ItemKind, ItemRef, NameId, Ref, UnOp, check, eval, features_used, rewrite_exprs,
-    rewrite_exprs_in, root_form,
+    rewrite_exprs_in, rewrite_tree, root_form,
 };
 
 const SIZE: Size = Size {
@@ -336,4 +336,60 @@ fn the_form_decision_is_the_feature_count_s() {
     );
     // the same constant in a field that may read the circuit counts dynamic
     assert_eq!(root_form(&d, roots[0].0, ExprUse::Circuit), Form::Dynamic);
+}
+
+#[test]
+fn one_tree_is_rewritten_alone() {
+    // round 7b door 3: `rewrite_tree` on one root: an identity rule returns the root itself and
+    // appends nothing; a wrapping rule returns a tree of equal value and leaves the original
+    for seed in 0..100u64 {
+        let mut d = generate(seed, &FeatureSet::ALL, SIZE);
+        let roots: Vec<ExprId> = d
+            .reachable()
+            .into_iter()
+            .flat_map(|(i, _)| visited(&d, i))
+            .map(|(e, _)| e)
+            .filter(|e| !e.is_none())
+            .collect();
+        let Some(&root) = roots.first() else { continue };
+        let before = d.clone();
+        let n = d.expr_count();
+        let same = rewrite_tree(&mut d.builder(), root, &mut |_, _| None);
+        assert_eq!((same, d.expr_count()), (root, n), "seed {seed}: identity");
+        let new = rewrite_tree(&mut d.builder(), root, &mut |b, e| {
+            let one = b.num(1.0);
+            Some(b.ternary(one, e, e))
+        });
+        assert_ne!(new, root, "seed {seed}");
+        match (eval(&before, root, &Fixed), eval(&d, new, &Fixed)) {
+            (Ok(x), Ok(y)) => assert!(x.to_bits() == y.to_bits() || (x.is_nan() && y.is_nan())),
+            (Err(_), Err(_)) => {}
+            (x, y) => panic!("seed {seed}: {x:?} became {y:?}"),
+        }
+        // the original rows are untouched: the old root still evaluates as before
+        assert!(d.eq_meaning(&d.clone()));
+        let old_now = eval(&d, root, &Fixed).ok().map(f64::to_bits);
+        assert_eq!(
+            old_now,
+            eval(&before, root, &Fixed).ok().map(f64::to_bits),
+            "seed {seed}"
+        );
+    }
+}
+
+#[test]
+fn a_bound_read_in_one_call() {
+    let mut d = Design::new();
+    let mut b = d.builder();
+    let (_, top) = b.file("t.sp", spicerack_ir::Role::Deck);
+    let one = b.num(1.0);
+    b.param(top, "p", one, spicerack_ir::Span::NONE);
+    let def = b
+        .design()
+        .lookup(top, spicerack_ir::DefKind::Param, b.design().find_name("p"));
+    let read = b.param_ref_to(def);
+    match b.design().expr(read) {
+        spicerack_ir::Expr::Param(r) => assert_eq!((r.def, b.design().str(r.name)), (def, "p")),
+        other => panic!("{other:?}"),
+    }
 }

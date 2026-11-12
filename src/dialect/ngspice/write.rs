@@ -119,7 +119,18 @@ pub(super) fn write(
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     // a string or list anywhere but a model (W1006): one walk over every item
     write_structure::admits(design, diags);
+    // each item's place in its scope: `reachable` lists a scope's items in order (O(items))
+    let mut at: std::collections::HashMap<ir::ScopeId, usize> = std::collections::HashMap::new();
     for (item, scope) in design.reachable() {
+        let k = at.entry(scope).or_insert(0);
+        let items = design.items(scope);
+        debug_assert_eq!(
+            items.get(*k),
+            Some(&item),
+            "reachable lists a scope in order"
+        );
+        let next = items.get(*k + 1).copied().unwrap_or(ir::ItemRef::NONE);
+        *k += 1;
         match item.kind {
             ir::ItemKind::Title
             | ir::ItemKind::Comment
@@ -142,7 +153,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
                 write_outputs::admits(design, item, diags);
             }
             ir::ItemKind::Load | ir::ItemKind::Loop | ir::ItemKind::Alter | ir::ItemKind::Reset => {
-                write_control::admits(design, item, diags);
+                write_control::admits(design, item, next, diags);
             }
             // ngspice spells none of these (FEATURES lacks them): nothing to refuse beyond the
             // feature

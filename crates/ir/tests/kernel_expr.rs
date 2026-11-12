@@ -239,3 +239,33 @@ fn invalid_literal_asserts() {
         form: NumForm::Plain,
     });
 }
+
+#[test]
+fn idt_takes_an_initial_value() {
+    // A28 (VACASK run bp3: `idt(x, ic)` starts from ic, the operating point reads ic): one
+    // optional second operand; absent is 0, so a literal 0 there is a second spelling of one
+    // meaning and `check` refuses it (LiteralShape, the non-canonical zero)
+    let read = |e: &str| {
+        let mut d = spicerack_ir::Design::new();
+        let mut diags = spicerack_ir::Diags::new();
+        let text =
+            format!("file \"t.sp\" deck\n  element behav b1 (a 0) expr=({e}) output=current\n");
+        spicerack_ir::parse(&text, &mut d.builder(), &mut diags);
+        let mut checked = spicerack_ir::Diags::new();
+        spicerack_ir::check(&d, &mut checked);
+        (
+            diags.len(),
+            checked.rows().iter().map(|r| r.code).collect::<Vec<_>>(),
+        )
+    };
+    assert_eq!(read("idt(v(a))"), (0, vec![]), "from 0");
+    assert_eq!(read("idt(v(a), 3)"), (0, vec![]), "from 3");
+    let zero = spicerack_ir::diag::violation_code(spicerack_ir::Violation::LiteralShape);
+    assert_eq!(
+        read("idt(v(a), 0)"),
+        (0, vec![zero]),
+        "absent is 0: one spelling"
+    );
+    assert_eq!(read("idt(v(a), 1, 2)").0, 1, "at most two operands");
+    assert_eq!(spicerack_ir::Func::Idt.arity(), (1, 2));
+}
