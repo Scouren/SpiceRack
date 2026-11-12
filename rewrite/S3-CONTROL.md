@@ -187,26 +187,27 @@ Script 29, Analysis 11, State 8 (`set`, `setcs`, `option`, `options`, `alter`, `
 
 | Rule | Evidence | Fixtures |
 |---|---|---|
+| C0 A script line is cut at `$ `, `;`, `//` outside quotes (`inpcom.c:3519-3560`); a block the file ends before closing is kept whole with its `.endc` | inpcom.c, O1 | `unclosed`, unit `a_script_lines_comment_is_cut_as_ngspice_cuts_it` |
 | C1 One script per deck: every block and `*#` line in file order (this file's, until includes are inlined); each statement's commands are items at its place; `.control`/`.endc` and `run` are framing | O1, O3, R49 (2) | `two_blocks`, `run_no_cards`, `run_with_cards`, `hash_line`, `continuation` |
 | C2 Analysis commands are `read_run::read_analysis` rows; with no dot-card analysis they are the plan; with cards and no state change the cards stand once | R49 (3) | `analysis_commands`, `run_with_cards`, `meas_command` |
 | C3 A state change in a deck with a dot-card analysis: every script statement one `Script` opaque, `P1404` | R49 (3), O4 | `script_state_cards` |
 | C4 Flow (`P1401`), a reprinted read (`P1402`), an effect (`P1403`), an unroll past 4096 (`P1405`): every script statement `Script` | V2, V3, §2 | `script_flow`, `script_vector`, `script_set_var`, `script_effect` |
 | C5 `alter dev v`, `alter dev = v`, `alter dev p v`, `alter @dev[p]=v` → `Alter` (`ElementValue` R/C/L, `SourceDc` V/I, `DeviceParam` named); `altermod` → `ModelParam`; a vector, an expression, a subcircuit path, `altermod … file` → `Unread` `P1408` | S4 | `alter_forms`, `alter_unread`, `altermod` |
 | C6 `alterparam p=v` → `Alter(Param)` listed at the next `reset`; none after it → `Inert` `P1407`; `alterparam sub p=v` → `Unread` | S1, S2 | `alterparam_reset`, `alterparam_no_reset` |
-| C7 `reset` with nothing to restore is framing; with state to restore `Unread` `P1408` until A27's restore row | S1 | `alterparam_reset` |
+| C7 `reset` → `Reset { restores: ALL }` (A28), the waiting `alterparam`s right after it; a parameter `foreach` → `Loop(param)` whose body starts with that `Reset`; a script `set` of a frontend-only key in a script holding a `reset` → `Private` (it survives `reset`, a `Reset` restores every option) | S1, S2 | `reset_restores`, `alterparam_reset`, `foreach_alterparam` |
 | C8 `option`/`set` of a typed key → `Option`/`Env` `FromHere`; an untyped circuit option or ngspice's own variable → `Private` `P1409`; any other variable, display → `Inert` `P1406` | S3 | `option_commands`, `inert_commands` |
 | C9 `foreach v w…` over numbers whose pass is "set one target from `$v`, then a body reading `$v` only in display commands" → `Loop` sweep list `keep_last`, `name` = `v`; else unrolled with each word as written; `repeat n` unrolled | V1, S5, lead's Q3 | `foreach_loop`, `foreach_alterparam`, `foreach_inert_var`, `foreach_unrolled`, `repeat` |
 | C10 `pre_osdi f` → `Load` osdi; plain `osdi` → `InvalidInSource` `P1411` | L1 | `pre_osdi`, `osdi_late`, `hash_line` |
-| C11 A script `save` before the first analysis with no `reset` in the script, a `meas` after the script's one analysis of its kind (no card): the outputs area's rows; else `Unread` | lead's Q5, Q6 | `save_command`, `save_later_unread`, `meas_command`, `meas_command_unread` |
+| C11 A script `save`: no dot card → `FromHere` at its place; cards, before the first analysis and no `reset` → the deck's `.save` (`WholeRun`); else a state change (C3). A `meas` of kind K: no card of K and the script's one K command before it, or one card of K before the script, no K command and the script's one `run` before it → the outputs area's `Measure`; else `Unread` | lead's Q5, Q6, A28 | `save_command`, `save_later`, `save_card`, `save_card_late`, `meas_command`, `meas_card_run`, `meas_command_unread` |
 | C12 A word no command → `InvalidInSource` `P1411`; `setseed`, `optran`, `codemodel` → `Private`; a block in an `.if` branch → `Private` `P1410` | §2, lead's Q4, Q8 | `no_command`, `private_commands`, `in_branch` |
 | W1 A deck whose run items hold an `Alter`, a `Loop`, a `FromHere` state item or a script-command pair is written as one script, analyses as commands; a `Load` is its own `pre_osdi` pair | R49 | `script_alter`, `script_mixed`, `opaque_pairs`, `load` |
 | W2 `Loop` → `foreach <name> <values>`, its target set from `$name` (`alterparam` + `reset` for a parameter), the body, `end`; an unnamed loop's variable is `sr<depth>`, read back unnamed | V1, S2 | `script_loop`, `script_loop_unnamed`, `script_param_loop` |
-| W3 Refused (`admits`): a parameter alter where another script state holds (`W1401`: its `reset` would drop it), a loop not over numbers (`W1402`), an alter value that is no number (`W1403`) | S1, S4 | — |
+| W3 A `Reset` writes the parameter alters right after it as `alterparam`, then `reset`; a `FromHere` save forces the script form | S1, S2, A28 | `script_reset`, `script_param_loop` |
+| W4 Refused (`admits`): a parameter alter not right after a `Reset` or a parameter loop whose body does not start with one (`W1401`), a loop not over numbers (`W1402`), an alter value that is no number (`W1403`), a Verilog-A load (`W1404`), a load listing its modules (`W1405`), a partial `Reset` (`W1406`) | S1, S2, S4, L1 | `script_items_ngspice_cannot_spell_are_refused` |
 
 Census (ngspice-45 `examples/` and `tests/`, read in place; 404 files holding `.control`, each
-statement its own file's script): no panic of this area; 256 read typed, 144 `Script` (94 flow,
-31 effect, 16 reprinted read, 2 state with cards). Per command: 105 `meas` and 7 `save` outside
-their exact case, 8 `alter` and 3 `alterparam` forms `Unread`; 15 `Private` (`set`, `option` of
-untyped options, `pre_set`, `optran`); 2 `InvalidInSource`. Five files fail `ir::check` in other
-areas (an XSPICE `xfer` model, an OSDI `N` instance, prose read as instances): sent to
-`ng-scaffold`.
+statement its own file's script): no panic; 258 read typed, 146 `Script` (98 flow, 31 effect,
+12 reprinted read, 5 state with cards). Per command: 79 `meas` outside their exact case and 14
+the outputs area refuses, 7 `save` (in decks with cards), 38 `alter` and 3 `alterparam` forms
+`Unread`; 14 `Private` (`set`, `option` of untyped options, `pre_set`, `optran`); 2
+`InvalidInSource` (an `.end` inside a block the file ends before closing).
