@@ -288,3 +288,15 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - The generator's reads go through `Gen::may_read`: a constant tree reads only constant definitions, a dynamic one under `Reads::Constant` none above `Temp`. Titles and comments draw from `Gen::line_word`.
 
 - Reach under the kernel's full-set harness (4,000 seeds, `FeatureSet::ALL`) is part of the run owner's gate. A kind that needs a predecessor gets it from its own generator, not from the kernel happening to pick it next: an `Hb`/`Pss` generator follows itself, half the time, with one periodic small-signal analysis; a sweep loop with `LoopOverOp` in the set starts its body, half the time, with an `Op`; both count in the size budget. Measured over seeds 0..4000: every run item kind, analysis kind, `RunExtra` member and option key now appears in at least 48 seeds (before: `LoopOverOp` 1, the periodic kinds 6–11). `run_gen` checks reach again on seeds 50,000..54,000.
+
+## A15 K1 applied (`Feature::Placed`)
+
+- Dense group, appended last (after `Family`): index `(scope - 1) * ItemKind::COUNT + kind`, `File` asserted out. Every pair has an index, though `Placed(_, Title)` cannot occur (named in kernel_gen's full-set test beside `Func(Ddt)`/`Func(Idt)`); a sparse table would buy 4 bits and cost a lookup in `index`.
+- Placement is set once, in `feature::item_features`, from `feature::chain_kinds` (which replaced `enclosing`). The run owner's flags and generator guards for its three members are removed, and so are `state_order::nested` and `run_words::in_scope_kind`, which had no other user. `Loop::generate`'s `LoopOverOp` seeding asks `gen::placeable` for the `Op` it pushes into its body.
+- `Title::check` reports a title outside a deck's top (`FieldDomain`), as `ItemKind::Title`'s doc always said; before, only the builder's assert and the IR-text refusal held it.
+- The generator no longer keeps sections in a file's top: `Placed(S, Section)` decides, and with it IR text's nested sections are exercised.
+
+## A15: `FormalReadsParam` widened and renamed `FormalNotConstant`
+
+- Ruled: every head default that is not a constant (a parameter read, or class `Temp`) sets it. The old name would mislead for `w=$temp`, so it is `Extra::FormalNotConstant`; its index is unchanged. `$tnom` and the other A1 leaves are constants of the run and do not set it. The generator keeps a default constant (`param_reads` off, `constant_only` on) unless the set has it.
+
