@@ -4,7 +4,8 @@
 //! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash) on every tenth written deck. A deck the
 //! corpus's cross-sim source list quarantines as `slow` is neither converted nor simulated (step 1
 //! `quarantined`). Each deck's line is also appended to `pair-<cell>-census.partial.txt` as it
-//! finishes, so a census cut short keeps what ran.
+//! finishes, so a census cut short keeps what ran. Triage: `PAIR_ONLY=<a|b|…>` (the decks whose
+//! path holds one, quarantine lifted), `PAIR_NOSIM=1` (no simulator).
 //!
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
 //! deck (`<path> <step>:<class> …`) in `$CARGO_TARGET_TMPDIR/pair-<cell>-census.txt`, and its
@@ -71,6 +72,13 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
             .into_owned()
     };
     paths.retain(|p| (corpus.keep)(&p.to_string_lossy()));
+    // Triage: `PAIR_ONLY=<a|b|…>` keeps the decks whose path holds one and converts them even
+    // when quarantined; `PAIR_NOSIM=1` runs no simulator (step 4 `slow`).
+    let only = std::env::var("PAIR_ONLY").ok();
+    if let Some(o) = &only {
+        paths.retain(|p| o.split('|').any(|w| p.to_string_lossy().contains(w)));
+    }
+    let nosim = std::env::var_os("PAIR_NOSIM").is_some();
     paths.sort();
     assert!(
         !paths.is_empty(),
@@ -100,7 +108,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
             path: p.to_path_buf(),
             src,
             policy: Policy::Lenient,
-            simulate: !slow.contains(&rel(p)),
+            simulate: !nosim && !slow.contains(&rel(p)),
             missing,
         }
     };
@@ -125,7 +133,8 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
     std::thread::scope(|s| {
         for w in 0..jobs.max(1) {
             let (running, workers_left, next, done) = (&running, &workers_left, &next, &done);
-            let (load, none, paths, slow, partial) = (&load, &none, &paths, &slow, &partial);
+            let (load, none, paths, slow, partial, only) =
+                (&load, &none, &paths, &slow, &partial, &only);
             s.spawn(move || {
                 // Bounded: each index is taken once.
                 loop {
@@ -133,7 +142,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
                     let Some(p) = paths.get(k) else { break };
                     running.lock().expect("no worker panicked")[w] =
                         Some((k, std::time::Instant::now()));
-                    let mut v = match slow.contains(&rel(p)) {
+                    let mut v = match only.is_none() && slow.contains(&rel(p)) {
                         // Quarantined: its conversion alone can run for hours (the
                         // powergrid decks), so it is named, not run.
                         true => Done {
