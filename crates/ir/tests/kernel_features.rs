@@ -305,6 +305,23 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.param(top, "p", v, Span::NONE);
             },
         ),
+        (
+            Extra::SubcktConstantParam,
+            |b, top| {
+                let (_, body) = b.subckt(top, "s", &[], &[], Span::NONE);
+                let one = b.num(1.0);
+                b.param(body, "k", one, Span::NONE);
+            },
+            |b, top| {
+                // a dependent local (it reads the formal) and a constant at the top
+                let one = b.num(1.0);
+                let (_, body) = b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+                let w = b.param_ref("w");
+                b.param(body, "k", w, Span::NONE);
+                let two = b.num(2.0);
+                b.param(top, "c", two, Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         let f = Feature::Extra(extra);
