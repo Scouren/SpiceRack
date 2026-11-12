@@ -142,27 +142,42 @@ impl RowFacts for Measure {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        let first = g.below(MeasureKind::COUNT as u32) as usize;
-        for k in 0..MeasureKind::COUNT {
-            let kind = MeasureKind::ALL[(first + k) % MeasureKind::COUNT];
-            if let Some(detail) = by_measure!(kind, gen_of(g, scope, b, features)) {
-                let name = g.fresh_name(b);
-                let analysis = AnalysisKind::ALL[g.below(AnalysisKind::COUNT as u32) as usize];
-                let item = b.push(
-                    scope,
-                    Measure {
-                        name,
-                        analysis,
-                        kind,
-                        detail,
-                    },
-                    Span::NONE,
-                );
-                define(b, name, scope, item);
-                return item;
-            }
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        ItemRef::NONE
+        let feature = |k: MeasureKind| match k {
+            MeasureKind::TrigTarg => RunExtra::MeasTrigTarg,
+            MeasureKind::When => RunExtra::MeasWhen,
+            MeasureKind::Find => RunExtra::MeasFind,
+            MeasureKind::Deriv => RunExtra::MeasDeriv,
+            MeasureKind::Stat => RunExtra::MeasStat,
+            MeasureKind::Param => RunExtra::MeasParam,
+        };
+        let kinds: Vec<MeasureKind> = MeasureKind::ALL
+            .into_iter()
+            .filter(|&k| has(features, feature(k)))
+            .collect();
+        if kinds.is_empty() {
+            return ItemRef::NONE;
+        }
+        let kind = kinds[g.below(kinds.len() as u32) as usize];
+        // The name first: the text interns it before the detail's names.
+        let name = g.fresh_name(b);
+        let analysis = AnalysisKind::ALL[g.below(AnalysisKind::COUNT as u32) as usize];
+        let detail = by_measure!(kind, gen_of(g, scope, b, features))
+            .expect("a measure kind with its feature generates");
+        let item = b.push(
+            scope,
+            Measure {
+                name,
+                analysis,
+                kind,
+                detail,
+            },
+            Span::NONE,
+        );
+        define(b, name, scope, item);
+        item
     }
 }
 

@@ -96,23 +96,40 @@ impl DetailFacts for Pz {
         features: &FeatureSet,
     ) -> Option<Self> {
         let source_input = has(features, RunExtra::PzSourceInput) && g.chance(2);
-        let mut row = Pz {
-            input: PzInput::Nodes,
-            transfer: PzTransfer::ALL[g.below(2) as usize],
-            find: PzFind::ALL[g.below(3) as usize],
-            in_p: NameId::NONE,
-            in_n: NameId::NONE,
-            out_p: g.fresh_name(b),
-            out_n: NameId::GROUND,
-            source: NameId::NONE,
-        };
-        if source_input {
-            row.input = PzInput::Source;
-            row.source = g.fresh_name(b);
+        let transfer = PzTransfer::ALL[g.below(2) as usize];
+        let find = PzFind::ALL[g.below(3) as usize];
+        // Names in the text's order: in_p, in_n, out_p, out_n, source.
+        let in_p = if source_input {
+            NameId::NONE
         } else {
-            row.in_p = g.fresh_name(b);
-            row.in_n = NameId::GROUND;
-        }
+            g.fresh_name(b)
+        };
+        let in_n = if source_input {
+            NameId::NONE
+        } else {
+            NameId::GROUND
+        };
+        let out_p = g.fresh_name(b);
+        let source = if source_input {
+            g.fresh_name(b)
+        } else {
+            NameId::NONE
+        };
+        let input = if source_input {
+            PzInput::Source
+        } else {
+            PzInput::Nodes
+        };
+        let row = Pz {
+            input,
+            transfer,
+            find,
+            in_p,
+            in_n,
+            out_p,
+            out_n: NameId::GROUND,
+            source,
+        };
         Some(row)
     }
 }

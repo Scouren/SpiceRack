@@ -290,6 +290,9 @@ impl RowFacts for Statistics {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let vary = |g: &mut Gen, b: &mut Builder<'_>| {
             let param = Ref::unresolved(g.fresh_name(b));
             let mut dists = vec![VaryDist::Gauss, VaryDist::Unif];

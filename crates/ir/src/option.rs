@@ -222,6 +222,9 @@ impl RowFacts for OptionRow {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let design = b.design();
         let pos = design.items(scope).len();
         if !has(features, RunExtra::OptionMidRun) && after_run_item(design, scope, pos) {
@@ -305,6 +308,9 @@ impl RowFacts for Env {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let temp = g.expr(b, features, Reads::Constant);
         let tnom = g.expr(b, features, Reads::Constant);
         b.push(scope, Env { temp, tnom }, Span::NONE)
@@ -400,6 +406,9 @@ impl RowFacts for NodeSet {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         if !has(features, RunExtra::NodeSetInSubckt)
             && in_scope_kind(b.design(), scope, ScopeKind::Subckt)
         {

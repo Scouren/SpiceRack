@@ -167,6 +167,9 @@ impl RowFacts for Save {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let probes = gen_list(g, b, features);
         let per = has(features, RunExtra::SavePerAnalysis) && g.chance(3);
         let analysis = if per {
@@ -245,6 +248,9 @@ impl RowFacts for Print {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let probes = gen_list(g, b, features);
         let analysis = AnalysisKind::ALL[g.below(AnalysisKind::COUNT as u32) as usize];
         let hb = has(features, RunExtra::PrintHbTime) && g.chance(3);

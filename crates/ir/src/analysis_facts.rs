@@ -29,13 +29,9 @@ use crate::r#gen::Gen;
 #[cfg(any(test, feature = "gen"))]
 use crate::id::NameId;
 use crate::id::{ItemRef, Ref, ScopeId};
-#[cfg(any(test, feature = "gen"))]
-use crate::item::ScopeKind;
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::run_extra::RunExtra;
-#[cfg(any(test, feature = "gen"))]
-use crate::run_words::in_scope_kind;
 use crate::run_words::{put_name, reachable, take_enum, take_name, word};
 use crate::text::Words;
 use crate::tran::{Four, Tran};
@@ -225,41 +221,47 @@ impl RowFacts for Analysis {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let design = b.design();
         let several = features.contains(Feature::Run(RunExtra::SeveralAnalyses));
         if analysis_count(design) > 0 && !several {
             return ItemRef::NONE;
         }
+        // Without `LoopScoped`, every loop must wrap every analysis: a new one goes inside
+        // every existing loop's body.
         let scoped = features.contains(Feature::Run(RunExtra::LoopScoped));
-        let loops = !design.loops.is_empty();
-        if loops && !scoped && !in_scope_kind(design, scope, ScopeKind::Loop) {
+        if !scoped
+            && !design
+                .loops
+                .rows()
+                .iter()
+                .all(|l| within(design, scope, l.body))
+        {
             return ItemRef::NONE;
         }
         let kinds: Vec<AnalysisKind> = AnalysisKind::ALL
             .into_iter()
-            .filter(|&k| features.contains(Feature::Analysis(k)))
+            .filter(|&k| features.contains(Feature::Analysis(k)) && possible(k, b, scope, features))
             .collect();
         if kinds.is_empty() {
             return ItemRef::NONE;
         }
-        let first = g.below(kinds.len() as u32) as usize;
-        for k in 0..kinds.len() {
-            let kind = kinds[(first + k) % kinds.len()];
-            let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features));
-            if let Some(detail) = detail {
-                let name = if g.chance(4) {
-                    g.fresh_name(b)
-                } else {
-                    NameId::NONE
-                };
-                return b.push(
-                    scope,
-                    Analysis { kind, name, detail },
-                    crate::span::Span::NONE,
-                );
-            }
-        }
-        ItemRef::NONE
+        let kind = kinds[g.below(kinds.len() as u32) as usize];
+        // The name first: the text, and so the parse, interns it before the detail's names.
+        let name = if g.chance(4) {
+            g.fresh_name(b)
+        } else {
+            NameId::NONE
+        };
+        let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+            .expect("a possible kind's detail generates");
+        b.push(
+            scope,
+            Analysis { kind, name, detail },
+            crate::span::Span::NONE,
+        )
     }
 }
 
@@ -312,4 +314,65 @@ pub(crate) fn gen_of<D: DetailFacts>(
 ) -> Option<u32> {
     let row = D::generate(g, scope, b, features)?;
     Some(b.detail(row))
+}
+
+// ---- private ----
+
+/// Whether `kind`'s detail generator succeeds here under `features` (its only failures; the
+/// header interns its name before calling it, so a failure would leave a stray name).
+#[cfg(any(test, feature = "gen"))]
+fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &FeatureSet) -> bool {
+    let has = |x: RunExtra| features.contains(Feature::Run(x));
+    match kind {
+        AnalysisKind::Tran => {
+            has(RunExtra::TranMaxStep)
+                || [
+                    RunExtra::TranCapNone,
+                    RunExtra::TranCapNgspice,
+                    RunExtra::TranCapSpan50,
+                    RunExtra::TranCapSpan10,
+                ]
+                .into_iter()
+                .any(has)
+        }
+        AnalysisKind::Pss => has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous),
+        AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {
+            let d = b.design();
+            base_before(d, scope, d.items(scope).len())
+        }
+        AnalysisKind::Op
+        | AnalysisKind::Dc
+        | AnalysisKind::Ac
+        | AnalysisKind::Noise
+        | AnalysisKind::Tf
+        | AnalysisKind::DcXf
+        | AnalysisKind::Xf
+        | AnalysisKind::Sens
+        | AnalysisKind::SensAc
+        | AnalysisKind::Pz
+        | AnalysisKind::Sp
+        | AnalysisKind::Net
+        | AnalysisKind::Four
+        | AnalysisKind::Disto
+        | AnalysisKind::Hb
+        | AnalysisKind::Stb
+        | AnalysisKind::DcInc
+        | AnalysisKind::TimedOp => true,
+    }
+}
+
+/// Whether `scope` is `body` or lies inside it. Bounded by the scope count.
+#[cfg(any(test, feature = "gen"))]
+fn within(design: &Design, scope: ScopeId, body: ScopeId) -> bool {
+    let mut s = scope;
+    for _ in 0..=design.scopes.len() {
+        if s == body {
+            return true;
+        }
+        if s.is_none() {
+            return false;
+        }
+        s = design.scope(s).parent;
+    }
+    unreachable!("the scope tree has a cycle")
 }

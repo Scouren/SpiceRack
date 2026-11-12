@@ -19,8 +19,6 @@
 //! `MonteCarlo`
 
 #[cfg(any(test, feature = "gen"))]
-use crate::analysis::Analysis;
-#[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::gen_of;
 use crate::analysis_facts::{
     DetailFacts, analysis_count, dump_of, fault_of, features_of, handles_of, parse_of, report,
@@ -40,13 +38,13 @@ use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, List, NameId};
 use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
-#[cfg(any(test, feature = "gen"))]
-use crate::plan::gen_target;
 use crate::plan::{
     Alter, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, Sampler, SweepLoop, TableLoop,
     TargetUse, Variations, dump_target, parse_target, target_features, target_handles,
     target_valid,
 };
+#[cfg(any(test, feature = "gen"))]
+use crate::plan::{gen_target, target_kinds};
 use crate::run_extra::RunExtra;
 use crate::run_words::{
     get, loop_depth, put_expr, put_exprs, put_flag, put_name, put_word, reachable, take_enum,
@@ -152,6 +150,9 @@ impl RowFacts for Loop {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let has = |x: RunExtra| features.contains(Feature::Run(x));
         let design = b.design();
         let outer = loop_depth(design, scope);
@@ -173,23 +174,28 @@ impl RowFacts for Loop {
             return ItemRef::NONE;
         }
         let after = ends[g.below(ends.len() as u32) as usize];
-        let first = g.below(LoopKind::COUNT as u32) as usize;
-        let mut detail = None;
-        for k in 0..LoopKind::COUNT {
-            let kind = LoopKind::ALL[(first + k) % LoopKind::COUNT];
-            if let Some(d) = by_loop!(kind, gen_of(g, scope, b, features)) {
-                detail = Some((kind, d));
-                break;
-            }
-        }
-        let Some((kind, detail)) = detail else {
+        let targets = !target_kinds(features, TargetUse::Loop).is_empty();
+        let kinds: Vec<LoopKind> = [
+            (LoopKind::Sweep, targets),
+            (LoopKind::Table, targets && has(RunExtra::LoopTable)),
+            (LoopKind::MonteCarlo, has(RunExtra::LoopMonteCarlo)),
+        ]
+        .into_iter()
+        .filter(|&(_, ok)| ok)
+        .map(|(k, _)| k)
+        .collect();
+        if kinds.is_empty() {
             return ItemRef::NONE;
-        };
+        }
+        let kind = kinds[g.below(kinds.len() as u32) as usize];
+        // The name first: the text interns it before the detail's names.
         let name = if g.chance(4) {
             g.fresh_name(b)
         } else {
             NameId::NONE
         };
+        let detail = by_loop!(kind, gen_of(g, scope, b, features))
+            .expect("a possible loop kind's detail generates");
         let row = |body| Loop {
             kind,
             after,
@@ -197,21 +203,8 @@ impl RowFacts for Loop {
             detail,
             body,
         };
-        let (item, body) = b.push_scoped(scope, ScopeKind::Loop, row, Span::NONE);
-        // The body: a few run items while the size budget lasts.
-        for _ in 0..1 + g.below(2) {
-            if g.budget() == 0 {
-                break;
-            }
-            if g.chance(3) && has(RunExtra::LoopNested) {
-                Loop::generate(g, body, b, features);
-            } else if g.chance(3) {
-                Alter::generate(g, body, b, features);
-            } else {
-                Analysis::generate(g, body, b, features);
-            }
-        }
-        item
+        // The kernel's generator fills the body (M4).
+        b.push_scoped(scope, ScopeKind::Loop, row, Span::NONE).0
     }
 }
 
@@ -267,17 +260,23 @@ impl RowFacts for Alter {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
+        if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
+            return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
+        }
         let Some(target) = gen_target(g, b, features, TargetUse::Alter) else {
             return ItemRef::NONE;
         };
         let string = features.contains(Feature::Run(RunExtra::AlterString))
             && features.contains(Feature::Expr(ExprTag::Str));
         let value = if string && g.chance(3) {
-            let w = g.fresh_name(b);
-            let text = b.design().str(w).to_owned();
+            let text = g.fresh();
             b.string(&text)
-        } else {
+        } else if string {
             g.expr(b, features, Reads::Constant)
+        } else {
+            // No string anywhere in the value, so its root is none (`AlterString`'s).
+            let no_str = features.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::Str)));
+            g.expr(b, &no_str, Reads::Constant)
         };
         b.push(scope, Alter { target, value }, Span::NONE)
     }

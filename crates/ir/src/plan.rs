@@ -31,7 +31,7 @@
 //!   `pub(crate) TargetKind::has_path`, `pub(crate) enum TargetUse`,
 //!   `pub(crate) fn target_handles`, `pub(crate) fn target_valid`,
 //!   `pub(crate) fn target_features`, `pub(crate) fn dump_target`, `pub(crate) fn parse_target`,
-//!   `pub(crate) fn gen_target`
+//!   `pub(crate) fn gen_target`, `pub(crate) fn target_kinds`
 //! - (`RowFacts` for `Loop` and `Alter`, and the loop details' facts: `plan_facts.rs`)
 //!
 //! IR text of a target: `(kind [option] [a] [b] [path=(…)])`: `(temp)`, `(param r)`,
@@ -480,24 +480,7 @@ pub(crate) fn gen_target(
         .into_iter()
         .filter(|&k| features.contains(Feature::Option(k)))
         .collect();
-    let allowed: Vec<TargetKind> = TargetKind::ALL
-        .into_iter()
-        .filter(|&k| {
-            let mut one = FeatureSet::EMPTY;
-            target_features(
-                &Target {
-                    kind: k,
-                    ..Target::TEMP
-                },
-                used,
-                &mut one,
-            );
-            let ok = one
-                .iter()
-                .all(|f| matches!(f, Feature::Option(_)) || features.contains(f));
-            ok && (k != TargetKind::Option || !keys.is_empty())
-        })
-        .collect();
+    let allowed = target_kinds(features, used);
     if allowed.is_empty() {
         return None;
     }
@@ -525,4 +508,31 @@ pub(crate) fn gen_target(
     }
     debug_assert!(target_valid(&t));
     Some(t)
+}
+
+/// The target kinds `gen_target` may draw for `used` under `features` (empty: it returns
+/// `None`, having changed nothing).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn target_kinds(features: &FeatureSet, used: TargetUse) -> Vec<TargetKind> {
+    let any_key = OptionKey::ALL
+        .into_iter()
+        .any(|k| features.contains(Feature::Option(k)));
+    TargetKind::ALL
+        .into_iter()
+        .filter(|&k| {
+            let mut one = FeatureSet::EMPTY;
+            target_features(
+                &Target {
+                    kind: k,
+                    ..Target::TEMP
+                },
+                used,
+                &mut one,
+            );
+            let ok = one
+                .iter()
+                .all(|f| matches!(f, Feature::Option(_)) || features.contains(f));
+            ok && (k != TargetKind::Option || any_key)
+        })
+        .collect()
 }

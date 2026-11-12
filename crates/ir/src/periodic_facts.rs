@@ -101,13 +101,15 @@ impl DetailFacts for Hb {
         } else {
             1
         };
+        // Each list right after its elements: the parse appends it there.
         let t: Vec<ExprId> = (0..n)
             .map(|_| g.expr(b, features, Reads::Constant))
             .collect();
+        let tones = b.exprs(&t);
         let h: Vec<ExprId> = (0..n)
             .map(|_| g.expr(b, features, Reads::Constant))
             .collect();
-        let (tones, harmonics) = (b.exprs(&t), b.exprs(&h));
+        let harmonics = b.exprs(&h);
         let intermod = if has(features, RunExtra::HbIntermod) && g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {
