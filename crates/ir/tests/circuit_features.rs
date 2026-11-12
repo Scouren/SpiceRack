@@ -1656,4 +1656,20 @@ mod tests {
         assert!(!with(ModelFamily::Other));
         assert!(with(ModelFamily::Resistor));
     }
+
+    /// A25: a library of family F states F, as a model of F does.
+    #[test]
+    fn a_device_library_uses_its_family() {
+        let mut d = Design::new();
+        let top = deck(&mut d);
+        d.builder().device_library(
+            top,
+            DeviceLibrary {
+                path: NameId::NONE,
+                family: ModelFamily::Bsim4,
+            },
+            Span::NONE,
+        );
+        assert!(features_used(&d).contains(Feature::Family(ModelFamily::Bsim4)));
+    }
 }
