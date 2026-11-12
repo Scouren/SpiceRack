@@ -32,8 +32,8 @@ use crate::passive::{Coupling, IcMode, Passive, TcBase, TcLaw};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::source::{DcRule, PortSpec, Source};
 use crate::wave::{
-    Am, AmModTime, Exp, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw, Sin,
-    TdFrom, WaveKind, WaveRef,
+    Am, AmModTime, Exp, GivenZero, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm,
+    SffmLaw, Sin, TdFrom, WaveKind, WaveRef,
 };
 
 /// Adds the element's kind, its waveform's kind and its circuit extras.
@@ -426,6 +426,23 @@ fn pre(p: PreDelay, offset: X, hold: X, zero: X) -> X {
 
 fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
     let some = |x: ExprId| x != ExprId::NONE;
+    // A17: the zero rule of the waves that have one
+    let rule = match w.kind {
+        WaveKind::Pulse => get_row::<Pulse>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Sin => get_row::<Sin>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Exp => get_row::<Exp>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Sffm => get_row::<Sffm>(design, w.index).map(|p| p.given_zero),
+        WaveKind::Pwl
+        | WaveKind::Am
+        | WaveKind::TrNoise
+        | WaveKind::TrRandom
+        | WaveKind::Pattern => None,
+    };
+    match rule {
+        Some(GivenZero::AsGiven) => add(X::GivenZeroAsGiven),
+        Some(GivenZero::SpiceDefault) => add(X::GivenZeroSpiceDefault),
+        None => {}
+    }
     match w.kind {
         WaveKind::Pulse => {
             if let Some(p) = get_row::<Pulse>(design, w.index) {

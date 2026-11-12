@@ -47,7 +47,7 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 | passives | resistor, capacitor, inductor | `Passive` (`passive.rs`) | `value` (Ω, F, H; `NONE` when only the model gives it), `ic` + `ic_mode`, `tc1`, `tc2`, `temp_abs`, `dtemp` (two fields: Xyce and VACASK have both, HSPICE only the offset), `noisy`, `parasitics` (row or `NONE`: `rser lser rpar cpar rlshunt`, LTspice's; the builders take them too); for a value that reads the circuit, `tc_base: TcBase::{Tnom, Fixed27}` (ngspice measures its `tc1`/`tc2` from 27 °C whatever `tnom` is, `asrcload.c:41`) and, on a capacitor, `tc_law: TcLaw::{Direct, Reciprocal}` (ngspice divides by the polynomial, `inpcom.c:6747`); `Fixed27` and `Reciprocal` elsewhere are `FieldDomain` (A15 C2) |
 | charge capacitor | charge-defined capacitor | `Behav` with `OutKind::Charge` | one construct, five spellings (`INV-constructs` D5) |
 | coupling | coupling | `Coupling { inductors: NameList, k: ExprId }` | no terminals; every listed pair is coupled by `k`; `k` may be an expression |
-| sources | voltage source, current source, RF port | `Source` (`source.rs`) | three independent slots: `dc` (what `.op`/`.dc` read) with `dc_rule: DcRule::{Given, WaveAtZero}` (A12 C4: `dc` is `NONE` exactly under `WaveAtZero`, the wave's t = 0 value; ngspice has `WaveAtZero` for SIN, PULSE, EXP, PWL, VACASK for every wave, and VACASK lacks `Given` with a wave: features `DcGivenWithWave`, `DcAtZero<Wave>`), `ac_mag` + `ac_phase_deg` (`NONE` = no AC stimulus), `wave` (`NONE` = the transient holds `dc`); `distof1`, `distof2`; `tc1`, `tc2` (Spectre scales the whole waveform); `parasitics`; port fields `port_index`, `z0`, with the value convention pinned as the EMF behind `z0` (Spectre's user value is half of it: its reader doubles) |
+| sources | voltage source, current source, RF port | `Source` (`source.rs`) | three independent slots: `dc` (what `.op`/`.dc` read) with `dc_rule: DcRule::{Given, WaveAtZero}` (A12 C4: `dc` is `NONE` exactly under `WaveAtZero`, the wave's t = 0 value; ngspice and VACASK have `WaveAtZero` for every wave (R36: ngspice's operating point runs the wave's own law at t = 0, `vsrcload.c:73-86`; SFFM and AM give 0 there because their law is 0 up to the delay, a random wave its offset), and VACASK lacks `Given` with a wave: features `DcGivenWithWave`, `DcAtZero<Wave>`), `ac_mag` + `ac_phase_deg` (`NONE` = no AC stimulus), `wave` (`NONE` = the transient holds `dc`); `distof1`, `distof2`; `tc1`, `tc2` (Spectre scales the whole waveform); `parasitics`; port fields `port_index`, `z0`, with the value convention pinned as the EMF behind `z0` (Spectre's user value is half of it: its reader doubles) |
 | linear controlled | VCVS, VCCS, CCCS, CCVS | `Controlled { gain, sense: NameId }` | terminals (out+, out−, ctl+, ctl−) or (out+, out−) + the sensing element's name |
 | polynomial | one kind, `output: V \| I`, `control: Voltage \| Current` | `Poly { dimension, controls: NameList, coeffs: ExprList }` | stays `Poly`; expanding it is a pass |
 | table | one kind | `Table { input: ExprId, points: ExprList, law: TableLaw, output }` | linear between points, ends held; ngspice's native TABLE rounds corners: its own law |
@@ -91,14 +91,34 @@ frequencies in hertz, phases in degrees.
 
 | Wave | Fields | Decisions (evidence in `INV-semantics.md` §5) |
 |---|---|---|
-| `Pulse` | `v1 v2 delay rise fall width period cycles law` | `cycles == NONE` means unlimited; a zero `rise` means an ideal edge (5.04, 5.05); `law: PulseLaw::{Spice, Vacask}` (A12 C1: VACASK needs `rise > 0`, `fall <= 0` is no falling edge, `period <= 0` one pulse) |
-| `Sin` | `offset amplitude freq delay damping phase_deg cycles pre` | `phase_deg` is the phase at `t = delay`; `pre` says what the source is before the delay (5.06, 5.07) |
-| `Exp` | `v1 v2 td1 tau1 td2 tau2 td2_from` | `td2` counts from `td2_from: TdFrom::{Zero, Td1}` (A12 C2: SPICE from 0, VACASK from `td1`; the reader no longer adds) (5.08) |
+| `Pulse` | `v1 v2 delay rise fall width period cycles law given_zero` | `cycles` above 0 is a count, `NONE` or any other value unlimited (A17); a zero `rise` under `AsGiven` is an ideal edge (5.04, 5.05); `law: PulseLaw::{Spice, Vacask}` (A12 C1: VACASK needs `rise > 0`, `fall <= 0` is no falling edge, `period <= 0` one pulse) |
+| `Sin` | `offset amplitude freq delay damping phase_deg cycles pre given_zero` | `phase_deg` is the phase at `t = delay`; `pre` says what the source is before the delay: ngspice `HoldDelayValue` (A17, from `vsrcload.c`); Xyce and HSPICE as their slices confirm (5.06, 5.07) |
+| `Exp` | `v1 v2 td1 tau1 td2 tau2 td2_from given_zero` | `td2` counts from `td2_from: TdFrom::{Zero, Td1}` (A12 C2: SPICE from 0, VACASK from `td1`; the reader no longer adds) (5.08) |
 | `Pwl` | `points` (t, v pairs, absolute times), `delay`, `repeat_from`, `repeat_join` | relative times are accumulated by the reader; a deck with no `t = 0` point gets the one its simulator implies (HSPICE ramps from the DC value, ngspice holds the first value: the reader writes the point) (5.09–5.11) |
-| `Sffm` | `offset amplitude carrier_freq mod_index signal_freq delay phase_c_deg phase_m_deg law pre` | named, never positional; `law` as §1 states the clamp and the defaults only; what it is before the delay is `pre: PreDelay` as for `Sin` and `Am` (A12 C3: VACASK holds its value at `delay`, ngspice is 0) (5.01, 5.02) |
+| `Sffm` | `offset amplitude carrier_freq mod_index signal_freq delay phase_c_deg phase_m_deg law pre given_zero` | named, never positional; `law` as §1 states the clamp and the defaults only; what it is before the delay is `pre: PreDelay` as for `Sin` and `Am` (A12 C3: VACASK holds its value at `delay`, ngspice is 0 for t ≤ delay, the delay included) (5.01, 5.02) |
 | `Am` | the general formula of 5.03 with every term a field, `pre` | each dialect's AM is a restriction of it |
-| `TrNoise`, `TrRandom` | ngspice's fields | time domain only |
+| `TrNoise`, `TrRandom` | ngspice's fields | time domain only, superposed on a given DC value; a `TrRandom` before its first draw and at the operating point is its offset (A17) |
 | `Pattern` | `bits levels delay rise fall sample repeats repeat_start` | 5.22 |
+
+**The zero rule** (AMEND-A12 A17, R35). `Pulse`, `Sin`, `Exp` and `Sffm` carry
+`given_zero: GivenZero::{AsGiven, SpiceDefault}` (features `GivenZeroAsGiven`,
+`GivenZeroSpiceDefault`). Under `AsGiven` every field below is present and means what it holds.
+Under `SpiceDefault` (ngspice, `vsrcload.c:110-226`, `:404-432`) a field below that evaluates to
+zero after parameter substitution, or that the card omits (`NONE`), means its default:
+
+| Wave | Field | Default |
+|---|---|---|
+| `Pulse` | `rise`, `fall` | TSTEP |
+| `Pulse` | `width`, `period` | TSTOP |
+| `Sin` | `freq` | 1/TSTOP |
+| `Exp` | `td1`, `tau1`, `tau2` | TSTEP |
+| `Exp` | `td2` | `td1` + TSTEP |
+| `Sffm` | `carrier_freq` | 500/TSTOP |
+
+A field holds what the card holds: an expression, a literal 0, or `NONE` when omitted. No reader
+copies a default in; a pass that converts `SpiceDefault` to `AsGiven` writes the `TStep` and
+`TStop` leaves (an expression `x` becomes `x == 0 ? TStep : x`). The table is A17's reading; the
+ngspice sources slice sends it with source lines, and a difference changes this table only.
 
 ## 4. Models (`model.rs`)
 
