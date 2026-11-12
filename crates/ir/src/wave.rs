@@ -146,7 +146,14 @@ pub enum PwlJoin {
     RampWidth,
     /// VACASK's periodic PWL (`period=` > 0, A22, R42): on [xN, period) and on [0, x1) of the
     /// wrapped time τ, the value is the line through (xN, yN) and (period + x1, y1), evaluated
-    /// at τ itself; between the points it is the plain PWL.
+    /// at τ itself; between the points it is the plain PWL. So the value jumps at each period
+    /// start and at x1. VACASK 36be560 (`src_pwl.sim`, branch `vc-sources`): points
+    /// (1u, 1) (2u, 3), period 4u give 4.333 at 0, 3.833 at 0.75u, 1 at 1u, 2.667 at 2.5u,
+    /// 1.733 at 3.9u, 4.267 at 4.1u; points (0, 0) (1u, 1), period 2u (x1 = 0) give 0.5 at
+    /// 1.5u and 3.5u. A `delay` shifts τ: before it, and at the operating point, the value
+    /// is the line at τ = 0. VACASK itself refuses x1 = 0 with xN = period and y1 ≠ yN (it
+    /// drops the last point when y1 = yN), and xN > period: the writer's refusals, not
+    /// invariants of this row.
     Extrapolate,
 }
 
