@@ -63,6 +63,13 @@ Decisions:
 - `Tran { stop, record_start, print_step, initial_step, ceiling: StepCeiling (Given(e) | Rule(StepCap)), uic: bool, startup: bool }` (A24: no literal-zero ceiling or `record_start`)
   (R67/A41: `print_step` given is `RunExtra::TranPrintStep`, absent `TranSimulatorStep`; each
   transient sets exactly one, and the generator draws the print step by which twin the set holds)
+  (R68/A42: an analysis's own argument, a DC axis's range and a sweep loop's range are of class
+  at most a parameter's, `Violation::RunArgumentClass`; one that reads a parameter, directly or
+  through a function's body, is `RunExtra::AnalysisParamArgument`; an analysis's output carries
+  no part, `output_valid`'s `FieldDomain`; a `Pss` with its harmonics, points, `sc_iter` or
+  `steady_coeff` absent is `RunExtra::PssArgumentOmitted`. The generator draws these arguments
+  constant, a parameter read and a bound call only with the feature, outputs without a part,
+  and all four `Pss` arguments without the feature.)
   (`INV-semantics.md` 8.01–8.03): every field named, none inferred from another, `NONE` is not 0.
   Each simulator reads the positional `.tran` fields differently (Xyce's first is an initial-step
   guess, ngspice's a print step that also caps the step, HSPICE's extra fields are segments): the

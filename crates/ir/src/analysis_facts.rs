@@ -16,7 +16,9 @@
 //! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
 //! `pub(crate) fn base_just_before`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
 //! `pub(crate) fn fault_of`, `pub(crate) fn dump_of`, `pub(crate) fn parse_of`,
-//! `pub(crate) fn gen_of`, `pub(crate) fn analysis_name` (gen); `RowFacts` for `Analysis`
+//! `pub(crate) fn gen_of`, `pub(crate) fn analysis_name` (gen),
+//! `pub(crate) fn check_run_arguments`, `pub(crate) fn run_arguments_read_param`,
+//! `pub(crate) fn run_arguments` (gen); `RowFacts` for `Analysis`
 
 use crate::analysis::{Analysis, AnalysisKind, RunDetail};
 use crate::build::Builder;
@@ -219,6 +221,11 @@ impl RowFacts for Analysis {
         };
         *set = set.with(Feature::Run(named));
         by_detail!(self.kind, (), features_of(design, self.detail, set));
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        if run_arguments_read_param(design, &handles) {
+            *set = set.with(Feature::Run(RunExtra::AnalysisParamArgument));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
@@ -230,6 +237,9 @@ impl RowFacts for Analysis {
         if let Some(v) = fault {
             report(design, at, v, out);
         }
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        check_run_arguments(design, at, &handles, out);
         let rows = Analysis::table(design).rows();
         let earlier = &rows[..(at.index as usize).min(rows.len())];
         if !self.name.is_none() && earlier.iter().any(|a| a.name == self.name) {
@@ -321,8 +331,10 @@ impl RowFacts for Analysis {
         }
         // The name first: the text, and so the parse, interns it before the detail's names.
         let name = analysis_name(g, b, features);
-        let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
-            .expect("a possible kind's detail generates");
+        let detail = run_arguments(g, features, |g| {
+            by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+        })
+        .expect("a possible kind's detail generates");
         let item = b.push(
             scope,
             Analysis { kind, name, detail },
@@ -345,8 +357,10 @@ impl RowFacts for Analysis {
             if !follow.is_empty() {
                 let kind = follow[g.below(follow.len() as u32) as usize];
                 let name = analysis_name(g, b, features);
-                let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
-                    .expect("a periodic kind generates right after its base");
+                let detail = run_arguments(g, features, |g| {
+                    by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+                })
+                .expect("a periodic kind generates right after its base");
                 b.push(
                     scope,
                     Analysis { kind, name, detail },
@@ -443,6 +457,86 @@ pub(crate) fn analysis_name(g: &mut Gen, b: &mut Builder<'_>, features: &Feature
     .expect("a naming feature is in the set")
 }
 
+/// R68/A42: the constant roots `handles` lists (an analysis's own arguments, a sweep loop's
+/// range) whose class is `Temp` or above, each reported as `RunArgumentClass` at `at`.
+pub(crate) fn check_run_arguments(
+    design: &Design,
+    at: ItemRef,
+    handles: &[Handle],
+    out: &mut Diags,
+) {
+    let table = crate::class::def_classes(design);
+    for (root, use_) in crate::feature::roots_with_use(design, ItemRef::NONE, handles) {
+        let class = crate::class::tree_class(design, root, table);
+        if use_ == ExprUse::Constant && class >= crate::class::ExprClass::Temp {
+            let code = violation_code(Violation::RunArgumentClass);
+            out.push_at(code, design, at, root.0);
+        }
+    }
+}
+
+/// R68/A42: whether a constant root `handles` lists (an analysis's own argument, a sweep
+/// loop's range) reads a parameter (`RunExtra::AnalysisParamArgument`): in its own tree, or in
+/// the body of a function it calls, transitively (a formal's read is not one), so inlining a
+/// call neither adds nor removes the feature. O(the roots' trees and the bodies they reach).
+pub(crate) fn run_arguments_read_param(design: &Design, handles: &[Handle]) -> bool {
+    let roots = crate::feature::roots_with_use(design, ItemRef::NONE, handles);
+    let mut work: Vec<ExprId> = roots
+        .into_iter()
+        .filter(|&(_, use_)| use_ == ExprUse::Constant)
+        .map(|(root, _)| root)
+        .collect();
+    let mut called: Vec<crate::id::DefId> = Vec::new();
+    let mut nodes = Vec::new();
+    // bounded: each root once, each function body once
+    while let Some(root) = work.pop() {
+        nodes.clear();
+        crate::class::tree_nodes(design, root, &mut nodes);
+        for &e in &nodes {
+            match design.expr(e) {
+                crate::expr::Expr::Param(r) => {
+                    let formal = r
+                        .def
+                        .index_checked(design.defs.len())
+                        .is_some_and(|k| design.defs[k].kind == DefKind::Func);
+                    if !formal {
+                        return true;
+                    }
+                }
+                crate::expr::Expr::UserCall(r, _) => {
+                    let Some(k) = r.def.index_checked(design.defs.len()) else {
+                        continue;
+                    };
+                    let def = design.defs[k];
+                    let body = def.kind == DefKind::Func && def.item.kind == ItemKind::Func;
+                    if body && !called.contains(&r.def) {
+                        called.push(r.def);
+                        work.push(design.row::<crate::item::Func>(def.item.index).body);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+/// Runs `f` with the generator drawing an analysis's own arguments (R68/A42): constant class
+/// only, and a parameter read only when the set holds `AnalysisParamArgument`.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn run_arguments<T>(
+    g: &mut Gen,
+    features: &FeatureSet,
+    f: impl FnOnce(&mut Gen) -> T,
+) -> T {
+    let saved = (g.constant_only, g.param_reads);
+    let reads = features.contains(Feature::Run(RunExtra::AnalysisParamArgument));
+    (g.constant_only, g.param_reads) = (true, saved.1 && reads);
+    let value = f(g);
+    (g.constant_only, g.param_reads) = saved;
+    value
+}
+
 // ---- private ----
 
 /// Whether `kind`'s detail generator succeeds here under `features` (its only failures; the
@@ -464,7 +558,11 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
                     .into_iter()
                     .any(has))
         }
-        AnalysisKind::Pss => has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous),
+        AnalysisKind::Pss => {
+            (has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous))
+                && (has(RunExtra::PssArgumentOmitted)
+                    || has(RunExtra::PssScIter) && has(RunExtra::PssSteadyCoeff))
+        }
         AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {
             base_just_before(b.design(), scope) && sweep_possible(features, SweepUse::Freq)
         }

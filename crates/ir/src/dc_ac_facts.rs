@@ -21,7 +21,7 @@
 //!
 //! Contents: `DetailFacts` for `Dc`, `Ac`, `Noise`, `Tf` (`DcXf`, `Xf`, `Sens`, `SensAc`:
 //! `xf_facts.rs`; `Pz`, `Sp`, `Net`, `Disto`, `TimedOp`: `network_facts.rs`);
-//! `pub(crate) fn output_valid`
+//! `pub(crate) fn output_valid`, `pub(crate) fn gen_output` (gen)
 
 use crate::analysis_facts::DetailFacts;
 use crate::build::Builder;
@@ -44,7 +44,7 @@ use crate::plan::{
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
 use crate::probe::{
-    Probe, ProbeKind, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
+    AcPart, Probe, ProbeKind, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
 };
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
@@ -61,9 +61,21 @@ use crate::text::Words;
 use crate::text_expr::Ctx;
 
 /// Whether `p` is a valid analysis output: a node voltage, a voltage between nodes or a branch
-/// current.
+/// current, with no part (R68/A42: the dB of a noise or transfer output means nothing on any
+/// simulator we run).
 pub(crate) fn output_valid(p: &Probe) -> bool {
-    probe_valid(p) && matches!(p.kind, ProbeKind::V | ProbeKind::Vdiff | ProbeKind::I)
+    probe_valid(p)
+        && matches!(p.kind, ProbeKind::V | ProbeKind::Vdiff | ProbeKind::I)
+        && p.part == AcPart::None
+}
+
+/// A generated analysis output: a node voltage, a voltage between nodes or a branch current
+/// the set allows, with no part (`output_valid`).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_output(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> Probe {
+    let mut p = gen_probe(g, b, features, true);
+    p.part = AcPart::None;
+    p
 }
 
 impl DetailFacts for Dc {
@@ -311,7 +323,7 @@ impl DetailFacts for Noise {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let mut output = gen_probe(g, b, features, true);
+        let mut output = gen_output(g, b, features);
         if output.kind == ProbeKind::I && !has(features, RunExtra::NoiseCurrentOutput) {
             output.kind = ProbeKind::V;
         }
@@ -383,7 +395,7 @@ impl DetailFacts for Tf {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let output = gen_probe(g, b, features, true);
+        let output = gen_output(g, b, features);
         Some(Tf {
             output,
             source: g.fresh_name(b),

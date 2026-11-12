@@ -322,7 +322,7 @@ fn every_generated_transient_sets_exactly_one_print_step_member() {
         .iter()
         .enumerate()
     {
-        for seed in 0..200u64 {
+        for seed in 0..400u64 {
             let d = generate(seed, set, SIZE);
             let mut diags = Diags::new();
             check_legal(&d, &FeatureSet::EMPTY, &mut diags);
@@ -348,4 +348,33 @@ fn every_generated_transient_sets_exactly_one_print_step_member() {
         }
     }
     assert!(seen.iter().all(|&n| n > 20), "transients per set: {seen:?}");
+}
+
+#[test]
+fn a_set_without_the_r68_features_draws_neither() {
+    // R68/A42 (2), (4): without `AnalysisParamArgument` no analysis argument or sweep range
+    // reads a parameter; without `PssArgumentOmitted` every periodic steady state states all
+    // four of its optional arguments (VACASK's and ngspice's laws)
+    let drop = [
+        RunExtra::AnalysisParamArgument,
+        RunExtra::PssArgumentOmitted,
+    ];
+    let set = drop.iter().fold(run_set(), |s, &x| {
+        s.minus(FeatureSet::EMPTY.with(Feature::Run(x)))
+    });
+    let (mut analyses, mut psses) = (0, 0);
+    for seed in 0..200u64 {
+        let d = generate(seed, &set, SIZE);
+        let used = features_used(&d);
+        for x in drop {
+            assert!(!used.contains(Feature::Run(x)), "seed {seed}: {x:?}");
+        }
+        let text = text_of(&d);
+        analyses += text.matches("analysis ").count();
+        psses += text.matches("analysis pss").count();
+    }
+    assert!(
+        analyses > 200 && psses > 5,
+        "{analyses} analyses, {psses} pss"
+    );
 }

@@ -358,7 +358,8 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::UserCall)) {
             let def = self.pick_def(b.design(), self.scope, DefKind::Func);
-            let def = if !def.is_none() && self.may_read(def) {
+            // without parameter reads, a bound call reads none either (its body may; R68/A42)
+            let def = if !def.is_none() && self.may_read(def) && self.param_reads {
                 def
             } else {
                 DefId::NONE

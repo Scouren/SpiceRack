@@ -184,9 +184,14 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::DcAxisUnnamed, D, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1"),
     (RunExtra::LoopUnnamed, L, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op"),
     (RunExtra::TranPrintStep, T, "  analysis tran stop=1u cap=none"),
+    // R68/A42: an analysis argument or sweep range that reads a parameter; a pss that omits one
+    // of its four optional arguments
+    (RunExtra::AnalysisParamArgument, "  param k = 1\n  analysis tran stop=(1u * k) print_step=1n cap=none", "  param k = 1\n  analysis tran stop=1u print_step=1n cap=none"),
+    (RunExtra::PssArgumentOmitted, "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10", PF),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
+const PF: &str = "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10 steady_coeff=1m";
 const D: &str = "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1)";
 const A: &str = "  analysis ac (lin start=1 stop=2 step=1)";
 const N: &str = "  analysis noise (v (out)) source=v1 (lin start=1 stop=2 step=1)";
@@ -326,4 +331,28 @@ fn a_threshold_reads_the_circuit_through_a_parameter() {
         !threshold_reads_circuit("  param p = 2\n", "p"),
         "a constant parameter's threshold is not"
     );
+}
+
+#[test]
+fn a_sweep_range_or_an_axis_reading_a_parameter_is_the_feature() {
+    // R68/A42 (2): the sweep range of a loop and of a DC axis count as the analysis's own
+    // arguments; a target that is a parameter does not (oracle: the ruling's words)
+    let x = Feature::Run(RunExtra::AnalysisParamArgument);
+    let decks = [
+        (
+            "  param k = 1\n  loop sweep (temp) (list values=[k])\n    analysis op",
+            true,
+        ),
+        (
+            "  param k = 1\n  analysis dc (source_dc v1) (lin start=0 stop=k step=1)",
+            true,
+        ),
+        (
+            "  param k = 1\n  analysis dc (param k) (lin start=0 stop=1 step=1)",
+            false,
+        ),
+    ];
+    for (deck, uses) in decks {
+        assert_eq!(features(deck).contains(x), uses, "{deck}");
+    }
 }

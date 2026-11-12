@@ -112,6 +112,11 @@ pub enum Violation {
     /// refuse the deck, VACASK gives missing trailing terminals internal nodes). The circuit
     /// owner's row check. `arg`: the terminal count.
     InstancePortCount,
+    /// An analysis's own argument (an expression field of its row, a DC axis's sweep range
+    /// included) or a sweep loop's range whose class is `Temp` or above (R68/A42: ngspice
+    /// evaluates the card once before the run, VACASK rejects `$temp` there). The run owner's
+    /// row check. `arg`: the root.
+    RunArgumentClass,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -122,7 +127,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::InstancePortCount as usize + 1] = [
+    pub const ALL: [Violation; Violation::RunArgumentClass as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -145,6 +150,7 @@ impl Violation {
         Violation::StringOrListBody,
         Violation::StringOrListField,
         Violation::InstancePortCount,
+        Violation::RunArgumentClass,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
