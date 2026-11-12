@@ -1,0 +1,5 @@
+# codes:
+file "save_script.sp" deck
+  title "save_script"
+  comment " oracle: ngspice-45 breakp2.c com_save, settrace, copynode (a script's save holds from where it stands; v(a), i(x), all read as .save's)"
+  save from_here (all_v) (all_branch_i) (v (a)) (i (v1))

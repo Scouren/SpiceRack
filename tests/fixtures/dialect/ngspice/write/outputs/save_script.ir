@@ -1,0 +1,4 @@
+# oracle: ngspice-45 breakp2.c com_save (a script's save holds from where it stands; copynode reads v(a), i(x), all as .save's gettoks does); written by hand
+file "save_script.sp" deck
+  title "save_script"
+  save from_here (all_v) (all_branch_i) (v (a)) (i (v1))
