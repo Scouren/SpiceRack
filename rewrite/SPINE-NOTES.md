@@ -187,6 +187,11 @@ Each line: question → choice → why.
     (`Untyped`, `TypedOnly`; `cases()`), the reach list over their union; the failure text names
     the setting. The `ScopeOwner` workaround is gone (kernel 7100faa1: check walks live scopes).
 
+42. Removing an item → `Editor::remove_item(scope, item)` everywhere the spine drops one
+    (`legalize`'s foreign inert/hint opaques, the pass tests' stubs, the laws' shrinker): it takes
+    the item's definitions out of the index too (kernel ed27e47d reports a stale one, X0018).
+    The shrinker removes an item once even when two rows name it.
+
 ## Requests (ruled by the lead)
 
 1. Strict code: the spine's own (`S0101`). Done.

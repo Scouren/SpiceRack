@@ -7,7 +7,8 @@
 //! Cites: `rewrite/AMEND-A12.md` A23; `rewrite/IR-KERNEL.md` C11 (explicit stacks).
 //!
 //! Contents: `pub fn rewrite_exprs(&mut Design, &mut dyn FnMut(&mut Builder<'_>, ExprId) ->
-//! Option<ExprId>) -> u32`, `pub fn rewrite_exprs_in(&mut Design, Form, …) -> u32`
+//! Option<ExprId>) -> u32`, `pub fn rewrite_exprs_in(&mut Design, Form, …) -> u32`,
+//! `pub fn rewrite_tree(&mut Builder<'_>, ExprId, …) -> ExprId`
 
 use crate::build::Builder;
 use crate::design::Design;
@@ -63,6 +64,25 @@ pub fn rewrite_exprs_in(
     rewrite_where(design, Some(form), rule)
 }
 
+/// Rewrites the one tree under `root` bottom-up by `rule` and returns its new root (`root`
+/// itself when nothing changed): a per-root twin of `rewrite_exprs` for a pass whose rule
+/// depends on where the copy goes (R53: a default copied to each instance). Its own memo; rows
+/// are appended, so the old tree and every root pointing at it are untouched; nothing is
+/// stored back. Explicit stack.
+pub fn rewrite_tree(
+    b: &mut Builder<'_>,
+    root: ExprId,
+    rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
+) -> ExprId {
+    let n = b.design().expr_count();
+    if root.is_none() || root.index() >= n {
+        return root;
+    }
+    let mut memo = vec![ExprId::NONE; n];
+    rewrite_into(b, root, &mut memo, rule);
+    memo[root.index()]
+}
+
 // ---- private ----
 
 /// The walk of `rewrite_exprs` (`only` `None`) and `rewrite_exprs_in`: roots read through
@@ -97,7 +117,7 @@ fn rewrite_where(
     {
         let mut b = design.builder();
         for root in roots {
-            rewrite_tree(&mut b, root, &mut memo, rule);
+            rewrite_into(&mut b, root, &mut memo, rule);
         }
     }
     // store the chosen roots back through each row's own walk
@@ -124,7 +144,7 @@ fn rewrite_where(
 /// Rewrites the tree under `root` into `memo`, post-order with an explicit stack. Only rows
 /// that existed before the pass (`memo`'s length) are visited; a child not below its parent (a
 /// broken design) is kept as it is.
-fn rewrite_tree(
+fn rewrite_into(
     b: &mut Builder<'_>,
     root: ExprId,
     memo: &mut [ExprId],
