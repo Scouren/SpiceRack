@@ -6,4 +6,6 @@ control
   analysis a4 ac from=1 to=1k mode="oct" points=3
   analysis a5 ac values=[1k, 2k, 5k]
   analysis a6 ac from=1 to=1k mode="dec" points=n
+  analysis a7 ac from=1 to=1k mode="lin" points=n-1
+  analysis a8 ac from=1 to=1k mode="lin" points=n
 endc

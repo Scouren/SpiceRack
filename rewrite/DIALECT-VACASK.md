@@ -363,7 +363,12 @@ VACASK (a candidate feature), or VACASK's own limit.
 | W2203 (coupling) | S4.2 | a mutual coupling with a multiplicity (VACASK "Parameter '$mfactor' not found.", run src_r_mfactor; ngspice-45 "unknown parameter (m)") | IR invariant (`Coupling.mult` NONE) |
 | W2203 (sources) | S4.2 | a source, controlled source or line with untyped instance parameters (VACASK "Parameter 'foo' not found.", run src_r_foo; ngspice-45 "unknown parameter (foo)"; Spectre's sources take some, no run) | feature, settled by the Spectre slice |
 | W2006 | S4.0 | `to_real` in a parameter expression of class Temp: R52's deferred gap (c) (the bare read in a behavioural source is A33's `BehavUntypedParam`, which `FEATURES` lacks) | feature |
-| W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp` or `rpar` (ngspice's B has them) | feature |
+| W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp`, `rpar` (ngspice's B has them) or a multiplicity (`MultOther` covers it with lines; law L5 seed 15) | feature |
+| W2109 | S4.1 | an unresolved element with a multiplicity (`$mfactor` is a parameter on a subckt that declares it: it reads back as one; law L5 seed 1) | VACASK's own |
+| W2311 | S4.3 | a `dcxf`, `acxf` or `noise` output that is no node or node pair (`ProbeI` is held for saves; law L5 seed 37) | feature (R58's grain: a probe kind per use) |
+| W2310 | S4.3 | an `mc` loop inside another (VD cmd-analysis-mc: no nesting; law L5 seed 20) | VACASK's own |
+| W2308 | S4.3 | a node set that no analysis line taking its list follows (law L5 seed 12) | VACASK's own |
+| W2309 | S4.3 | a source-DC sweep whose path names no independent source from the top (law L5 seed 15) | VACASK's own |
 | W2108 | S4.1 | an element whose kind is not the one its model's family gives | feature |
 | W2304 | S4.3 | an option row of a key only another simulator has | feature |
 | W2307 | S4.3 | a sweep of the DC value of a source whose DC is its wave at zero (VACASK reads `dc` only while the type is dc: settle run/sweep_source, e = 0 0 where ngspice-45's `.dc` gives 2 4) | feature (R64: a pass giving the source its wave's value at zero as a given DC, written as R42's fold, would convert it) |
@@ -375,7 +380,7 @@ VACASK (a candidate feature), or VACASK's own limit.
 | W2101 | S4.1 | a name with white space or a line break | VACASK's own |
 | W2102 | S4.1 | a parameter the shipped module lacks; a user module's `version=` | VACASK's own |
 | W2103 | S4.1 | two libraries of one family whose files hold different modules | VACASK's own |
-| W2104 | S4.1 | a master no visible model or subckt statement names (VACASK takes the kind from the master) | VACASK's own |
+| W2104 | S4.1 | a master no visible model or subckt statement names (VACASK takes the kind from the master), a source's included (law L5 seed 1) | VACASK's own |
 | W2105 (module half) | S4.1 | a device against its shipped module's terminal count | VACASK's own |
 | W2107 | S4.1 | a model of a family no run proved a VACASK module implements (R41 a) | VACASK's own |
 | W2303 | S4.3 | a save shape VACASK has no directive for (R29, S12) | VACASK's own |

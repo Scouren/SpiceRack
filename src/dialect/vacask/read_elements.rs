@@ -204,11 +204,20 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        super::write_elements::UNRESOLVED_MULT,
+        ir::Info {
+            title: "an unresolved element with a multiplicity",
+            cite: "VD cir-mfactor; DIALECT-VACASK run n2 (\"Parameter '$mfactor' not found.\" on a subcircuit that does not declare it)",
+            explain: "VACASK's $mfactor is the multiplicity on a device and an ordinary parameter on a subcircuit that declares it; an element whose master is unknown reads its $mfactor back as a parameter, so its multiplicity has no VACASK spelling.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
         super::write_elements::BEHAV_FIELD,
         ir::Info {
-            title: "a behavioural source with a temperature or parallel-resistance field",
+            title: "a behavioural source with a temperature, parallel-resistance or multiplicity field",
             cite: "VD dev-builtin-behavioral (parameters: v/potential, i/flow, expr, declarations, evaluation, discipline)",
-            explain: "VACASK's behavioural source takes its expression only; tc1, tc2, temp, dtemp and rpar have no VACASK spelling on it.",
+            explain: "VACASK's behavioural source takes its expression only; tc1, tc2, temp, dtemp, rpar and $mfactor have no VACASK spelling on it.",
             kind: ir::Kind::Refusal,
         },
     ),
