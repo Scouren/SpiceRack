@@ -14,7 +14,7 @@ use spicerack_ir::measure::{MeasureParam, MeasureWhen};
 use spicerack_ir::periodic::{FreqAxis, Hb, HbTruncate, Pac, Pss, PssMode};
 use spicerack_ir::plan::{MonteCarlo, Sampler, SweepLoop, TableLoop, Variations};
 use spicerack_ir::stats::Correlation;
-use spicerack_ir::tran::{Four, StepCap, Tran};
+use spicerack_ir::tran::{Four, StepCap, StepCeiling, Tran};
 use spicerack_ir::{
     Alter, Analysis, AnalysisKind, AnalysisKinds, Applies, Builder, Design, Diags, Edge, Elaborate,
     Env, Event, ExprId, IcScope, List, Loop, LoopEnd, LoopKind, Measure, MeasureKind, NameId,
@@ -48,6 +48,20 @@ const BROKEN: &[Fixture] = &[
         let x = [b.num(1e-9)];
         let segments = b.exprs(&x);
         let tr = Tran { segments, ..tran(b) };
+        raw(b, s, AnalysisKind::Tran, tr);
+    }),
+    ("tran with a literal-zero ceiling", Violation::FieldDomain, |b, s| {
+        let zero = b.num(0.0);
+        let tr = Tran { ceiling: StepCeiling::Given(zero), ..tran(b) };
+        raw(b, s, AnalysisKind::Tran, tr);
+    }),
+    ("tran with an absent given ceiling", Violation::FieldDomain, |b, s| {
+        let tr = Tran { ceiling: StepCeiling::Given(NO), ..tran(b) };
+        raw(b, s, AnalysisKind::Tran, tr);
+    }),
+    ("tran recording from the literal 0", Violation::FieldDomain, |b, s| {
+        let zero = b.num(0.0);
+        let tr = Tran { record_start: zero, ..tran(b) };
         raw(b, s, AnalysisKind::Tran, tr);
     }),
     ("lin sweep with step and points", Violation::FieldDomain, |b, s| {
@@ -216,13 +230,12 @@ fn tran(b: &mut Builder<'_>) -> Tran {
         stop,
         record_start: NO,
         print_step: step,
-        max_step: NO,
         initial_step: NO,
         noise_fmax: NO,
         noise_fmin: NO,
         noise_seed: NO,
         segments: List::EMPTY,
-        cap: StepCap::None,
+        ceiling: StepCeiling::Rule(StepCap::None),
         uic: false,
         startup: false,
     }

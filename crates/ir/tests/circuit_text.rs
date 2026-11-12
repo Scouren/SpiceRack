@@ -597,4 +597,66 @@ mod tests {
             );
         });
     }
+
+    /// The spine's mutation law (ir-spine 51cd4f21, `tests/dialect_mutants.rs`): an element or
+    /// model line the builder would assert on is one `TEXT_SYNTAX` row and pushes no item, as the
+    /// kernel rows' reader does (`item_text.rs`). Oracle: `check` of what was read reports
+    /// nothing, and no element or model item exists.
+    #[test]
+    fn a_line_the_builder_would_refuse_pushes_nothing() {
+        let cases = [
+            // FieldDomain: a key of another kind leaves a resistor without its value
+            "file \"rc.sp\" deck\n  element resistor r2 (out gnd) dc=(1 / 2)\n",
+            // TerminalCount: a broken terminal list
+            "file \"rc.sp\" deck\n  element resistor r1 out) value=1\n",
+            // a code model without its word
+            "file \"rc.sp\" deck\n  model m1 code_model\n",
+            // a module model without its module
+            "file \"rc.sp\" deck\n  model m2 module\n",
+        ];
+        // DuplicateElement: a second element of one whole name in one scope (the first stays)
+        let text = "file \"rc.sp\" deck\n  subckt div (in out gnd) r=1\n    element resistor r1 (in out) value=r\n    element resistor r1 (in out) value=r\n";
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        parse(text, &mut d.builder(), &mut diags);
+        let codes: Vec<_> = diags.rows().iter().map(|r| r.code).collect();
+        assert_eq!(codes, vec![spicerack_ir::diag::TEXT_SYNTAX], "{text}");
+        let elements = d
+            .reachable()
+            .into_iter()
+            .filter(|(i, _)| i.kind == spicerack_ir::ItemKind::Element)
+            .count();
+        assert_eq!(elements, 1, "{text}");
+        let mut checked = Diags::new();
+        spicerack_ir::check(&d, &mut checked);
+        assert!(checked.is_empty(), "{text}: {:?}", checked.rows());
+        for text in cases {
+            let mut d = Design::new();
+            let mut diags = Diags::new();
+            parse(text, &mut d.builder(), &mut diags);
+            assert!(!diags.is_empty(), "{text}");
+            assert!(
+                diags
+                    .rows()
+                    .iter()
+                    .all(|r| r.code == spicerack_ir::diag::TEXT_SYNTAX),
+                "{text}: {:?}",
+                diags.rows()
+            );
+            let items: Vec<_> = d
+                .reachable()
+                .into_iter()
+                .filter(|(i, _)| {
+                    matches!(
+                        i.kind,
+                        spicerack_ir::ItemKind::Element | spicerack_ir::ItemKind::Model
+                    )
+                })
+                .collect();
+            assert!(items.is_empty(), "{text}: {items:?}");
+            let mut checked = Diags::new();
+            spicerack_ir::check(&d, &mut checked);
+            assert!(checked.is_empty(), "{text}: {:?}", checked.rows());
+        }
+    }
 }

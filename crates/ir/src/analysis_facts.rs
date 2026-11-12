@@ -38,6 +38,8 @@ use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::loop_depth;
 use crate::run_words::{put_name, take_enum, take_name, word};
+#[cfg(any(test, feature = "gen"))]
+use crate::sweep::{SweepUse, sweep_possible};
 use crate::text::Words;
 use crate::text_expr::Ctx;
 use crate::tran::{Four, Tran};
@@ -124,7 +126,7 @@ pub(crate) fn detail_get<D: RunDetail>(design: &Design, index: u32) -> Option<D>
 
 /// Appends violation `v` of item `at` (`arg`: the item's row).
 pub(crate) fn report(design: &Design, at: ItemRef, v: Violation, out: &mut Diags) {
-    out.push(violation_code(v), design.span_of(at), at.index);
+    out.push_at(violation_code(v), design, at, at.index);
 }
 
 /// Whether an `Hb` or `Pss` analysis comes before position `pos` of `scope` in run order: in
@@ -322,7 +324,9 @@ impl RowFacts for Analysis {
         {
             let follow: Vec<AnalysisKind> = PERIODIC
                 .into_iter()
-                .filter(|&k| features.contains(Feature::Analysis(k)))
+                .filter(|&k| {
+                    features.contains(Feature::Analysis(k)) && possible(k, b, scope, features)
+                })
                 .collect();
             if !follow.is_empty() {
                 let kind = follow[g.below(follow.len() as u32) as usize];
@@ -436,24 +440,24 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
         }
         AnalysisKind::Pss => has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous),
         AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {
-            base_just_before(b.design(), scope)
+            base_just_before(b.design(), scope) && sweep_possible(features, SweepUse::Freq)
         }
-        AnalysisKind::Op
-        | AnalysisKind::Dc
-        | AnalysisKind::Ac
+        AnalysisKind::Dc => sweep_possible(features, SweepUse::Dc),
+        AnalysisKind::Ac
         | AnalysisKind::Noise
+        | AnalysisKind::Xf
+        | AnalysisKind::SensAc
+        | AnalysisKind::Sp
+        | AnalysisKind::Disto
+        | AnalysisKind::Stb => sweep_possible(features, SweepUse::Freq),
+        AnalysisKind::Op
         | AnalysisKind::Tf
         | AnalysisKind::DcXf
-        | AnalysisKind::Xf
         | AnalysisKind::Sens
-        | AnalysisKind::SensAc
         | AnalysisKind::Pz
-        | AnalysisKind::Sp
         | AnalysisKind::Net
         | AnalysisKind::Four
-        | AnalysisKind::Disto
         | AnalysisKind::Hb
-        | AnalysisKind::Stb
         | AnalysisKind::DcInc
         | AnalysisKind::TimedOp => true,
     }

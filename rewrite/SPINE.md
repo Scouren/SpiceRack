@@ -139,15 +139,21 @@ any other edge, a pass of one group importing another group included.
 **Laws** (`tests/pass_laws.rs`, generic over `GROUPS`, failing passes compared by name with a
 strict `KNOWN` list; a law that runs on no generated design for a pass fails for it), over
 generated designs that use the pass's `removes` and over ones that do not: P1 `ir::check` is
-clean after it; P2 every item still carrying `removes` (by `ir::check_legal`) has a note of the
+clean after it; P2 every item still carrying `removes` (by `ir::check_legal`, matched by `Diag::item`, never by span: a generated item has none) has a note of the
 pass at it, every other has lost it; P3 the output uses nothing outside the input's features
 plus `requires`; P4 running it twice equals running it once (IR text equal); P5 on a design
 without the feature nothing changes (IR text equal). Meaning (the reference evaluator, or a
 simulator on both forms) is each pass's own test.
 
+**Files and rows.** A pass registry row is one `Pass`; a rule whose rows share their code (12
+rows for `fold_constant_bitops`, one per operator; two for `substitute_tran_leaves`, `TStep` and
+`TStop`) keeps them in one file, the rule's: the file is named for the rule, each row's
+`Pass::name` is the row's own, and the row's fixtures live in its own folder.
+
 **Fixtures.** `tests/fixtures/passes/<group>/<pass>/<case>.ir` and `<case>.out.ir`, and
 `<case>.notes` when the pass appends a row (A26: the codes it appends, one a line, in order,
-`#` comments): the pass laws read each case, run its pass, compare the codes with `.notes`
+`#` comments): the pass laws read each case, run the row named `<pass>` (the folder is the row's name, not its file's),
+compare the codes with `.notes`
 (a case whose pass appends a row and has no `.notes` fails), check, and compare the written
 text; a folder naming no registered pass fails. The golden walk excludes `tests/fixtures/passes/`.
 
@@ -189,9 +195,14 @@ laws run on.
   to its sides (L1–L8; L6 over a corpus only under `--features corpus`; L9 belongs to each
   dialect's own simulator tests). Generated designs come from `ir::gen::generate(seed,
   row.write.features(), size)`; seeds are fixed and printed on failure. L4 reads: `write` is
-  total over a design `legalize` accepted; a generated design `legalize` refuses (`admits`) is
-  skipped and counted, and the law fails when no admitted design holds an item kind the
-  writer's features claim. In this slice the only
+  total over a design `legalize` accepted. A generated design the row refuses is shrunk to what
+  it admits (A25, R48): the items its refusals name (`Diag::item`) are dropped from their
+  listing scopes, then the items `ir::check` no longer accepts, to a fixpoint bounded by the item
+  count, and the laws run on the rest; a refusal at no item skips the seed, counted by code in
+  the failure text. A law that runs on no design fails. The reach list: every `Item`, `Elem`,
+  `Wave`, `Analysis` and `Family` kind of the writer's features is used by some admitted design
+  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list. So a writer's `admits`
+  pushes each refusal at its item (`Diags::push_at`); a refusal at no item costs the seed. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden
   edge: a file under `src/dialect/<d>/` importing another dialect (except a declared parent),
@@ -202,6 +213,45 @@ laws run on.
   a subcircuit, an element, an analysis); a refusal when `PASSES` cannot remove a feature a stub
   writer lacks; `Policy::Strict` refusing an `Unread`; the facade's message format; the route
   override.
+
+## 8a. The pair test (`tests/test_pair.rs`, from the trunk merge)
+
+One binary, one cell per (source, target) pair it lists (`ngspice→vacask`, `vacask→ngspice`
+first). A listed cell whose two rows are not both in `BUILTIN` with the sides it needs fails: it
+never skips, so the binary lands with the trunk. The harness is the spine's (`dialect::read`
+strict for authored decks, lenient for corpus decks; one `dialect::legalize`; `dialect::write`
+per file); `tests/test_cross_sim/sim.rs` and `cmp.rs` move to `tests/common/` and are shared.
+
+**Oracles, per deck, in this order; the first failure names the component** (REWRITE-PLAN
+§7.4): 1 read (no refusal, `ir::check` clean, no `Unread` under strict) → the source reader;
+2 legalize (no refusal, unless the cell's list expects it with its code) → a pass or a
+`FEATURES`; 3 the target text read back by the target's reader `eq_meaning` the legalized design
+→ the target dialect; 4 numbers: the source simulator on the source deck and the target simulator
+on the written text, every vector of every plot at the tolerances of `tests/common/cmp.rs` →
+the target writer, or the simulators; 5 names: every source vector has its counterpart under
+the run's rename map; 6 the written bytes equal under 1 and 8 jobs.
+
+**Tolerances** are stated once, in `cmp.rs`, each with the arithmetic that derives it from the
+simulators' own (RELTOL, VNTOL, ABSTOL, the transient's step control): op/dc/ac within
+2·(RELTOL·swing + floor), RELTOL 1e-3, floor VNTOL 1e-6 V or ABSTOL + GMIN·Vmax; a transient
+within 1e-2 of the swing + 2·VNTOL in a 1 % time tube. A deck may tighten them, never loosen.
+
+**A deck, added without touching the harness** (the owners of the facts add them: each pass's
+simulator proof is a pair deck; each dialect area adds one deck for its statements):
+- `tests/fixtures/pair/<cell>/<deck>.<ext>`: the source deck in the source dialect's own
+  extension (`.sp`, `.sim`), with its analyses; nothing else is needed for the defaults.
+- optional `tests/fixtures/pair/<cell>/<deck>.pair`: one `key = value` a line, `#` comments:
+  `owner = <agent or area>`, `proves = <pass or statement>`, and tightenings only:
+  `reltol = <≤ 1e-3>`, `vntol = <≤ 1e-6>`, `abstol = <≤ the default>`, `tube = <≤ 0.01>`,
+  `vectors = <name> …` (compare these only; default: every vector). A key that would loosen a
+  tolerance fails the deck.
+- expected failures in `tests/fixtures/pair/<cell>.txt`, one a line:
+  `<deck> <step 1..6> <class> <proof>` (the classes and proof forms of the cross-sim lists),
+  compared by name both ways: a listed deck that passes, or fails at another step, fails.
+
+The merge tier runs every deck in `tests/fixtures/pair/`; under `--features corpus` the cells
+add the corpora the old cross-sim cells run (spice-bench for ngspice→vacask, the VACASK corpus
+for vacask→ngspice). `tests/fixtures/pair/` is no golden input.
 
 ## 9. Gate to leave the slice
 

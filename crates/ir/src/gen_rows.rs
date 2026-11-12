@@ -73,7 +73,12 @@ pub(crate) fn gen_load(
     } else {
         LoadKind::Osdi
     };
-    let path = format!("{}.osdi", g.fresh());
+    // A25: the extension a simulator decides the kind by
+    let extension = match kind {
+        LoadKind::VerilogA => "va",
+        LoadKind::Osdi => "osdi",
+    };
+    let path = format!("{}.{extension}", g.fresh());
     let item = b.load(scope, kind, &path, Span::NONE);
     for _ in 0..g.below(3) {
         let module = g.fresh_name(b);

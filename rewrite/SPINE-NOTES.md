@@ -143,7 +143,29 @@ Each line: question → choice → why.
     `tests/fixtures/dialect/ir/read/{worked,kernel}.ir`. Its first run found three IR-text
     reader holes (KNOWN): `ir::parse` pushes an element row `check` refuses instead of a `P9001`
     for a second element of one name (X0016), a key of another kind (`dc=` on a resistor,
-    X0015) and a terminal count out of range (X0006).
+    X0015) and a terminal count out of range (X0006). All three refused (one `P9001`, nothing
+    pushed) since ir-circuit ed8baf22 (ir-rewrite bdcae2e3); the `ir` entry is gone.
+
+35. A25 (R48) in the laws → shrink to admitted in `tests/common/laws.rs` (included by
+    `dialect_laws.rs` by path; a one-file folder fails check_style.py, `common/` is the house
+    place): a refused generated design loses the items its refusals name, then what `check` no
+    longer accepts, to a fixpoint; a refusal at no item (or at an item a pass made) skips the
+    seed, counted by code. Kernel surprise: dropping a scope-owning item with `items_mut` (the
+    editor's "dead item" door) makes `check` report `ScopeOwner` at no item for the dead body;
+    the harness ignores that row when the scope's owner is unlisted (request: `check` skips
+    scopes whose owner is dead, or reports at the owner). Self-test: a stub whose `admits`
+    refuses every non-element admits 0 of 64 as generated; shrunk, L4 sees its planted writer
+    panic on a capacitor. The reach list over 512 seeds (64 left 2 waves and 16 families unreached
+    for `ir`; 512 reaches every kind): `KNOWN_REACH` empty. L4's own item-kind check is replaced
+    by the reach list.
+36. P2 by item → `Diag::item`; self-test: a pass noting the first comment and leaving all fails P2
+    (by span it passed: generated spans are all `NONE`).
+
+37. L5 and L6 compare by meaning (R28): `Design::eq_meaning` (real literals equal by value, whatever
+    their form); the IR text stays only as the failure's evidence. L6 is L5 over a corpus, so it
+    follows. The shrink self-test searches its seed (bounded, 1,024) instead of relying on the
+    generator's stream (round 5 changed it). A rule's rows share one file; a fixture folder is a
+    row's name (SPINE §4).
 
 ## Requests (ruled by the lead)
 

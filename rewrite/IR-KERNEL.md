@@ -283,7 +283,7 @@ resolved `Ref` (a row reference, or a `Param`/`UserCall` in one of its expressio
 definition that lives in the body of a subcircuit enclosing the item's own subcircuit: on the
 item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still at or past it
 (so neither the own subcircuit nor a file's top). An item in no subcircuit never has it.
-`Extra::FormalNotConstant` (was `FormalReadsParam`; widened by A15): a `Subckt` head default that is not a constant, holding a `Param` read anywhere in its tree or of class `Temp`. The
+`Extra::FormalNotConstant` (was `FormalReadsParam`; widened by A15): a `Subckt` head default that is not a constant, holding a `Param` read or `$tnom` (A25, VACASK run c3) anywhere in its tree or of class `Temp`. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
 leaf or a `$temp` in a head default only when it has `FormalNotConstant` (VACASK runs n1, m1, c1, t2).
 `Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose
@@ -395,6 +395,14 @@ form. `Extra::LongLiteral` marks one; the generator makes them only when the set
 a root of the other form keeps its id, and a subtree shared by roots of both forms is rewritten
 for the one and kept for the other. Property: with a wrapping rule of `-(-e)`, the other form's
 `Neg` feature is never added, its roots keep their ids, and every root keeps its value.
+
+**A25 (2026-11-12): a row names its item (R48).** `Diag.item: ItemRef` (`ItemRef::NONE` when a
+row is about no item) and `Diags::push_at(code, design, item, arg)`, which takes the span from
+the item. `check`, `check_legal` and every row's own check push at the item, so a design built
+with no spans (Python, a generator) still says which item a refusal is about. `Diag` is 28 bytes. `FormalNotConstant` counts a `$tnom` default (VACASK run c3). `Extra::SubcktConstantParam`: a `Param`
+listed in a `Subckt` body whose value is a constant (no parameter read, no `$tnom`, class
+`Constant`; VACASK reads it as a formal). The generator lists no `Param` in a subcircuit body
+unless the set has it.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

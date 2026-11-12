@@ -16,7 +16,7 @@ use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
 use crate::facts::{Handle, RowFacts};
-use crate::feature::FeatureSet;
+use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
 use crate::id::{ItemRef, NameId, Ref, ScopeId};
@@ -29,8 +29,10 @@ use crate::text::{Ctx, Words};
 /// models of the family name the family, not the library.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DeviceLibrary {
-    /// The path as the source spelled it (a variant such as `spice/sn/resistor.osdi` kept as
-    /// written); `NONE`: the target's default file for the family.
+    /// `NONE`: the dialect's default file for the family, the one proven over the family's whole
+    /// typed parameter set; set: another proven file, kept as the source spelled it (such as
+    /// `spice/resistor.osdi`). Spelling in both cases, never a different meaning: no check or
+    /// feature reads it, and a pass that drops libraries drops the row whatever its path (R45).
     pub path: NameId,
     /// The equation family the library implements.
     pub family: ModelFamily,
@@ -58,8 +60,9 @@ impl RowFacts for DeviceLibrary {
         // no reference field
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // `Feature::Item(DeviceLibrary)` is the kernel's; the row states nothing else
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        // `Feature::Item(DeviceLibrary)` is the kernel's; the family is the row's (A25)
+        *set = set.with(Feature::Family(self.family));
     }
 
     fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
@@ -84,8 +87,8 @@ impl RowFacts for DeviceLibrary {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        _features: &FeatureSet,
+        features: &FeatureSet,
     ) -> ItemRef {
-        crate::circuit_gen::generate_library(g, scope, b)
+        crate::circuit_gen::generate_library(g, scope, b, features)
     }
 }

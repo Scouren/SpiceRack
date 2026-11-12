@@ -31,7 +31,7 @@ use crate::run_words::{
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::sweep::gen_sweep;
-use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
+use crate::sweep::{SweepUse, dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
 use crate::text_expr::Ctx;
 
@@ -47,7 +47,7 @@ impl DetailFacts for SweepLoop {
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         target_features(&self.target, TargetUse::Loop, set);
-        sweep_features(&self.sweep, set);
+        sweep_features(&self.sweep, SweepUse::Loop, set);
     }
 
     fn fault(&self, _design: &Design) -> Option<Violation> {
@@ -78,7 +78,7 @@ impl DetailFacts for SweepLoop {
         features: &FeatureSet,
     ) -> Option<Self> {
         let target = gen_target(g, b, features, TargetUse::Loop)?;
-        let sweep = gen_sweep(g, b, features);
+        let sweep = gen_sweep(g, b, features, SweepUse::Loop);
         Some(SweepLoop { target, sweep })
     }
 }
