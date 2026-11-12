@@ -55,14 +55,22 @@ pub fn named_once(
         .map(|d| d.item)
         .collect();
     let named = statement_names(design, feature);
-    let mut seen = std::collections::HashSet::new();
     for (item, n) in &named {
         let unnamed = *n == ir::NameId::NONE;
         assert_eq!(unnamed, left.contains(item), "{name} seed {seed}: {item:?}");
-        if !unnamed {
-            let fresh = seen.insert(design.str(*n).to_ascii_lowercase());
-            assert!(fresh, "{name} seed {seed}: {} twice", design.str(*n));
-        }
+    }
+    // DC axes and loops are one set of names: both are sweeps on VACASK (`names_chain.sim`)
+    let one_set = match feature {
+        ir::RunExtra::AnalysisUnnamed => named.clone(),
+        _ => [ir::RunExtra::DcAxisUnnamed, ir::RunExtra::LoopUnnamed]
+            .iter()
+            .flat_map(|&k| statement_names(design, k))
+            .collect(),
+    };
+    let mut seen = std::collections::HashSet::new();
+    for (_, n) in one_set.iter().filter(|(_, n)| *n != ir::NameId::NONE) {
+        let fresh = seen.insert(design.str(*n).to_ascii_lowercase());
+        assert!(fresh, "{name} seed {seed}: {} twice", design.str(*n));
     }
     let given: Vec<&ir::Diag> = diags
         .rows()

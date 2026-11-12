@@ -384,8 +384,10 @@ VACASK (a candidate feature), or VACASK's own limit.
 | W2107 | S4.1 | a model of a family no run proved a VACASK module implements (R41 a) | VACASK's own |
 | W2303 | S4.3 | a save shape VACASK has no directive for (R29, S12) | VACASK's own |
 
-W2301 and W2302 are notes (a name the writer gave), not refusals. They go with ir-run's
-`AnalysisUnnamed`, `DcAxisUnnamed` and `LoopUnnamed`, which `FEATURES` will lack.
+The writer gives no name (W2301 and W2302 are retired): `FEATURES` holds `AnalysisNamed`,
+`DcAxisNamed` and `LoopNamed` and none of the unnamed three, so the run group's naming rows
+(`analysis_name_given`, `dc_axis_name_given`, `loop_name_given`: R59, A35) name every
+analysis, DC axis and loop before `write`, each with its `U0410` note.
 
 ## 8. Tests (each names its oracle)
 

@@ -8,12 +8,13 @@
 //!
 //! The rules are the evaluator's tag table, by node, on sets: `Add`, `Sub`, `Mul`, `DivTyped`,
 //! `Min`, `Max` are Int when every operand is; `Neg`, `SgnZeroPos` keep the operand's; a ternary
-//! is either branch's; comparisons, logic, bit operators and `ToInt` are Int; everything else is
-//! Real. A fixpoint over the definitions (the sets only grow), bounded by their count.
+//! is either branch's; comparisons, logic, bit operators and `ToInt` are Int; a string or a list
+//! has no numeric tag (`TEXT`); everything else is Real. A fixpoint over the definitions (the sets only grow), bounded by their count.
 //!
 //! Cites: `rewrite/AMEND-A12.md` K1, A21; `crates/ir/src/eval.rs` (`apply`'s tags).
 //!
 //! Contents: `pub(super) const INT`, `pub(super) const REAL`, `pub(super) const BOTH`,
+//! `pub(super) const TEXT`,
 //! `pub(super) struct Tags` (`Tags::new`, `Tags::of`, `Tags::set`)
 
 use std::collections::HashMap;
@@ -27,6 +28,9 @@ pub(super) const INT: u8 = 1;
 pub(super) const REAL: u8 = 2;
 /// Either tag.
 pub(super) const BOTH: u8 = INT | REAL;
+/// No numeric tag: the value may be a string or a list (no rule compares it equal to `INT`,
+/// `REAL` or `BOTH`, so a typed rule leaves it).
+pub(super) const TEXT: u8 = 4;
 
 /// The tag sets of the design as it stood when built, by `ExprId`, and of the rows a pass
 /// appends after (`Tags::of` computes a new row from its operands; `Tags::set` states the tags a
@@ -186,8 +190,8 @@ impl Tags {
             }
             ir::Expr::Call(ir::Func::ToInt, _) => INT,
             ir::Expr::Call(ir::Func::SgnZeroPos, l) => get(design.exprs(l)[0]),
+            ir::Expr::Str(_) | ir::Expr::List(_) => TEXT,
             ir::Expr::Num(_)
-            | ir::Expr::Str(_)
             | ir::Expr::Call(..)
             | ir::Expr::V(..)
             | ir::Expr::I(_)
@@ -197,8 +201,7 @@ impl Tags {
             | ir::Expr::TStep
             | ir::Expr::TStop
             | ir::Expr::Tnom
-            | ir::Expr::Draw(..)
-            | ir::Expr::List(_) => REAL,
+            | ir::Expr::Draw(..) => REAL,
         }
     }
 }

@@ -90,15 +90,16 @@ impl Write for Vacask {
         write_outputs::admits(design, diags);
     }
 
-    /// One file of a legal design (`write.rs`).
+    /// One file of a legal design (`write.rs`). It appends no note: every name it writes is
+    /// the design's (R59, A35).
     fn write(
         &self,
         design: &ir::Design,
         file: ir::FileId,
         out: &mut String,
-        diags: &mut ir::Diags,
+        _diags: &mut ir::Diags,
     ) {
-        write::write(design, file, out, diags);
+        write::write(design, file, out);
     }
 }
 

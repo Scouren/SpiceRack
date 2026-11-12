@@ -1,7 +1,8 @@
 //! Passes `toreal_to_mul` and `toreal_to_mul_dyn`: a design in, the same design out with every
 //! `real(x)` (`ToReal`, A21: the value of `x`, Real) of one feature context written `x` when the
 //! tag table says `x` is Real on every evaluation, else `1 * x` (a Real `1`: the product is `x`
-//! exactly, and Real). Exact in value and tag; `x` is evaluated once. It refuses nothing.
+//! exactly, and Real). Exact in value and tag; `x` is evaluated once. An `x` that may be a
+//! string or a list (the table's `TEXT`) has no numeric tag: the call stays, note `U0117`.
 //!
 //! `toreal_to_mul` removes `Func(ToReal)` and requires `Binary(Mul)`; `_dyn` the dynamic form.
 //!
@@ -10,10 +11,10 @@
 //! Contents: `pub fn toreal_to_mul(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn toreal_to_mul_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::BOTH_FORMS;
+use super::TEXT_OPERAND;
 use super::nodes::plain;
 use super::nodes::{form, func_form, note_left};
-use super::tags::{REAL, Tags};
+use super::tags::{REAL, TEXT, Tags};
 use crate::ir;
 
 /// Rewrites `ToReal` in every root of the plain form.
@@ -36,7 +37,11 @@ fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
             return None;
         };
         let x = b.design().exprs(args)[0];
-        if tags.of(b.design(), x) == REAL {
+        let t = tags.of(b.design(), x);
+        if t & TEXT != 0 {
+            return None;
+        }
+        if t == REAL {
             return Some(x);
         }
         let one = plain(b, 1, 0);
@@ -48,6 +53,6 @@ fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
         design,
         diags,
         func_form(ir::Func::ToReal, dynamic),
-        BOTH_FORMS,
+        TEXT_OPERAND,
     );
 }
