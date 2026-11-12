@@ -180,6 +180,12 @@ impl Reference {
 /// the written files keep the source tree's layout. `None` when that cannot be stated: either
 /// key absolute, or above the root (a key the loader kept a leading `..` in); the writer then
 /// spells the path as it was read, with a note.
+///
+/// Why relative to the including file and nothing stronger (R78a): ngspice-45 resolves a
+/// relative include against the working directory first, then against the including file's
+/// directory (`settle/include_cwd/` on `step2-ngspice` 4f3de43f: `ngspice -b sub/deck.sp` reads
+/// a file of that name in the working directory when one stands there). So this spelling works
+/// from every working directory that holds no file of that name, and from none that does.
 pub fn relative_path(from: &str, to: &str) -> Option<String> {
     let above = |k: &str| k.starts_with('/') || k == ".." || k.starts_with("../");
     if above(from) || above(to) {
