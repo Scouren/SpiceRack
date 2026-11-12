@@ -238,6 +238,39 @@ fn generated_script_plans_read_back_to_their_meaning() {
     );
 }
 
+#[test]
+fn script_items_ngspice_cannot_spell_are_refused() {
+    // Oracle: ngspice-45's forms. pre_osdi takes a path (inp.c:791-797) and the modules are the
+    // binary's; a foreach word is no expression (control.c:462-466); an alter takes one number
+    // (device.c ft_getpnames); alterparam applies at a reset that drops live alters
+    // (runcoms2.c:172-240).
+    const REFUSED: &[(&str, &str, &str)] = &[
+        (
+            "a load naming its modules",
+            "  load osdi \"a.osdi\" modules=(m1)",
+            "W1405",
+        ),
+        ("a Verilog-A load", "  load veriloga \"a.va\"", "W1404"),
+        (
+            "a loop over an expression",
+            "  param p = 1\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op",
+            "W1402",
+        ),
+        (
+            "a parameter alter after a live alter",
+            "  param p = 1\n  alter (element_value r1) value=2k\n  alter (param p) value=3",
+            "W1401",
+        ),
+    ];
+    for (why, items, code) in REFUSED {
+        let mut design = parse_ir(why, &format!("file \"r.sp\" deck\n{items}\n"));
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row(), &mut diags);
+        let codes: Vec<String> = diags.rows().iter().map(|r| r.code.to_string()).collect();
+        assert_eq!(codes, [*code], "{why}");
+    }
+}
+
 /// A deck in IR text from `seed`: a parameter, then up to six run items, a loop holding up to
 /// three (one nested loop at most).
 fn plan_text(seed: u64) -> String {
