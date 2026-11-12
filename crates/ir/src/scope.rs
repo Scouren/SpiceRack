@@ -4,7 +4,7 @@
 //!
 //! Lookup is neutral and lexical: a scope, then its parent, up to the file's top scope. Anything
 //! a dialect adds (include scope, section visibility, kit-wide search) is its reader's rule,
-//! applied when it resolves (`Builder::resolve`).
+//! applied when it resolves (`Builder::resolve`); `link` applies the neutral rule.
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §4 (`files`, `scopes`, `defs`); `REWRITE-PLAN.md` §3.2;
 //! `rewrite/INV-constructs.md` A2, A28, B21.

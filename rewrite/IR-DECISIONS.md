@@ -46,3 +46,10 @@ Where `IR-KERNEL.md` is silent or two statements conflict: the question, the cho
 - Which `exp10` a `Scale` may have → a power some scale letter states: −18, −15, −12, −9, −6, −3, −2, 3, 6, 9, 12, 15 (Spectre `%`/`c` is −2, `P` is 15). `Mil` has `exp10 == 0`; `frac <= 18`. Checked by `Literal::is_valid`, `Builder::literal` (assert) and `check` (`Violation::LiteralShape`, new, the 14th). `NonFinite` now means a literal whose value overflows.
 - IR text scale letters, one spelling each → `a f p n u m c k meg g t peta` and `mil`. A negative literal is `-1.5`; the `Neg` of a literal is `-(1.5)` (two trees, so two spellings).
 - Added `Literal::ZERO`, `Literal::eq_value` (exact decimal comparison, which `Design::eq_meaning` uses) and `Literal::is_valid`. `Gen::number -> f64` became `Gen::literal -> Literal`, so the generator exercises every form; `Words::number` returns `Option<Literal>`.
+
+## Addendum A4 (the linker)
+
+- Supersedes the A2 line on row references in IR text: `link` (`link.rs`) runs after the whole text, so bare forward references work; `Words::reference` is now `(b, diags) -> Ref` with no kind and no scope (the linker knows both through `map_refs`), and `Words` lost its `pending` list.
+- `name?` must survive a `link` that binds every unresolved `Ref` → a crate-private second sentinel, `DefId::HELD` (`u32::MAX − 1`). `Words` writes it, `link` skips it, and `text::parse` turns it into `NONE` before it returns, so it never reaches a finished design (`check` reports it as `HandleRange`).
+- `link` reports each reference it leaves unresolved as a note, `diag::LINK_UNBOUND` = `R9001` (range `R9001..=R9099` for the linker). Unresolved stays legal.
+- `map_refs` gives one `DefKind` per `Ref`, but an instance's master may be a `Subckt`, `Model` or `Module` → for now the circuit owner passes the kind its row states; reported to the lead (see the report).

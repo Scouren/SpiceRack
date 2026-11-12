@@ -31,8 +31,9 @@
 //! string   = '"' { char | '\"' | '\\' | '\n' } '"'
 //! name     = bare | "`" { char | "\`" | "\\" } "`"
 //! bare     = [A-Za-z0-9_.$]+ in a name position; [A-Za-z_][A-Za-z0-9_.$]* in an expression
-//! ref      = name                    resolved: bound by `Design::lookup` from the item's scope
-//!          | name "?"                unresolved (def NONE)
+//! ref      = name                    bound by `link` after the whole text (exact name, from the
+//!                                    item's scope outward); unresolved if nothing matches
+//!          | name "?"                deliberately unresolved (def NONE)
 //!          | name "#" digits         bound to that definition (only when lookup binds elsewhere)
 //! ```
 //!
@@ -104,10 +105,9 @@
 //! keyword (one exhaustive `match` over `ItemKind`) to the row's `RowFacts::dump` / `parse`.
 //! A row's `parse` reads its statement through [`Words`], the reader's cursor over one line.
 //!
-//! References in a row are bound as they are read: a bare name to what `Design::lookup` finds
-//! among the definitions pushed so far, so `dump` writes `name#k` for a reference to a definition
-//! that comes later in the text. Parameter and user-call reads inside expressions are bound after
-//! the whole text is read (`Builder::resolve`), so they may name later definitions bare.
+//! References are bound by `link` after the whole text is read (A4), so a bare name may name a
+//! definition that comes later. `name?` is held unresolved through the link; `dump` writes
+//! `name#k` only when the lookup would bind another definition than the row's.
 //!
 //! Contents: `pub fn dump(&Design, FileId, &mut String)`,
 //! `pub fn parse(&str, &mut Builder<'_>, &mut Diags)`, `pub struct Words<'t>`,
@@ -118,7 +118,7 @@
 //! `Words::names(&mut self, &mut Builder<'_>, &mut Diags) -> NameList`,
 //! `Words::number(&mut self, &mut Diags) -> Option<Literal>`,
 //! `Words::string(&mut self, &mut Diags) -> Option<Cow<'t, str>>`,
-//! `Words::reference(&mut self, DefKind, ScopeId, &mut Builder<'_>, &mut Diags) -> Ref`,
+//! `Words::reference(&mut self, &mut Builder<'_>, &mut Diags) -> Ref`,
 //! `Words::value(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
 //! `Words::expr(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
 //! `Words::exprs(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprList`,
@@ -134,7 +134,6 @@ use crate::diag::Diags;
 use crate::diag::TEXT_SYNTAX;
 use crate::expr::Literal;
 use crate::id::{ExprId, ExprList, FileId, NameId, NameList, ParamList, Ref, ScopeId};
-use crate::item::DefKind;
 use crate::span::Span;
 
 /// The IR text reader's cursor over one statement line (after its indentation). A word is a
@@ -149,8 +148,6 @@ pub struct Words<'t> {
     pub(crate) pos: usize,
     /// Byte offset of the end of this line.
     pub(crate) end: usize,
-    /// Parameter and user-call reads to bind once the whole text is read: (expression, scope).
-    pub(crate) pending: Vec<(ExprId, ScopeId)>,
 }
 
 /// Appends `file`'s block (its `file` line and every item of its scopes, depth first in item
@@ -165,8 +162,8 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
 /// Reads one or more `file` blocks into `b`. Total: a line it cannot read appends a
 /// `diag::TEXT_SYNTAX` row (span: the line's bytes in `text`, file `NONE`) and is skipped; what
 /// it can read is still built. Each item line goes to its kind's `RowFacts::parse` by its keyword
-/// (one exhaustive dispatch over `ItemKind`); expression references are bound after the whole
-/// text is read, row references as they are read (module header).
+/// (one exhaustive dispatch over `ItemKind`); then `link` binds every reference, `name?` ones
+/// excepted (module header).
 pub fn parse(text: &str, b: &mut Builder<'_>, diags: &mut Diags) {
     todo!()
 }
@@ -220,21 +217,15 @@ impl<'t> Words<'t> {
         todo!()
     }
 
-    /// A reference to a definition of `kind`: `name` (bound by `Design::lookup` from `scope`
-    /// among the definitions pushed so far; reports when none), `name?` (unresolved) or
-    /// `name#k` (bound to definition `k`, checked by `check` once the text is read).
-    pub fn reference(
-        &mut self,
-        kind: DefKind,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Ref {
+    /// A reference: `name` (unresolved; `link` binds it after the whole text), `name?` (held
+    /// unresolved through the link) or `name#k` (bound to definition `k`, checked by `check`).
+    /// The row stores the returned `Ref` as it is.
+    pub fn reference(&mut self, b: &mut Builder<'_>, diags: &mut Diags) -> Ref {
         todo!()
     }
 
-    /// A field value: an atom, or a parenthesized expression. Names read in it are bound from
-    /// `scope` after the whole text.
+    /// A field value: an atom, or a parenthesized expression (references in it are linked after
+    /// the whole text). `scope` is where the expression is used.
     pub fn value(&mut self, scope: ScopeId, b: &mut Builder<'_>, diags: &mut Diags) -> ExprId {
         todo!()
     }

@@ -21,7 +21,7 @@
 //! Contents: the modules below, and re-exports of `Design`, `ItemRow`, `Builder`, `Editor`, the
 //! handles of `id`, `Span`, `Table`, the kernel enums of `item` and `expr`, `RowFacts`,
 //! `Handle`, `Feature`,
-//! `FeatureSet`, `Extra`, `features_used`, `check`, `check_legal`, `Violation`, the diagnostic
+//! `FeatureSet`, `Extra`, `features_used`, `link`, `check`, `check_legal`, `Violation`, the diagnostic
 //! rows of `diag`, `eval`, `Bindings`, `Domain`, `dump`, `parse`.
 
 #![forbid(unsafe_code)]
@@ -43,6 +43,7 @@ pub mod expr;
 pub mod feature;
 pub mod id;
 pub mod item;
+pub mod link;
 pub mod names;
 pub mod scope;
 pub mod span;
@@ -81,6 +82,7 @@ pub use id::{
     Ref, ScopeId, TextId,
 };
 pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
+pub use link::link;
 pub use span::Span;
 pub use table::Table;
 pub use text::{dump, parse};

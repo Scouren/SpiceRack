@@ -10,9 +10,9 @@
 //! appends the row, appends the item to the scope's list, and returns the [`ItemRef`].
 //! A push of a defining item (`subckt`, `section`, `param`, `func`, the owners' `model`) also
 //! appends its definition; modules and anything else are defined with [`Builder::define`].
-//! References are pushed unresolved and bound with [`Builder::resolve`] (expressions) or by the
-//! row itself (rows that carry a [`Ref`]) once the reader knows the target: the lookup rule is
-//! the reader's ([`Design::lookup`] is the neutral one).
+//! A dialect reader binds references by its own simulator's rule: [`Builder::resolve`] for an
+//! expression, a resolved [`Ref`] in the row it pushes. A builder that has no such rule leaves
+//! them unresolved and calls `link` (the neutral rule, A4) when it is done.
 //!
 //! ```ignore
 //! let mut b = design.builder();

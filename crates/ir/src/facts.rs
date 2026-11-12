@@ -7,10 +7,11 @@
 //! Per-kind constant facts an owner's `check` needs (`ElemKind::terminals() -> (u8, u8)`,
 //! `ElemKind::has_detail()`, `ElemKind::needs_model()`) are `const fn`s in the owner's file.
 //!
-//! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addendum A2).
+//! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2 and A4).
 //!
-//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::features`, `RowFacts::check`,
-//! `RowFacts::dump`, `RowFacts::parse`, `RowFacts::generate`), `pub enum Handle`,
+//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
+//! `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
+//! `RowFacts::generate`), `pub enum Handle`,
 //! `macro todo_facts` (crate-internal: the definition phase's placeholder impl)
 
 use crate::build::Builder;
@@ -22,6 +23,7 @@ use crate::r#gen::Gen;
 use crate::id::{
     BranchList, ExprId, ExprList, ItemRef, NameId, NameList, ParamList, Ref, ScopeId, TextId,
 };
+use crate::item::DefKind;
 use crate::text::Words;
 
 /// What the kernel's generic code needs from an item row. Implemented by the row's owner, in
@@ -30,6 +32,11 @@ pub trait RowFacts: ItemRow {
     /// Appends every handle the row and its detail rows hold, in field order (the kernel checks
     /// their ranges and reads the expression features from them).
     fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+
+    /// Calls `f` on each `Ref` the row holds, in field order, with the definition kind the field
+    /// expects (A4). The linker binds through it; a pass that renumbers definitions rewrites
+    /// through it.
+    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind));
 
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
     /// kind and its `Extra`s. The kernel adds the expression features from `handles`.
@@ -91,6 +98,9 @@ macro_rules! todo_facts {
     ($row:ty) => {
         impl $crate::facts::RowFacts for $row {
             fn handles(&self, design: &$crate::Design, out: &mut Vec<$crate::facts::Handle>) {
+                todo!()
+            }
+            fn map_refs(&mut self, f: &mut dyn FnMut(&mut $crate::Ref, $crate::DefKind)) {
                 todo!()
             }
             fn features(&self, design: &$crate::Design, set: &mut $crate::FeatureSet) {

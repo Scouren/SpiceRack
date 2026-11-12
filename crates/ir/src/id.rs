@@ -14,6 +14,8 @@
 //!   `pub struct ExprId`, `pub struct DefId`, `pub struct TextId`, `pub struct NumId`; on each:
 //!   `NONE`,
 //!   `index(self) -> usize`, `is_none(self) -> bool`
+//! - `DefId::HELD` (crate-private: a reference the IR text wrote `name?`, until `text::parse`
+//!   has run `link`)
 //! - `pub struct ItemRef`, `ItemRef::NONE`, `ItemRef::new(kind, index) -> ItemRef`
 //! - `pub struct Ref`, `Ref::unresolved(name) -> Ref`, `Ref::is_resolved(self) -> bool`
 //! - `pub struct List<T>`, `List::EMPTY`, `List::len(self) -> usize`,
@@ -180,6 +182,13 @@ handle!(
 impl NameId {
     /// The name `0`, ground, interned first in every design so it is always id 0.
     pub const GROUND: NameId = NameId(0);
+}
+
+impl DefId {
+    /// A reference held unresolved on purpose while `text::parse` runs `link` (written `name?`);
+    /// `link` skips it and the parser turns it into `NONE` before it returns. Never in a finished
+    /// design (`check`: `HandleRange`).
+    pub(crate) const HELD: DefId = DefId(u32::MAX - 1);
 }
 
 impl ItemRef {
