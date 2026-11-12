@@ -152,7 +152,7 @@ pub use edit::Editor;
 pub use eval::{Bindings, Domain, Value, eval, eval_typed};
 pub use expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, Literal, NumForm, UnOp};
 pub use facts::{ExprUse, Handle, RowFacts};
-pub use feature::{Extra, Feature, FeatureSet, features_used};
+pub use feature::{Extra, Feature, FeatureSet, Form, features_used, root_form};
 pub use id::{
     BranchList, DefId, ExprId, ExprList, FileId, ItemRef, List, NameId, NameList, NumId, ParamList,
     Ref, ScopeId, TextId,
@@ -167,7 +167,7 @@ pub use plan::{
     Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
 };
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
-pub use rewrite::rewrite_exprs;
+pub use rewrite::{rewrite_exprs, rewrite_exprs_in};
 pub use run_extra::RunExtra;
 pub use span::Span;
 pub use stats::{Statistics, Vary, VaryDist};

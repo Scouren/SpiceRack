@@ -32,7 +32,7 @@ use crate::class::{ExprClass, def_classes, node_class};
 use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{ItemKind, Role, ScopeKind};
 use crate::model::ModelFamily;
@@ -90,6 +90,17 @@ pub enum Feature {
     /// is `Placed(Branch, Subckt)` and `Placed(Subckt, Subckt)`. `File` is never the scope kind:
     /// every target lets an item stand in a file's top.
     Placed(ScopeKind, ItemKind),
+}
+
+/// Which of a function's or operator's two features a root counts (`Func` or `FuncDyn`, and so
+/// on: R14, A19, A26): a pass that removes one feature rewrites only the roots of its form.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Form {
+    /// The root stands in a constant-in-time field and reads nothing of class `Temp` or above.
+    Static,
+    /// The root stands in a field that may read the circuit, or it or what it reads is of class
+    /// `Temp` or above.
+    Dynamic,
 }
 
 /// The kernel's features that are fields or placements, not kinds. The circuit and run owners'
@@ -607,6 +618,14 @@ pub(crate) fn chain_kinds(design: &Design, scope: ScopeId) -> [bool; ScopeKind::
         at = s.parent;
     }
     kinds
+}
+
+/// The form a root counts its functions and operators in, given how its field reads (`use`, as
+/// `RowFacts::map_exprs` reports it): `Dynamic` for a field that may read the circuit or a tree of
+/// class `Temp` or above (A19, R14), else `Static`. The one decision: `features_used` makes it
+/// through the same rule. O(the tree) once the definitions' classes are cached.
+pub fn root_form(design: &Design, root: ExprId, use_: ExprUse) -> Form {
+    todo!()
 }
 
 // ---- private ----

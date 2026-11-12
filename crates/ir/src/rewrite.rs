@@ -12,7 +12,7 @@
 use crate::build::Builder;
 use crate::design::Design;
 use crate::facts::RowFacts;
-use crate::feature::expr_roots;
+use crate::feature::{Form, expr_roots};
 use crate::id::{ExprId, ItemRef};
 
 /// Rewrites every expression root of every listed item by `rule` and returns how many roots
@@ -77,6 +77,18 @@ pub fn rewrite_exprs(
         });
     }
     changed
+}
+
+/// As [`rewrite_exprs`], restricted to the roots of one `form` (A26: `root_form` of each root as
+/// it stands before the pass): a root of the other form keeps its id, and a subtree a root of
+/// each form shares is rewritten for the one and kept for the other (rows are appended, so both
+/// trees exist). Returns how many roots changed.
+pub fn rewrite_exprs_in(
+    design: &mut Design,
+    form: Form,
+    rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
+) -> u32 {
+    todo!()
 }
 
 // ---- private ----
