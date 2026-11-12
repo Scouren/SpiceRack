@@ -1,5 +1,5 @@
 //! Passes group `expr` (expressions): a design in, the design without one feature out, one
-//! pass per file. Empty: the group's owner adds its passes here.
+//! pass per file.
 //!
 //! Owns the passes that rewrite expression trees: the functions, operators, leaves and draws one
 //! target lacks (`div_to_div_typed`, `powabs_to_pow`, `round_half_even_to_away`,
@@ -20,13 +20,40 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
+//! A function or operator is two features, `Func(f)` and `FuncDyn(f)` by the root it stands in
+//! (`ir::features_used`), so each rule is two rows, `<rule>` and `<rule>_dyn`, one file:
+//! `context.rs` applies a rule to one context's roots and leaves the other's.
+//!
+//! Contents: `pub mod powabs_to_pow`, `pub(super) const PASSES: &[Pass]`,
+//! `pub(super) const CODES: &[(ir::Code, ir::Info)]`
+
+mod context;
+pub mod powabs_to_pow;
 
 use super::Pass;
 use crate::ir;
 
 /// The group's passes, in the order `legalize` tries them.
-pub(super) const PASSES: &[Pass] = &[];
+pub(super) const PASSES: &[Pass] = &[
+    Pass {
+        name: "powabs_to_pow",
+        removes: ir::Feature::Func(ir::Func::PowAbs),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Func(ir::Func::Abs))
+            .with(ir::Feature::Func(ir::Func::Pow)),
+        notes: &[],
+        run: powabs_to_pow::powabs_to_pow,
+    },
+    Pass {
+        name: "powabs_to_pow_dyn",
+        removes: ir::Feature::FuncDyn(ir::Func::PowAbs),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::FuncDyn(ir::Func::Abs))
+            .with(ir::Feature::FuncDyn(ir::Func::Pow)),
+        notes: &[],
+        run: powabs_to_pow::powabs_to_pow_dyn,
+    },
+];
 
 /// The group's catalogue rows (`U0100..=U0199`).
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[];

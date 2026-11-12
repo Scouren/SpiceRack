@@ -1,4 +1,4 @@
 file "p.sp" deck
   param a = 2
   param p = pow(abs(a - 3), 0.5) + pow(abs(-2), pow(abs(a), 2))
-  func f(x) = pow(abs(x), 3)
+  func f(x) = pow_abs(x, 3)

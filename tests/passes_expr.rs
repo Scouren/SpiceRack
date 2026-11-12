@@ -36,6 +36,13 @@ struct Point<'d> {
     trial: u64,
 }
 
+/// `x` and `y` bound to two values, the temperature 27, everything else 1.
+struct Pair<'d> {
+    design: &'d ir::Design,
+    x: ir::Value,
+    y: ir::Value,
+}
+
 impl ir::Bindings for Point<'_> {
     fn param(&self, p: ir::Ref) -> Option<f64> {
         self.param_value(p).map(|v| v.number)
@@ -66,6 +73,46 @@ impl ir::Bindings for Point<'_> {
     }
     fn tnom(&self) -> Option<f64> {
         Some(self.value("$tnom").number)
+    }
+    fn draw(&self, _: ir::Dist, _: ir::DrawWhen, _: ir::DrawPer, args: &[f64]) -> Option<f64> {
+        Some(args[0])
+    }
+}
+
+impl ir::Bindings for Pair<'_> {
+    fn param(&self, p: ir::Ref) -> Option<f64> {
+        self.param_value(p).map(|v| v.number)
+    }
+    fn param_value(&self, p: ir::Ref) -> Option<ir::Value> {
+        Some(match self.design.str(p.name) {
+            "x" => self.x,
+            "y" => self.y,
+            _ => ir::Value::real(1.0),
+        })
+    }
+    fn voltage(&self, _: ir::NameId, _: ir::NameId) -> Option<f64> {
+        Some(1.0)
+    }
+    fn current(&self, _: ir::NameId) -> Option<f64> {
+        Some(1.0)
+    }
+    fn time(&self) -> Option<f64> {
+        Some(1.0)
+    }
+    fn temp(&self) -> Option<f64> {
+        Some(27.0)
+    }
+    fn freq(&self) -> Option<f64> {
+        Some(1.0)
+    }
+    fn tstep(&self) -> Option<f64> {
+        Some(1.0)
+    }
+    fn tstop(&self) -> Option<f64> {
+        Some(1.0)
+    }
+    fn tnom(&self) -> Option<f64> {
+        Some(27.0)
     }
     fn draw(&self, _: ir::Dist, _: ir::DrawWhen, _: ir::DrawPer, args: &[f64]) -> Option<f64> {
         Some(args[0])
@@ -176,10 +223,7 @@ fn holds(design: &ir::Design, root: ir::ExprId, hit: fn(ir::Expr) -> bool) -> bo
 }
 
 /// `None` when the two results agree (bits, tag, or the domain error's kind), else the pair.
-fn differ(
-    a: Result<ir::Value, ir::Domain>,
-    b: Result<ir::Value, ir::Domain>,
-) -> Option<String> {
+fn differ(a: Result<ir::Value, ir::Domain>, b: Result<ir::Value, ir::Domain>) -> Option<String> {
     let same = match (a, b) {
         (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits() && x.int == y.int,
         (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
@@ -270,53 +314,6 @@ fn tagged(v: f64, int: bool) -> ir::Value {
     }
 }
 
-/// `x` and `y` bound to two values, the temperature 27, everything else 1.
-struct Pair<'d> {
-    design: &'d ir::Design,
-    x: ir::Value,
-    y: ir::Value,
-}
-
-impl ir::Bindings for Pair<'_> {
-    fn param(&self, p: ir::Ref) -> Option<f64> {
-        self.param_value(p).map(|v| v.number)
-    }
-    fn param_value(&self, p: ir::Ref) -> Option<ir::Value> {
-        Some(match self.design.str(p.name) {
-            "x" => self.x,
-            "y" => self.y,
-            _ => ir::Value::real(1.0),
-        })
-    }
-    fn voltage(&self, _: ir::NameId, _: ir::NameId) -> Option<f64> {
-        Some(1.0)
-    }
-    fn current(&self, _: ir::NameId) -> Option<f64> {
-        Some(1.0)
-    }
-    fn time(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn temp(&self) -> Option<f64> {
-        Some(27.0)
-    }
-    fn freq(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn tstep(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn tstop(&self) -> Option<f64> {
-        Some(1.0)
-    }
-    fn tnom(&self) -> Option<f64> {
-        Some(27.0)
-    }
-    fn draw(&self, _: ir::Dist, _: ir::DrawWhen, _: ir::DrawPer, args: &[f64]) -> Option<f64> {
-        Some(args[0])
-    }
-}
-
 fn is_powabs(e: ir::Expr) -> bool {
     matches!(e, ir::Expr::Call(ir::Func::PowAbs, _))
 }
@@ -333,7 +330,8 @@ fn powabs_to_pow_keeps_every_value() {
 #[test]
 fn powabs_to_pow_dyn_keeps_every_value() {
     // `$temp` makes the root dynamic (class Temp, R14); `0 * $temp` adds nothing to y
-    let text = "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = pow_abs(x, y + 0 * $temp)\n";
+    let text =
+        "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = pow_abs(x, y + 0 * $temp)\n";
     let points = keeps_boundary_values("powabs_to_pow_dyn", text);
     let generated = keeps_generated_values("powabs_to_pow_dyn", is_powabs);
     assert!(generated > 0, "no generated root held a dynamic pow_abs");
