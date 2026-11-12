@@ -253,10 +253,12 @@ impl Design {
         Editor { design: self }
     }
 
-    /// The file a run starts from: the first `Deck` file, else file 0. Asserts the design has a
-    /// file.
+    /// The file a run starts from: the first `Deck` file, else file 0; `FileId::NONE` for a
+    /// design with no file (a caller that needs a file asserts).
     pub fn entry(&self) -> FileId {
-        assert!(!self.files.is_empty(), "a design with a file has an entry");
+        if self.files.is_empty() {
+            return FileId::NONE;
+        }
         let deck = self.files.iter().position(|f| f.role == Role::Deck);
         FileId(deck.unwrap_or(0) as u16)
     }

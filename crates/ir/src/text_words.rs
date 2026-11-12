@@ -47,6 +47,8 @@ pub struct Words<'t> {
     pub(crate) end: usize,
     /// Byte offset of the statement's first byte (after its indentation).
     pub(crate) line: usize,
+    /// The file block the line sits in: every span this cursor makes names it.
+    pub(crate) file: FileId,
 }
 
 impl<'t> Words<'t> {
@@ -305,7 +307,7 @@ impl<'t> Words<'t> {
         }
         let end = self.word_end(at);
         Span {
-            file: FileId::NONE,
+            file: self.file,
             start: at as u32,
             len: (end - at) as u32,
         }
@@ -346,7 +348,7 @@ impl<'t> Words<'t> {
     /// The whole statement's bytes (the span a reader gives the item it pushes).
     pub fn line_span(&self) -> Span {
         Span {
-            file: FileId::NONE,
+            file: self.file,
             start: self.line as u32,
             len: (self.end - self.line) as u32,
         }
@@ -419,7 +421,7 @@ impl Words<'_> {
         diags.push(
             TEXT_SYNTAX,
             Span {
-                file: FileId::NONE,
+                file: self.file,
                 start: at as u32,
                 len: (end - at) as u32,
             },

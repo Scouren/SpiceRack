@@ -71,9 +71,10 @@ Each line: question → choice → why.
     `legalize` refuses (any refusal) and fails when no admitted design holds an item kind the
     writer claims (checked over `Feature::Item` only; kinds outside the kernel's join when the
     generator builds them).
-24. `OpaqueClass::Hint` (R19) is not in the kernel yet: `legalize`'s match over classes is exhaustive,
-    so the member's arrival stops the build; then a spine note row (distinct from `INERT_DROPPED`:
-    "the numbers may move within the solver's tolerance") and the drop.
+24. `OpaqueClass::Hint` (R19, kernel b32ee486) → another family's hint is dropped from its scope with
+    the spine's `HINT_DROPPED` note (`S0103`: "a solver hint of another dialect was dropped"; the
+    numbers may move within the target solver's tolerance), distinct from `INERT_DROPPED`; its own
+    family keeps it.
 25. The `Read` contract (lead's ruling on surprise 4) → a reader creates a file for every text of
     `src`, the entry first, even when empty. `IrText` meets it by opening an empty file at the
     `Sources` path when a text opens no `file` block (empty, comments only, or refused lines): an
@@ -135,6 +136,21 @@ index; `ir::diag::info` answers the kernel's codes). Differences found:
    is reached only when a library includes one. Either `transpile` writes file 0 (the `Read`
    contract puts the entry first), or `entry()` states the case; the spine keeps `entry()` until
    ruled.
+
+## The IR at b32ee486
+
+- Surprise 1 resolved (b8035c65): `parse` names each span's file block; a routed IR-text diagnostic
+  prints `name:3:…` (`a_routed_ir_text_diagnostic_names_its_line` lost its marker).
+- Surprise 4 resolved: `Design::entry()` is total (`FileId::NONE`); `transpile`'s assertion is now the
+  reader-bug check it was meant to be.
+- Surprise 6 still open in the kernel: `entry()` is still the first `Deck`. Ruled: file 0.
+  `a_kit_whose_entry_is_a_library_writes_the_library` carries the marker until it lands.
+7. The facade maps `span.file` to the `Sources` entry of that index. For a reader that names its
+   files (IR text) one `Sources` text holds several design files, so a row in the second `file`
+   block of one text prints `name:0:0:` (its offset is into the first text, its file id 1). Today
+   only `ir` is such a reader and the facade never routes it; a fix needs either `span.file` →
+   the source text's index from the reader, or the facade asking `names_its_files` and using
+   text 0.
 
 ## Open
 

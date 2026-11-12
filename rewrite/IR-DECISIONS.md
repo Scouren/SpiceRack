@@ -208,3 +208,29 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `map_refs` (A9) visits, in this fixed order: an analysis's DC axes' targets; a sweep loop's target or a table loop's columns; an alter's target; a statistics block's process then mismatch variations, then each correlation's two ends. An element target's `a` is a name, never visited.
 - `design_features` sets `SeveralAnalyses`, `OptionMidRun` and `LoopScoped` (reported at `Span::NONE`); `NodeSetInSubckt` and `LoopNested` are set per row from its scope.
 - Generators choose a kind whose detail they can build before interning anything (a failed attempt would leave a stray name), build in the parse's order (names and lists exactly where the text puts them), require `Expr(Num)` (`Gen::expr` asserts it), leave loop bodies to the kernel, and keep a non-string alter value free of strings.
+
+## The spine's two text requests
+
+- `text::parse` gives every span (an item's, a `TEXT_SYNTAX` row's) the file of the block its line sits in (`FileId::NONE` for a `file` line itself), with byte offsets into the whole text handed to `parse`. `Words` carries the line's file in a crate field, so every reader's `line_span()`/`span()` is right without a change on the owners' side.
+- `Design::entry` is total: `FileId::NONE` for a design with no file; a caller that needs a file asserts.
+
+## A12 K1 applied (typed arithmetic)
+
+- `Sgn` is Int-valued (Int iff its operand is), against AMEND-A12's table and with DIALECT-VACASK run f2 (`sgn(-3)/2` printed 0; R5, the run wins). Reported to the lead before building.
+- The evaluator keeps every numeric rule on `f64` and adds the tag in `apply` from the operator and its operands' tags; `DivTyped` is the one operator whose number depends on the tags. `eval` is `eval_typed(...).map(|v| v.number)`.
+- `Bindings::param_value` is a defaulted method (no existing `Bindings` impl breaks); a typed parameter (an instance passing `x=3` or `x=3.0`) comes through it.
+- IR text: `3i` (the suffix `i`; no scale letter is `i`), `/:` at `*`'s precedence, `to_int`.
+- The Int zero (`0i`) is a valid literal beside `Literal::ZERO`; `eq_value` separates Int from real literals of one value (also `Design::eq_meaning`).
+- `Literal` and `NumForm` moved to `literal.rs` (expr.rs passed 500 lines), re-exported from `expr`.
+- The generator makes Int literals only when the set has `Extra::IntLiteral` (`Gen::int_literals`, set by `expr`); `DivTyped` and `ToInt` follow the `Binary`/`Func` features as every member does.
+
+## A12 K2 applied (two features of scope)
+
+- `EnclosingRef` counts every resolved reference an item holds: its row `Ref`s and the `Param`/`UserCall` nodes of its expressions; an unresolved (`HELD` or `NONE`) one is not bound anywhere and does not count. The test is on the item's own scope chain (`Design::in_enclosing_subckt`, crate-private), so a subckt's head defaults (read in the subckt's parent scope) count against the parent's subcircuit.
+- `FormalReadsParam` is a `Subckt` row fact (its `features`), not a design-level hook: it depends on the row's own defaults only.
+- The generator: `Gen::enclosing_ok` filters `pick_def`'s draws; `Gen::param_reads` is cleared around a subckt's head defaults when the set lacks `FormalReadsParam`, and `leaf()` then drops `Param`.
+
+## A12 K3 applied (`OpaqueClass::Hint`)
+
+- Appended last (`S0006`), text word `hint`; no feature per class exists today, so `Feature::COUNT` does not move. The generator draws it with every other class (`OpaqueClass::ALL`).
+

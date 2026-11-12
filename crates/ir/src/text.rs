@@ -21,11 +21,13 @@
 //! field    = name | ref | "(" [ name { " " name } ] ")" | key "=" value
 //! value    = atom | "(" expr ")" | "(" [ name { " " name } ] ")"
 //! atom     = number | string | ref | leaf
-//! number   = ["-"] digits ["." digits] [ "e" ["-"] digits | scale | "mil" ]
+//! number   = ["-"] digits ["." digits] [ "e" ["-"] digits | scale | "mil" ] | ["-"] digits "i"
 //!            the literal as stored (Addendum A3): the mantissa's digits with `frac` of them
 //!            after the point (trailing zeros kept: 0.050000), then the form: `e<exp10>`
-//!            (Exponent), a scale letter (Scale), `mil`, or nothing (Plain). Lossless: the
-//!            text rebuilds the literal field by field; `1k` and `1e3` stay distinct.
+//!            (Exponent), a scale letter (Scale), `mil`, or nothing (Plain); a whole number with
+//!            the suffix `i` is an Int literal (A12 K1: `3i` is of integer type, `3` is real).
+//!            Lossless: the text rebuilds the literal field by field; `1k` and `1e3` stay
+//!            distinct.
 //! scale    = a(−18) f(−15) p(−12) n(−9) u(−6) m(−3) c(−2) k(3) meg(6) g(9) t(12) peta(15)
 //!            (lower case, one spelling each)
 //! string   = '"' { char | '\"' | '\\' | '\n' } '"'
@@ -46,7 +48,7 @@
 //! include "path" [section=name]
 //! global name { name }
 //! load veriloga|osdi "path" [modules=(name …)]      the loaded modules' definitions
-//! opaque name unread|private|inert|invalid|script "text"
+//! opaque name unread|private|inert|invalid|script|hint "text"
 //! subckt name (port …) { key=value }                 body below
 //! section name [library=name]                        body below
 //! if (expr)            body below; then at the same depth:  elif (expr)  …  else
@@ -66,7 +68,8 @@
 //! rel     = shift { (" < " | " <= " | " > " | " >= ") shift }
 //! shift   = add { (" << " | " >> ") add }
 //! add     = mul { (" + " | " - ") mul }
-//! mul     = unary { (" * " | " / " | " // ") unary }    (`//` is IntDiv)
+//! mul     = unary { (" * " | " / " | " // " | " /: ") unary }
+//!           (`//` is IntDiv, `/:` is DivTyped, A12 K1)
 //! unary   = ("-" | "!" | "~") unary | primary
 //!           (a "-" glued to a digit where a unary may stand is a negative literal's sign; the
 //!           `Neg` of a literal is written "-(…)": `-1.5` and `-(1.5)` are two trees)
@@ -292,7 +295,9 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
     }
 }
 
-/// Reads one or more `file` blocks into `b`. Total: a line it cannot read appends a
+/// Reads one or more `file` blocks into `b`. Every span it makes (an item's, a `TEXT_SYNTAX`
+/// row's) names the file block its line sits in (`FileId::NONE` for a `file` line itself) and
+/// holds byte offsets into `text`, the whole text handed to `parse`, not into its block. Total: a line it cannot read appends a
 /// `diag::TEXT_SYNTAX` row (span: the line's bytes in `text`, file `NONE`) and is skipped; what
 /// it can read is still built. Each item line goes to its kind's `RowFacts::parse` by its keyword
 /// (one exhaustive dispatch over `ItemKind`); then `link` binds every reference, `name?` ones
@@ -313,11 +318,17 @@ pub fn parse(text: &str, b: &mut Builder<'_>, diags: &mut Diags) {
             skip_deeper = None;
         }
         let before = diags.len();
+        // the line's file: the block it sits in (a `file` line itself is in none)
+        let file = match stack.first() {
+            Some(&top) if depth > 0 => b.design().scope(top).file,
+            Some(_) | None => FileId::NONE,
+        };
         let mut w = Words {
             text,
             pos: at,
             end,
             line: at,
+            file,
         };
         let failed = statement(
             &mut w,
@@ -489,6 +500,7 @@ fn if_conditions(
             pos: at,
             end,
             line: at,
+            file: w.file,
         };
         match (d == depth).then(|| line.next()).flatten() {
             Some("elif") => {

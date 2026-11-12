@@ -38,7 +38,7 @@
 //!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`)
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
-//!   `pub const INERT_DROPPED: ir::Code`
+//!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
@@ -146,6 +146,10 @@ pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
 /// `arg` 0.
 pub const INERT_DROPPED: ir::Code = ir::Code::new(b'S', 102);
 
+/// The note [`legalize`] adds where it drops a solver hint of another dialect (`Hint`, R19):
+/// `S0103`, `arg` 0.
+pub const HINT_DROPPED: ir::Code = ir::Code::new(b'S', 103);
+
 /// The spine's catalogue rows, in code order.
 const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
     (
@@ -163,6 +167,15 @@ const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
             title: "an inert statement of another dialect was dropped",
             cite: "rewrite/RULINGS.md R11; REWRITE-PLAN.md §3.4 (`Inert` changes no number)",
             explain: "The statement is another dialect's text that its own simulator runs to the same numbers without; the target cannot spell it, so it is left out. The deck is still written.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        HINT_DROPPED,
+        ir::Info {
+            title: "a solver hint of another dialect was dropped",
+            cite: "rewrite/RULINGS.md R19, R11; AMEND-A12 (`OpaqueClass::Hint`)",
+            explain: "The statement tunes another simulator's solver (tolerances, iteration limits, a method); it changes no meaning of the circuit, so it is left out. The numbers may move within the target solver's own tolerance. The deck is still written.",
             kind: ir::Kind::Note,
         },
     ),
@@ -213,7 +226,8 @@ pub fn read(
 /// `design` made legal for `to`, once per (design, target), in place (clone first to keep the
 /// neutral design or to write a second target). Every `Opaque` of another text family is
 /// dropped from its scope with an [`INERT_DROPPED`] note when its class is `Inert` (it moves no
-/// number) and refused otherwise (`U0001`, `arg` = `Feature::Item(Opaque)`, at the item); a
+/// number), with a [`HINT_DROPPED`] note when it is `Hint` (solver tuning: numbers may move
+/// within the solver's tolerance), and refused otherwise (`U0001`, `arg` = `Feature::Item(Opaque)`, at the item); a
 /// writer of [`ANY_FAMILY`] skips that step. Then `passes::legalize` with the writer's features,
 /// whose `ir::check_legal` reports what no pass removed. Last, always, the writer's own
 /// [`Write::admits`], so the caller sees every refusal at once. Legality is of the whole design.
@@ -232,6 +246,10 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
         match row.class {
             ir::OpaqueClass::Inert => {
                 diags.push(INERT_DROPPED, span, 0);
+                dropped.push((item, scope));
+            }
+            ir::OpaqueClass::Hint => {
+                diags.push(HINT_DROPPED, span, 0);
                 dropped.push((item, scope));
             }
             ir::OpaqueClass::Unread
