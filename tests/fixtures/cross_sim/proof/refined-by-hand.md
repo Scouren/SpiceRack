@@ -11,6 +11,15 @@ from the band in units of the tolerance: under 1 passes. Run 2026-11-11.
 |---|---|---|---|---|
 | SUBCKT/subckt_a5.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.54; /20000: VDDDEV#branch 8.46 | pass, worst VDDDEV#branch 0.716 |
 | SUBCKT/subckt_a5_hs.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.54; /20000: VDDDEV#branch 8.46 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a0.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a1.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a1_dup.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a2.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a2_dup.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a3.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a3_hs.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a4.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
+| SUBCKT/subckt_a4_hs.cir | 100 ps (TSTOP/300000) | 300552 / 300130 | /2000: VIN1#branch 6.29; /20000: VDDDEV#branch 7.92 | pass, worst VDDDEV#branch 0.716 |
 | HB/RC/simpleRC2.cir | 20 ns (TSTOP/500000) | 500018 / 500010 | /2000 and /20000: V(2) 27.96 (Xyce's own step is finer than both, so its run does not change) | pass, worst N3 0.008 |
 | SANDLER23/sandler23.cir | 20 ns ((TSTOP-TSTART)/100000) | 100321 / 100293 | /2000: X1:12 2.87; /20000: X1:12 1.61 | pass, worst X1:11 0.973 |
 
@@ -28,5 +37,10 @@ SANDLER23 passes by 3% of the tolerance, and neither simulator's own last two le
 (Xyce /100000 against /20000: X1:12 1.59; ngspice: 3.48): the certificate is the pair at this
 step, not a limit. subckt_a5: Xyce at 100 ps against its /20000 passes (0.71); ngspice does not
 (9.26), it is ngspice that moves.
+
+The nine `subckt_a0`…`a4` rows are `subckt_a5`'s inverter chain with the
+subcircuit written another way: one set of numbers for all nine, written
+decks of the tool-batch record (S4, e2ad5d7), run 2026-11-11 (ZERO-LEDGER
+P1-066).
 
 Source: ZERO-LEDGER P1-045 (the tool and the logs are in the row's spec evidence).

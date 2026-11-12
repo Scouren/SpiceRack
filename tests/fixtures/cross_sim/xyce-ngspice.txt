@@ -434,15 +434,15 @@ SENS/fdipulse2.cir mismatch # tran V(1): 4000 leaves the tube at t=0 (tol 2.000e
 SOURCES/ebh.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: b4a: unknown controlling source v_e3 | doAnalyses: no such parameter on this device or parameter is missing
 SOURCES/ebh_sub.cir target-fails # no raw file .cross_sim_out.raw: Fatal error: b.xsub.b4a: unknown controlling source v.xsub.v_e3 | doAnalyses: no such parameter on this device or parameter is m
 SOURCES/sources.cir target-fails # no raw file .cross_sim_out.raw: Error: no such function 'spice_pulse' at line 25
-SUBCKT/subckt_a0.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a1.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a1_dup.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a2.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a2_dup.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a3.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a3_hs.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a4.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
-SUBCKT/subckt_a4_hs.cir mismatch # tran OUT: 4.990780137463853 leaves the tube at t=0.000025584775764222627 (tol 4.991e-2)
+SUBCKT/subckt_a0.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a1.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a1_dup.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a2.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a2_dup.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a3.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a3_hs.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a4.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
+SUBCKT/subckt_a4_hs.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 7.92 x out
 SUBCKT/subckt_a5.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 8.46 x out
 SUBCKT/subckt_a5_hs.cir simulator-differs:refinement reason=S-NUMERIC-CONVERGES proof=refined-by-hand.md # both at TMAX 100 ps agree (worst 0.716 of the tolerance); at TSTOP/20000 VDDDEV#branch is 8.46 x out
 SUBCKT/subckt_j1.cir target-fails # no raw file .cross_sim_out.raw: Unknown model type vswitch - ignored | Error on line 22 or its substitute:: s.x1.x1.s1 99 x1.7 1 2 sw | Simulation interrupted d
