@@ -364,3 +364,20 @@ fn a_sweep_range_or_an_axis_reading_a_parameter_is_the_feature() {
         assert_eq!(features(deck).contains(x), uses, "{deck}");
     }
 }
+
+#[test]
+fn a_loop_bodys_shape_reads_its_run_items_only() {
+    // the lead's finding (pass_laws p3, `drop_unused_funcs`, seed 47): a function definition in
+    // a loop body runs nothing (its place is `Placed(Loop, Func)`), so dropping it changes
+    // neither `LoopOverOp` nor `SweepBodyNotOne`. Oracle: each member's doc, read by hand
+    let has = |lines: &str, x: RunExtra| features(lines).contains(Feature::Run(x));
+    let with_func = "  loop sweep (temp) (list values=[1])\n    func f(x) = x\n    analysis op";
+    let without = "  loop sweep (temp) (list values=[1])\n    analysis op";
+    for x in [RunExtra::LoopOverOp, RunExtra::SweepBodyNotOne] {
+        assert_eq!(has(with_func, x), has(without, x), "{x:?}");
+    }
+    assert!(
+        has(with_func, RunExtra::LoopOverOp),
+        "one operating point, a definition beside it"
+    );
+}
