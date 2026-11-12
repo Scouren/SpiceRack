@@ -12,7 +12,8 @@
 //! `RowFacts::generate` (one exhaustive dispatch over `ItemKind`) with a [`Gen`], the state every
 //! row's generator draws from.
 //!
-//! Contents: `pub struct Size`, `pub fn generate(u64, &FeatureSet, Size) -> Design`,
+//! Contents: `pub struct Size`, `pub enum Params`, `pub fn generate(u64, &FeatureSet, Size) -> Design`,
+//! `pub fn generate_with(u64, &FeatureSet, Size, Params) -> Design`,
 //! `pub struct Gen`, `Gen::below(&mut self, u32) -> u32`, `Gen::chance(&mut self, u32) -> bool`,
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
 //! `Gen::expr` (in `gen_expr.rs`),
@@ -91,6 +92,11 @@ pub struct Gen {
     /// Whether the expression being built lies in a `Handle::ExprDyn` field generated with
     /// `Reads::Constant` (a measure's threshold): its operators take the dynamic form (A19).
     pub(crate) dyn_form: bool,
+    /// Whether the expression being built is a function body (A28): its forms are its callers',
+    /// unknown while it is built, so each operator must be allowed in both forms.
+    pub(crate) both_forms: bool,
+    /// Whether rows draw untyped parameter lists (A28; the owners' row generators read it).
+    pub(crate) params: Params,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -104,6 +110,19 @@ pub enum Reads {
     /// A field the row lists as `Handle::ExprDyn` (a behavioural source, a charge, a table's
     /// input, a switch's control).
     Circuit,
+}
+
+/// Whether generated rows carry untyped parameter lists (A28): `Untyped` is the default (an
+/// element's instance parameters and a model's parameters drawn with random names);
+/// `TypedOnly` generates every row with its typed fields and those lists empty, so that a
+/// dialect that checks parameter names against its device tables admits the design. The law
+/// harness runs both.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Params {
+    /// Untyped parameter lists drawn with random names.
+    Untyped,
+    /// Untyped parameter lists left empty.
+    TypedOnly,
 }
 
 /// The powers of ten a `Scale` literal may have (A3).
@@ -125,8 +144,14 @@ const WORDS: [&str; 8] = [
 /// A random design under `features`, at most `size`. A feature outside the set never appears;
 /// a feature in it may not (the set is an upper bound).
 pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
+    generate_with(seed, features, size, Params::Untyped)
+}
+
+/// As [`generate`], with the untyped-parameter setting `params` (A28).
+pub fn generate_with(seed: u64, features: &FeatureSet, size: Size, params: Params) -> Design {
     let mut design = Design::new();
     let mut g = Gen::new(seed, features, size);
+    g.params = params;
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
     for k in 0..files {
@@ -299,6 +324,8 @@ impl Gen {
             case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
             constant_only: false,
             dyn_form: false,
+            both_forms: false,
+            params: Params::Untyped,
         }
     }
 

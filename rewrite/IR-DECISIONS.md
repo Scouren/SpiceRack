@@ -398,3 +398,20 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 
 - `Builder::element_named(scope, name) -> Option<ItemRef>`: the first element of that whole name listed in `scope`, from an index on `Design` (`element_names`, lookup only) built on first use in O(items). It is extended by `Builder::push` itself whenever the row is an `Element`, so IR text (which pushes through the low tier) and `Builder::element` both keep it. It is cleared where `editor()` hands out its door and in `Editor::items_mut` and `Editor::set`, the mutations that can move or rename an element, as the class cache is. It takes `&mut self` because the builder's design is `&mut`; it reads only.
 
+## A28 applied: dead scopes, draws
+
+- `check` walks the live scopes: a file's top, and the body of an item listed in a live scope (`check_scopes::live_scopes`, an explicit worklist). Range checks still run on every scope, since a pass reads them; the tree's shape, owners and listings are checked on live scopes only. `files_and_scopes` moved to `check_scopes.rs` (check.rs passed 500 lines).
+- `Feature::DistDyn(Dist)`, the 21st group, appended last. A draw's distribution counts `DistDyn` in a dynamic root, `Dist` in a static one; `DrawWhen` and `DrawPer` stay one feature each (no simulator was found to differ by form there). The generator picks a distribution from the form's features.
+
+## A28 applied: body forms (R51)
+
+- The forms are a second cache beside the class table (`Design::forms`, an `FxMap` from a body's `ExprId` to bits), computed on first use by an explicit worklist: every listed root that is no body seeds the calls its tree makes with its own form, and each (definition, form) is expanded once. One helper, `Design::derived_changed`, clears both caches at every site that cleared the classes. `root_form` and the feature count look a body up by its expression id; a body id also used by another field would be read as a body (no builder makes one).
+- The form logic (`Form`, `root_form`, `form_of`, `form_feature`, the forms computation) moved to `form.rs`, re-exported from `feature`; feature.rs passed 500 lines.
+- `Func(Ddt)` and `Func(Idt)` are no longer unreachable: an uncalled body that holds one counts it static.
+- The generator builds a body from operators the set allows in both forms (`Gen::both_forms`), since its callers, and so its forms, come later.
+- Finding, reported to the lead: inlining can change a root's form when it drops an argument of class `Temp` or above (an extra argument, or one for a formal the body never reads): the caller was dynamic only through that argument. The inlining property excludes those inlinings and counts them; inlining that drops nothing adds no feature. Separately, the generator calls user functions with an argument count unequal to the formals, and `check` does not refuse it.
+
+## A28: the generator setting
+
+- `gen::Params { Untyped, TypedOnly }` and `generate_with(seed, features, size, params)`; `generate` is `generate_with(…, Params::Untyped)`, so no caller changes. The setting reaches the row generators as `Gen::params`. The kernel's rows draw no untyped parameter list (a subcircuit's head parameters are formals, typed by the row), so the setting's effect is the circuit owner's element and model generators; they honour it in their files.
+

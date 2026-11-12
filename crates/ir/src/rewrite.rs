@@ -49,12 +49,17 @@ pub fn rewrite_exprs(
 /// As [`rewrite_exprs`], restricted to the roots of one `form` (A26: `root_form` of each root as
 /// it stands before the pass): a root of the other form keeps its id, and a subtree a root of
 /// each form shares is rewritten for the one and kept for the other (rows are appended, so both
-/// trees exist). Returns how many roots changed.
+/// trees exist). A function body counts in its callers' forms (A28): one of both forms is left
+/// to neither call. Returns how many roots changed.
+///
+/// # Panics
+/// On `Form::Both`: a pass rewrites one form.
 pub fn rewrite_exprs_in(
     design: &mut Design,
     form: Form,
     rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
 ) -> u32 {
+    assert!(form != Form::Both, "a pass rewrites the roots of one form");
     rewrite_where(design, Some(form), rule)
 }
 
