@@ -89,8 +89,7 @@ pub(super) fn comment(w: &mut Out<'_>, item: ir::ItemRef) {
     let c: ir::item::Comment = w.design.row(item.index);
     let text = w.design.text(c.text).to_string();
     for line in text.split('\n') {
-        w.out.push('*');
-        w.line(line);
+        w.line(&format!("*{line}"));
     }
 }
 
@@ -194,7 +193,7 @@ pub(super) fn if_(w: &mut Out<'_>, item: ir::ItemRef) {
         s
     };
     let head = clause(w, 0);
-    w.out.push_str(&head);
+    w.line(head.trim_end_matches('\n'));
     for k in (0..branches.len()).rev() {
         let tail = if k + 1 < branches.len() {
             clause(w, k + 1)
@@ -230,8 +229,9 @@ pub(super) fn func(w: &mut Out<'_>, item: ir::ItemRef) {
 
 /// Appends a refusal for any item but a model whose expressions hold a string or a list
 /// (`W1006`): `FEATURES` holds `Expr(Str)` for a model's version string only, and no feature
-/// states where a string stands; and for a structure item whose value holds a node the
-/// evaluator its class picks cannot spell (`W1007`: a draw in a value that reads `temper`). Placements, formals without a default, dynamic `.if`
+/// states where a string stands; and for any such item whose expression holds a node the
+/// evaluator its class picks cannot spell (`W1007`: a draw in a value that reads `temper` or
+/// the circuit, which the B-source parser writes and which has no `unif`). Placements, formals without a default, dynamic `.if`
 /// conditions and line breaks are features or invariants (A15), not refusals.
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     // ponytail: the roots through the pass door on a copy (the kernel has no read-only twin of
@@ -242,10 +242,6 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         if item.kind == ItemKind::Model {
             continue;
         }
-        let structure = matches!(
-            item.kind,
-            ItemKind::Param | ItemKind::Func | ItemKind::Subckt | ItemKind::If
-        );
         let (mut text, mut unspelled) = (false, false);
         ed.map_exprs(item, &mut |e, _| {
             if e.is_none() {
@@ -253,7 +249,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             }
             text |= expr_write::holds_text(design, *e);
             let eval = expr_write::eval_of(design, *e);
-            unspelled |= structure && !expr_write::spells_in(design, *e, eval);
+            unspelled |= !expr_write::spells_in(design, *e, eval);
         });
         if text {
             diags.push_at(codes::TEXT_VALUE, design, item, 0);

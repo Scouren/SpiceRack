@@ -76,9 +76,8 @@ pub(super) const DEFAULT_CYCLE: Code = Code::new(b'R', 1005);
 /// A string or list value where ngspice reads an expression (a `.param`, head default, `.if`
 /// or `.func`): numparam has no string or vector values.
 pub(super) const TEXT_VALUE: Code = Code::new(b'W', 1006);
-/// A structure value (a `.param`, head default, `.func` body, `.if` condition) holding a node
-/// the evaluator its class picks cannot spell: a draw in a value that reads the temperature (the
-/// B-source parser has no `unif`).
+/// An expression holding a node the evaluator its class picks cannot spell: a draw in a value
+/// that reads the temperature or the circuit (the B-source parser has no `unif`).
 pub(super) const UNSPELLED_VALUE: Code = Code::new(b'W', 1007);
 
 /// The S3.0 rows.
@@ -145,9 +144,9 @@ pub(super) const CODES: &[Row] = &[
     ),
     refusal(
         UNSPELLED_VALUE,
-        "a structure value its evaluator cannot spell",
+        "an expression its evaluator cannot spell",
         "ngspice-45 xpressn.c, inpptree.c",
-        "a value that reads the temperature is written for the B-source parser, which has no draw function; refused.",
+        "a value that reads the temperature or the circuit is written for the B-source parser, which has no draw function; refused.",
     ),
     row(
         FIRST_LAST,

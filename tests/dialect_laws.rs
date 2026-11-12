@@ -41,11 +41,18 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "l7",
-    "ngspice",
-    "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "l5",
+        "ngspice",
+        "seed 0: a bsim4, b3_soi_dd or hicum2 model with no version reads back with ngspice's default version (models); a Load's modules list is lost on write (control); an Alter value 840127mil reads back as 213392258e-7, equal by value (R28), so eq_meaning on an Alter's value is in question (spine); each reported to its owner",
+    ),
+    (
+        "l7",
+        "ngspice",
+        "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
+    ),
+];
 
 /// The most seeds the shrink self-test searches for its case.
 const SEARCH_MAX: u64 = 1024;
@@ -57,28 +64,21 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 /// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
 const KNOWN_REACH: &[(&str, &str)] = &[
     // ngspice: every admitted design over REACH_SEEDS drops these by an area's admits refusal
-    // (reported to the areas with the S3 integration report)
-    ("ngspice", "Item(Measure)"),
-    ("ngspice", "Elem(Resistor)"),
+    // (the list goes to the lead with each kind's blocking refusal after A25 item 4 and A28)
     ("ngspice", "Elem(Capacitor)"),
+    ("ngspice", "Elem(Inductor)"),
     ("ngspice", "Elem(VSource)"),
-    ("ngspice", "Elem(ISource)"),
-    ("ngspice", "Elem(Port)"),
     ("ngspice", "Elem(Table)"),
     ("ngspice", "Wave(Pulse)"),
     ("ngspice", "Wave(Sin)"),
     ("ngspice", "Wave(Exp)"),
-    ("ngspice", "Wave(Pwl)"),
     ("ngspice", "Wave(Sffm)"),
     ("ngspice", "Wave(Am)"),
     ("ngspice", "Wave(TrNoise)"),
     ("ngspice", "Wave(TrRandom)"),
     ("ngspice", "Analysis(Dc)"),
-    ("ngspice", "Analysis(Ac)"),
     ("ngspice", "Analysis(Noise)"),
     ("ngspice", "Analysis(SensAc)"),
-    ("ngspice", "Analysis(Sp)"),
-    ("ngspice", "Analysis(Four)"),
     ("ngspice", "Analysis(Pss)"),
     ("ngspice", "Family(Mesa)"),
 ];

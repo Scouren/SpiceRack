@@ -75,11 +75,7 @@ const WRITE: &[&str] = &[
 
 /// The fixtures and decks that fail today, by name, with the test that fails and why. Strict
 /// both ways: a listed one that passes fails the test until its line goes.
-const PENDING: &[(&str, &str, &str)] = &[(
-    "load_then_deck",
-    "write",
-    "ng-scaffold: write_structure's comment and if_ write before Out::line closes the region",
-)];
+const PENDING: &[(&str, &str, &str)] = &[];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in

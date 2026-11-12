@@ -98,8 +98,7 @@ pub(super) fn needs_script(design: &ir::Design, scope: ir::ScopeId) -> bool {
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
 /// (R21, `Write::admits`).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
-    let span = design.span_of(item);
-    let mut refuse = |code| diags.push(code, span, 0);
+    let mut refuse = |code| diags.push_at(code, design, item, 0);
     match item.kind {
         ir::ItemKind::Alter => {
             let a: ir::Alter = design.row(item.index);
