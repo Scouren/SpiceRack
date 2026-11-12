@@ -489,3 +489,40 @@ fn a_blank_line_one_is_an_empty_title() {
     assert_eq!(d.text(t.text), "");
     assert_eq!(write(&d), "\n.param a=1\n.end\n");
 }
+
+#[test]
+fn a_source_whose_value_reads_the_circuit_is_refused_with_the_sources_code() {
+    // R21, the elements and sources areas' agreement: `write_elements::admits` forwards V, I
+    // and port elements to `write_sources::admits`; a V source's DC that reads the circuit has
+    // no ngspice source spelling (a source value is a constant), so legalize refuses it (W1150)
+    // instead of the writer's assertion firing.
+    let mut d = ir::Design::new();
+    {
+        let mut b = d.builder();
+        let (_, top) = b.file("d.sp", ir::Role::Deck);
+        b.title(top, "t", ir::Span::NONE);
+        let dc = b.v("b", None);
+        let head = b.head("v1", &["a", "0"], None, &[], ir::ExprId::NONE);
+        let row = ir::source::Source {
+            dc,
+            ac_mag: ir::ExprId::NONE,
+            ac_phase_deg: ir::ExprId::NONE,
+            tc1: ir::ExprId::NONE,
+            tc2: ir::ExprId::NONE,
+            pac_mag: ir::ExprId::NONE,
+            pac_phase_deg: ir::ExprId::NONE,
+            wave: ir::WaveRef::NONE,
+            noise_psd: ir::ExprList::EMPTY,
+            parasitics: ir::NO_ROW,
+            port: ir::NO_ROW,
+            distof: ir::NO_ROW,
+            dc_rule: ir::source::DcRule::Given,
+        };
+        b.source(top, ir::ElemKind::VSource, head, row, ir::Span::NONE);
+    }
+    let row = dialect::by_name("ngspice").expect("row");
+    let mut diags = ir::Diags::new();
+    dialect::legalize(&mut d, row, &mut diags);
+    let codes: Vec<String> = codes_of(&diags).iter().map(|c| c.to_string()).collect();
+    assert!(codes.contains(&"W1150".to_string()), "{codes:?}");
+}

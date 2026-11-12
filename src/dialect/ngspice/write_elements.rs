@@ -46,8 +46,7 @@ pub(super) const CODES: &[Row] = &[(
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let e: ir::Element = design.row(item.index);
     if matches!(e.kind, K::VSource | K::ISource | K::Port) {
-        // the source area's (`write_sources::admits` once it lands)
-        return;
+        return write_sources::admits(design, item, diags);
     }
     if !admit::spellable(design, &e) {
         diags.push(UNSPELLABLE, design.span_of(item), 0);

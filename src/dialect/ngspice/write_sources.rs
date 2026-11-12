@@ -50,13 +50,6 @@ struct Extra {
 }
 
 /// Appends `UNSPELLED` at a source ngspice cannot spell (R21).
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "write_elements::admits forwards sources (S3.1a merge)"
-    )
-)]
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let e: ir::Element = design.row(item.index);
     if e.kind.detail() != ir::DetailKind::Source || spells(design, &e) {
