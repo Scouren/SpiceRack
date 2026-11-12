@@ -41,7 +41,8 @@ use crate::ir::{self, CircuitExtra as X, ElemKind as K, Feature, FeatureSet, Ite
 /// What the element area reads: every kind below, and the field members its rules produce.
 /// Not: `MultOther` (no switch, line or coupling of ngspice takes `m`), `MultInstanceParallel`
 /// (an X `m` is ngspice's append law, R31), `TcBaseTnom` (a B source measures from 27 °C),
-/// `NameWithoutLetter` (A13), `BuiltinMaster`, `IcInOp`, parasitics,
+/// `NameWithoutLetter` (A13), `BuiltinMaster`, `IcInOp`, `SemiInitialOn` (a semiconductor takes `off`
+/// only), parasitics,
 /// Laplace, frequency tables, delays, ports, modules named directly, unresolved masters.
 pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::Element),
@@ -95,7 +96,7 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Circuit(X::CouplingMany),
     Feature::Circuit(X::TableNgspiceRounded),
     Feature::Circuit(X::SemiArea),
-    Feature::Circuit(X::SemiInitial),
+    Feature::Circuit(X::SemiInitialOff),
     Feature::Circuit(X::DiodeThermal),
     Feature::Circuit(X::SwitchInitial),
     Feature::Circuit(X::LineFreqNl),
