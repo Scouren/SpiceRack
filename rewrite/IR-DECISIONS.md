@@ -327,3 +327,14 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `IcBeyondNext` is `IcNextOnly`'s twin (`next_only` false), so each member of the field has its feature. A node set is generated only when one of the two is in the set.
 - Docs: `OptionKey::TrTol` is not VACASK's `tran_lteratio` (a hint, R19). `MethodGear` is variable order up to `MaxOrd`, not VACASK's fixed-order `gear2`/`bdf2`, and no member states a fixed order yet.
 - Reach over the harness's 4,000 seeds of `FeatureSet::ALL`: `DcAxisNamed` 132, `LoopNamed` 1305, `SweepBodyNotOne` 1503, `RunInterleaved` 3997, `IcBeyondNext` 2614, `SaveAnalysisSet` 1673.
+
+## A19 applied (an `ExprDyn` field's form)
+
+- `feature::item_features` marks a root dynamic when the row lists it as `Handle::ExprDyn`, or when its class is at least `Temp`. A root listed under both kinds counts as dynamic.
+- Generator: `operator()` takes the dynamic form under `Reads::Circuit` or `Gen::dyn_form`. The run owner's `gen_event` sets `dyn_form` around the event value, an `ExprDyn` field generated with constant reads unless the set has `MeasCircuitThreshold`. The merged tree's `random_run_subsets_restrict_the_generator` found it as `FuncDyn(Sqrt)` outside a set.
+- The test's unary is `-(2 + 1)`: IR text reads `-1` as a negative literal, not a `Neg` node.
+
+## A21 applied (`Func::ToReal`)
+
+- Appended last to `Func` (text `to_real`); its value is `x`, and its tag Real is an explicit arm beside `ToInt`'s. Spec examples from VACASK run b1 in kernel_typed: `to_real(3i) /: 2i` is 1.5, `to_int(to_real(3i)) /: 2i` is 1, and `ToReal` of a Real is the identity.
+

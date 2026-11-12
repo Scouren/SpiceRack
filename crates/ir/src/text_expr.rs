@@ -378,6 +378,7 @@ pub(crate) fn func_text(f: Func) -> &'static str {
         Func::Pwl => "pwl",
         Func::ToInt => "to_int",
         Func::SgnZeroPos => "sgn_zero_pos",
+        Func::ToReal => "to_real",
     }
 }
 

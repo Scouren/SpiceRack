@@ -86,6 +86,9 @@ pub struct Gen {
     /// Whether the expression being built must be of class `Constant` (cleared around an `If`
     /// condition when the set lacks `Extra::IfConditionDynamic`).
     pub(crate) constant_only: bool,
+    /// Whether the expression being built lies in a `Handle::ExprDyn` field generated with
+    /// `Reads::Constant` (a measure's threshold): its operators take the dynamic form (A19).
+    pub(crate) dyn_form: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -138,6 +141,7 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         param_reads: true,
         case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
         constant_only: false,
+        dyn_form: false,
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);

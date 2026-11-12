@@ -273,8 +273,9 @@ number; `Bindings::param_value` passes a typed parameter, defaulting to `param` 
 `Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
 `Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
 chosen branch's; `ToInt` Int; `SgnZeroPos` (−1 for `x < 0`, +1 otherwise, −0.0 included:
-VACASK's `sgn`, runs e1, f4) its operand's; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
-domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`. An Int
+VACASK's `sgn`, runs e1, f4) its operand's; `ToReal` (A21, R40: the value of `x`, VACASK run
+b1) Real; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`, `ToReal` is `to_real`. An Int
 and a real literal of one value are not `eq_value` (they mean different things).
 
 **A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
@@ -339,6 +340,15 @@ the set (`gen::placeable`, also for a row's own generator that pushes into a bod
 sections may now be nested where the set allows. `Placed(_, Title)` never occurs: a title stands
 only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
 text refuses it, so only a pass moving the item reaches the check).
+
+**A19 (2026-11-12): a field that may read the circuit counts the dynamic form (R38).** An
+expression a row lists as `Handle::ExprDyn` counts its functions and operators as `FuncDyn`,
+`BinaryDyn` and `UnaryDyn` whatever its class; elsewhere the form follows the class as before
+(dynamic when `Temp` or `Circuit`). A constant in a B source's expression is the dynamic form,
+because its simulator reads that field with the behavioural parser (`B1 a 0 V={2**3}`). The
+generator picks operators from the dynamic features for every tree under `Reads::Circuit`, and
+for a `Handle::ExprDyn` field it builds with constant reads (`Gen::dyn_form`, a measure's
+threshold).
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

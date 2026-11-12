@@ -98,7 +98,7 @@ pub struct Passive {
     /// C and L. Native: ng only. Evidence: D2, 6.17.
     pub ac: ExprId,
     /// The ngspice instance scale (dimensionless): it divides a resistor's conductance and
-    /// multiplies a capacitor's capacitance. `NONE`: 1. Native: ng (Spectre's geometry scale
+    /// multiplies a capacitor's capacitance and an inductor's inductance (`indtemp.c:79`). `NONE`: 1. Native: ng (Spectre's geometry scale
     /// is folded into `mult` by its reader). Evidence: D2, 6.07.
     pub scale: ExprId,
     /// Row in the parasitics table, or `NO_ROW` for none. Evidence: D8, 6.04, 6.05.
