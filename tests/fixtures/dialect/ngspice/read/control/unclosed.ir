@@ -1,0 +1,6 @@
+# codes: P1401
+file "unclosed.sp" deck
+  title "unclosed"
+  comment " oracle: a block the file ends before closing runs to the end of the file (inp.c:742-812: commands until .endc; corpus Monte_Carlo/MC_ring_ts.sp); kept whole with its .endc, so a written .end stays outside"
+  analysis op
+  opaque ngspice script ".control\nif 1\nop\nend\n.endc"

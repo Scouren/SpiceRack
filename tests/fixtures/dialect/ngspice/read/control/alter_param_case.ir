@@ -1,0 +1,9 @@
+# codes:
+file "alter_param_case.sp" deck
+  title "alter_param_case"
+  comment " oracle: names fold across the read (one spelling per name, ngspice folds case: inpcom.c:1775); a ; after the value is a comment (inpcom.c:3540; corpus measure/mos-meas-dc-control.sp)"
+  model nch mos1 polarity=n
+  element mosfet m1 (d g 0 0) model=nch params=(W=10u)
+  alter (device_param m1 W) value=10.01u
+  alter (model_param nch vto) value=0.5
+  analysis op
