@@ -1,7 +1,8 @@
 //! The verdict word lists of `rewrite/S3-CONTROL.md` §2 (ngspice-45 `commands.c`), the
-//! display variables and the frontend-only option keys: data the planner reads.
+//! variables of ngspice's own, the circuit options and the frontend-only option keys: data the planner reads.
 //!
-//! Contents: `pub(super) const INERT`, `EFFECTS`, `FLOWS`, `OWNS`, `ANALYSES`, `DISPLAY_VARS`,
+//! Contents: `pub(super) const INERT`, `EFFECTS`, `FLOWS`, `OWNS`, `ANALYSES`, `PRIVATE_VARS`,
+//! `CIRCUIT_OPTIONS`,
 //! `FRONTEND_KEYS` (each `&[&str]`)
 
 /// Display commands (`S3-CONTROL.md` §2: Inert).
@@ -112,29 +113,99 @@ pub(super) const ANALYSES: &[&str] = &[
     "op", "tf", "tran", "pss", "sp", "ac", "dc", "pz", "sens", "disto", "noise",
 ];
 
-/// Frontend variables that only change how results are shown or written (`INV-constructs.md`
-/// K3, checked against `options.c` `cp_usrset`: none reaches `if_option`).
-pub(super) const DISPLAY_VARS: &[&str] = &[
-    "appendwrite",
-    "askquit",
-    "brief",
-    "curplottitle",
-    "gridstyle",
-    "height",
-    "noaskquit",
-    "nobreak",
-    "nolegend",
-    "nomoremode",
-    "nopadding",
-    "noprintscale",
+/// Frontend variables that change what a run computes or how its numbers are written
+/// (`options.c` `cp_usrset`, `inp.c`, `outitf.c`): `Private`. Every other variable a `set`
+/// assigns that is no circuit option is shown or read only by script commands (a typed one
+/// reading it makes the script `Script`): `Inert`.
+pub(super) const PRIVATE_VARS: &[&str] = &[
+    "units",
+    "ngbehavior",
+    "filetype",
+    "rawfile",
+    "rawfileprec",
+    "csnumprec",
+    "sourcepath",
+    "strictnumparse",
+    "strict_errorhandling",
+    "skywaterpdk",
+    "rndseed",
+    "savecurrents",
+    "nosubckt",
+    "noparse",
+    "controlswait",
+    "num_threads",
+];
+
+/// The circuit's own options (`cktsopt.c:240-380`, `if_option` accepts them): a `set` of one
+/// is the `option` of it (`US_SIMVAR`).
+pub(super) const CIRCUIT_OPTIONS: &[&str] = &[
+    "maxopalter",
+    "maxevtiter",
+    "noopalter",
+    "ramptime",
+    "convlimit",
+    "convstep",
+    "convabsstep",
+    "autopartial",
+    "rshunt",
+    "cshunt",
+    "noopiter",
+    "gmin",
+    "gshunt",
+    "reltol",
+    "abstol",
+    "vntol",
+    "trtol",
+    "chgtol",
+    "pivtol",
+    "pivrel",
+    "tnom",
+    "temp",
+    "itl1",
+    "itl2",
+    "itl3",
+    "itl4",
+    "itl5",
+    "itl6",
+    "srcsteps",
+    "gminsteps",
+    "gminfactor",
+    "acct",
+    "list",
+    "nomod",
+    "nopage",
+    "node",
+    "opts",
+    "oldlimit",
     "numdgt",
-    "plotstyle",
-    "pointchars",
-    "width",
-    "wr_singlescale",
-    "wr_vecnames",
-    "xbrushwidth",
-    "xgridwidth",
+    "cptime",
+    "limtim",
+    "limpts",
+    "lvlcod",
+    "lvltim",
+    "method",
+    "maxord",
+    "indverbosity",
+    "xmu",
+    "defm",
+    "defl",
+    "defw",
+    "minbreak",
+    "defad",
+    "defas",
+    "bypass",
+    "trytocompact",
+    "badmos3",
+    "keepopinfo",
+    "copynodesets",
+    "nodedamping",
+    "absdv",
+    "reldv",
+    "noopac",
+    "epsmin",
+    "sparse",
+    "klu",
+    "klu_memgrow_factor",
 ];
 
 /// Typed option keys that are frontend variables, not circuit options (absent from

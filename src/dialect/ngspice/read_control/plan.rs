@@ -11,9 +11,13 @@
 //! `pub(super) enum Op`, `pub(super) fn plan(&[Block], cards: bool) -> Result<Vec<Vec<Op>>,
 //! ir::Code>`
 
-use super::args::{alter, alterparam, assignments, class_of, is_number, repeat_count, subst};
+use super::args::{
+    alter, alterparam, assignments, class_of, is_number, known, repeat_count, subst,
+};
 use super::script::{Block, Cmd, Node};
-use super::table::{ANALYSES, DISPLAY_VARS, EFFECTS, FLOWS, FRONTEND_KEYS, INERT, OWNS};
+use super::table::{
+    ANALYSES, CIRCUIT_OPTIONS, EFFECTS, FLOWS, FRONTEND_KEYS, INERT, OWNS, PRIVATE_VARS,
+};
 use super::{DISPLAY, EFFECT, FLOW, FORM, NO_COMMAND, NO_RESET, OWN, STATE_WITH_CARDS, UNROLL};
 use crate::dialect::ngspice::read_run;
 use crate::ir;
@@ -218,6 +222,14 @@ impl Interp {
         env: &[(String, String)],
         out: &mut Vec<Op>,
     ) -> Result<(), ir::Code> {
+        // an unrolled pass: the command's own text gets its loop words, so that a kept opaque
+        // means what that pass ran
+        let unrolled = Cmd {
+            text: known(&c.text, env),
+            line: c.line.clone(),
+            hash: c.hash,
+        };
+        let c = &unrolled;
         let word = c.word();
         let opaque = |class, code| Op::Opaque {
             class,
@@ -370,7 +382,9 @@ impl Interp {
         let sim = |k: &str| {
             matches!(k, "temp" | "tnom" | "method") || read_run::KEYS.iter().any(|(n, _)| *n == k)
         };
-        if keys.iter().all(|(k, _)| DISPLAY_VARS.contains(&k.as_str())) {
+        let shown =
+            |k: &str| !sim(k) && !PRIVATE_VARS.contains(&k) && !CIRCUIT_OPTIONS.contains(&k);
+        if keys.iter().all(|(k, _)| shown(k)) {
             SetKind::Display
         } else if keys.iter().all(|(k, _)| sim(k)) {
             SetKind::Simulator

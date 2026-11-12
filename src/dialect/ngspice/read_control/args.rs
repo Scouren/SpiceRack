@@ -9,7 +9,7 @@
 //! &[(String, String)]) -> Result<String, ir::Code>`, `pub(super) fn assignments(&str) ->
 //! Vec<(String, Option<String>)>`, `pub(super) fn alter(&str, bool) -> Result<(Target, String),
 //! ir::Code>`, `pub(super) fn alterparam(&str) -> Result<(Target, String), ir::Code>`,
-//! `pub(super) fn repeat_count(&str) -> Option<usize>`, `pub(super) fn class_of(ir::Code) ->
+//! `pub(super) fn known(&str, &[(String, String)]) -> String`, `pub(super) fn repeat_count(&str) -> Option<usize>`, `pub(super) fn class_of(ir::Code) ->
 //! ir::OpaqueClass`
 
 use super::plan::{MARK, Target, UNROLL_MAX};
@@ -149,4 +149,30 @@ pub(super) fn class_of(code: ir::Code) -> ir::OpaqueClass {
     } else {
         ir::OpaqueClass::InvalidInSource
     }
+}
+
+/// `text` with each `$var` bound in `env` to a word replaced by it, everything else kept (a
+/// template's marker is no word: its `$var` stays, valid inside the loop the writer puts back).
+pub(super) fn known(text: &str, env: &[(String, String)]) -> String {
+    let mut out = text.to_string();
+    for (var, word) in env.iter().rev().filter(|(_, w)| w != MARK) {
+        let pat = format!("${var}");
+        let mut at = 0;
+        // Bounded: each step moves past one occurrence.
+        while let Some(k) = out[at..].find(&pat) {
+            let start = at + k;
+            let end = start + pat.len();
+            let more = out[end..]
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
+            if more {
+                at = end;
+                continue;
+            }
+            out.replace_range(start..end, word);
+            at = start + word.len();
+        }
+    }
+    out
 }
