@@ -24,6 +24,14 @@ const SIZE: Size = Size {
     files: 2,
 };
 
+/// The kernel harness's size (`kernel_gen.rs`), for the reach test.
+const KERNEL_SIZE: Size = Size {
+    items: 40,
+    scope_depth: 3,
+    expr_depth: 4,
+    files: 2,
+};
+
 /// The run owner's item kinds.
 const RUN_KINDS: [ItemKind; 11] = [
     ItemKind::Statistics,
@@ -196,4 +204,27 @@ fn the_same_seed_gives_the_same_run_bytes() {
             text_of(&generate(seed, &set, SIZE))
         );
     }
+}
+
+#[test]
+fn every_run_feature_is_reached_on_a_second_seed_list() {
+    // The kernel's full-set test reaches every feature over seeds 0..4000; the same must hold on
+    // a disjoint list, so reach does not hang on one seed list. Run features only (the kernel's
+    // own are its test's): every run item kind, analysis kind, run field feature and option key,
+    // under every feature of the crate, as the kernel's harness runs it.
+    let set = FeatureSet::ALL;
+    let mut reached = FeatureSet::EMPTY;
+    for seed in 50_000..54_000u64 {
+        reached = reached.union(features_used(&generate(seed, &set, KERNEL_SIZE)));
+    }
+    let ours = |f: &Feature| match f {
+        Feature::Item(k) => RUN_KINDS.contains(k),
+        Feature::Analysis(_) | Feature::Run(_) | Feature::Option(_) => true,
+        _ => false,
+    };
+    let missing: Vec<Feature> = set.minus(reached).iter().filter(ours).collect();
+    assert!(
+        missing.is_empty(),
+        "run features no seed generated: {missing:?}"
+    );
 }
