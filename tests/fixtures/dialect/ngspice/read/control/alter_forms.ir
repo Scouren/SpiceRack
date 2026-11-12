@@ -1,0 +1,11 @@
+# codes:
+file "alter_forms.sp" deck
+  title "alter_forms"
+  comment " oracle: S3-CONTROL S4: device.c:1249-1420 com_alter_common (bare value: the principal parameter, spiceif.c:951; dev p v, dev p = v, @dev[p] = v); names fold (inpcom.c:1775)"
+  alter (element_value r1) value=2k
+  alter (element_value r1) value=3k
+  alter (source_dc v1) value=1.5
+  alter (device_param r1 resistance) value=4k
+  alter (device_param r1 resistance) value=5k
+  alter (element_value c1) value=1p
+  analysis op

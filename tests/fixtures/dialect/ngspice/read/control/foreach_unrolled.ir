@@ -1,0 +1,6 @@
+# codes:
+file "foreach_unrolled.sp" deck
+  title "foreach_unrolled"
+  comment " oracle: S3-CONTROL V1: an analysis that reads the variable is not the Loop law: the loop unrolled, each word substituted as written"
+  analysis dc (source_dc v1) (lin start=1 stop=1 step=1)
+  analysis dc (source_dc v1) (lin start=2 stop=2 step=1)

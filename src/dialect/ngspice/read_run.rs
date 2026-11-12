@@ -22,7 +22,8 @@
 //! (ngspice's option spellings, which `write_run` spells back); for the control area, which reads
 //! a script command (`tran 1n 1u uic`) as the card without its dot:
 //! `pub(super) use words::split as split_words` (`fn(&str) -> Vec<String>`),
-//! `pub(super) use analysis::read as read_analysis` (`fn(&mut Lower, Stmt, name: &str,
+//! `pub(super) use analysis::Card`, `pub(super) use analysis::read as read_analysis`
+//! (`fn(&mut Lower, Stmt, name: &str,
 //! words: &[String]) -> Result<Card, Fail>`), `pub(super) use rows::push as push_analysis`
 //! (`fn(&mut Lower, Stmt, &Card)`)
 
@@ -31,6 +32,11 @@ mod rows;
 mod state;
 mod words;
 
+#[allow(
+    unused_imports,
+    reason = "the control area holds a validated Card between its passes"
+)]
+pub(super) use analysis::Card;
 pub(super) use analysis::read as read_analysis;
 pub(super) use rows::push as push_analysis;
 pub(super) use state::KEYS;
@@ -73,9 +79,10 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::DcNested),
     Feature::Run(RunExtra::DcAxisTemp),
     Feature::Run(RunExtra::DcAxisElementValue),
-    Feature::Run(RunExtra::SweepLinPoints),
-    Feature::Run(RunExtra::SweepDec),
-    Feature::Run(RunExtra::SweepOct),
+    Feature::Run(RunExtra::SweepDcLinStep),
+    Feature::Run(RunExtra::SweepFreqLinPoints),
+    Feature::Run(RunExtra::SweepFreqDec),
+    Feature::Run(RunExtra::SweepFreqOct),
     Feature::Run(RunExtra::NoiseSummary),
     Feature::Run(RunExtra::SpNoise),
     Feature::Run(RunExtra::ProbeVdiff),
@@ -299,7 +306,8 @@ mod tests {
         let a: ir::Analysis = design.row(item.index);
         assert_eq!(a.kind, ir::AnalysisKind::Tran);
         let t: ir::tran::Tran = design.detail(a.detail);
-        assert!(t.uic && t.max_step.is_none() && t.record_start.is_none());
-        assert_eq!(t.cap, ir::tran::StepCap::NgspiceRule);
+        assert!(t.uic && t.record_start.is_none());
+        let rule = ir::tran::StepCeiling::Rule(ir::tran::StepCap::NgspiceRule);
+        assert_eq!(t.ceiling, rule);
     }
 }

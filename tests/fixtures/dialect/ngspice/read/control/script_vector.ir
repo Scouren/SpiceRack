@@ -1,0 +1,5 @@
+# codes: P1402
+file "script_vector.sp" deck
+  title "script_vector"
+  comment " oracle: S3-CONTROL V3: alter $&k reads a vector reprinted with six digits (variable.c:1045; settle/subst.sp): Script"
+  opaque ngspice script ".control\nlet k = 1.23456789k\nalter r1 $&k\nop\n.endc"

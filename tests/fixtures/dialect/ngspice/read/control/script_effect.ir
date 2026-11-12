@@ -1,0 +1,5 @@
+# codes: P1403
+file "script_effect.sp" deck
+  title "script_effect"
+  comment " oracle: S3-CONTROL §2: source runs another file at run time (commands.c:501): Script"
+  opaque ngspice script ".control\nsource other.cir\nop\n.endc"

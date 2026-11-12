@@ -1,0 +1,6 @@
+# codes: P1404
+file "script_state_cards.sp" deck
+  title "script_state_cards"
+  comment " oracle: R49 (3): a script that changes state in a deck with a dot-card analysis is one Script opaque (settle/order_after_script.sp, order_script_and_card.sp)"
+  analysis op
+  opaque ngspice script ".control\nalter r1 3k\n.endc"

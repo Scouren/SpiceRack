@@ -1,0 +1,11 @@
+# codes: P1406 P1406 P1406 P1406 P1406 P1406
+file "inert_commands.sp" deck
+  title "inert_commands"
+  comment " oracle: S3-CONTROL §2: display commands move no number (commands.c echo, print, let, display, set of a display variable, quit); each its own .control pair (R49 (2), O1)"
+  opaque ngspice inert ".control\necho start\n.endc"
+  analysis op
+  opaque ngspice inert ".control\nprint v(b)\n.endc"
+  opaque ngspice inert ".control\nlet k = 2\n.endc"
+  opaque ngspice inert ".control\ndisplay\n.endc"
+  opaque ngspice inert ".control\nset width=120\n.endc"
+  opaque ngspice inert ".control\nquit\n.endc"

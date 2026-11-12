@@ -1,0 +1,6 @@
+# codes:
+file "pre_osdi.sp" deck
+  title "pre_osdi"
+  comment " oracle: S3-CONTROL L1: pre_osdi loads before the parse, relative to the deck (inp.c:791-797, :847-859; settle/load_ctl.sp)"
+  load osdi "res.osdi"
+  analysis op

@@ -1,0 +1,6 @@
+# codes: P1411
+file "osdi_late.sp" deck
+  title "osdi_late"
+  comment " oracle: S3-CONTROL L1: a plain osdi runs after the parse, too late for the deck (settle/load_late.sp): InvalidInSource"
+  opaque ngspice invalid ".control\nosdi res.osdi\n.endc"
+  analysis op

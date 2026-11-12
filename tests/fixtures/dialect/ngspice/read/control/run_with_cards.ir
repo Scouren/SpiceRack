@@ -1,0 +1,6 @@
+# codes: P1406
+file "run_with_cards.sp" deck
+  title "run_with_cards"
+  comment " oracle: R49 (3): a script that changes no state: the card stands once, run is framing (settle/order_run_one_card.sp); plot is display"
+  analysis tran stop=5u print_step=1u cap=ngspice_rule
+  opaque ngspice inert ".control\nplot v(b)\n.endc"

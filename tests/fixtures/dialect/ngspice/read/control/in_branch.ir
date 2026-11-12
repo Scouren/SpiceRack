@@ -1,0 +1,7 @@
+# codes: P1410
+file "in_branch.sp" deck
+  title "in_branch"
+  comment " oracle: lead's Q8: a block in an .if branch runs whatever the condition (settle/order_block_placement.sp): Private"
+  param s = 1
+  if (s == 1)
+    opaque ngspice private ".control\nop\n.endc"

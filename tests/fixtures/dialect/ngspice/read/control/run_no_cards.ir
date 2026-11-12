@@ -1,0 +1,5 @@
+# codes:
+file "run_no_cards.sp" deck
+  title "run_no_cards"
+  comment " oracle: R49 (3): run with no dot-card analysis runs nothing (runcoms.c dosim; settle/order_run_no_card.sp): framing"
+  analysis op

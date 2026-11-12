@@ -1,8 +1,8 @@
 # codes:
 file "tran.sp" deck
   title "tran"
-  comment " oracle: ngspice-45 inp2dot.c dot_tran (tstep tstop [tstart [tmax]] [uic]), traninit.c:29-34 (no tmax: min(tstep, span/50))"
+  comment " oracle: ngspice-45 inp2dot.c dot_tran (tstep tstop [tstart [tmax]] [uic]), traninit.c:29-34 (no tmax: min(tstep, span/50); tstart 0 is recording from 0, the IR's none, A24)"
   analysis tran stop=1u print_step=1n cap=ngspice_rule
   analysis tran stop=1u record_start=100n print_step=1n cap=ngspice_rule
-  analysis tran stop=1u record_start=0 print_step=1n max_step=10n cap=ngspice_rule uic
+  analysis tran stop=1u print_step=1n max_step=10n uic
   analysis tran stop=tstop print_step=10p cap=ngspice_rule

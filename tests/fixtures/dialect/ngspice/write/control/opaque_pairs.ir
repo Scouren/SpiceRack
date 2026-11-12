@@ -1,0 +1,7 @@
+# oracle: lead's Q7 and R49: inert commands are .control pairs; a deck holding one is written as one script, the analysis a command among them (S3-CONTROL O1); written by hand
+file "opaque_pairs.sp" deck
+  title "opaque_pairs"
+  opaque ngspice inert ".control\necho a\n.endc"
+  opaque ngspice inert ".control\necho b\n.endc"
+  analysis op
+  opaque ngspice inert ".control\necho c\n.endc"

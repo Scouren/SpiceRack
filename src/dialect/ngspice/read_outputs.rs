@@ -26,7 +26,8 @@
 //! Contents: `pub(super) const FEATURES`, `pub(super) const CODES`, `pub(super) const UNTYPED`,
 //! `INVALID`, `INERT`, `DC_WINDOW`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
 //! `pub(super) fn probe(lw, st, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`,
-//! `pub(super) fn words(&str) -> Vec<String>`, `pub(super) fn unwrap(&str) -> &str`; the probe
+//! `pub(super) fn save_command`, `pub(super) fn meas_command` (each `(lw, st, &[String]) -> Result<(), No>`),
+//! `pub(super) fn fail(No) -> Fail`, `pub(super) fn words(&str) -> Vec<String>`, `pub(super) fn unwrap(&str) -> &str`; the probe
 //! words (`Ctx`, `Want`, `probe_word`) are `read_outputs/probe.rs`, the measures
 //! `read_outputs/meas.rs`
 
@@ -140,11 +141,9 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
             _ => meas::card(lw, st, &words),
         }
     };
-    match result {
-        Ok(()) => {}
-        Err(No::Untyped) => lw.opaque(st, ir::OpaqueClass::Unread, UNTYPED),
-        Err(No::Invalid) => lw.opaque(st, ir::OpaqueClass::InvalidInSource, INVALID),
-        Err(No::DcWindow) => lw.opaque(st, ir::OpaqueClass::Unread, DC_WINDOW),
+    if let Err(no) = result {
+        let f = fail(no);
+        lw.opaque(st, f.class, f.code);
     }
 }
 
@@ -205,26 +204,65 @@ pub(super) fn probe(
     analysis: ir::AnalysisKind,
 ) -> Result<ir::Probe, Fail> {
     let _ = (st, analysis); // one spelling in every analysis output
-    let fail = |no| match no {
-        No::Untyped => Fail {
-            code: UNTYPED,
-            class: ir::OpaqueClass::Unread,
-        },
-        No::Invalid => Fail {
-            code: INVALID,
-            class: ir::OpaqueClass::InvalidInSource,
-        },
-        No::DcWindow => Fail {
-            code: DC_WINDOW,
-            class: ir::OpaqueClass::Unread,
-        },
-    };
     let mut wants =
         probe_word(&text.split_whitespace().collect::<String>(), Ctx::Output).map_err(fail)?;
     if wants.len() != 1 {
         return Err(fail(No::Untyped));
     }
     Ok(build(lw, &wants.remove(0)))
+}
+
+/// A script's `save word …` before its first analysis (the control area calls it then):
+/// `com_save` reads each word by `copynode`, as `.save` reads it by `gettoks`, except a
+/// `v(a,b)`, which `copynode` reads as one name `a,b` (not typed). Pushes one `Save` or none.
+#[allow(dead_code, reason = "the control area calls it (S3.4)")]
+pub(super) fn save_command(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
+    if words.iter().any(|w| w.contains('(') && w.contains(',')) {
+        return Err(No::Untyped);
+    }
+    save(lw, st, words)
+}
+
+/// A script's `meas kind name …` (the control area calls it when the script holds one analysis
+/// of that kind, before it): `com_meas` hands its words to `get_measure2` with no numparam
+/// pass, so a value is a number (or a one-point vector, not typed) and `param=` is "no such
+/// function". Pushes one `Measure` or none.
+#[allow(dead_code, reason = "the control area calls it (S3.4)")]
+pub(super) fn meas_command(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
+    let f = words
+        .get(2)
+        .map(|w| w.to_ascii_lowercase())
+        .unwrap_or_default();
+    if f.starts_with("param") || f.starts_with("expr") {
+        return Err(No::Invalid);
+    }
+    let plain = |rhs: &str| {
+        let low = rhs.to_ascii_lowercase();
+        low == "last"
+            || low.starts_with("v(")
+            || low.starts_with("i(")
+            || low
+                .trim_start_matches(['-', '+'])
+                .starts_with(|c: char| c.is_ascii_digit() || c == '.')
+    };
+    if words
+        .iter()
+        .filter_map(|w| w.split_once('='))
+        .any(|(_, rhs)| !plain(rhs))
+    {
+        return Err(No::Untyped);
+    }
+    meas::card(lw, st, words)
+}
+
+/// The class and code of the opaque a statement becomes for `no`.
+pub(super) fn fail(no: No) -> Fail {
+    let (code, class) = match no {
+        No::Untyped => (UNTYPED, ir::OpaqueClass::Unread),
+        No::Invalid => (INVALID, ir::OpaqueClass::InvalidInSource),
+        No::DcWindow => (DC_WINDOW, ir::OpaqueClass::Unread),
+    };
+    Fail { code, class }
 }
 
 // ---- private ----

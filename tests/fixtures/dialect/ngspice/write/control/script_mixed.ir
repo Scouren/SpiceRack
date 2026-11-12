@@ -1,0 +1,9 @@
+# oracle: R49: whole-run state stays a card; the script holds the plan in IR order; written by hand
+file "script_mixed.sp" deck
+  title "script_mixed"
+  option rel_tol value=1e-4 whole_run
+  alter (element_value r1) value=2k
+  analysis op
+  opaque ngspice inert ".control\necho x\n.endc"
+  alter (model_param dmod is) value=1e-10
+  analysis tran stop=5u print_step=1u cap=ngspice_rule

@@ -22,8 +22,8 @@ use super::read_run;
 use super::write::Out;
 use super::write_outputs;
 use crate::ir::dc_ac::{Ac, Dc, Disto, Noise, Pz, PzFind, PzTransfer, Sens, SensAc, Sp, Tf};
-use crate::ir::periodic::{Pss, PssMode};
-use crate::ir::tran::{Four, StepCap, Tran};
+use crate::ir::periodic::Pss;
+use crate::ir::tran::{Four, StepCeiling, Tran};
 use crate::ir::{self, AnalysisKind};
 
 /// What the run area spells: exactly what its reader produces (L5).
@@ -46,18 +46,17 @@ pub(super) const CODES: &[Row] = &[
     refusal(
         CARD_FORM,
         "an analysis field ngspice's card has no position for",
-        "ngspice-45 inp2dot.c dot_dc, dot_ac, dot_tran; traninit.c:29",
-        "a DC axis over another target or sweep, a frequency sweep by step, or a transient ceiling ngspice would read back otherwise; refused.",
+        "ngspice-45 dctrcurv.c:89-149, inp2dot.c dot_pss",
+        "a DC axis on an element ngspice does not sweep, a .pss missing an argument, or an output no card spells; refused.",
     ),
 ];
 
 /// A Fourier analysis whose harmonic count is not ngspice's default (DC and 9 harmonics): its
 /// count is the deck's `nfreqs` option, which no `.four` card states.
 const FOUR_HARMONICS: ir::Code = ir::Code::new(b'W', 1300);
-/// An analysis field ngspice's card has no position for: a DC axis other than a source, a
-/// resistor or `temp` swept by step; a frequency sweep by step; a transient ceiling without a
-/// start, a zero ceiling, or another default ceiling than ngspice's; an output no ngspice card
-/// spells (`write_outputs::probe_admits`).
+/// An analysis field ngspice's card has no position for: a DC source axis on an element that is
+/// no V or I source, an element-value axis on one that is no resistor; a `.pss` missing one of
+/// its last four arguments; an output no ngspice card spells (`write_outputs::probe_admits`).
 const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
 
 /// A card value that reads the temperature: numparam evaluates a dot card's `{…}` once, before
@@ -85,9 +84,9 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     let a: ir::Analysis = design.row(item.index);
     let mut form_ok = true;
     let mut outs = Vec::new();
+    // a sweep's form is a feature (`Sweep{Dc,Freq}*`, A24); its values are checked here
     let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
         values.extend([s.start, s.stop, s.points]);
-        s.kind != ir::SweepKind::Lin || s.step.is_none()
     };
     match a.kind {
         AnalysisKind::Dc => {
@@ -96,23 +95,22 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
                 let t = axis.target;
                 let name = (!t.a.name.is_none())
                     .then(|| design.str(t.a.name).as_bytes()[0].to_ascii_lowercase());
-                form_ok &= t.path.len == 0
-                    && match t.kind {
-                        ir::TargetKind::Temp => true,
-                        ir::TargetKind::SourceDc => matches!(name, Some(b'v' | b'i')),
-                        ir::TargetKind::ElementValue => name == Some(b'r'),
-                        _ => false,
-                    };
+                // ngspice sweeps a resistor, a V or I source, or temp (dctrcurv.c:89-149);
+                // the target's kind and place are features
+                form_ok &= match t.kind {
+                    ir::TargetKind::SourceDc => matches!(name, Some(b'v' | b'i')),
+                    ir::TargetKind::ElementValue => name == Some(b'r'),
+                    _ => true,
+                };
                 let s = axis.sweep;
-                form_ok &= s.kind == ir::SweepKind::Lin && !s.step.is_none();
                 values.extend([s.start, s.stop, s.step]);
             }
         }
-        AnalysisKind::Ac => form_ok &= freq(design.detail::<Ac>(a.detail).sweep, &mut values),
+        AnalysisKind::Ac => freq(design.detail::<Ac>(a.detail).sweep, &mut values),
         AnalysisKind::Noise => {
             let n: Noise = design.detail(a.detail);
             outs.push(n.output);
-            form_ok &= freq(n.sweep, &mut values);
+            freq(n.sweep, &mut values);
             values.push(n.points_per_summary);
         }
         AnalysisKind::Tf => outs.push(design.detail::<Tf>(a.detail).output),
@@ -120,22 +118,20 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         AnalysisKind::SensAc => {
             let s: SensAc = design.detail(a.detail);
             outs.push(s.output);
-            form_ok &= freq(s.sweep, &mut values);
+            freq(s.sweep, &mut values);
         }
         AnalysisKind::Disto => {
             let d: Disto = design.detail(a.detail);
-            form_ok &= freq(d.sweep, &mut values);
+            freq(d.sweep, &mut values);
             values.push(d.f2_over_f1);
         }
-        AnalysisKind::Sp => form_ok &= freq(design.detail::<Sp>(a.detail).sweep, &mut values),
+        AnalysisKind::Sp => freq(design.detail::<Sp>(a.detail).sweep, &mut values),
         AnalysisKind::Tran => {
             let t: Tran = design.detail(a.detail);
-            let zero_max = !t.max_step.is_none()
-                && matches!(design.expr(t.max_step), ir::Expr::Num(n) if design.literal_eq(design.num(n), ir::Literal::ZERO));
-            form_ok &= t.cap == StepCap::NgspiceRule
-                && (t.max_step.is_none() || !t.record_start.is_none())
-                && !zero_max;
-            values.extend([t.print_step, t.stop, t.record_start, t.max_step]);
+            values.extend([t.print_step, t.stop, t.record_start]);
+            if let StepCeiling::Given(e) = t.ceiling {
+                values.push(e);
+            }
         }
         AnalysisKind::Four => {
             let f: Four = design.detail(a.detail);
@@ -150,7 +146,6 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         }
         AnalysisKind::Pss => {
             let p: Pss = design.detail(a.detail);
-            form_ok &= p.mode == PssMode::Autonomous && p.osc_n == ir::NameId::GROUND;
             let given = [p.harmonics, p.points, p.sc_iter, p.steady_coeff];
             form_ok &= given.iter().all(|e| !e.is_none());
             values.extend([p.fundamental, p.tstab]);
@@ -165,7 +160,8 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     check_values(design, &values, &mut refuse);
 }
 
-/// An `Analysis` as its card.
+/// An `Analysis` as its card, or as its script command when the deck takes the script form
+/// (`Out::scripted`, R49).
 pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let a: ir::Analysis = d.row(item.index);
@@ -197,10 +193,20 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
         AnalysisKind::Tran => {
             let r: Tran = d.detail(a.detail);
             t.push_str(".tran");
-            for e in [r.print_step, r.stop, r.record_start, r.max_step] {
-                if !e.is_none() {
-                    value(d, e, &mut t);
+            value(d, r.print_step, &mut t);
+            value(d, r.stop, &mut t);
+            match (r.record_start, r.ceiling) {
+                // `tstart` stands before `tmax`: none is recording from 0, spelled `0`
+                (start, StepCeiling::Given(max)) => {
+                    if start.is_none() {
+                        t.push_str(" 0");
+                    } else {
+                        value(d, start, &mut t);
+                    }
+                    value(d, max, &mut t);
                 }
+                (start, StepCeiling::Rule(_)) if !start.is_none() => value(d, start, &mut t),
+                (_, StepCeiling::Rule(_)) => {}
             }
             if r.uic {
                 t.push_str(" uic");
@@ -304,14 +310,25 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
             unreachable!("ngspice write: FEATURES lacks Analysis({other:?})")
         }
     }
-    w.line(&t);
+    if w.scripted() {
+        // R49: a deck whose plan needs a script runs every analysis as a command, the card
+        // without its dot (`read_run::read_analysis` reads it back the same way); `.four` is the
+        // `fourier` command, which the frontend runs for the card too (`fourier.c`)
+        let cmd = t
+            .strip_prefix(".four ")
+            .map_or_else(|| t[1..].to_string(), |rest| format!("fourier {rest}"));
+        w.script(&cmd);
+    } else {
+        w.line(&t);
+    }
 }
 
-/// An `Option` as `.options key[=value]` (`method=trap|gear` for the method flags).
+/// An `Option` as `.options key[=value]` (`method=trap|gear` for the method flags), or the
+/// script command `option key[=value]` when it holds from its place on.
 pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let o: ir::OptionRow = d.row(item.index);
-    let mut t = String::from(".options ");
+    let mut t = String::new();
     match o.key {
         ir::OptionKey::MethodTrap => t.push_str("method=trap"),
         ir::OptionKey::MethodGear => t.push_str("method=gear"),
@@ -327,32 +344,35 @@ pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
             }
         }
     }
-    w.line(&t.replace("= ", "="));
+    state(w, o.holds, ".options", &t);
 }
 
-/// An `Env`: `.temp t` when it sets the temperature only and is the design's one `Env` that
-/// sets it, else `.options temp=t tnom=n` (what it sets): `.temp` beats every `.options temp=`
-/// (`inp.c:1159-1186`), while among `.options` keys the last wins, the IR's rule (R24), and
-/// both spellings read back to the same `Env`.
+/// An `Env`: `.temp t` when it sets the temperature only and is the design's one whole-run
+/// `Env` that sets it, else `.options temp=t tnom=n` (what it sets): `.temp` beats every
+/// `.options temp=` (`inp.c:1159-1186`), while among `.options` keys the last wins, the IR's
+/// rule (R24), and both spellings read back to the same `Env`. A `FromHere` one is the script
+/// command `option temp=t tnom=n`.
 pub(super) fn env(w: &mut Out<'_>, item: ir::ItemRef) {
     let d = w.design;
     let e: ir::Env = d.row(item.index);
-    let mut t = String::new();
-    if e.tnom.is_none() && temps_set(d) == 1 {
-        t.push_str(".temp");
+    let whole = e.holds == ir::Applies::WholeRun;
+    if whole && e.tnom.is_none() && temps_set(d) == 1 {
+        let mut t = String::from(".temp");
         value(d, e.temp, &mut t);
-    } else {
-        t.push_str(".options");
-        for (key, v) in [("temp", e.temp), ("tnom", e.tnom)] {
-            if !v.is_none() {
+        return w.line(&t);
+    }
+    let mut t = String::new();
+    for (key, v) in [("temp", e.temp), ("tnom", e.tnom)] {
+        if !v.is_none() {
+            if !t.is_empty() {
                 t.push(' ');
-                t.push_str(key);
-                t.push('=');
-                value(d, v, &mut t);
             }
+            t.push_str(key);
+            t.push('=');
+            value(d, v, &mut t);
         }
     }
-    w.line(&t.replace("= ", "="));
+    state(w, e.holds, ".options", &t);
 }
 
 /// A `NodeSet` as `.ic v(path)=value`, `.nodeset v(path)=value` or `.nodeset all=value`.
@@ -394,9 +414,23 @@ fn check_values(design: &ir::Design, values: &[ir::ExprId], refuse: &mut impl Fn
     }
 }
 
-/// How many `Env` items of `design` set the temperature.
+/// `body` (`k=v …`) as a state card (`WholeRun`: `.options body`) or, holding from its place on,
+/// as the script command `option body` (ngspice's `set` of each key: `cp_vset`; ng-control's
+/// run state_option_temp).
+fn state(w: &mut Out<'_>, holds: ir::Applies, card: &str, body: &str) {
+    let body = body.replace("= ", "=");
+    match holds {
+        ir::Applies::WholeRun => w.line(&format!("{card} {body}")),
+        ir::Applies::FromHere => w.script(&format!("option {body}")),
+    }
+}
+
+/// How many whole-run `Env` items of `design` set the temperature.
 fn temps_set(design: &ir::Design) -> usize {
-    let sets = |i: ir::ItemRef| !design.row::<ir::Env>(i.index).temp.is_none();
+    let sets = |i: ir::ItemRef| {
+        let e: ir::Env = design.row(i.index);
+        !e.temp.is_none() && e.holds == ir::Applies::WholeRun
+    };
     design
         .reachable()
         .into_iter()

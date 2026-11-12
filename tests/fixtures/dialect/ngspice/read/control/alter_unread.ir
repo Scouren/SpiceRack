@@ -1,0 +1,8 @@
+# codes: P1408 P1408 P1408
+file "alter_unread.sp" deck
+  title "alter_unread"
+  comment " oracle: R49 (5), lead's Q4: an alter of a vector parameter, a frontend expression value, a subcircuit element: Unread at its place"
+  opaque ngspice unread ".control\nalter @v1[pulse]=[ 0 1 1n 1n 1n 5n 10n ]\n.endc"
+  opaque ngspice unread ".control\nalter r1 = 2*1k\n.endc"
+  opaque ngspice unread ".control\nalter r.x1.r2 1k\n.endc"
+  analysis op
