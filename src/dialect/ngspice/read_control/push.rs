@@ -15,15 +15,14 @@ use crate::dialect::ngspice::expr_read::{self, Tree};
 use crate::dialect::ngspice::number::{self, Grammar};
 use crate::dialect::ngspice::read::{Lower, Stmt};
 use crate::dialect::ngspice::read_outputs;
-use crate::dialect::ngspice::read_run;
+use crate::dialect::ngspice::read_run::{self, Card};
 use crate::dialect::ngspice::tables::Eval;
 use crate::ir;
 
 /// An operation read, nothing appended yet.
 pub(super) enum Ready {
-    /// An analysis: its command word and words, read once by `read_analysis` already.
-    // ponytail: read again at the push (the run area's `Card` is not exported yet)
-    Analysis(String, Vec<String>),
+    /// An analysis, read by the run area.
+    Analysis(Box<Card>),
     /// An alter: its target and value.
     Alter(Target, Value),
     /// A typed option, from here.
@@ -76,12 +75,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
     let span = lw.span(st.node);
     for r in items {
         match r {
-            Ready::Analysis(name, words) => {
-                let inner = Stmt { scope, ..st };
-                let card = read_run::read_analysis(lw, inner, name, words)
-                    .unwrap_or_else(|_| unreachable!("ready read the analysis"));
-                read_run::push_analysis(lw, inner, &card);
-            }
+            Ready::Analysis(card) => read_run::push_analysis(lw, Stmt { scope, ..st }, card),
             Ready::Alter(target, value) => {
                 let t = target_of(lw, target);
                 let v = emit(lw, st, scope, value);
@@ -125,7 +119,11 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
                 lw.diags.push(*code, span, 0);
             }
             Ready::Loop(var, target, values, body) => {
-                lw.b.name(var); // interned before its target, as the IR text names them
+                // the writer's made-up variable of an unnamed loop reads back unnamed (R42)
+                let name = (*var != made_up(lw, scope)).then_some(var.as_str());
+                if let Some(n) = name {
+                    lw.b.name(n); // interned before its target, as the IR text names them
+                }
                 let t = target_of(lw, target);
                 let vals: Vec<ir::ExprId> = values.iter().map(|&l| lw.b.literal(l)).collect();
                 let list = lw.b.exprs(&vals);
@@ -133,8 +131,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
                     target: t,
                     sweep: ir::SweepSpec::list(list),
                 };
-                let (item, inner) =
-                    lw.b.loop_(scope, Some(var), row, ir::LoopEnd::KeepLast, span);
+                let (item, inner) = lw.b.loop_(scope, name, row, ir::LoopEnd::KeepLast, span);
                 refer(lw, item, scope, target);
                 push(lw, st, inner, body);
             }
@@ -154,8 +151,9 @@ fn one(
     Ok(vec![match op {
         Op::Analysis { name, rest, .. } => {
             let words = read_run::split_words(rest);
-            read_run::read_analysis(lw, st, name, &words).map_err(fail)?;
-            Ready::Analysis(name.clone(), words)
+            Ready::Analysis(Box::new(
+                read_run::read_analysis(lw, st, name, &words).map_err(fail)?,
+            ))
         }
         Op::Alter {
             target: Target::Param(p),
@@ -294,4 +292,20 @@ fn refer(lw: &mut Lower<'_, '_>, item: ir::ItemRef, scope: ir::ScopeId, t: &Targ
     let folded = lw.names.fold(name);
     let id = lw.b.name(&folded);
     lw.refer(item, 0, scope, kind, id);
+}
+
+/// The variable `write_control::loop_` makes up for an unnamed loop in `scope`: `sr` and the
+/// loop's depth, itself included.
+fn made_up(lw: &Lower<'_, '_>, scope: ir::ScopeId) -> String {
+    let d = lw.b.design();
+    let mut depth = 1;
+    let mut s = scope;
+    // Bounded: each step goes one scope outward; a file's top scope has no parent.
+    while !s.is_none() {
+        if d.scope(s).kind == ir::ScopeKind::Loop {
+            depth += 1;
+        }
+        s = d.scope(s).parent;
+    }
+    format!("sr{depth}")
 }

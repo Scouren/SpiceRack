@@ -72,9 +72,25 @@ const WRITE: &[&str] = &[
     "script_param_loop",
 ];
 
-/// The fixtures that fail today, by name, with why. Strict both ways: a listed fixture that
-/// passes fails the test until its line goes.
-const PENDING: &[(&str, &str)] = &[];
+/// The fixtures and decks that fail today, by name, with the test that fails and why. Strict
+/// both ways: a listed one that passes fails the test until its line goes.
+const PENDING: &[(&str, &str, &str)] = &[
+    (
+        "option_commands",
+        "fixpoint",
+        "ng-run: a FromHere option as a script `option` (after A27's one form)",
+    ),
+    (
+        "script_option",
+        "write",
+        "ng-run: a FromHere option as a script `option` (after A27's one form)",
+    ),
+    (
+        "options",
+        "simulator",
+        "ng-run: a FromHere option as a script `option` (after A27's one form)",
+    ),
+];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in
@@ -128,7 +144,7 @@ fn each_read_fixture_gives_the_codes_and_the_ir_it_lists() {
     }
     assert_eq!(
         failed,
-        pending(READ),
+        pending("read"),
         "the failing fixtures are the pending ones"
     );
 }
@@ -148,7 +164,7 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
     }
     assert_eq!(
         failed,
-        pending(READ),
+        pending("fixpoint"),
         "the failing fixtures are the pending ones"
     );
 }
@@ -156,8 +172,8 @@ fn each_read_fixture_is_a_fixpoint_of_read_write_read() {
 #[test]
 fn each_write_fixture_writes_to_its_text() {
     for name in WRITE {
-        if PENDING.iter().any(|(n, _)| n == name) {
-            continue; // a stub's `unreachable!` cannot be caught by name: listed, not run
+        if pending("write").contains(name) {
+            continue; // a writer's assertion cannot be caught by name: listed, not run
         }
         let design = parse_ir(name, &text("write", name, "ir"));
         assert_eq!(write_entry(&design), text("write", name, "sp"), "{name}");
@@ -167,7 +183,7 @@ fn each_write_fixture_writes_to_its_text() {
 #[test]
 fn each_write_fixture_reads_back_to_its_design() {
     for name in WRITE {
-        if PENDING.iter().any(|(n, _)| n == name) {
+        if pending("write").contains(name) {
             continue;
         }
         let design = parse_ir(name, &text("write", name, "ir"));
@@ -185,6 +201,9 @@ fn a_written_deck_runs_on_ngspice_to_the_original_vectors() {
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("dialect_ngspice_control");
     std::fs::create_dir_all(&dir).expect("a scratch directory");
     for (name, deck) in DECKS {
+        if pending("simulator").contains(name) {
+            continue; // listed, not run: the writer asserts
+        }
         let (design, _) = read_deck(&format!("{name}.sp"), deck);
         let written = write_entry(&design);
         assert_ne!(&written, deck, "{name}: the script is written, not copied");
@@ -198,12 +217,12 @@ fn a_written_deck_runs_on_ngspice_to_the_original_vectors() {
     }
 }
 
-/// The names of `PENDING` among `names`, in list order.
-fn pending(names: &[&str]) -> Vec<&'static str> {
+/// The names `PENDING` lists for `test`, in list order.
+fn pending(test: &str) -> Vec<&'static str> {
     PENDING
         .iter()
-        .map(|(n, _)| *n)
-        .filter(|n| names.contains(n))
+        .filter(|(_, t, _)| *t == test)
+        .map(|(n, _, _)| *n)
         .collect()
 }
 

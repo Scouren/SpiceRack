@@ -101,6 +101,15 @@ fn commands(text: &str) -> Vec<Cmd> {
     for raw in text.lines() {
         let l = raw.trim();
         let lower = l.to_ascii_lowercase();
+        // a `*#` line in a block is its command (`inp.c:752-756` keeps it; `:777` strips `*#`)
+        if let Some(cmd) = l.strip_prefix("*#") {
+            out.push(Cmd {
+                text: raw.trim_end().to_string(),
+                line: cmd.trim().to_string(),
+                hash: false,
+            });
+            continue;
+        }
         if l.is_empty()
             || l.starts_with('*')
             || lower.starts_with(".control")
