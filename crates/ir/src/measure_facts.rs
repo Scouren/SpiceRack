@@ -91,10 +91,6 @@ impl RowFacts for Measure {
         by_measure!(row.kind, names_of(design, row.detail, f));
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        let _ = (design, at, f); // no reference
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }

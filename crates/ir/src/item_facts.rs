@@ -35,16 +35,8 @@ impl RowFacts for Title {
         out.push(Handle::Text(self.text));
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
@@ -86,16 +78,8 @@ impl RowFacts for Comment {
         out.push(Handle::Text(self.text));
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -132,10 +116,6 @@ impl RowFacts for Comment {
 impl RowFacts for Include {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.path), Handle::Name(self.section)]);
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
     }
 
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
@@ -183,16 +163,8 @@ impl RowFacts for Global {
         out.push(Handle::Names(self.nets));
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -231,16 +203,8 @@ impl RowFacts for Load {
         out.push(Handle::Name(self.path));
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -278,16 +242,8 @@ impl RowFacts for Opaque {
         out.extend([Handle::Name(self.dialect), Handle::Text(self.text)]);
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -329,10 +285,6 @@ impl RowFacts for Subckt {
             Handle::Params(self.params),
             Handle::Scope(self.body),
         ]);
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
     }
 
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
@@ -436,10 +388,6 @@ impl RowFacts for Section {
         ]);
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
@@ -489,10 +437,6 @@ impl RowFacts for If {
                 out.push(Handle::Expr(branch.cond));
             }
         }
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
     }
 
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {

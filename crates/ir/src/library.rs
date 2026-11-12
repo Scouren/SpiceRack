@@ -52,10 +52,6 @@ impl RowFacts for DeviceLibrary {
         out.push(Handle::Name(self.path));
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // holds no reference
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }

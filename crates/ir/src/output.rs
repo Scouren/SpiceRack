@@ -131,10 +131,6 @@ impl RowFacts for Save {
         names(design, f).probes(row.probes);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        let _ = (design, at, f); // no reference
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
@@ -273,10 +269,6 @@ impl RowFacts for Print {
     fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
         let row: Print = design.row(at.index);
         names(design, f).probes(row.probes);
-    }
-
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        let _ = (design, at, f); // no reference
     }
 
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {

@@ -260,10 +260,6 @@ impl RowFacts for OptionRow {
         }
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        let _ = (design, at, f); // no reference
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
@@ -393,10 +389,6 @@ impl RowFacts for Env {
         design.editor().set(at.index, row);
     }
 
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        let _ = (design, at, f); // no reference
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }
@@ -489,10 +481,6 @@ impl RowFacts for NodeSet {
                 r.net_path(row.reference);
             }
         }
-    }
-
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        let _ = (design, at, f); // no reference
     }
 
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {

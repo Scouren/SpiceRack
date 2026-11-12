@@ -32,16 +32,22 @@ use crate::text_expr::Ctx;
 /// the row's file; the kernel reaches every kind through one exhaustive dispatch.
 pub trait RowFacts: ItemRow {
     /// Appends every handle the row and its detail rows hold, in field order (the kernel checks
-    /// their ranges and reads the expression features from them).
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+    /// their ranges and reads the expression features from them). Default: none, for a row
+    /// that holds no handle.
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        let _ = (design, out);
+    }
 
     /// Calls `f` on every `Ref` the item `at` owns (its header row, its detail rows, its pools),
     /// in a fixed order, with the definition kind each field expects, and stores them back (A4,
     /// A9). An associated function, so a row reaches references outside its header. The linker
     /// binds through it, `check` reads through it, `Builder::bind_ref` addresses its k-th slot,
     /// and a pass that renumbers definitions rewrites through it. Must not change anything but
-    /// the references `f` changes.
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
+    /// the references `f` changes. Default: none, for a row with no reference field
+    /// (`kernel_gen`'s drift property fails a row whose `refs` lists one this does not visit).
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f);
+    }
 
     /// Appends every `Ref` the item `at` owns, with the kind its field expects, in `map_refs`'s
     /// order, changing nothing: the read-only twin for readers (`check`) that hold `&Design`
@@ -77,8 +83,11 @@ pub trait RowFacts: ItemRow {
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
     /// kind and its `Extra`, `CircuitExtra` or `RunExtra` features; `at` is the item, `scope` the
     /// scope that lists it (A9). The kernel adds the expression and placement features; features
-    /// of the whole design are the owners' `design_features` hooks.
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
+    /// of the whole design are the owners' `design_features` hooks. Default: none beyond the
+    /// kernel's, for a row whose kind is its only feature.
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+        let _ = (design, at, scope, set);
+    }
 
     /// Appends the violations of the row's own invariants (counts, a detail row present exactly
     /// when the kind has one, field domains); `at` is the item (for the span), `scope` the scope

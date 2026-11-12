@@ -18,7 +18,7 @@ use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::RowFacts;
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
@@ -125,14 +125,6 @@ impl ResetSet {
 }
 
 impl RowFacts for Reset {
-    fn handles(&self, _design: &Design, _out: &mut Vec<Handle>) {
-        // no handle field
-    }
-
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        let _ = (design, at, f); // no reference
-    }
-
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
     }

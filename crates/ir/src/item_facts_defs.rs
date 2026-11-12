@@ -25,10 +25,6 @@ impl RowFacts for Param {
         out.extend([Handle::Name(self.name), Handle::Expr(self.value)]);
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let mut row: Param = design.row(at.index);
         f(&mut row.value, ExprUse::Constant);
@@ -92,10 +88,6 @@ impl RowFacts for Func {
         ]);
     }
 
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
     fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
         let mut row: Func = design.row(at.index);
         f(&mut row.body, ExprUse::Circuit);
@@ -104,10 +96,6 @@ impl RowFacts for Func {
 
     fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
         // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
