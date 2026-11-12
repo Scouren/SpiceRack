@@ -1,0 +1,10 @@
+# Oracle: settle star_deck ("Syntax error, unexpected string." on `* a star line`) and run fx
+# (every ngspice card in a VACASK file is a syntax error): a statement no reader rule reads is
+# one VACASK rejects in a deck, invalid in source, P2013.
+# codes: P2013 P2013 S0004 S0004
+file "not_vacask.sim" deck
+  title "not vacask text"
+  model vsource source_v
+  opaque vacask invalid "* a star line"
+  opaque vacask invalid ".model dn d is=1e-14"
+  element vsource v1 (a 0) model=vsource dc=1i

@@ -1,0 +1,8 @@
+section a
+* star inside the chosen section
+parameters p=1
+endsection
+* star outside
+section b
+parameters p=2
+endsection

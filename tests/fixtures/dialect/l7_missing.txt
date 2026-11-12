@@ -35,17 +35,13 @@ ngspice Func(Clamp) unspoken
 ngspice Func(Ddt) unspoken
 ngspice Func(Idt) unspoken
 ngspice FuncDyn(PowRe) unspoken
-ngspice FuncDyn(Trunc) unspoken
 ngspice FuncDyn(Atan2) owed from=vacask
 ngspice FuncDyn(Hypot) owed from=vacask
 ngspice FuncDyn(Fmod) unspoken
 ngspice FuncDyn(Clamp) unspoken
 ngspice FuncDyn(Idt) owed from=vacask
-ngspice FuncDyn(ToInt) owed from=vacask
 ngspice Binary(IntDiv) unspoken
-ngspice Binary(DivTyped) owed from=vacask
 ngspice BinaryDyn(IntDiv) unspoken
-ngspice BinaryDyn(DivTyped) owed from=vacask
 ngspice DrawPer(CallSite) owed from=vacask
 ngspice DrawPer(Instance) unspoken
 ngspice DrawPer(Run) unspoken
@@ -58,7 +54,6 @@ ngspice Extra(ListValue) unspoken
 ngspice Extra(FormalOuterRead) unspoken
 ngspice Circuit(MultVSource) owed from=vacask
 ngspice Circuit(MultInstanceParallel) unspoken
-ngspice Circuit(MultModule) owed from=vacask
 ngspice Circuit(MultOther) owed from=vacask
 ngspice Circuit(IcInOp) unspoken
 ngspice Circuit(ElementParasitics) unspoken
@@ -75,7 +70,6 @@ ngspice Circuit(SinPreOffset) unspoken
 ngspice Circuit(SinPreZero) unspoken
 ngspice Circuit(SinSecondTone) unspoken
 ngspice Circuit(AmPreOffset) unspoken
-ngspice Circuit(AmPreHold) owed from=vacask
 ngspice Circuit(AmModCarrierPhase) unspoken
 ngspice Circuit(PwlRepeatPeriod) owed from=vacask
 ngspice Circuit(PwlRepeatCount) unspoken
@@ -180,7 +174,6 @@ ngspice Run(VaryPercent) unspoken
 ngspice Run(VaryMean) unspoken
 ngspice Run(NodeSetMidRun) owed from=vacask
 ngspice Run(NodeSetFromHere) owed from=vacask
-ngspice Run(SaveAnalysisSet) owed from=vacask
 ngspice Run(PssOscDiff) unspoken
 ngspice Option(MethodEuler) owed from=vacask
 ngspice Option(MaxStep) unspoken
@@ -219,8 +212,6 @@ ngspice Family(CurrentSwitchLogCubic) unspoken
 ngspice Family(Relay) unspoken
 ngspice Family(HspiceW) unspoken
 ngspice Family(CoreJilesAtherton) unspoken
-ngspice Family(SourceV) owed from=vacask
-ngspice Family(SourceI) owed from=vacask
 ngspice Family(Vcvs) owed from=vacask
 ngspice Family(Vccs) owed from=vacask
 ngspice Family(Ccvs) owed from=vacask
@@ -345,7 +336,6 @@ vacask Func(Clamp) unspoken
 vacask Func(Ddt) unspoken
 vacask Func(Idt) unspoken
 vacask FuncDyn(PowRe) unspoken
-vacask FuncDyn(Trunc) unspoken
 vacask FuncDyn(Fmod) unspoken
 vacask FuncDyn(Clamp) unspoken
 vacask Binary(IntDiv) unspoken

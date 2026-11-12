@@ -6,14 +6,23 @@
 //! read an instance's value takes is bound, and an unbound one is out of the domain.
 //!
 //! Contents: `pub struct AtInstance`, `AtInstance::new`, `AtInstance::value(&self, usize) -> Option<f64>`,
-//! `ir::Bindings` for it, `pub fn keeps_every_instances_values(&str, fn(&mut ir::Design, &mut ir::Diags))`, `pub fn values(&ir::Design, bool) -> Vec<Option<u64>>`,
-//! `pub fn design(u64) -> String`
+//! `ir::Bindings` for it, `pub enum Read`, `pub fn keeps_every_instances_values(&str, fn(&mut ir::Design, &mut ir::Diags), Read)`,
+//! `pub fn values(&ir::Design, bool) -> Vec<Option<u64>>`, `pub fn design(u64, Read) -> String`
 
 use std::cell::Cell;
 
 use spicerack::ir;
 
 use crate::bindings::ByDefinition;
+
+/// How a seeded default reads a top parameter (R62, A37): unbound (`u?`, looked up from each
+/// instance's scope) or bound where the definition stands (`u`, the lexical rule), with the
+/// wrapper `w` shadowing some of the names either way.
+#[derive(Clone, Copy)]
+pub enum Read {
+    Unbound,
+    Lexical,
+}
 
 /// One instance of one subcircuit, read the way ngspice reads its formals (R53, A29).
 pub struct AtInstance<'d> {
@@ -119,17 +128,23 @@ impl ir::Bindings for AtInstance<'_> {
 }
 
 /// R53's property over 200 seeded designs for the row `name` (the test's doc in
-/// `tests/passes_structure.rs`).
-pub fn keeps_every_instances_values(name: &str, run: fn(&mut ir::Design, &mut ir::Diags)) {
-    let (mut designs, mut points, mut passed) = (0, 0, 0);
+/// `tests/passes_structure.rs`), their defaults' reads `Read::Lexical` or `Read::Unbound`.
+pub fn keeps_every_instances_values(
+    name: &str,
+    run: fn(&mut ir::Design, &mut ir::Diags),
+    read: Read,
+) {
+    let (mut designs, mut points, mut passed, mut changed) = (0, 0, 0, 0);
     for seed in 1..=200u64 {
-        let text = design(seed);
+        let text = design(seed, read);
         let mut design = ir::Design::new();
         let mut diags = ir::Diags::new();
         ir::parse(&text, &mut design.builder(), &mut diags);
         assert!(diags.is_empty(), "seed {seed}: {:?}\n{text}", diags.rows());
         let before = values(&design, false);
+        let text_before = dump(&design);
         run(&mut design, &mut diags);
+        changed += usize::from(dump(&design) != text_before);
         let mut found = ir::Diags::new();
         ir::check(&design, &mut found);
         assert!(found.is_empty(), "seed {seed}: {:?}\n{text}", found.rows());
@@ -140,10 +155,10 @@ pub fn keeps_every_instances_values(name: &str, run: fn(&mut ir::Design, &mut ir
         passed += diags.rows().is_empty() as usize;
     }
     assert!(
-        designs == 200 && points > 1000 && passed == 200,
-        "{name}: {designs} {points} {passed}"
+        designs == 200 && points > 1000 && passed == 200 && changed > 100,
+        "{name}: {designs} {points} {passed} {changed} changed"
     );
-    eprintln!("{name}: {designs} seeded designs, {points} instance values");
+    eprintln!("{name}: {designs} seeded designs, {changed} changed, {points} instance values");
 }
 
 /// Every formal's value at every instance of the design, in listed order.
@@ -168,8 +183,9 @@ pub fn values(d: &ir::Design, strict: bool) -> Vec<Option<u64>> {
     out
 }
 
-/// One seeded design of R53's shape, as IR text.
-pub fn design(seed: u64) -> String {
+/// One seeded design of R53's shape, as IR text: each default's reads of `u`, `v`, `g` as
+/// `read` says.
+pub fn design(seed: u64, read: Read) -> String {
     let mut x = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
     let mut next = move |n: u64| {
         x ^= x << 13;
@@ -178,6 +194,10 @@ pub fn design(seed: u64) -> String {
         x % n
     };
     let params = ["u", "v", "g"];
+    let mark = match read {
+        Read::Unbound => "?",
+        Read::Lexical => "",
+    };
     let mut t = String::from("file \"a.sp\" deck\n");
     for p in params {
         t += &format!("  param {p} = {}\n", 1 + next(9));
@@ -189,9 +209,9 @@ pub fn design(seed: u64) -> String {
         let p = params[next(3) as usize];
         let default = match (next(4), k) {
             (0, _) => format!("{}", 1 + next(5)),
-            (1, _) | (_, 0) => format!("{p}?"),
+            (1, _) | (_, 0) => format!("{p}{mark}"),
             (2, _) => format!("(f{} * 2)", next(k as u64)),
-            _ => format!("(f{} + {p}?)", next(k as u64)),
+            _ => format!("(f{} + {p}{mark})", next(k as u64)),
         };
         head.push(format!("f{k}={default}"));
     }
@@ -226,4 +246,13 @@ pub fn design(seed: u64) -> String {
     }
     t += "  element instance xw (n 0) model=w\n";
     t
+}
+
+// ---- private ----
+
+/// The design's IR text.
+fn dump(design: &ir::Design) -> String {
+    let mut out = String::new();
+    ir::dump(design, design.entry(), &mut out);
+    out
 }

@@ -1,0 +1,9 @@
+section a
+* star inside a section
+parameters p=1
+endsection
+* star outside
+.model x d
+section b
+parameters p=2
+endsection

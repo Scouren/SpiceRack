@@ -20,12 +20,14 @@ mod bindings;
 mod compare;
 #[path = "passes_expr/towers.rs"]
 mod towers;
+#[path = "passes_expr/typed.rs"]
+mod typed;
 
 use spicerack::ir;
 
 use compare::{
-    ANY, code, keeps_boundary_values, keeps_every_root_value, keeps_folded, keeps_generated_values,
-    keeps_values_over, notes, typed,
+    ANY, code, keeps_boundary_values, keeps_folded, keeps_generated_values, keeps_values_over,
+    notes, typed,
 };
 
 /// Each rule of the powers, roundings and ternaries: its rows, the texts whose roots it
@@ -61,6 +63,12 @@ const RULES: &[Rule] = &[
     ("sgn_to_ternary", &["sgn(x)", "sgn(x - y)"], |e| {
         matches!(e, ir::Expr::Call(ir::Func::Sgn, _))
     }),
+    // ngspice's behavioural evaluator has no trunc (run in `trunc_to_ternary.rs`'s header)
+    (
+        "trunc_to_ternary",
+        &["trunc(x)", "trunc(x / y)", "trunc(x - y)"],
+        |e| matches!(e, ir::Expr::Call(ir::Func::Trunc, _)),
+    ),
     ("step_to_ternary", &["step(x)", "step(x * y)"], |e| {
         matches!(e, ir::Expr::Call(ir::Func::Step, _))
     }),
@@ -152,35 +160,6 @@ fn div_to_div_typed_keeps_every_value() {
     }
     assert!(typed("div_to_div_typed", hit) > 0);
     assert!(typed("div_to_div_typed_dyn", hit) > 0);
-}
-
-#[test]
-fn div_typed_to_div_keeps_every_value() {
-    let hit = |e| matches!(e, ir::Expr::Binary(ir::BinOp::DivTyped, ..));
-    for (x, y, tags) in [
-        ("1i", "2i", &[3u8][..]),
-        ("1", "2i", &[2]),
-        ("1i", "1", &[1]),
-    ] {
-        let text = format!(
-            "file \"p.sp\" deck\n  param x = {x}\n  param y = {y}\n  param r = x /: y\n  element behav b1 (n 0) expr=(x /: y + v(n))\n"
-        );
-        for name in ["div_typed_to_div", "div_typed_to_div_dyn"] {
-            let points = keeps_boundary_values(name, &text, tags);
-            eprintln!("{name} ({x}, {y}): {points} boundary points");
-        }
-    }
-    assert!(typed("div_typed_to_div", hit) > 0);
-    assert!(typed("div_typed_to_div_dyn", hit) > 0);
-}
-
-#[test]
-fn a_division_of_mixed_operand_types_is_noted_and_so_is_every_int_quotient() {
-    let got = notes("div_typed_to_div", "mixed");
-    assert!(
-        !got.is_empty() && got.iter().all(|&c| c == code(101)),
-        "{got:?}"
-    );
 }
 
 #[test]
@@ -425,26 +404,6 @@ fn long_literal_to_shortest_keeps_every_value() {
         notes("long_literal_to_shortest", "plain"),
         [code(111), code(111)]
     );
-}
-
-/// Oracle: `eval_typed` by value, never the rule's arithmetic: every root of generated
-/// designs before and after (parameters bound to their definitions, so a literal in a
-/// definition reaches its readers); each root the rule changes in a deck at the boundary set,
-/// `x` and `y` of every tag (its `q` is a typed division the rule must leave: a rule that wrote
-/// its literals Real would change it, and it would be compared); and the notes on the fixture
-/// whose tags are read (a typed division, a body under `to_int`, a bit operator, `to_real`).
-#[test]
-fn int_literal_to_plain_keeps_every_value_and_leaves_what_a_tag_reads() {
-    let changed = keeps_every_root_value("int_literal_to_plain");
-    eprintln!("int_literal_to_plain: {changed} generated roots changed");
-    assert!(
-        changed > 0,
-        "no generated root held an unread integer literal"
-    );
-    let text = "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = x * 3i + y - 2i\n  param s = min(x, 4i) * -y\n  param t = x > 1i ? y : 0i\n  param q = (x * 2i + 1i) /: 3i\n";
-    let points = keeps_boundary_values("int_literal_to_plain", text, ANY);
-    eprintln!("int_literal_to_plain: {points} boundary points");
-    assert_eq!(notes("int_literal_to_plain", "read"), [code(118); 6]);
 }
 
 #[test]

@@ -1,0 +1,3 @@
+# The save scoped to op, dc and tran widened to every kind: no other analysis runs.
+owner = runrules
+proves = save_set_to_all

@@ -316,9 +316,23 @@ pub(super) fn opaque(
     l.comments_until(span.start + span.len, false);
 }
 
-/// Statement `n` as an `Unread` opaque: the stub of every area not written yet.
+/// Statement `n`, which no reader rule reads: VACASK has no syntax for it (run fx; settle
+/// star_deck, star_in_section: "Syntax error, unexpected string."), so it is invalid in source
+/// (P2013), except at a library's top outside every section, which VACASK skips when the
+/// library is included by `section=` (settle star_outside_section, junk_outside_section):
+/// Inert (P2014). Nothing is left `Unread` (the corpus zero gate).
 pub(super) fn unread(l: &mut Lower<'_, '_, '_>, n: Node) {
-    opaque(l, n, ir::OpaqueClass::Unread, Some(codes::UNREAD));
+    let file = l.b.design().file(l.cst.file);
+    let skipped = file.role != ir::Role::Deck && l.scope == file.top;
+    match skipped {
+        true => opaque(l, n, ir::OpaqueClass::Inert, Some(codes::SKIPPED)),
+        false => opaque(
+            l,
+            n,
+            ir::OpaqueClass::InvalidInSource,
+            Some(codes::NO_SYNTAX),
+        ),
+    }
 }
 
 /// Statement `n`'s text: from its first token's first byte to its last token's last byte.
@@ -336,10 +350,8 @@ pub(super) fn field_name(cst: &Cst<'_>, field: u32) -> String {
         Tag::Ident => super::name::unquote(ast.name(Name(ast.lhs(n)))),
         Tag::Str => {
             let t = cst.tokens.text(ast.main_token(n));
-            t.strip_prefix('"')
-                .and_then(|t| t.strip_suffix('"'))
-                .unwrap_or(t)
-                .to_string()
+            let inner = t.strip_prefix('"').and_then(|t| t.strip_suffix('"'));
+            super::expr_read::unescape(inner.unwrap_or(t))
         }
         _ => super::name::unquote(cst.tokens.text(ast.main_token(n))),
     }

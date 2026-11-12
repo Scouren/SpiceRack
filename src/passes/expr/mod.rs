@@ -37,7 +37,7 @@
 //! once to a new parameter, read twice) lifts the bound; it changes the design's definitions, a
 //! structure-level decision, so it is the upgrade path, not this version.
 //!
-//! Contents: `pub mod div_to_div_typed`, `pub mod div_typed_to_div`, `pub mod draws_always_to_sampling`, `pub mod draws_per_reference_to_call_site`, `pub mod explin14_to_ternary`, `pub mod fold_constant_bitops`, `pub mod inline_funcs`, `pub mod int_literal_to_plain`, `pub mod ln_abs_to_ln`, `pub mod long_literal_to_shortest`, `pub mod param_reads_to_typed`, `pub mod pow_signed_to_ternary`, `pub mod pow_to_powabs`, `pub mod powabs_to_pow`, `pub mod pwl_to_ternary`, `pub mod ramp_to_ternary`, `pub mod round_half_away_to_floor`, `pub mod round_half_even_to_away`, `pub mod sampling_draws_to_nominal`, `pub mod sgn_to_ternary`, `pub mod sgnzeropos_to_ternary`, `pub mod sqr_to_mul`, `pub mod sqrt_abs_to_sqrt`, `pub mod step_half_to_ternary`, `pub mod step_to_ternary`, `pub mod substitute_tran_leaves`, `pub mod tnom_to_env`, `pub mod toint_to_trunc`, `pub mod toreal_to_mul`, `pub(super) const PASSES: &[Pass]`
+//! Contents: `pub mod div_to_div_typed`, `pub mod div_typed_to_div`, `pub mod draws_always_to_sampling`, `pub mod draws_per_reference_to_call_site`, `pub mod explin14_to_ternary`, `pub mod fold_constant_bitops`, `pub mod inline_funcs`, `pub mod int_literal_to_plain`, `pub mod ln_abs_to_ln`, `pub mod long_literal_to_shortest`, `pub mod param_reads_to_typed`, `pub mod pow_signed_to_ternary`, `pub mod pow_to_powabs`, `pub mod powabs_to_pow`, `pub mod pwl_to_ternary`, `pub mod ramp_to_ternary`, `pub mod round_half_away_to_floor`, `pub mod round_half_even_to_away`, `pub mod sampling_draws_to_nominal`, `pub mod sgn_to_ternary`, `pub mod sgnzeropos_to_ternary`, `pub mod sqr_to_mul`, `pub mod sqrt_abs_to_sqrt`, `pub mod step_half_to_ternary`, `pub mod step_to_ternary`, `pub mod substitute_tran_leaves`, `pub mod tnom_to_env`, `pub mod toint_to_trunc`, `pub mod toreal_to_mul`, `pub mod trunc_to_ternary`, `pub(super) const PASSES: &[Pass]`
 //! (`rows.rs`), `pub(super) const CODES: &[(ir::Code, ir::Info)]` and the codes (`codes.rs`)
 
 mod codes;
@@ -58,6 +58,7 @@ pub mod pow_to_powabs;
 pub mod powabs_to_pow;
 pub mod pwl_to_ternary;
 pub mod ramp_to_ternary;
+mod reach;
 pub mod round_half_away_to_floor;
 pub mod round_half_even_to_away;
 mod rows;
@@ -73,6 +74,7 @@ mod tags;
 pub mod tnom_to_env;
 pub mod toint_to_trunc;
 pub mod toreal_to_mul;
+pub mod trunc_to_ternary;
 
 pub(super) use codes::*;
 pub(super) use rows::PASSES;

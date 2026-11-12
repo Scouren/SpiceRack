@@ -18,7 +18,7 @@
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
 //! Contents: `pub mod constant_param_to_formal`, `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
-//! `pub mod drop_device_libraries`, `pub mod explicit_family_models`,
+//! `pub mod drop_device_libraries`, `pub mod drop_unread_source_models`, `pub mod explicit_family_models`,
 //! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`, `pub mod name_with_letter`,
 //! `pub mod splice_elaborate`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
@@ -28,6 +28,7 @@ pub mod deck_title;
 pub mod device_libraries;
 pub mod drop_builtin_models;
 pub mod drop_device_libraries;
+pub mod drop_unread_source_models;
 pub mod explicit_family_models;
 pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
@@ -183,6 +184,21 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[drop_builtin_models::UNBOUND_MASTER],
         run: drop_builtin_models::drop_builtin_models,
     },
+    // after `drop_builtin_models`: the models it unbinds are unread here
+    Pass {
+        name: "drop_unread_source_v",
+        removes: ir::Feature::Family(ir::ModelFamily::SourceV),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[drop_unread_source_models::SOURCE_MODEL_READ],
+        run: drop_unread_source_models::drop_unread_source_v,
+    },
+    Pass {
+        name: "drop_unread_source_i",
+        removes: ir::Feature::Family(ir::ModelFamily::SourceI),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[drop_unread_source_models::SOURCE_MODEL_READ],
+        run: drop_unread_source_models::drop_unread_source_i,
+    },
     Pass {
         name: "drop_device_libraries",
         removes: ir::Feature::Item(ir::ItemKind::DeviceLibrary),
@@ -272,7 +288,7 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Info {
             title: "an elaborate statement the target's one top circuit cannot hold",
             cite: "rewrite/AMEND-A12.md R1; rewrite/DIALECT-VACASK.md §6 (VS V1, V2)",
-            explain: "The target's top circuit is its deck's top scope, so an elaborate statement is spliced in: the named subcircuits' bodies become the top. This one cannot be: it is not the only one, it follows an analysis, the top holds elements of its own, a named subcircuit is also instantiated or has a formal without a default, or two spliced bodies define one name. The statement is refused.",
+            explain: "The target's top circuit is its deck's top scope, so an elaborate statement is spliced in: the named subcircuits' bodies join the top. This one cannot be: it is not the only one, it follows an analysis, a named subcircuit is also instantiated or has a formal without a default, or two spliced bodies define one name. The statement is refused.",
             kind: ir::Kind::Note,
         },
     ),
@@ -309,6 +325,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a source whose model name binds no definition",
             cite: "rewrite/IR-CIRCUIT.md §4a; rewrite/AMEND-A12.md C5",
             explain: "The target's source names no model. This one names a model no definition in the design binds (its kit is absent), so nothing says it is the builtin device the bare source means, and the element is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        drop_unread_source_models::SOURCE_MODEL_READ,
+        ir::Info {
+            title: "a builtin source model something still reads",
+            cite: "rewrite/IR-CIRCUIT.md §4a; rewrite/AMEND-A12.md C5",
+            explain: "The target has no model for an independent source, so a source model nothing reads is dropped. This one is still read (an element names it, or a run item addresses it), so it cannot go and is refused.",
             kind: ir::Kind::Note,
         },
     ),

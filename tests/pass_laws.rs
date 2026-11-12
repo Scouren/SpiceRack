@@ -89,6 +89,13 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
         ),
     ),
     (
+        "am_pre_hold_to_zero",
+        sources_only(
+            &[ir::WaveKind::Am],
+            ir::Feature::Circuit(ir::CircuitExtra::AmPreZero),
+        ),
+    ),
+    (
         "as_given_to_given_zero",
         sources_only(
             &[
