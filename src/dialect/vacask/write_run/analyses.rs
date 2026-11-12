@@ -22,6 +22,7 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let row: ir::Analysis = d.row(at.index);
     assert!(!row.name.is_none(), "FEATURES lacks AnalysisUnnamed");
     let name = d.str(row.name).to_string();
+    let scope = w.scopes.get(&at).copied();
     super::fold_alters(w, at);
     if row.kind == ir::AnalysisKind::Dc {
         let dc: ir::dc_ac::Dc = d.detail(row.detail);
@@ -31,7 +32,7 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
             w.line();
             w.out.push_str("sweep ");
             name::spell(d.str(axis.name), Place::Other, w.out);
-            target(d, axis.target, w.out);
+            target(d, w.epoch, axis.target, w.out);
             range(d, axis.sweep, w.out);
             w.out.push('\n');
         }
@@ -90,7 +91,7 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
         ir::AnalysisKind::Tran => tran(d, d.detail(row.detail), out),
         k => unreachable!("FEATURES lacks Analysis({k:?}): legalize refused it"),
     }
-    lists(d, at, out);
+    lists(d, scope, at, out);
     out.push('\n');
     if row.kind == ir::AnalysisKind::Dc {
         w.depth -= 1;
@@ -129,8 +130,9 @@ pub(super) fn range(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
 }
 
 /// ` instance="x1:r1" parameter="r"`, ` instance="x1:v1" parameter="dc"` (a source's DC value,
-/// R64), ` model="m" parameter="p"`, ` option="name"`.
-pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
+/// R64), ` instance="__topinst__" parameter="p"` (a top-level parameter, R70),
+/// ` model="m" parameter="p"`, ` option="name"`.
+pub(super) fn target(d: &ir::Design, epoch: Option<ir::ItemRef>, t: ir::Target, out: &mut String) {
     let element = |out: &mut String| {
         let mut path = name_of(d, t.path);
         if !path.is_empty() {
@@ -146,10 +148,22 @@ pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
             out.push_str(" parameter=");
             quote(d.str(t.b), out);
         }
+        // R70: the top-level instance is the design, its parameters the top level's.
+        ir::TargetKind::Param => {
+            out.push_str(" instance=\"__topinst__\" parameter=");
+            quote(d.str(t.a.name), out);
+        }
         ir::TargetKind::SourceDc => {
             out.push_str(" instance=");
             element(out);
             out.push_str(" parameter=\"dc\"");
+        }
+        // R64b: a passive's value is its `r`, `c` or `l`.
+        ir::TargetKind::ElementValue => {
+            out.push_str(" instance=");
+            element(out);
+            out.push_str(" parameter=");
+            quote(super::value_word(d, epoch, t), out);
         }
         ir::TargetKind::ModelParam => {
             out.push_str(" model=");
@@ -233,6 +247,11 @@ fn output(d: &ir::Design, p: ir::Probe, out: &mut String) {
 
 /// A transient's keys.
 fn tran(d: &ir::Design, t: ir::tran::Tran, out: &mut String) {
+    // R67, A41: VACASK has no output interval; `legalize` removed a given one first.
+    debug_assert!(
+        t.print_step.is_none(),
+        "FEATURES lacks Run(TranPrintStep): legalize leaves no print step"
+    );
     out.push_str("tran");
     key(d, "stop", t.stop, out);
     key(d, "step", t.initial_step, out);
@@ -250,8 +269,8 @@ fn tran(d: &ir::Design, t: ir::tran::Tran, out: &mut String) {
 
 /// The ` ic={…}` and ` nodeset={…}` lists of the `NodeSet` rows just before `at` in its scope,
 /// each kind's list where its first row stood.
-fn lists(d: &ir::Design, at: ir::ItemRef, out: &mut String) {
-    let Some((_, scope)) = d.reachable().into_iter().find(|(item, _)| *item == at) else {
+fn lists(d: &ir::Design, scope: Option<ir::ScopeId>, at: ir::ItemRef, out: &mut String) {
+    let Some(scope) = scope else {
         return;
     };
     let items = d.items(scope);

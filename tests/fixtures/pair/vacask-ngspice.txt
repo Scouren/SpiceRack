@@ -5,14 +5,14 @@
 # pulse_vacask_to_spice) and F6 (ba0dd4c6: model before value) are gone; F5 went with div_typed_to_div runnable for ngspice (step2-passes 6a340ea0).
 # Proofs: `pass=<name>` the pass rewrite/DIALECT-VACASK.md §6.2 (or REWRITE-PLAN §4.4) plans for the
 # feature refused (not registered on the trunk); `finding=<id>` a pair finding sent to the lead:
-#   F7  WRONG NUMBER: `alter instance("__topinst__") a=2.0` (a top-level parameter, VACASK
+#   F7  WRONG NUMBER (fixed in the reader by step2-vacask, R70/A43; now refused, not converted): `alter instance("__topinst__") a=2.0` (a top-level parameter, VACASK
 #       re-elaborates) is read as a device-parameter alter of an element `__topinst__` and
 #       written `alter @__topinst__[a]=2`; ngspice-45: "no such device or model name
 #       __topinst__", every op at a=1 (corpus test/test_cblock.sim). Owner: the VACASK reader
 #       (an AlterParam target), or the IR (a device alter naming no element), then the ngspice
 #       writer (alterparam and reset).
-alter_toplevel 2 refused:W1408 finding=F7 # the ngspice writer refuses the alter of a device the design does not hold (settle alter_missing_device.sp: ngspice reports and runs on at the old value); goes when the VACASK reader reads it as a parameter alter (f84873bc), then refused W1401 (no reset follows)
+alter_toplevel 2 refused:W1401 finding=F7 # R70: the reader now reads alter instance("__topinst__") a=2.0 as a design-parameter alter; the ngspice writer refuses it (W1401, a parameter alter where other script state holds) until the alter-effect feature and its rule exist
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314)
-tran_rc_pulse 2 refused:U0001:Run(TranInitialStep)+Run(TranSimulatorStep) pass=tran_explicit_cap # VACASK's tran step forms
-tran_sine 2 refused:U0001:Run(TranInitialStep)+Run(TranSimulatorStep) pass=tran_explicit_cap # as tran_rc_pulse
+latch 4 mismatch finding=F8 # R75; reported as "dc: sweep grid changed (14 -> 14 points)": the outer axis (rin) has no vector in ngspice's plot to pair the grid by; the values differ too (latch_vdd shows them)
+latch_vdd 4 mismatch finding=F8 # R75: dc a at vin=2 of outer step 2 (vdd 5.1): 3.02 V VACASK vs 2.55 V ngspice

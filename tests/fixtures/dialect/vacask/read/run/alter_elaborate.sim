@@ -1,4 +1,12 @@
 alter and elaborate
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt s (p)
+  r1 (p 0) res r=1k
+ends
+x1 (n) s
+r1 (n 0) res r=1k
+r2 (n 0) res r=1k
 subckt a (p)
 ends
 subckt b (p)

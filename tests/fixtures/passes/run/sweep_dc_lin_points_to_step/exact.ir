@@ -1,0 +1,2 @@
+file "a.sp" deck
+  analysis dc (source_dc v1) (lin start=0i stop=1.8 points=101i)

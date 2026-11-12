@@ -21,6 +21,8 @@ use spicerack::dialect::{self, DialectRow, Policy, Sources};
 use spicerack::ir;
 use spicerack::ir::ItemRow as _;
 
+use spicerack::result::RawData;
+
 use crate::files::PairFile;
 use crate::sim::{self, Ran};
 use crate::{Cell, cmp, laws, plots};
@@ -74,17 +76,24 @@ pub type Written = Vec<(String, String)>;
 pub const JOBS: usize = 8;
 
 /// What the spine made of one deck: the legalized design, the written files, the rename map
-/// (new name → source name, lower case) and the names of its devices (every element but a
-/// subcircuit instance, under both names, lower case).
+/// (new name → source name, lower case), the names of its devices (every element but a
+/// subcircuit instance, under both names, lower case) and the statement names the target cannot
+/// spell (`NAME_DROPPED`, lower case: a DC axis's is its swept vector in VACASK's output).
 struct Spine {
     legal: ir::Design,
     files: Written,
     renames: HashMap<String, String>,
     devices: BTreeSet<String>,
+    axes: BTreeSet<String>,
 }
 
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
+
+/// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
+/// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
+/// each axis, which VACASK writes as the axis's swept vector.
+const NAME_DROPPED: ir::Code = ir::Code::new(b'U', 407);
 
 /// `name_with_letter`'s note at a renamed element, `arg` the old name (the pass's `RENAMED`,
 /// `src/passes/structure/name_with_letter.rs`; the passes are not public items).
@@ -110,6 +119,18 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     }
     let spine = match spine(from, to, &deck.src, deck.policy) {
         Ok(s) => s,
+        Err((1, f)) if deck.policy == Policy::Lenient => {
+            // A corpus deck the reader refuses: when the source simulator rejects it too, the
+            // refusal is right and no reader finding (`source-rejects`, both messages).
+            let text = &deck.src.files()[0].1;
+            return match sim::run_checked(c.from_sim, &deck.path, text, &[], SECS) {
+                Ran::Failed(why) => {
+                    let said = format!("reader: {} | {}: {why}", f.said, c.from_sim.name());
+                    stop(fails, 1, fail("source-rejects", said), None)
+                }
+                _ => stop(fails, 1, f, None),
+            };
+        }
         Err((step, f)) => return stop(fails, step, f, None),
     };
     let written = Some(spine.files.clone());
@@ -168,10 +189,16 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     for (k, v) in &pair.tightened {
         tol.tighten(k, *v).expect("pair_file checked it");
     }
-    if let Err(why) = cmp::compare(&a, &b, tol) {
-        fails.insert(4, fail("mismatch", why));
+    match cmp::compare(&a, &b, tol) {
+        Err(why) => {
+            fails.insert(4, fail("mismatch", why));
+        }
+        Ok(()) if std::env::var_os("PAIR_MARGINS").is_some() => {
+            eprintln!("margin {}: {}", deck.name, margin(&a, &b, text, &entry.1));
+        }
+        Ok(()) => {}
     }
-    if let Err(why) = plots::names(&a, &b, &spine.devices) {
+    if let Err(why) = plots::names(&a, &b, &spine.devices, &spine.axes) {
         fails.insert(5, fail("missing-vector", why));
     }
     Done {
@@ -306,6 +333,11 @@ fn spine(
             (new, design.str(ir::NameId(d.arg)).to_ascii_lowercase())
         })
         .collect();
+    let axes = diags.rows()[read..]
+        .iter()
+        .filter(|d| d.code == NAME_DROPPED)
+        .map(|d| design.str(ir::NameId(d.arg)).to_ascii_lowercase())
+        .collect();
     let files = guard(3, || laws::write_all(&design, to).files().to_vec())?;
     let mut devices = BTreeSet::new();
     for (item, _) in design.reachable() {
@@ -324,6 +356,7 @@ fn spine(
         files,
         renames,
         devices,
+        axes,
     })
 }
 
@@ -459,6 +492,35 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
             format!("{}/{:?}/{note}/{word}", design.str(o.dialect), o.class)
         })
         .collect()
+}
+
+/// How much of step 4's tolerance a passing pair uses (`PAIR_MARGINS=1`, triage): the smallest
+/// fraction `f` of RELTOL, VNTOL and ABSTOL (the transient's band scales with them) at which
+/// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
+/// below it (the worst vector, its value and the tolerance there).
+fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
+    let at = |f: f64| {
+        let mut t = cmp::Tol::of(&[src, written]);
+        for (k, d) in [("reltol", 1e-3), ("vntol", 1e-6), ("abstol", 1e-12)] {
+            t.tighten(k, d * f)
+                .expect("a fraction of the default tightens");
+        }
+        cmp::compare(a, b, t)
+    };
+    let (mut lo, mut hi) = (0.0f64, 1.0f64);
+    // Bounded: seven halvings take the bracket under 1 %.
+    for _ in 0..7 {
+        let mid = (lo + hi) / 2.0;
+        match at(mid) {
+            Ok(()) => hi = mid,
+            Err(_) => lo = mid,
+        }
+    }
+    let below = at(lo).err().unwrap_or_else(|| "passes at 0: exact".into());
+    format!(
+        "uses {:.0} % of the tolerance; below it: {below}",
+        hi * 100.0
+    )
 }
 
 /// Step 4's verdict when a run gave no plots: whose run, and why.

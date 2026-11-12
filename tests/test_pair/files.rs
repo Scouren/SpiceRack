@@ -16,7 +16,7 @@ use std::path::Path;
 use crate::cmp;
 
 /// A deck's `.pair` file, read.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct PairFile {
     /// Each tightening, in file order: (key, value).
     pub tightened: Vec<(String, f64)>,

@@ -1,0 +1,12 @@
+mc samples from a parameter
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a 0) res r=1k
+parameters f0=1k n=2
+control
+  mc m2 samples=n lh=0
+    analysis op2 op
+  endmc
+endc

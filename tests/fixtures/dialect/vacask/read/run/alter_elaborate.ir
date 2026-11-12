@@ -5,11 +5,18 @@
 # codes: P2311 S0002 S0003 S0003
 file "alter_elaborate.sim" deck
   title "alter and elaborate"
+  device_library resistor
+  model res resistor
+  subckt s (p)
+    element resistor r1 (p 0) model=res value=1k
+  element instance x1 (n) model=s
+  element resistor r1 (n 0) model=res value=1k
+  element resistor r2 (n 0) model=res value=1k
   subckt a (p)
   subckt b (p)
-  alter (device_param r1 r) value=2k
-  alter (device_param r2 r) value=2k
-  alter (device_param r1 r path=(x1)) value=3k
+  alter (element_value r1) value=2k
+  alter (element_value r2) value=2k
+  alter (element_value r1 path=(x1)) value=3k
   alter (model_param res tc) value=1m
   elaborate (a b)
   opaque vacask inert "elaborate circuit"

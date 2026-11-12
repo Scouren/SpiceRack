@@ -1,0 +1,12 @@
+nodeset vector
+load "resistor.osdi"
+model res resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+control
+  analysis op1 op nodeset=[ "b"; 0.3 ]
+  analysis op2 op nodeset=[ "a"; "b"; 0.3 ]
+  analysis t1 tran stop=1u icmode="uic" ic=["b"; 0.2]
+endc

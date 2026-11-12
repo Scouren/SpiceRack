@@ -1,0 +1,11 @@
+pulse with no period, width or fall: a step
+// settle: VACASK 36be560, v(a): 1 at 0.5m, 3 at 1.002m, 3 at 3m and at the stop 5m (a step held to the stop)
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource type="pulse" val0=1 val1=3 rise=1u delay=1m
+r1 (a 0) res r=1k
+control
+  options rawfile="ascii"
+  analysis tr tran stop=5m step=1u maxstep=10u
+endc

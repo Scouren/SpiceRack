@@ -84,17 +84,18 @@ impl Write for Vacask {
         use ir::ItemKind as K;
         let mut handles = Vec::new();
         let mut folds = fold::Admits::default();
+        let index = write_elements::Index::of(design);
         for (at, scope) in design.reachable() {
             expr_write::admit(design, at, &mut handles, diags);
             folds.see(design, at, scope);
             match at.kind {
                 K::Load | K::DeviceLibrary => write_structure::admit(design, at, diags),
-                K::Model => write_models::admit(design, at, diags),
+                K::Model => write_models::admit(design, &index.words, at, diags),
                 K::Element => {
-                    write_elements::admit(design, at, scope, diags);
+                    write_elements::admit(design, &index, at, scope, diags);
                     write_sources::admit(design, at, diags);
                 }
-                K::Analysis | K::Loop | K::NodeSet | K::Option | K::Reset => {
+                K::Analysis | K::Loop | K::Alter | K::NodeSet | K::Option | K::Reset => {
                     write_run::admit(design, at, scope, diags);
                 }
                 K::Save => write_outputs::admit(design, at, diags),
@@ -109,7 +110,6 @@ impl Write for Vacask {
                 | K::Param
                 | K::Func
                 | K::Statistics
-                | K::Alter
                 | K::Env
                 | K::Print
                 | K::Measure

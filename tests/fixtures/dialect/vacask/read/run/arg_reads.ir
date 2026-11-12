@@ -1,0 +1,16 @@
+# Oracle: R68, A42; settle run/temp_tran, temp_ac, temp_dc, param_tran (VACASK: "Variable or
+# constant '$temp' not defined.", "… 'k' not defined.", the analysis failed with exit code 0):
+# an analysis argument or sweep range reading `$temp`, `$tnom` or a top-level parameter is
+# invalid in source, P2316 (and a sweep's analysis with it); a circuit variable's read stays
+# Private (P2315, with its var's P2307).
+# codes: P2307 P2315 P2316 P2316 P2316 P2316 S0002 S0002 S0004 S0004 S0004 S0004 S0004
+file "arg_reads.sim" deck
+  title "analysis arguments that read the temperature or a parameter"
+  param k = 2i
+  opaque vacask private "var v=1"
+  opaque vacask invalid "analysis t1 tran stop=1m*(1+$temp/100)"
+  opaque vacask invalid "analysis t2 tran stop=1m*k"
+  opaque vacask invalid "analysis a1 ac from=1 to=10*$tnom mode=\"lin\" points=1"
+  opaque vacask invalid "sweep s1 option=\"temp\" from=0 to=k step=1"
+  opaque vacask invalid "analysis op1 op"
+  opaque vacask private "analysis t3 tran stop=1m*v"

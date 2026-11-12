@@ -1,0 +1,4 @@
+file "d.sp" deck
+  comment "width = fall = 2*(5m - 1m) = 8m; period = 8m + 1u + 8m + 8m = 0.024001 (computed apart, by Python)"
+  element vsource v1 (a 0) dc=0 wave=pulse(v1=1 v2=3 delay=1m rise=1u fall=0 width=0 period=0 law=vacask)
+  analysis tran stop=5m max_step=10u

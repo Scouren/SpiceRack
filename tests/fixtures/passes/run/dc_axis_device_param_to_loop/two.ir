@@ -1,0 +1,5 @@
+file "a.sp" deck
+  element vsource v1 (in 0) dc=1
+  element resistor r1 (in 0) value=1k
+  element resistor r2 (in 0) value=1k
+  analysis dc (device_param r1 r) (list values=[1k, 2k]) (device_param r2 r) (list values=[3k, 4k]) restart

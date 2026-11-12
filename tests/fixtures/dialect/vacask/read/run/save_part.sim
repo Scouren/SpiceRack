@@ -1,0 +1,6 @@
+saves of parts
+control
+  save vdb(b)
+  save vr(b) vm(b)
+  analysis op1 op
+endc

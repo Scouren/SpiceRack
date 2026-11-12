@@ -15,12 +15,13 @@
 //! Contents: `mc`, `statement` (crate-private)
 
 use super::{
-    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, VARIABLE, assign, bare_name,
-    check_value, string,
+    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, SWEEP_WAVE, TOP_INSTANCE, VARIABLE,
+    assign, bare_name, bind_top_param, check_value, string, top_param,
 };
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::fold;
 use crate::dialect::vacask::read::{self, Lower};
+use crate::dialect::vacask::read_elements::Aimed;
 use crate::ir;
 use crate::syntax::ast::{Node, Tag};
 
@@ -77,11 +78,14 @@ pub(super) fn mc(l: &mut Lower<'_, '_, '_>, n: Node) -> Option<bool> {
         },
     };
     let seed = get("seed");
-    for v in [Some(samples), seed].into_iter().flatten() {
-        if let Err(r) = check_value(l, v) {
-            read::opaque(l, n, r.class, Some(r.code));
-            return Some(true);
-        }
+    // R68, A42: `samples` and `seed` are analysis arguments (settle run/mc_param: "Variable or
+    // constant 'n' not defined." for a parameter; a `var` runs, mc_var).
+    let given: Vec<u32> = [Some(samples), seed].into_iter().flatten().collect();
+    if let Err(w) = super::sweep::check_arg(l, &given) {
+        read::opaque(l, n, w.class, w.code);
+        // Kept as text with its body when Private (a `var`'s read); refused like any bad `mc`
+        // line when invalid, its body read as the statements it holds.
+        return (w.class == ir::OpaqueClass::Private).then_some(true);
     }
     let runs = expr_read::expr(l, samples, Context::Param).expect("checked");
     let seed = seed.map_or(ir::ExprId::NONE, |s| {
@@ -183,15 +187,59 @@ fn alter(l: &mut Lower<'_, '_, '_>, n: Node) {
             return read::opaque(l, n, r.class, Some(r.code));
         }
     }
+    // R70, R64b: `__topinst__` is the design itself, its parameters the top level's; a dc
+    // source's `dc` is its DC value, a passive's `r`/`c`/`l` its value; an instance or a
+    // top-level parameter no file declares is VACASK's error (settle run/nosuch_alter,
+    // top_nosuch: "Instance not found.", "Parameter 'zz' not found."); the `dc` of a waveform
+    // source moves nothing VACASK reads (settle run/sweep_source), kept as text.
+    let at = (l.cst.file, l.start(n));
+    let aim = |l: &Lower<'_, '_, '_>, name: &str, key: &str| match name == TOP_INSTANCE {
+        true if top_param(l, key) => Some(ir::TargetKind::Param),
+        true => None,
+        false => {
+            let mut path: Vec<String> = name.split(':').map(str::to_string).collect();
+            let element = path.pop().expect("split gives one part");
+            match l.declared.aim(&path, &element, key, at) {
+                Aimed::Missing => None,
+                Aimed::SourceDc => Some(ir::TargetKind::SourceDc),
+                Aimed::SourceWave => Some(ir::TargetKind::Temp),
+                Aimed::ElementValue => Some(ir::TargetKind::ElementValue),
+                Aimed::Device => Some(ir::TargetKind::DeviceParam),
+            }
+        }
+    };
+    let mut kinds = Vec::new();
+    if word == "instance" {
+        for name in &names {
+            for (key, _) in &pairs {
+                let Some(kind) = aim(l, name, key) else {
+                    return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(REJECTED));
+                };
+                kinds.push(kind);
+            }
+        }
+    }
+    // `Temp` stands for a waveform source's `dc` here (no alter targets the temperature).
+    if kinds.contains(&ir::TargetKind::Temp) {
+        return read::opaque(l, n, ir::OpaqueClass::Private, Some(SWEEP_WAVE));
+    }
+    let mut kinds = kinds.into_iter();
     let span = l.stmt;
     for name in &names {
         for (key, v) in &pairs {
             let target = match word.as_str() {
-                "instance" => {
-                    let mut path: Vec<&str> = name.split(':').collect();
-                    let element = path.pop().expect("split gives one part");
-                    l.b.target(ir::TargetKind::DeviceParam, &path, element, Some(key))
-                }
+                "instance" => match kinds.next().expect("one kind per name and key") {
+                    ir::TargetKind::Param => {
+                        let t = l.b.target(ir::TargetKind::Param, &[], key, None);
+                        bind_top_param(l, t)
+                    }
+                    kind => {
+                        let mut path: Vec<&str> = name.split(':').collect();
+                        let element = path.pop().expect("split gives one part");
+                        let b = (kind == ir::TargetKind::DeviceParam).then_some(key.as_str());
+                        l.b.target(kind, &path, element, b)
+                    }
+                },
                 _ => {
                     let mut t = l.b.target(ir::TargetKind::ModelParam, &[], name, Some(key));
                     let design = l.b.design();

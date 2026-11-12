@@ -1,0 +1,12 @@
+sweep of a top parameter
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+parameters a=1.0
+v1 (in 0) vsource dc=10.0
+r1 (in 0) resistor r=1k*a
+control
+  options rawfile="ascii"
+  sweep sa instance="__topinst__" parameter="a" values=[1, 2, 4]
+    analysis d1 op
+endc
