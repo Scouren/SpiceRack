@@ -94,7 +94,7 @@ fn a_valid_design_reports_nothing() {
 #[test]
 fn each_kernel_invariant_has_its_fixture() {
     type Break = fn(&mut Base);
-    let cases: [(Violation, Break); 15] = [
+    let cases: [(Violation, Break); 16] = [
         (Violation::HandleRange, |b| {
             let row = Param {
                 name: NameId(10_000),
@@ -209,6 +209,16 @@ fn each_kernel_invariant_has_its_fixture() {
             let top = b.d.file(crate::id::FileId(0)).top;
             let param = b.param;
             b.d.editor().items_mut(top).retain(|&i| i != param);
+        }),
+        (Violation::CallArity, |b| {
+            // f(x) called with two arguments
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let f = b.d.lookup(top, DefKind::Func, b.d.find_name("f"));
+            let mut bl = b.d.builder();
+            let (one, two) = (bl.num(1.0), bl.num(2.0));
+            let call = bl.user_call("f", &[one, two]);
+            bl.resolve(call, f);
+            bl.param(top, "c", call, Span::NONE);
         }),
     ];
     for (want, break_it) in cases {

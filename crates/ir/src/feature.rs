@@ -22,7 +22,8 @@
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
-//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
+//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`,
+//!   `pub(crate) fn unplaced_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`,
 //!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; re-exported from
@@ -30,7 +31,7 @@
 
 use crate::analysis::AnalysisKind;
 use crate::circuit_extra::CircuitExtra;
-use crate::class::{ExprClass, def_classes, node_class};
+use crate::class::def_classes;
 use crate::design::Design;
 use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
@@ -418,9 +419,17 @@ pub fn features_used(design: &Design) -> FeatureSet {
     set
 }
 
-/// The features of the whole design, no item's: each owner's
-/// `design_features` hook (A9). `check_legal` reports these at `Span::NONE`.
+/// The features of the whole design, no item's: each owner's `design_features` hook (A9).
+/// `check_legal` reports the run owner's at their items (`analysis::feature_items`) and the rest
+/// (`unplaced_level`) at `Span::NONE`.
 pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
+    unplaced_level(design, set);
+    crate::analysis::design_features(design, set);
+}
+
+/// The design-level features that name no item: a deck without a title, the circuit owner's
+/// hook.
+pub(crate) fn unplaced_level(design: &Design, set: &mut FeatureSet) {
     let untitled = |f| {
         let file = design.file(f);
         file.role == Role::Deck
@@ -433,7 +442,6 @@ pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
         *set = set.with(Feature::Extra(Extra::DeckWithoutTitle));
     }
     crate::element::design_features(design, set);
-    crate::analysis::design_features(design, set);
 }
 
 /// The features of one reachable item in `scope`: its kind, its row's own (`RowFacts::features`),
@@ -485,12 +493,7 @@ pub(crate) fn item_features(
     for (root, use_) in roots_with_use(design, &handles) {
         let nodes = walk.tree(design, root);
         // the one form decision (A26): the field's use and the tree's class (R14, A19)
-        let table = def_classes(design);
-        let class = nodes
-            .iter()
-            .map(|&e| node_class(design, e, table))
-            .max()
-            .unwrap_or(ExprClass::Constant);
+        let class = crate::class::tree_class(design, root, def_classes(design));
         // A28 (R51): a function body counts in its callers' forms, every other root in its own
         let forms = if item.kind == ItemKind::Func {
             let bits = body_forms(design).get(&root).copied().unwrap_or(0);

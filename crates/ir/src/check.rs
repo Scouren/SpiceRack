@@ -19,7 +19,7 @@ use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
+use crate::feature::{ExprWalk, FeatureSet, item_features, unplaced_level};
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::item::{DefKind, ItemKind};
 use crate::literal;
@@ -93,6 +93,10 @@ pub enum Violation {
     /// `Editor::remove_item` and `Editor::move_item`), or a reference is bound to a definition
     /// the index does not hold. `arg`: the definition.
     StaleDefinition,
+    /// A user call bound to a function whose formals number differently from its arguments
+    /// (the lead's ruling on A28's finding b: no simulator we know accepts one). `arg`: the call's
+    /// expression.
+    CallArity,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -103,7 +107,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::StaleDefinition as usize + 1] = [
+    pub const ALL: [Violation; Violation::CallArity as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -122,6 +126,7 @@ impl Violation {
         Violation::DuplicateElement,
         Violation::DefinitionCycle,
         Violation::StaleDefinition,
+        Violation::CallArity,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -175,8 +180,16 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
             diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
         }
     }
+    // the run owner's design-level features name their item (`analysis::feature_items`)
+    let mut placed = Vec::new();
+    crate::analysis::feature_items(design, &mut placed);
+    for (f, item) in placed {
+        if !legal.contains(f) {
+            diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
+        }
+    }
     let mut whole = FeatureSet::EMPTY;
-    design_level(design, &mut whole);
+    unplaced_level(design, &mut whole);
     for f in whole.minus(*legal).iter() {
         diags.push(UNSUPPORTED, Span::NONE, f.index() as u32);
     }
@@ -196,6 +209,18 @@ pub(crate) fn table_len(d: &Design, kind: ItemKind) -> usize {
 
 // ---- private ----
 
+/// How many formals the user function `def` has, when `def` is a function this design defines.
+fn formal_count(d: &Design, def: DefId) -> Option<usize> {
+    let row = d.defs[def.index_checked(d.defs.len())?];
+    (row.kind == DefKind::Func
+        && row.item.kind == ItemKind::Func
+        && (row.item.index as usize) < table_len(d, ItemKind::Func))
+    .then(|| {
+        d.names(d.row::<crate::item::Func>(row.item.index).args)
+            .len()
+    })
+}
+
 /// Whether the definition index holds `def` under its own key (round 7b: a definition a pass
 /// removed through `Editor::remove_item` is not held).
 fn in_index(d: &Design, def: DefId) -> bool {
@@ -210,8 +235,6 @@ fn probe_classes(out: &mut Out<'_>) {
     let d = out.design;
     let table = crate::class::def_classes(d);
     let mut handles = Vec::new();
-    // one stamped walk for the whole pass: no per-field table (O(design) in all)
-    let mut walk = ExprWalk::new(d);
     for (item, _) in d.reachable() {
         handles.clear();
         for_kind!(item.kind, R => d.row::<R>(item.index).handles(d, &mut handles));
@@ -231,12 +254,7 @@ fn probe_classes(out: &mut Out<'_>) {
             }
         }
         for e in roots {
-            let class = walk
-                .tree(d, e)
-                .iter()
-                .map(|&n| crate::class::node_class(d, n, table))
-                .max()
-                .unwrap_or(ExprClass::Constant);
+            let class = crate::class::tree_class(d, e, table);
             if class == ExprClass::Circuit {
                 out.report(Violation::ProbeContext, item, e.0);
             }
@@ -506,6 +524,11 @@ fn expression(
             }
             Expr::UserCall(r, _) if r.is_resolved() && !same(d, r, DefKind::Func) => {
                 out.report(Violation::RefTarget, item, r.def.0)
+            }
+            Expr::UserCall(r, args)
+                if r.is_resolved() && formal_count(d, r.def).is_some_and(|n| n != args.len()) =>
+            {
+                out.report(Violation::CallArity, item, node.0)
             }
             Expr::Num(_)
             | Expr::Str(_)

@@ -445,3 +445,16 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 ## Run features per item kind: state modes (ng-run's W1303)
 
 - `StateFromHere`/`StateWholeRun` are now split into `{Option,Env,NodeSet}{FromHere,WholeRun}`, and `WholeRunMidRun` into `{Option,Env,NodeSet,Save}WholeRunMidRun`. A dialect then lists exactly the kinds it spells from a given place: ngspice spells a from-here option and temperature, but not a from-here node condition. Each kind's four mode features are one `option::Modes` constant (`OPTION_MODES`, `ENV_MODES`, `NODE_SET_MODES`, `SAVE_MODES`), read by the row features, the listed-order walk and `state_gen::gen_holds`.
+
+## A32 applied (the element-name door)
+
+- `map_element_uses` takes the item's listing scope (`(scope, item, f)`, changed from the first proposal before any body): finding it per item would scan every list.
+- Three phases per item: the row's paths are copied (the row's walk holds `&mut Design`), the pass answers each segment with the design readable (`walk_path`), and a second walk stores the names in the same order. A segment after `NONE` is still offered to the pass with `scope: NONE`, so it can note the reference.
+- The drift property A32 asks for ("every use listed resolves, every resolved reference is listed") needs `check` to resolve element references, which it does not today; until the owners' rows land, the tests pin the kernel's `Expr::I` part and the path walk by hand.
+
+## The class of a call (ruled)
+
+- `class::class_nodes` is the one walk that decides which rows a tree's class reads; `tree_class`, `tree_class_with` (the generator's table), the definition graph, the feature count, the forms and `check`'s last pass go through it. `formals_read` decides, per call, which arguments' formals the body reads (a walk of the body per call node; no cache: bodies are small and the classes are cached above it). `node_class` is gone (no caller left).
+- The generator no longer tracks a class node by node: it computes the finished tree's class with `tree_class_with` over its own definition table, which is exact by construction and O(tree).
+- The inlining property no longer excludes inlinings that drop a dynamic argument.
+

@@ -209,3 +209,35 @@ fn a_next_only_and_a_standing_condition_of_one_node_at_one_analysis_are_refused(
     let guess = "  nodeset nodeset every_op node=(a) value=2 whole_run\n";
     assert_eq!(faults(&deck(&[guess, next, op])), 0, "another kind");
 }
+
+#[test]
+fn check_legal_reports_a_design_level_run_feature_at_its_item() {
+    // pass-structure's finding 1: the item between two run items, the state item after one
+    let d = read(
+        "file \"t.sp\" deck
+  analysis op
+  param p = 1
+  option klu whole_run
+",
+    );
+    let top: Vec<ItemRef> = d.items(d.file(d.entry()).top).to_vec();
+    let legal = spicerack_ir::features_used(&d)
+        .minus(
+            spicerack_ir::FeatureSet::EMPTY.with(spicerack_ir::Feature::Run(
+                spicerack_ir::RunExtra::RunInterleaved,
+            )),
+        )
+        .minus(
+            spicerack_ir::FeatureSet::EMPTY.with(spicerack_ir::Feature::Run(
+                spicerack_ir::RunExtra::OptionWholeRunMidRun,
+            )),
+        );
+    let mut diags = Diags::new();
+    spicerack_ir::check_legal(&d, &legal, &mut diags);
+    let at: Vec<ItemRef> = diags.rows().iter().map(|r| r.item).collect();
+    assert_eq!(
+        at,
+        [top[2], top[1]],
+        "the option after the analysis, the param between"
+    );
+}

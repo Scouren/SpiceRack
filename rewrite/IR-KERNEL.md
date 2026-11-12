@@ -456,6 +456,27 @@ for a reference bound to a definition the index does not hold: a pass that drops
 `Editor::items_mut` fails it. `rewrite_tree(b, root, rule)` rewrites one root with its own memo
 and returns the new root; `Builder::param_ref_to(def)` builds a bound read.
 
+**A32 (2026-11-12): element names used as references.** `RowFacts::map_element_names(design, at,
+f: FnMut(&mut [NameId]))` (default none): each by-name element reference a row holds outside its
+expressions, a single name as a slice of one, a path as its name-pool slice, in field order.
+`Editor::map_element_uses(scope, item, f: FnMut(ElementUse) -> Option<NameId>)` adds the item's
+`Expr::I` reads (root by root, left to right) and resolves each path segment's scope: segment 0
+in the item's listing scope, each next in the body of the master of the instance before it, by
+its old name or else its new one; `ScopeId::NONE` after a non-instance or an unresolved master
+(never guessed). `Design::element_uses()` is the read-only twin over every live item.
+
+**Round 7b (2026-11-12): the class of a call (A28's finding, ruled).** A user call's class is
+its body's, each formal read taking its argument's class: an argument whose formal the body
+never reads adds nothing (ngspice substitutes the body textually; on any simulator such an
+argument does not change the value). One walk carries the rule (`class::class_nodes`: a tree's
+rows but those arguments) for the class table, `expr_class`, the feature count, the forms and
+`check`; the generator computes its tree's class with it at the end. Inlining then changes no
+root's class.
+
+**Round 7b (2026-11-12): a call's arity.** `Violation::CallArity` (X0019): a user call bound to
+a function whose formals number differently from its arguments, at the item. The generator calls
+a bound function with one argument per formal.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

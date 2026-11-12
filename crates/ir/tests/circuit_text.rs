@@ -659,4 +659,43 @@ mod tests {
             assert!(checked.is_empty(), "{text}: {:?}", checked.rows());
         }
     }
+
+    /// A32: the family word and the library rule are public. Oracle: the IR dump of a model of
+    /// each family writes `model m <word>` (the reader's own word); the library rule's members by
+    /// hand from A12 C5, A20 and R44.
+    #[test]
+    fn the_family_word_and_the_library_rule_are_public() {
+        let mut words = std::collections::HashSet::new();
+        for f in ModelFamily::ALL {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            let mut b = d.builder();
+            let name = b.name("m");
+            b.push(top, model(name, f, Polarity::None), Span::NONE);
+            let mut text = String::new();
+            for file in d.files() {
+                dump(&d, file, &mut text);
+            }
+            assert!(
+                text.contains(&format!("model m {}", f.word())),
+                "{f:?}: {text}"
+            );
+            assert!(
+                words.insert(f.word()),
+                "{f:?}: a second family with this word"
+            );
+        }
+        for (f, free) in [
+            (ModelFamily::SourceV, true),
+            (ModelFamily::Mutual, true),
+            (ModelFamily::Module, true),
+            (ModelFamily::CodeModel, true),
+            (ModelFamily::Other, true),
+            (ModelFamily::TlineIdeal, false),
+            (ModelFamily::Resistor, false),
+            (ModelFamily::Bsim4, false),
+        ] {
+            assert_eq!(f.library_free(), free, "{f:?}");
+        }
+    }
 }
