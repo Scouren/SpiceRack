@@ -1,9 +1,10 @@
 # codes:
 file "jfet_mes_hfet.sp" deck
   title "jfet_mes_hfet"
-  comment " oracle: inpdomod.c njf/pjf (0-1 JFET, 2 JFET2), nmf/pmf/nhfet/phfet (0-1 MES, 5 HFET1, 6 HFET2); the type word is the device's polarity flag (jfet.c, mes.c, hfet2.c)"
+  comment " oracle: inpdomod.c njf/pjf (0-1 JFET, 2 JFET2), nmf/pmf/nhfet/phfet (0-1 MES, 2-4 MESA with its level a parameter, mesa.c:108, 5 HFET1, 6 HFET2); the type word is the device's polarity flag (jfet.c, mes.c, hfet2.c)"
   model j1 jfet_shichman polarity=n params=(beta=1e-4 vto=-2)
   model j2 jfet_parker_skellern polarity=p params=(beta=1e-4)
   model mf mesfet polarity=p params=(vto=-2)
   model h5 hfet1 polarity=n params=(vto=0.1)
   model h6 hfet2 polarity=p
+  model ma mesa polarity=p params=(level=3 vto=-1)

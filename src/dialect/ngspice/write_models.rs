@@ -4,8 +4,8 @@
 //! in IR order: a number as `INPevaluate` reads it, a string quoted, anything else
 //! `expr_write::value` (bare name or `{…}`). A bin's name is already `base.<digits>`.
 //!
-//! `admits` (R21) refuses what ngspice cannot run as the row says: a family it has no device
-//! for, a version that picks no device or a version on a family ngspice runs one way, a
+//! A family ngspice has no device for is a `Feature::Family` its `FEATURES` lack (R32).
+//! `admits` (R21) refuses what ngspice cannot run as the row says: a version that picks no device or a version on a family ngspice runs one way, a
 //! parameter the device's tables lack (ngspice would ignore it: a wrong number with no crash),
 //! a bin of a family ngspice does not bin or not named `base.<digits>`, a value it reads back
 //! otherwise or that reads the run.
@@ -22,7 +22,6 @@ use super::expr_write;
 use super::families;
 use super::number::{self, Grammar};
 use super::read_models;
-use super::tables::Eval;
 use super::write::Out;
 use crate::ir::{self, Code, Info, Kind, ModelFamily as F};
 
@@ -31,12 +30,6 @@ pub(super) const FEATURES: ir::FeatureSet = read_models::FEATURES;
 
 /// This area's codes, `W1200–W1299`.
 pub(super) const CODES: &[Row] = &[
-    refusal(
-        FAMILY,
-        "a model family ngspice has no device for",
-        "ngspice-45 inpdomod.c INPdomodel",
-        "no type word and level of ngspice runs this family's equations.",
-    ),
     refusal(
         VERSION,
         "a model version ngspice has no device for",
@@ -63,8 +56,6 @@ pub(super) const CODES: &[Row] = &[
     ),
 ];
 
-/// A family ngspice has no device for.
-const FAMILY: Code = Code::new(b'W', 1201);
 /// A version ngspice has no device for, or a version on a family ngspice runs one way.
 const VERSION: Code = Code::new(b'W', 1202);
 /// A parameter the device's tables lack (or `level`, a field).
@@ -86,7 +77,7 @@ pub(super) fn admits(
     let mut refuse = |code| diags.push(code, span, 0);
     let named = matches!(m.family, F::CodeModel | F::Module);
     if !named && families::card(m.family, m.polarity).is_none() {
-        refuse(FAMILY);
+        // a family ngspice lacks is a feature FEATURES lacks: `check_legal` refused it
         return;
     }
     let version = (!m.version.is_none()).then(|| version_text(design, m.version));
@@ -113,14 +104,20 @@ pub(super) fn admits(
     let params = design.params(m.params);
     for &(name, value) in params {
         let name = design.str(name);
+        // `level` is the family's (MESA's own, a parameter of the device)
+        let level = name == "level" && m.family != F::Mesa;
         if let Some(dev) = device
-            && (name == "level" || !families::accepts(dev, name))
+            && (level || !families::accepts(dev, name))
         {
             refuse(PARAM);
         }
         if !value_spells(design, value) {
             refuse(VALUE);
         }
+    }
+    if m.family == F::Mesa && !mesa_level(design, m.params) {
+        // without its level 2-4 the card reads back as a MES (level 1) model
+        refuse(PARAM);
     }
     if m.bin_of != ir::NameId::NONE {
         let name = design.str(m.name);
@@ -188,6 +185,14 @@ const fn refusal(
     )
 }
 
+/// Whether a MESA row's params hold `level` as the number 2, 3 or 4.
+fn mesa_level(d: &ir::Design, params: ir::ParamList) -> bool {
+    d.params(params).iter().any(|&(name, v)| {
+        d.str(name) == "level"
+            && matches!(d.expr(v), ir::Expr::Num(n) if [2.0, 3.0, 4.0].contains(&d.num(n).value()))
+    })
+}
+
 /// A version's text: a string as is, a number as `INPevaluate` reads it; `None` for any other
 /// expression.
 fn version_text(d: &ir::Design, e: ir::ExprId) -> Option<String> {
@@ -232,8 +237,8 @@ fn value_spells(d: &ir::Design, e: ir::ExprId) -> bool {
         ir::Expr::Num(_) => true,
         ir::Expr::Str(s) => !d.str(s).contains(['"', '\n', '\r']),
         _ => {
-            ir::expr_class(d, e) < ir::ExprClass::Temp
-                && expr_write::spells_in(d, e, Eval::Numparam)
+            ir::expr_class(d, e) < ir::ExprClass::Circuit
+                && expr_write::spells_in(d, e, expr_write::eval_of(d, e))
         }
     }
 }

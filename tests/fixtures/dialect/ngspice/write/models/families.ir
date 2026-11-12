@@ -39,3 +39,4 @@ file "families.sp" deck
   model aj urc
   model ak code_model word=d_and
   model al module module=mymod
+  model am mesa polarity=n params=(level=2)

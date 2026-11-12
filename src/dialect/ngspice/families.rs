@@ -11,7 +11,7 @@
 //! is not the card as written. BSIM3, BSIM4 and HiSIM-HV pick their device by the version's
 //! prefix (`INPfindVer`, `prefix`); every other family has one device. Of each group's levels
 //! the first is the writer's: 49 and 54 for BSIM3 and BSIM4 (the PDK spellings), no level where
-//! level 1 is the family's.
+//! level 1 is the family's; MESA's level (2-4) is its own parameter, kept in the row's params.
 //!
 //! The parameter names are `families/params.txt`, generated from the ngspice-45 source by
 //! `families/params.py` (the settable rows of each device's model and instance `IFparm` tables,
@@ -45,8 +45,6 @@ pub(super) enum Reading {
     Family(F),
     /// No device: ngspice ignores the card and its instances fail.
     Invalid,
-    /// A device the IR has no family for yet (MESA, `nmf` levels 2-4).
-    Unread,
 }
 
 /// The type-word groups of `INPdomodel` that dispatch on `level`, and their words (n, p).
@@ -67,7 +65,7 @@ const LEVELS: &[(Group, &[i64], Reading)] = &[
     (Group::Jfet, &[1, 0], Reading::Family(F::JfetShichman)),
     (Group::Jfet, &[2], Reading::Family(F::JfetParkerSkellern)),
     (Group::Mes, &[1, 0], Reading::Family(F::Mesfet)),
-    (Group::Mes, &[2, 3, 4], Reading::Unread),
+    (Group::Mes, &[2, 3, 4], Reading::Family(F::Mesa)),
     (Group::Mes, &[5], Reading::Family(F::Hfet1)),
     (Group::Mes, &[6], Reading::Family(F::Hfet2)),
     (Group::Mos, &[1, 0], Reading::Family(F::Mos1)),
@@ -135,6 +133,7 @@ const DEVICES: &[(F, &str)] = &[
     (F::JfetShichman, "jfet"),
     (F::JfetParkerSkellern, "jfet2"),
     (F::Mesfet, "mes"),
+    (F::Mesa, "mesa"),
     (F::Hfet1, "hfet1"),
     (F::Hfet2, "hfet2"),
     (F::Mos1, "mos1"),
@@ -259,7 +258,8 @@ pub(super) fn card(family: F, polarity: Polarity) -> Option<(&'static str, Optio
     } else {
         words[0]
     };
-    let level = (levels[0] > 1).then_some(levels[0] as u32);
+    // MESA's level (2, 3 or 4) is its own model parameter (mesa.c:108), written with the rest
+    let level = (levels[0] > 1 && family != F::Mesa).then_some(levels[0] as u32);
     Some((word, level))
 }
 
@@ -371,7 +371,8 @@ mod tests {
                     Reading::Family(F::DiodeLevel3)
                 } else if levelled(word) {
                     assert_eq!(polarity_word(word), p, "{f:?}");
-                    dispatch(word, i64::from(level.unwrap_or(1)))
+                    let mesa = if f == F::Mesa { 2 } else { 1 };
+                    dispatch(word, i64::from(level.unwrap_or(mesa)))
                 } else {
                     assert_eq!(level, None, "{f:?}");
                     Reading::Family(fixed(word).expect("a fixed word"))
@@ -424,6 +425,17 @@ mod tests {
             "Other",
         ];
         assert_eq!(lacks, want);
+    }
+
+    #[test]
+    fn features_list_exactly_the_families_card_spells() {
+        // Oracle: `card`, the table the reader dispatches by (law L5: FEATURES is the image)
+        let features = super::super::read_models::FEATURES;
+        for f in F::ALL {
+            let spelled = card(f, Polarity::N).is_some() || matches!(f, F::CodeModel | F::Module);
+            let has = features.contains(crate::ir::Feature::Family(f));
+            assert_eq!(has, spelled, "{f:?}");
+        }
     }
 
     #[test]

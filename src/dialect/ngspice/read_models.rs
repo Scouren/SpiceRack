@@ -21,7 +21,8 @@
 //! - the type word is itself read as a parameter, so `psoi`, `phfet` at level 1 and `pmf` at
 //!   levels 5-6 set no polarity: the device runs its default n type (a note);
 //! - a value that is no number gets braces (`inp_fix_param_values`): numparam reads it; a number
-//!   is `INPevaluate`'s (`number::card`);
+//!   is `INPevaluate`'s (`number::card`); one that reads `temper` is the B-source parser's (class
+//!   `Temp`, R14); one that reads the circuit, a sequence or `true`/`false` is `Unread`;
 //! - `INPmakeMod` keeps the first card of a name: a repeat in one scope is `Inert`;
 //! - BSIM3, BSIM4, HiSIM2 and HiSIM-HV bin `base.<digits>` (`INPgetModBin`, `model_name_match`).
 //!
@@ -49,7 +50,7 @@ use crate::ir::{self, Code, Feature, Info, Kind, ModelFamily as F, OpaqueClass, 
 use crate::syntax::ast::{NONE, Node, Tag};
 
 /// What this area adds to `FEATURES`, the image of its reader: models, inside subcircuits too,
-/// bins, with no device library, and a string (a model's version). A model in an `.if` branch (R33) joins as
+/// bins, with no device library, a string (a model's version), and the families ngspice has. A model in an `.if` branch (R33) joins as
 /// `Placed(Branch, Model)` when the kernel's placement class lands (AMEND-A12 A15).
 pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ir::ItemKind::Model),
@@ -58,6 +59,46 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     // ngspice's devices are built in: no model needs a `DeviceLibrary` (A12 C5)
     Feature::Circuit(ir::CircuitExtra::ModelWithoutLibrary),
     Feature::Expr(ir::ExprTag::Str),
+    // the families ngspice-45 has a device for (`families::card`), a code model and a module
+    Feature::Family(F::Resistor),
+    Feature::Family(F::Capacitor),
+    Feature::Family(F::Inductor),
+    Feature::Family(F::Diode),
+    Feature::Family(F::DiodeLevel3),
+    Feature::Family(F::GummelPoon),
+    Feature::Family(F::Vbic),
+    Feature::Family(F::Hicum2),
+    Feature::Family(F::Mos1),
+    Feature::Family(F::Mos2),
+    Feature::Family(F::Mos3),
+    Feature::Family(F::Mos6),
+    Feature::Family(F::Mos9),
+    Feature::Family(F::Bsim1),
+    Feature::Family(F::Bsim2),
+    Feature::Family(F::Bsim3),
+    Feature::Family(F::Bsim4),
+    Feature::Family(F::B3SoiFd),
+    Feature::Family(F::B3SoiDd),
+    Feature::Family(F::B3SoiPd),
+    Feature::Family(F::B4Soi),
+    Feature::Family(F::Soi3),
+    Feature::Family(F::Hisim2),
+    Feature::Family(F::HisimHv),
+    Feature::Family(F::Vdmos),
+    Feature::Family(F::JfetShichman),
+    Feature::Family(F::JfetParkerSkellern),
+    Feature::Family(F::Mesfet),
+    Feature::Family(F::Mesa),
+    Feature::Family(F::Hfet1),
+    Feature::Family(F::Hfet2),
+    Feature::Family(F::SwitchHyst),
+    Feature::Family(F::CurrentSwitchHyst),
+    Feature::Family(F::Ltra),
+    Feature::Family(F::Txl),
+    Feature::Family(F::Cpl),
+    Feature::Family(F::Urc),
+    Feature::Family(F::CodeModel),
+    Feature::Family(F::Module),
 ]);
 
 /// This area's codes, `P1200–P1299, R1200–R1299`.
@@ -78,7 +119,7 @@ pub(super) const CODES: &[Row] = &[
         UNREAD,
         "a model card form with no IR rule yet",
         "rewrite/S3-AREAS.md",
-        "a level or version in braces, a flag word, a device name as type word, a MESA level, a sequence or temperature value: kept as text (Unread).",
+        "a level or version in braces, a flag word, a device name as type word, a sequence or a value that reads the circuit: kept as text (Unread).",
     ),
     note(
         CIDER,
@@ -229,7 +270,8 @@ fn read(lw: &mut Lower<'_, '_>, st: Stmt) -> Result<(), Refusal> {
     if family == F::Txl {
         txl(lw, &card)?;
     }
-    let own_level = families::levelled(&card.word) || card.word == "d";
+    // the level is the family's, but MESA's (2-4) is a parameter of the device (mesa.c:108)
+    let own_level = families::levelled(&card.word) && family != F::Mesa || card.word == "d";
     let key = families::version(family).map(|v| v.0);
     let kept = params(&card, own_level, key, device, &mut notes);
     let mut vals = Vec::new();
@@ -329,7 +371,6 @@ fn head(lw: &Lower<'_, '_>, card: &Card, notes: &mut Vec<Code>) -> Result<Head, 
         let f = match families::dispatch(word, level) {
             Reading::Family(f) => f,
             Reading::Invalid => return Err((OpaqueClass::InvalidInSource, NO_DEVICE)),
-            Reading::Unread => return Err(unread()),
         };
         let mut p = families::polarity_word(word);
         let device = families::device(f, None).expect("a dispatched family has a device");
@@ -459,7 +500,7 @@ fn params<'c>(
             if key == "level" && own_level || Some(key.as_str()) == version {
                 continue;
             }
-            if key == "level" || !families::accepts(dev, key) {
+            if !families::accepts(dev, key) {
                 notes.push(IGNORED);
                 continue;
             }
@@ -517,10 +558,15 @@ fn read_value(lw: &Lower<'_, '_>, st: Stmt, node: Node) -> Result<Value, Refusal
         Tag::Delimited => unwrap(&text),
         _ => return Err(unread()),
     };
-    if lw.class(st.container, expr, &[]) >= Class::Temp {
-        return Err(unread());
-    }
-    expr_read::parse_in(expr, Eval::Numparam)
+    // a value that reads `temper` is re-evaluated at each temperature by the B-source parser
+    // (`inp_fix_temper_in_param`; run: vto={0.5+temper*1m} at .temp 27 and 127 gives
+    // vto 0.527 and 0.627); one that reads the circuit has no rule here
+    let eval = match lw.class(st.container, expr, &[]) {
+        Class::Constant => Eval::Numparam,
+        Class::Temp => Eval::Behavioural,
+        Class::Circuit => return Err(unread()),
+    };
+    expr_read::parse_in(expr, eval)
         .map(Value::Expr)
         .map_err(|f| (f.class, f.code))
 }

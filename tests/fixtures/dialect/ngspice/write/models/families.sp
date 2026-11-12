@@ -37,4 +37,5 @@ families
 .model aj urc
 .model ak d_and
 .model al mymod
+.model am nmf level=2
 .end

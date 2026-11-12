@@ -111,9 +111,12 @@ fn admits_refuses_what_ngspice_cannot_spell() {
     // "unrecognized parameter - ignored": a silent wrong number), INPgetModBin (only BSIM3,
     // BSIM4, HiSIM2 and HiSIM-HV bin; a bin is `base.<digits>`).
     let cases = [
-        ("model a mos0 polarity=n", "W1201"),
-        ("model a diode_pspice", "W1201"),
-        ("model a other polarity=n word=foo", "W1201"),
+        // a family ngspice lacks is a feature its FEATURES lack (R32): check_legal's U row
+        ("model a mos0 polarity=n", "U0001"),
+        ("model a diode_pspice", "U0001"),
+        ("model a other polarity=n word=foo", "U0001"),
+        // MESA without its level reads back as MES (mesa.c:108, inpdomod.c nmf level 1)
+        ("model a mesa polarity=n params=(vto=1)", "W1203"),
         ("model a bsim4 polarity=n version=\"4.9\"", "W1202"),
         ("model a mos1 polarity=n version=\"1.0\"", "W1202"),
         ("model a hisim_hv polarity=n version=\"3.0\"", "W1202"),
@@ -173,6 +176,11 @@ fn written_models_run_on_ngspice_to_the_original_numbers() {
         (".model mm vdmos pchan vto=-1 kp=1 ron=5", "M1 0 g d mm"),
         (".model jj njf level=2 beta=1e-3 vto=-1", "J1 d g 0 jj"),
         (".model rr res r=2k", "R2 d 0 rr"),
+        (".model mz pmf level=2 vto=-1 beta=1e-3", "Z1 0 g d mz"),
+        (
+            ".temp 127\n.model mm nmos vto={0.5+temper*1m} kp=1e-4",
+            "M1 d g 0 0 mm w=1u l=1u",
+        ),
         (".model mm psoi level=10", "M1 d g 0 0 0 mm w=1u l=1u"),
         (
             ".model mm nmos level=1 vto=0.5 kp=1e-4 foo=3 kp=2e-4 m=2",
