@@ -115,9 +115,9 @@ fn loops_alters_and_state() {
   loop monte_carlo runs=100 seed=7 samples=[1, 3] all latin_hypercube nominal
   alter (option private tran_rmax vacask) value=10
   alter (option rel_tol) value=1m
-  node_set ic transient node=(x1 n) value=1
-  node_set nodeset every_op next_only node=(a) reference=(b) value=0.5
-  node_set device every_op node=(c1) value=0
+  nodeset ic transient node=(x1 n) value=1
+  nodeset nodeset every_op next_only node=(a) reference=(b) value=0.5
+  nodeset device every_op node=(c1) value=0
 ";
     case(text, |b, top| {
         let (t, tn) = (n(b, "85"), n(b, "27"));

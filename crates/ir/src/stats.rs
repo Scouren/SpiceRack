@@ -40,7 +40,7 @@ use crate::run_extra::RunExtra;
 use crate::run_words::has;
 use crate::run_words::{
     close, flag, get, open, put_expr, put_flag, put_ref, put_word, take_enum, take_expr, take_word,
-    word, write_ref,
+    trim_lead, word, write_ref,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -203,7 +203,7 @@ impl RowFacts for Statistics {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("statistics");
+        let at = out.len();
         for (key, list) in [("process", self.process), ("mismatch", self.mismatch)] {
             if list.len > 0 {
                 put_word(out, key);
@@ -237,6 +237,7 @@ impl RowFacts for Statistics {
         put_expr(out, design, "truncate", self.truncate);
         put_expr(out, design, "process_truncate", self.process_truncate);
         put_expr(out, design, "mismatch_truncate", self.mismatch_truncate);
+        trim_lead(out, at);
     }
 
     fn parse(

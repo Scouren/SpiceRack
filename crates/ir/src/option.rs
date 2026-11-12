@@ -24,7 +24,7 @@
 //! ```text
 //! option <key> [value=v]                       option private <name> <dialect> [value=v]
 //! env temp=v tnom=v
-//! node_set ic|nodeset|device transient|every_op [next_only] [node=(…)] [reference=(…)] value=v
+//! nodeset ic|nodeset|device transient|every_op [next_only] [node=(…)] [reference=(…)] value=v
 //! ```
 //!
 //! Contents: `pub struct OptionRow`, `pub struct Env`, `pub struct NodeSet`,
@@ -48,7 +48,7 @@ use crate::run_extra::RunExtra;
 use crate::run_words::has;
 use crate::run_words::{
     after_run_item, flag, in_scope_kind, locate_row, put_expr, put_flag, put_name, put_names,
-    put_word, take_enum, take_expr, take_names, take_word, word,
+    put_word, take_enum, take_expr, take_names, take_word, trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -182,7 +182,6 @@ impl RowFacts for OptionRow {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("option ");
         out.push_str(&word(self.key));
         put_name(out, design, "", self.private);
         put_name(out, design, "", self.dialect);
@@ -282,9 +281,10 @@ impl RowFacts for Env {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("env");
+        let at = out.len();
         put_expr(out, design, "temp", self.temp);
         put_expr(out, design, "tnom", self.tnom);
+        trim_lead(out, at);
     }
 
     fn parse(
@@ -358,8 +358,7 @@ impl RowFacts for NodeSet {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("node_set");
-        put_word(out, &word(self.kind));
+        out.push_str(&word(self.kind));
         put_word(out, &word(self.applies));
         put_flag(out, self.next_only, "next_only");
         put_names(out, design, "node", self.node);

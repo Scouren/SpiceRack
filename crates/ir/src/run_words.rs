@@ -14,7 +14,7 @@
 //!
 //! Contents:
 //! - words: `pub(crate) fn word`, `pub(crate) fn member`, `pub(crate) fn put_word`,
-//!   `pub(crate) fn put_flag`, `pub(crate) fn put_expr`, `pub(crate) fn put_exprs`,
+//!   `pub(crate) fn put_flag`, `pub(crate) fn trim_lead`, `pub(crate) fn put_expr`, `pub(crate) fn put_exprs`,
 //!   `pub(crate) fn put_name`, `pub(crate) fn put_names`, `pub(crate) fn put_ref`, `pub(crate) fn write_ref`,
 //!   `pub(crate) fn put_value`, `pub(crate) fn take_word`, `pub(crate) fn take_enum`,
 //!   `pub(crate) fn take_key`, `pub(crate) fn take_expr`, `pub(crate) fn take_exprs`,
@@ -39,6 +39,7 @@ use crate::id::{ExprId, ExprList, ItemRef, List, NameId, NameList, POOL_MAX, Ref
 use crate::item::{ItemKind, ScopeKind};
 use crate::run_extra::RunExtra;
 use crate::text::Words;
+use crate::text_expr::{self, Ctx};
 
 // ---- words ----
 
@@ -65,6 +66,14 @@ pub(crate) fn member<E: Copy + Debug>(all: &[E], w: &str) -> Option<E> {
 pub(crate) fn put_word(out: &mut String, w: &str) {
     out.push(' ');
     out.push_str(w);
+}
+
+/// Removes the space a field writer put at `at`: a row's first field follows the kernel's
+/// `keyword ` directly.
+pub(crate) fn trim_lead(out: &mut String, at: usize) {
+    if out[at..].starts_with(' ') {
+        out.remove(at);
+    }
 }
 
 /// ` w` when `on`.
@@ -467,20 +476,15 @@ pub(crate) fn reachable(design: &Design, scope: ScopeId, kind: ItemKind) -> usiz
 
 // ---- private ----
 
-// Placeholders until the kernel's text writers land (M3; requested from the kernel owner):
-// each is the inverse of the `Words` reader of the same value. `ptr_arg` fires only because
-// the bodies are `todo!()`.
-#[allow(clippy::ptr_arg)]
+// The kernel's writers with a detached context, until A9 passes each row its `Ctx`.
 fn kernel_write_expr(design: &Design, e: ExprId, out: &mut String) {
-    todo!("kernel M3: text::write_expr")
+    text_expr::write_expr(design, e, &Ctx::detached(), out);
 }
 
-#[allow(clippy::ptr_arg)]
 fn kernel_write_value(design: &Design, e: ExprId, out: &mut String) {
-    todo!("kernel M3: text::write_value")
+    text_expr::write_value(design, e, &Ctx::detached(), out);
 }
 
-#[allow(clippy::ptr_arg)]
 fn kernel_write_name(design: &Design, n: NameId, out: &mut String) {
-    todo!("kernel M3: text::write_name")
+    text_expr::write_name(design.str(n), out);
 }

@@ -40,7 +40,9 @@ use crate::probe::{
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
-use crate::run_words::{flag, get, put_flag, put_word, take_enum, take_key, take_word, word};
+use crate::run_words::{
+    flag, get, put_flag, put_word, take_enum, take_key, take_word, trim_lead, word,
+};
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
 use crate::text::Words;
@@ -123,11 +125,12 @@ impl RowFacts for Save {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("save");
+        let at = out.len();
         if !self.every_analysis {
             put_word(out, &format!("analysis={}", word(self.analysis)));
         }
         dump_list(design, self.probes, out);
+        trim_lead(out, at);
     }
 
     fn parse(
@@ -202,8 +205,7 @@ impl RowFacts for Print {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("print");
-        put_word(out, &word(self.analysis));
+        out.push_str(&word(self.analysis));
         put_flag(out, self.view == PrintView::HbTime, "hb_time");
         dump_list(design, self.probes, out);
     }

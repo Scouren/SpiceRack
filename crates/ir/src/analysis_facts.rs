@@ -196,7 +196,6 @@ impl RowFacts for Analysis {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("analysis ");
         out.push_str(&word(self.kind));
         put_name(out, design, "name", self.name);
         by_detail!(self.kind, (), dump_of(design, self.detail, out));

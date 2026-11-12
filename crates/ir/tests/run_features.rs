@@ -92,13 +92,13 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::McNominal, "  loop monte_carlo runs=10 nominal\n    analysis op", M),
     (RunExtra::McMismatch, "  loop monte_carlo runs=10 mismatch\n    analysis op", M),
     (RunExtra::OptionMidRun, "  analysis op\n  option klu", "  option klu\n  analysis op"),
-    (RunExtra::IcEveryOp, "  node_set ic every_op node=(a) value=1", S),
-    (RunExtra::IcNextOnly, "  node_set ic transient next_only node=(a) value=1", S),
-    (RunExtra::IcDifferential, "  node_set ic transient node=(a) reference=(b) value=1", S),
-    (RunExtra::NodesetAll, "  node_set nodeset every_op value=1", "  node_set nodeset every_op node=(a) value=1"),
-    (RunExtra::NodeSetInSubckt, "  subckt s (a)\n    node_set ic transient node=(a) value=1", "  subckt s (a)\n  node_set ic transient node=(a) value=1"),
-    (RunExtra::NodeSetHierarchical, "  node_set ic transient node=(x1 a) value=1", S),
-    (RunExtra::IcDevice, "  node_set device every_op node=(c1) value=1", S),
+    (RunExtra::IcEveryOp, "  nodeset ic every_op node=(a) value=1", S),
+    (RunExtra::IcNextOnly, "  nodeset ic transient next_only node=(a) value=1", S),
+    (RunExtra::IcDifferential, "  nodeset ic transient node=(a) reference=(b) value=1", S),
+    (RunExtra::NodesetAll, "  nodeset nodeset every_op value=1", "  nodeset nodeset every_op node=(a) value=1"),
+    (RunExtra::NodeSetInSubckt, "  subckt s (a)\n    nodeset ic transient node=(a) value=1", "  subckt s (a)\n  nodeset ic transient node=(a) value=1"),
+    (RunExtra::NodeSetHierarchical, "  nodeset ic transient node=(x1 a) value=1", S),
+    (RunExtra::IcDevice, "  nodeset device every_op node=(c1) value=1", S),
     (RunExtra::ProbeVdiff, "  save (vdiff (a) (b))", P),
     (RunExtra::ProbeI, "  save (i (v1))", P),
     (RunExtra::ProbeITerminal, "  save (i_terminal terminal=1 (m1))", P),
@@ -148,7 +148,7 @@ const PSS: &str = "  analysis pss driven fundamental=1meg tstab=1u";
 const L: &str = "  loop sweep (temp) (list values=[1])\n    analysis op";
 const M: &str = "  loop monte_carlo runs=10\n    analysis op";
 const AL: &str = "  alter (temp) value=1";
-const S: &str = "  node_set ic transient node=(a) value=1";
+const S: &str = "  nodeset ic transient node=(a) value=1";
 const P: &str = "  save (v (out))";
 const MW: &str = "  measure m tran when (cross rise (v (a)) value=1 count=1)";
 const MP: &str = "  measure m tran param value=1";

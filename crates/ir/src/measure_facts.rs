@@ -99,8 +99,7 @@ impl RowFacts for Measure {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("measure");
-        crate::run_words::put_name(out, design, "", self.name);
+        crate::text_expr::write_name(design.str(self.name), out);
         put_word(out, &word(self.analysis));
         put_word(out, &word(self.kind));
         by_measure!(self.kind, dump_of(design, self.detail, out));

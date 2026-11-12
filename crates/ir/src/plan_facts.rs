@@ -50,7 +50,7 @@ use crate::plan::{
 use crate::run_extra::RunExtra;
 use crate::run_words::{
     get, loop_depth, put_expr, put_exprs, put_flag, put_name, put_word, reachable, take_enum,
-    take_expr, take_exprs, take_name, take_word, word,
+    take_expr, take_exprs, take_name, take_word, trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -110,7 +110,6 @@ impl RowFacts for Loop {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("loop ");
         out.push_str(&word(self.kind));
         put_flag(out, self.after == LoopEnd::KeepLast, "keep_last");
         put_name(out, design, "name", self.name);
@@ -242,9 +241,10 @@ impl RowFacts for Alter {
     }
 
     fn dump(&self, design: &Design, out: &mut String) {
-        out.push_str("alter");
+        let at = out.len();
         dump_target(design, &self.target, out);
         put_expr(out, design, "value", self.value);
+        trim_lead(out, at);
     }
 
     fn parse(
