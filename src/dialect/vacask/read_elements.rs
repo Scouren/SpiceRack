@@ -79,7 +79,10 @@ pub(super) const UNRESOLVED: ir::Code = ir::Code::new(b'R', 2002);
 pub(super) const NOT_FORMAL: ir::Code = ir::Code::new(b'R', 2004);
 /// `$mfactor` on a subckt that does not declare it.
 pub(super) const NO_MFACTOR: ir::Code = ir::Code::new(b'R', 2005);
-/// An instance whose terminal count is not its master's.
+/// An instance whose terminal count is not its master's. Corpus census (36be560's 184 files, each
+/// read alone): 14 statements in 8 files, every one a 3-terminal `sp_bjt` (4 terminals) or
+/// `sp_vdmos` (5) in `demo/spice/` and `benchmark/vadistiller/bjtring` (R41 Q3: the count
+/// decides whether the short instance is ever typed).
 pub(super) const TERMINALS: ir::Code = ir::Code::new(b'P', 2104);
 /// An instance whose terminals are not in parentheses.
 pub(super) const NO_PARENS: ir::Code = ir::Code::new(b'P', 2107);
