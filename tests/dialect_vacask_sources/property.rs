@@ -154,3 +154,24 @@ fn property_am_and_mutual_round_trip() {
         assert_eq!(canonical(&again), before, "seed {seed}");
     }
 }
+
+/// Oracle: A31 and VD dev-builtin-src (AM: `1 + modindex·sin(…)`): an `Am` whose `mod_offset`
+/// is not the real literal 1 (`2.`, and `1i`, an Int) is the feature `AmModOffset`, which
+/// VACASK lacks, so `legalize` refuses it by that feature (no writer-side refusal).
+#[test]
+fn an_am_offset_other_than_one_is_a_missing_feature() {
+    for offset in ["2.", "1i"] {
+        let text = format!(
+            "file \"am.sim\" deck\n  title \"am\"\n  model vs source_v\n  element vsource v1 (a 0) model=vs wave=am(offset=0 amplitude=1 mod_offset={offset} mod_index=0.5 mod_freq=1k carrier_freq=1k delay=0 phase_m_deg=0 phase_c_deg=0 pre=hold_delay_value) dc_rule=wave_at_zero\n"
+        );
+        let (mut design, _) = read(&spicerack::dialect::Sources::one("am.ir", &text), "ir");
+        let row = spicerack::dialect::by_name("vacask").expect("the vacask row");
+        let mut diags = ir::Diags::new();
+        spicerack::dialect::legalize(&mut design, row, &mut diags);
+        let want = ir::Feature::Circuit(ir::CircuitExtra::AmModOffset);
+        let refused = diags.rows().iter().any(|d| {
+            spicerack::dialect::refuses(d.code) && ir::Feature::from_index(d.arg as u16) == want
+        });
+        assert!(refused, "offset {offset}: {:?}", diags.rows());
+    }
+}

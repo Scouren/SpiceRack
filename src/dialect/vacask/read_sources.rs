@@ -149,13 +149,6 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Kind::Note,
     ),
     row(
-        super::write_sources::AM_OFFSET,
-        "an AM wave with a modulation offset other than 1",
-        "VD dev-builtin-src (AM: 1 + modindex·sin(…))",
-        "VACASK's AM fixes the offset inside the modulating factor at 1; no parameter spells another.",
-        ir::Kind::Refusal,
-    ),
-    row(
         super::write_sources::PARAMS,
         "a source, controlled source or mutual with instance parameters",
         "VD dev-builtin-src, -vcvs, -cccs, -mutual; S 7.11",
