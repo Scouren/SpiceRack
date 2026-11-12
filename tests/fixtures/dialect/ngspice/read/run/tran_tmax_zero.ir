@@ -2,4 +2,4 @@
 file "tran_tmax_zero.sp" deck
   title "tran_tmax_zero"
   comment " oracle: ngspice-45 traninit.c:29 (tmax 0 is no tmax: the default ceiling)"
-  analysis tran stop=1u record_start=0 print_step=1n cap=ngspice_rule
+  analysis tran stop=1u print_step=1n cap=ngspice_rule

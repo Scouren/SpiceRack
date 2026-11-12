@@ -22,8 +22,8 @@ use super::read_run;
 use super::write::Out;
 use super::write_outputs;
 use crate::ir::dc_ac::{Ac, Dc, Disto, Noise, Pz, PzFind, PzTransfer, Sens, SensAc, Sp, Tf};
-use crate::ir::periodic::{Pss, PssMode};
-use crate::ir::tran::{Four, StepCap, Tran};
+use crate::ir::periodic::Pss;
+use crate::ir::tran::{Four, StepCeiling, Tran};
 use crate::ir::{self, AnalysisKind};
 
 /// What the run area spells: exactly what its reader produces (L5).
@@ -46,18 +46,17 @@ pub(super) const CODES: &[Row] = &[
     refusal(
         CARD_FORM,
         "an analysis field ngspice's card has no position for",
-        "ngspice-45 inp2dot.c dot_dc, dot_ac, dot_tran; traninit.c:29",
-        "a DC axis over another target or sweep, a frequency sweep by step, or a transient ceiling ngspice would read back otherwise; refused.",
+        "ngspice-45 dctrcurv.c:89-149, inp2dot.c dot_pss",
+        "a DC axis on an element ngspice does not sweep, a .pss missing an argument, or an output no card spells; refused.",
     ),
 ];
 
 /// A Fourier analysis whose harmonic count is not ngspice's default (DC and 9 harmonics): its
 /// count is the deck's `nfreqs` option, which no `.four` card states.
 const FOUR_HARMONICS: ir::Code = ir::Code::new(b'W', 1300);
-/// An analysis field ngspice's card has no position for: a DC axis other than a source, a
-/// resistor or `temp` swept by step; a frequency sweep by step; a transient ceiling without a
-/// start, a zero ceiling, or another default ceiling than ngspice's; an output no ngspice card
-/// spells (`write_outputs::probe_admits`).
+/// An analysis field ngspice's card has no position for: a DC source axis on an element that is
+/// no V or I source, an element-value axis on one that is no resistor; a `.pss` missing one of
+/// its last four arguments; an output no ngspice card spells (`write_outputs::probe_admits`).
 const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
 
 /// A card value that reads the temperature: numparam evaluates a dot card's `{…}` once, before
@@ -86,9 +85,9 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     let a: ir::Analysis = design.row(item.index);
     let mut form_ok = true;
     let mut outs = Vec::new();
+    // a sweep's form is a feature (`Sweep{Dc,Freq}*`, A24); its values are checked here
     let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
         values.extend([s.start, s.stop, s.points]);
-        s.kind != ir::SweepKind::Lin || s.step.is_none()
     };
     match a.kind {
         AnalysisKind::Dc => {
@@ -97,23 +96,22 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
                 let t = axis.target;
                 let name = (!t.a.name.is_none())
                     .then(|| design.str(t.a.name).as_bytes()[0].to_ascii_lowercase());
-                form_ok &= t.path.len == 0
-                    && match t.kind {
-                        ir::TargetKind::Temp => true,
-                        ir::TargetKind::SourceDc => matches!(name, Some(b'v' | b'i')),
-                        ir::TargetKind::ElementValue => name == Some(b'r'),
-                        _ => false,
-                    };
+                // ngspice sweeps a resistor, a V or I source, or temp (dctrcurv.c:89-149);
+                // the target's kind and place are features
+                form_ok &= match t.kind {
+                    ir::TargetKind::SourceDc => matches!(name, Some(b'v' | b'i')),
+                    ir::TargetKind::ElementValue => name == Some(b'r'),
+                    _ => true,
+                };
                 let s = axis.sweep;
-                form_ok &= s.kind == ir::SweepKind::Lin && !s.step.is_none();
                 values.extend([s.start, s.stop, s.step]);
             }
         }
-        AnalysisKind::Ac => form_ok &= freq(design.detail::<Ac>(a.detail).sweep, &mut values),
+        AnalysisKind::Ac => freq(design.detail::<Ac>(a.detail).sweep, &mut values),
         AnalysisKind::Noise => {
             let n: Noise = design.detail(a.detail);
             outs.push(n.output);
-            form_ok &= freq(n.sweep, &mut values);
+            freq(n.sweep, &mut values);
             values.push(n.points_per_summary);
         }
         AnalysisKind::Tf => outs.push(design.detail::<Tf>(a.detail).output),
@@ -121,22 +119,20 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         AnalysisKind::SensAc => {
             let s: SensAc = design.detail(a.detail);
             outs.push(s.output);
-            form_ok &= freq(s.sweep, &mut values);
+            freq(s.sweep, &mut values);
         }
         AnalysisKind::Disto => {
             let d: Disto = design.detail(a.detail);
-            form_ok &= freq(d.sweep, &mut values);
+            freq(d.sweep, &mut values);
             values.push(d.f2_over_f1);
         }
-        AnalysisKind::Sp => form_ok &= freq(design.detail::<Sp>(a.detail).sweep, &mut values),
+        AnalysisKind::Sp => freq(design.detail::<Sp>(a.detail).sweep, &mut values),
         AnalysisKind::Tran => {
             let t: Tran = design.detail(a.detail);
-            let zero_max = !t.max_step.is_none()
-                && matches!(design.expr(t.max_step), ir::Expr::Num(n) if design.num(n).mantissa == 0);
-            form_ok &= t.cap == StepCap::NgspiceRule
-                && (t.max_step.is_none() || !t.record_start.is_none())
-                && !zero_max;
-            values.extend([t.print_step, t.stop, t.record_start, t.max_step]);
+            values.extend([t.print_step, t.stop, t.record_start]);
+            if let StepCeiling::Given(e) = t.ceiling {
+                values.push(e);
+            }
         }
         AnalysisKind::Four => {
             let f: Four = design.detail(a.detail);
@@ -151,7 +147,6 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         }
         AnalysisKind::Pss => {
             let p: Pss = design.detail(a.detail);
-            form_ok &= p.mode == PssMode::Autonomous && p.osc_n == ir::NameId::GROUND;
             let given = [p.harmonics, p.points, p.sc_iter, p.steady_coeff];
             form_ok &= given.iter().all(|e| !e.is_none());
             values.extend([p.fundamental, p.tstab]);
@@ -198,10 +193,20 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
         AnalysisKind::Tran => {
             let r: Tran = d.detail(a.detail);
             t.push_str(".tran");
-            for e in [r.print_step, r.stop, r.record_start, r.max_step] {
-                if !e.is_none() {
-                    value(d, e, &mut t);
+            value(d, r.print_step, &mut t);
+            value(d, r.stop, &mut t);
+            match (r.record_start, r.ceiling) {
+                // `tstart` stands before `tmax`: none is recording from 0, spelled `0`
+                (start, StepCeiling::Given(max)) => {
+                    if start.is_none() {
+                        t.push_str(" 0");
+                    } else {
+                        value(d, start, &mut t);
+                    }
+                    value(d, max, &mut t);
                 }
+                (start, StepCeiling::Rule(_)) if !start.is_none() => value(d, start, &mut t),
+                (_, StepCeiling::Rule(_)) => {}
             }
             if r.uic {
                 t.push_str(" uic");

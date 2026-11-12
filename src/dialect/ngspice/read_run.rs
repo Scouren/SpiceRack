@@ -73,9 +73,10 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::DcNested),
     Feature::Run(RunExtra::DcAxisTemp),
     Feature::Run(RunExtra::DcAxisElementValue),
-    Feature::Run(RunExtra::SweepLinPoints),
-    Feature::Run(RunExtra::SweepDec),
-    Feature::Run(RunExtra::SweepOct),
+    Feature::Run(RunExtra::SweepDcLinStep),
+    Feature::Run(RunExtra::SweepFreqLinPoints),
+    Feature::Run(RunExtra::SweepFreqDec),
+    Feature::Run(RunExtra::SweepFreqOct),
     Feature::Run(RunExtra::NoiseSummary),
     Feature::Run(RunExtra::SpNoise),
     Feature::Run(RunExtra::ProbeVdiff),
@@ -299,7 +300,8 @@ mod tests {
         let a: ir::Analysis = design.row(item.index);
         assert_eq!(a.kind, ir::AnalysisKind::Tran);
         let t: ir::tran::Tran = design.detail(a.detail);
-        assert!(t.uic && t.max_step.is_none() && t.record_start.is_none());
-        assert_eq!(t.cap, ir::tran::StepCap::NgspiceRule);
+        assert!(t.uic && t.record_start.is_none());
+        let rule = ir::tran::StepCeiling::Rule(ir::tran::StepCap::NgspiceRule);
+        assert_eq!(t.ceiling, rule);
     }
 }
