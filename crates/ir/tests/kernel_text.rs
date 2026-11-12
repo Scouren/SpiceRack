@@ -434,3 +434,14 @@ fn deep_nesting_goes_through_every_walk() {
     check(&back, &mut checked);
     assert!(checked.is_empty());
 }
+
+#[test]
+fn a_subckt_default_reading_a_sibling_needs_no_mark() {
+    // A10: the head defaults are looked up from the body, so the sibling read is bare
+    let text = "file \"s.sp\" deck\n  param r = 5\n  subckt s () r=1 w=(2 * r)\n";
+    let (d, diags) = read(text);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    let out = write(&d);
+    assert!(!out.contains('#'), "{out}");
+    assert_eq!(out, text);
+}

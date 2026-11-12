@@ -12,7 +12,8 @@
 //! - `Sources::new() -> Sources`, `Sources::one(path: &str, text: &str) -> Sources`,
 //!   `Sources::add(&mut self, path: &str, text: &str) -> usize`,
 //!   `Sources::has(&self, path: &str) -> bool`, `Sources::files(&self) -> &[(String, String)]`,
-//!   `Sources::entries(&self) -> &[(String, String)]`, `Sources::form(&self) -> ir::Role`,
+//!   `Sources::entries(&self) -> &[(String, String)]`, `Sources::set_form(&mut self, form: ir::Role)`,
+//!   `Sources::form(&self) -> ir::Role`,
 //!   `Sources::load(entries: &[&str], form: ir::Role, reader: &dyn Read, loader: &mut dyn FnMut(&str) -> Option<String>) -> Sources`
 //! - `Reference::path(&self) -> &str`, `Reference::resolve(&self, from: &str) -> String`
 
@@ -95,6 +96,18 @@ impl Sources {
         &self.files[..self.entries]
     }
 
+    /// Sets what the entries are.
+    ///
+    /// # Panics
+    /// When `form` is neither `Deck` nor `Library`.
+    pub fn set_form(&mut self, form: ir::Role) {
+        self.form = match form {
+            ir::Role::Deck => Form::Deck,
+            ir::Role::Library => Form::Library,
+            ir::Role::VerilogA | ir::Role::Missing => panic!("Sources::set_form: deck or library"),
+        };
+    }
+
     /// `Role::Deck` or `Role::Library`: what the entries are.
     pub fn form(&self) -> ir::Role {
         match self.form {
@@ -116,15 +129,8 @@ impl Sources {
         loader: &mut dyn FnMut(&str) -> Option<String>,
     ) -> Sources {
         assert!(!entries.is_empty(), "Sources::load: at least one entry");
-        let form = match form {
-            ir::Role::Deck => Form::Deck,
-            ir::Role::Library => Form::Library,
-            ir::Role::VerilogA | ir::Role::Missing => panic!("Sources::load: deck or library"),
-        };
-        let mut src = Sources {
-            form,
-            ..Sources::default()
-        };
+        let mut src = Sources::new();
+        src.set_form(form);
         let mut seen: HashSet<String> = HashSet::new();
         let mut todo: VecDeque<(String, u8, bool)> =
             entries.iter().map(|e| (normalize(e), 0, true)).collect();

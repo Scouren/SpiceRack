@@ -15,16 +15,20 @@
 //! Contents: `pub struct Size`, `pub fn generate(u64, &FeatureSet, Size) -> Design`,
 //! `pub struct Gen`, `Gen::below(&mut self, u32) -> u32`, `Gen::chance(&mut self, u32) -> bool`,
 //! `Gen::literal(&mut self) -> Literal`, `Gen::fresh_name(&mut self, &mut Builder<'_>) -> NameId`,
-//! `Gen::expr(&mut self, &mut Builder<'_>, &FeatureSet, Reads) -> ExprId`,
+//! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
-//! `Gen::budget(&self) -> u32`, `pub enum Reads`
+//! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::fresh(&mut self) -> String`,
+//! `Gen::word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
+//! `Gen::note(&mut self, DefId, ExprClass)`
 
 use crate::build::Builder;
+use crate::class::ExprClass;
 use crate::design::Design;
-use crate::expr::Literal;
-use crate::feature::FeatureSet;
-use crate::id::{DefId, ExprId, NameId, ScopeId};
-use crate::item::DefKind;
+use crate::expr::{ExprTag, Literal, NumForm};
+use crate::facts::RowFacts;
+use crate::feature::{Extra, Feature, FeatureSet};
+use crate::id::{DefId, ItemRef, NameId, ScopeId};
+use crate::item::{DefKind, ItemKind, Role, ScopeKind};
 
 /// How big a generated design is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,6 +55,23 @@ pub struct Gen {
     pub(crate) items_left: u32,
     /// Fresh names made so far (`g0`, `g1`, …).
     pub(crate) fresh: u32,
+    /// The scope the row being generated goes into (set by `generate` before each row): where
+    /// `expr` looks for definitions to read.
+    pub(crate) scope: ScopeId,
+    /// The formal arguments of the function whose body is being generated (`Func`'s generator
+    /// sets them around its `expr` call), which `expr` may read.
+    pub(crate) formals: Vec<String>,
+    /// The definitions of each kind seen so far, in definition order (`pick_def`'s index,
+    /// caught up from the design's table on each call: definitions are only appended).
+    pub(crate) by_kind: Vec<Vec<DefId>>,
+    /// The dynamic class of each definition generated so far, by `DefId` (`Constant` when not
+    /// noted): a constant-class tree reads only constant-class definitions (R14).
+    pub(crate) def_class: Vec<ExprClass>,
+    /// The class of the tree being generated (after `expr` returns: of the tree it built), and
+    /// what that tree may read.
+    pub(crate) class: ExprClass,
+    pub(crate) dynamic: bool,
+    pub(crate) reads: Reads,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -66,51 +87,275 @@ pub enum Reads {
     Circuit,
 }
 
+/// The powers of ten a `Scale` literal may have (A3).
+const SCALE_POWERS: [i16; 12] = [-18, -15, -12, -9, -6, -3, -2, 3, 6, 9, 12, 15];
+
+/// The words generated strings and texts are drawn from: lower case (no case clash), with the
+/// characters IR text escapes.
+const WORDS: [&str; 8] = [
+    "4.8",
+    "a",
+    "two words",
+    "q\"uote",
+    "back\\slash",
+    "",
+    "line\nbreak",
+    "x.y",
+];
+
 /// A random design under `features`, at most `size`. A feature outside the set never appears;
 /// a feature in it may not (the set is an upper bound).
 pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
-    todo!()
+    let mut design = Design::new();
+    let mut g = Gen {
+        state: seed,
+        size,
+        items_left: size.items,
+        fresh: 0,
+        scope: ScopeId::NONE,
+        formals: Vec::new(),
+        by_kind: vec![Vec::new(); DefKind::COUNT],
+        def_class: Vec::new(),
+        class: ExprClass::Constant,
+        dynamic: false,
+        reads: Reads::Constant,
+    };
+    let mut b = design.builder();
+    let files = 1 + g.below(size.files.max(1) as u32);
+    for k in 0..files {
+        let role = if k == 0 { Role::Deck } else { Role::Library };
+        let (_, top) = b.file(&format!("f{k}.sp"), role);
+        fill(&mut g, &mut b, top, features);
+    }
+    design
 }
 
 impl Gen {
     /// A uniform integer in `0..n`. Asserts `n > 0`.
     pub fn below(&mut self, n: u32) -> u32 {
-        todo!()
+        assert!(n > 0, "a range of at least one value");
+        // splitmix64
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        ((z ^ (z >> 31)) % n as u64) as u32
     }
 
     /// True with probability `1 / n`. Asserts `n > 0`.
     pub fn chance(&mut self, n: u32) -> bool {
-        todo!()
+        self.below(n) == 0
     }
 
     /// A random valid literal: every `NumForm`, magnitudes `1e-15..1e9`, either sign, zero,
     /// trailing zeros in `frac`, so every writer's number spelling and the literal round trip are
     /// exercised.
     pub fn literal(&mut self) -> Literal {
-        todo!()
+        let sign = if self.chance(4) { -1 } else { 1 };
+        let mantissa = sign * (1 + self.below(999_999)) as i64;
+        let frac = self.below(4) as u8;
+        let l = match self.below(5) {
+            0 => Literal::ZERO,
+            1 => Literal {
+                mantissa,
+                frac,
+                exp10: 0,
+                form: NumForm::Plain,
+            },
+            2 => Literal {
+                mantissa,
+                frac,
+                exp10: self.below(41) as i16 - 20,
+                form: NumForm::Exponent,
+            },
+            3 => {
+                let exp10 = SCALE_POWERS[self.below(SCALE_POWERS.len() as u32) as usize];
+                Literal {
+                    mantissa,
+                    frac,
+                    exp10,
+                    form: NumForm::Scale,
+                }
+            }
+            _ => Literal {
+                mantissa,
+                frac,
+                exp10: 0,
+                form: NumForm::Mil,
+            },
+        };
+        debug_assert!(l.is_valid(), "a generated literal is valid");
+        l
     }
 
     /// A name never used before in this design (`g` and a counter), interned.
     pub fn fresh_name(&mut self, b: &mut Builder<'_>) -> NameId {
-        todo!()
+        let name = self.fresh();
+        b.name(&name)
     }
 
-    /// A random expression of depth at most `size.expr_depth`, using only `features` and only
-    /// leaves `reads` allows. Parameter reads name definitions visible where it is used, or are
-    /// left unresolved.
-    pub fn expr(&mut self, b: &mut Builder<'_>, features: &FeatureSet, reads: Reads) -> ExprId {
-        todo!()
-    }
-
-    /// An existing definition of `kind` visible from `scope`, chosen uniformly, or `NONE` when
-    /// there is none.
+    /// An existing definition of `kind` visible from `scope`, chosen at random (up to eight
+    /// draws among that kind's definitions), or `NONE` when the draws find none visible.
     pub fn pick_def(&mut self, design: &Design, scope: ScopeId, kind: DefKind) -> DefId {
-        todo!()
+        let seen: usize = self.by_kind.iter().map(Vec::len).sum();
+        for (k, def) in design.definitions().iter().enumerate().skip(seen) {
+            self.by_kind[def.kind as usize].push(DefId(k as u32));
+        }
+        let mut chain = Vec::new();
+        let mut at = scope;
+        // bounded by the scope count: each step moves to a parent
+        for _ in 0..=design.scopes.len() {
+            if at.is_none() {
+                break;
+            }
+            chain.push(at);
+            at = design.scope(at).parent;
+        }
+        // a few random draws among this kind's definitions, kept if visible: O(depth) per read
+        let n = self.by_kind[kind as usize].len() as u32;
+        for _ in 0..if n == 0 { 0 } else { 8 } {
+            let k = self.below(n) as usize;
+            let def = self.by_kind[kind as usize][k];
+            if chain.contains(&design.def(def).scope) {
+                return def;
+            }
+        }
+        DefId::NONE
+    }
+
+    /// A fresh name as text, not interned (a row's generator passes it to the push, which
+    /// interns it in a builder caller's order).
+    pub(crate) fn fresh(&mut self) -> String {
+        self.fresh += 1;
+        format!("g{}", self.fresh - 1)
+    }
+
+    /// The class noted for a generated definition (`Constant` when none was).
+    pub(crate) fn class_of(&self, def: DefId) -> ExprClass {
+        self.def_class
+            .get(def.index())
+            .copied()
+            .unwrap_or(ExprClass::Constant)
+    }
+
+    /// Notes the class of a definition just pushed.
+    pub(crate) fn note(&mut self, def: DefId, class: ExprClass) {
+        if self.def_class.len() <= def.index() {
+            self.def_class.resize(def.index() + 1, ExprClass::Constant);
+        }
+        self.def_class[def.index()] = class;
+    }
+
+    /// A word for a string value or a text (`WORDS`).
+    pub(crate) fn word(&mut self) -> &'static str {
+        WORDS[self.below(WORDS.len() as u32) as usize]
     }
 
     /// Items still allowed; a row generator that opens a scope fills its body only while this is
     /// positive.
     pub fn budget(&self) -> u32 {
-        todo!()
+        self.items_left
     }
+}
+
+// ---- private ----
+
+/// Fills `top` and every body its items open, depth first (each body right after its item: the
+/// order of `text::dump`), choosing kinds the set and the placement allow.
+fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
+    let deck = b.design().file(b.design().scope(top).file).role == Role::Deck;
+    if deck && features.contains(Feature::Item(ItemKind::Title)) && g.items_left > 0 && g.chance(2)
+    {
+        let text = g.word();
+        b.title(top, text, crate::span::Span::NONE);
+        g.items_left -= 1;
+    }
+    // the top takes what the budget leaves; each body a few items
+    let first = g.items_left;
+    let mut stack: Vec<(ScopeId, usize, u32)> = vec![(top, 0, first)];
+    while let Some((scope, depth, left)) = stack.pop() {
+        if left == 0 || g.items_left == 0 {
+            continue;
+        }
+        let kinds = candidates(
+            b.design(),
+            scope,
+            depth,
+            g.size.scope_depth as usize,
+            features,
+        );
+        if kinds.is_empty() {
+            continue;
+        }
+        stack.push((scope, depth, left - 1));
+        let kind = kinds[g.below(kinds.len() as u32) as usize];
+        g.scope = scope;
+        let scopes_before = b.design().scopes.len();
+        let item: ItemRef = for_kind!(kind, R => R::generate(g, scope, b, features));
+        g.items_left -= 1;
+        let d = b.design();
+        let bodies: Vec<ScopeId> = (scopes_before..d.scopes.len())
+            .map(|s| ScopeId(s as u32))
+            .filter(|s| d.scope(*s).owner == item)
+            .collect();
+        for &body in bodies.iter().rev() {
+            let n = g.below(4);
+            stack.push((body, depth + 1, n));
+        }
+    }
+}
+
+/// The kinds a row in `scope` may have: in the set, allowed where it sits (placement `Extra`s,
+/// sections only in a file's top, scopes only below the depth cap), and with what its fields
+/// need (literals for any expression). Never `Title` (`fill` places it first in a deck).
+fn candidates(
+    d: &Design,
+    scope: ScopeId,
+    depth: usize,
+    cap: usize,
+    features: &FeatureSet,
+) -> Vec<ItemKind> {
+    let (mut in_subckt, mut in_branch, mut at) = (false, false, scope);
+    for _ in 0..=d.scopes.len() {
+        if at.is_none() {
+            break;
+        }
+        let s = d.scope(at);
+        in_subckt |= s.kind == ScopeKind::Subckt;
+        in_branch |= s.kind == ScopeKind::Branch;
+        at = s.parent;
+    }
+    let has = |f| features.contains(f);
+    let file_top = d.scope(scope).kind == ScopeKind::File;
+    let exprs = has(Feature::Expr(ExprTag::Num));
+    let opens = depth < cap;
+    ItemKind::ALL
+        .into_iter()
+        .filter(|&k| has(Feature::Item(k)))
+        .filter(|&k| match k {
+            ItemKind::Title => false,
+            ItemKind::Subckt => opens && (!in_subckt || has(Feature::Extra(Extra::NestedSubckt))),
+            ItemKind::Section => opens && file_top,
+            ItemKind::If => opens && exprs,
+            ItemKind::Loop => opens,
+            ItemKind::Func => exprs && (!in_subckt || has(Feature::Extra(Extra::LocalFunc))),
+            ItemKind::Param => exprs && (!in_branch || has(Feature::Extra(Extra::ParamInBranch))),
+            ItemKind::Load => !in_branch || has(Feature::Extra(Extra::LoadInBranch)),
+            ItemKind::Model => !in_subckt || has(Feature::Extra(Extra::LocalModel)),
+            ItemKind::Comment
+            | ItemKind::Include
+            | ItemKind::Global
+            | ItemKind::Opaque
+            | ItemKind::Statistics
+            | ItemKind::Element
+            | ItemKind::Analysis
+            | ItemKind::Alter
+            | ItemKind::Option
+            | ItemKind::Env
+            | ItemKind::NodeSet
+            | ItemKind::Save
+            | ItemKind::Print
+            | ItemKind::Measure => true,
+        })
+        .collect()
 }

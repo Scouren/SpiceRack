@@ -391,6 +391,19 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Trunc => x.trunc(),
         Func::RoundHalfAway => x.round(),
         Func::RoundHalfEven => x.round_ties_even(),
+        Func::StepHalf => {
+            if x < 0.0 {
+                0.0
+            } else if x == 0.0 {
+                0.5
+            } else {
+                1.0
+            }
+        }
+        Func::PowSigned if x == 0.0 && y() < 0.0 => return Err(out),
+        Func::PowSigned if x < 0.0 => -(-x).powf(y()),
+        Func::PowSigned => x.powf(y()),
+        Func::Sqr => x * x,
         Func::Sgn => {
             if x > 0.0 {
                 1.0

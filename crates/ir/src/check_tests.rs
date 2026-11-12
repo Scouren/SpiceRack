@@ -226,3 +226,19 @@ fn a_measure_definition_read_outside_a_measure_is_a_ref_target() {
     assert_eq!(violations(&b.d), vec![Violation::RefTarget]);
     let _ = DefId::NONE;
 }
+
+#[test]
+fn a_non_canonical_empty_list_is_a_handle_range() {
+    let mut b = base();
+    let top = b.d.file(crate::id::FileId(0)).top;
+    let sub =
+        b.d.items(top)
+            .iter()
+            .copied()
+            .find(|i| i.kind == crate::ItemKind::Subckt)
+            .unwrap();
+    let mut row: crate::item::Subckt = b.d.row(sub.index);
+    row.ports = crate::id::List::range(1, 0); // empty, but not `List::EMPTY`
+    b.d.editor().set(sub.index, row);
+    assert_eq!(violations(&b.d), vec![Violation::HandleRange]);
+}

@@ -18,19 +18,24 @@
 //!   `pub struct Analysis`, `pub struct RunDetails`
 //! - `pub trait RunDetail: DetailRow` (`RunDetail::Kind`, `RunDetail::KIND`); it and the
 //!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
-//! - `RowFacts` for `Analysis` (`todo_facts!` placeholder, A2)
+//! - (`RowFacts` for `Analysis` and every detail row's facts: `analysis_facts.rs`); crate:
+//!   `pub(crate) fn design_features(&Design, &mut FeatureSet)`
 
 use crate::dc_ac::{
     Ac, Dc, DcAxis, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf,
 };
+use crate::design::ItemRow;
 use crate::design::{Design, DetailRow};
+use crate::feature::{Feature, FeatureSet};
 use crate::id::NameId;
+use crate::item::{ItemKind, ScopeKind};
 use crate::measure::{
     MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg, MeasureWhen,
 };
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
-use crate::plan::{LoopKind, MonteCarlo, SweepLoop, TableLoop, Target};
+use crate::plan::{Loop, LoopKind, MonteCarlo, SweepLoop, TableLoop, Target};
 use crate::probe::Probe;
+use crate::run_extra::RunExtra;
 use crate::stats::{Correlation, Vary};
 use crate::tran::{Four, Tran};
 
@@ -252,9 +257,60 @@ impl AnalysisKind {
 
     /// Whether the kind has a detail row (every kind but `Op` and `DcInc`).
     pub const fn has_detail(self) -> bool {
-        todo!()
+        !matches!(self, AnalysisKind::Op | AnalysisKind::DcInc)
     }
 }
 
-// run: implementation phase — replace this line with the row's `impl RowFacts` (IR-KERNEL A2)
-todo_facts!(Analysis);
+/// The run owner's features of the whole design, which no single row carries (A9): several
+/// analyses in one run (`SeveralAnalyses`), an option set after a run item or inside a loop
+/// (`OptionMidRun`), a loop whose body does not hold every analysis (`LoopScoped`). Called once
+/// by `features_used` and `check_legal` (which reports them at `Span::NONE`). One pass over the
+/// scopes and items: O(scopes + items).
+pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
+    let n = design.scopes.len();
+    // Analyses per scope subtree: a scope's own, then added into its parent, children first
+    // (a child scope always has a higher id than its parent).
+    let mut below = vec![0usize; n];
+    for (s, items) in design.scope_items.iter().enumerate() {
+        below[s] = items
+            .iter()
+            .filter(|i| i.kind == ItemKind::Analysis)
+            .count();
+    }
+    for s in (0..n).rev() {
+        let parent = design.scopes[s].parent;
+        if !parent.is_none() {
+            assert!(
+                parent.index() < s,
+                "a parent scope comes before its children"
+            );
+            below[parent.index()] += below[s];
+        }
+    }
+    let total: usize = design
+        .files()
+        .map(|f| below[design.file(f).top.index()])
+        .sum();
+    if total > 1 {
+        *set = set.with(Feature::Run(RunExtra::SeveralAnalyses));
+    }
+    for (s, items) in design.scope_items.iter().enumerate() {
+        let in_loop = design.scopes[s].kind == ScopeKind::Loop;
+        let mut after_run = in_loop;
+        for item in items {
+            if item.kind == ItemKind::Option && after_run {
+                *set = set.with(Feature::Run(RunExtra::OptionMidRun));
+            }
+            if item.kind == ItemKind::Loop {
+                let body = Loop::table(design).get(item.index).body;
+                if below[body.index()] < total {
+                    *set = set.with(Feature::Run(RunExtra::LoopScoped));
+                }
+            }
+            after_run |= matches!(
+                item.kind,
+                ItemKind::Analysis | ItemKind::Alter | ItemKind::Loop
+            );
+        }
+    }
+}

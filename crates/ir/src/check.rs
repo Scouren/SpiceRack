@@ -17,7 +17,7 @@ use crate::design::{Design, ItemRow};
 use crate::diag::{Diags, UNSUPPORTED, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::feature::{ExprWalk, Extra, Feature, FeatureSet, case_clash, item_features};
+use crate::feature::{ExprWalk, FeatureSet, design_level, item_features};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::span::Span;
@@ -29,7 +29,7 @@ use crate::span::Span;
 #[repr(u8)]
 pub enum Violation {
     /// A handle in some row, list or pool is neither `NONE` (where `NONE` is allowed) nor in its
-    /// table's range, or a list's range overruns its pool. `arg`: the handle's value.
+    /// table's range, a list's range overruns its pool, or an empty list is not `List::EMPTY`. `arg`: the handle's value.
     HandleRange,
     /// The scope tree is not a forest of file scopes: a cycle, a scope that reaches no `File`
     /// scope, a file scope with a parent, or an item in two lists. `arg`: the scope.
@@ -114,8 +114,11 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
 }
 
-/// Appends one `UNSUPPORTED` row per item that uses a feature outside `legal` (span: the item;
-/// `arg`: `Feature::index`). Assumes `check` passed. O(rows).
+/// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside
+/// `legal` (span: the item; `arg`: `Feature::index`), and one at `Span::NONE` per feature of the
+/// whole design outside it (the case clash, the owners' `design_features`). It appends nothing
+/// exactly when `features_used(design).minus(legal)` is empty: these rows are `legalize`'s
+/// leftovers (R10). Assumes `check` passed. O(rows).
 pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
     let mut walk = ExprWalk::new(design);
     for (item, scope) in design.reachable() {
@@ -125,9 +128,10 @@ pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
             diags.push(UNSUPPORTED, design.span_of(item), f.index() as u32);
         }
     }
-    let clash = Feature::Extra(Extra::CaseSensitiveNames);
-    if !legal.contains(clash) && case_clash(design) {
-        diags.push(UNSUPPORTED, Span::NONE, clash.index() as u32);
+    let mut whole = FeatureSet::EMPTY;
+    design_level(design, &mut whole);
+    for f in whole.minus(*legal).iter() {
+        diags.push(UNSUPPORTED, Span::NONE, f.index() as u32);
     }
 }
 
@@ -155,6 +159,13 @@ fn files_and_scopes(out: &mut Out<'_>) {
         }
     }
     let mut listed: HashSet<ItemRef> = HashSet::new();
+    // the scope that first lists each item, for the owner test (one pass, not a search per scope)
+    let mut listing: std::collections::HashMap<ItemRef, ScopeId> = std::collections::HashMap::new();
+    for (k, items) in d.scope_items.iter().enumerate() {
+        for &item in items {
+            listing.entry(item).or_insert(ScopeId(k as u32));
+        }
+    }
     for (k, s) in d.scopes.iter().enumerate() {
         let id = k as u32;
         let parent_ok = s.parent.is_none() || s.parent.index() < n_scopes;
@@ -175,7 +186,7 @@ fn files_and_scopes(out: &mut Out<'_>) {
                 out.report(Violation::ScopeTree, d.span_of(item), id);
             }
         }
-        if s.kind != ScopeKind::File && !owner_matches(d, ScopeId(id)) {
+        if s.kind != ScopeKind::File && !owner_matches(d, ScopeId(id), &listing) {
             out.report(Violation::ScopeOwner, Span::NONE, id);
         }
     }
@@ -203,7 +214,11 @@ fn reaches_a_file(d: &Design, scope: ScopeId) -> bool {
 
 /// Whether a non-file scope's owner has the scope's kind, names it as a body, and is listed in
 /// the scope's parent.
-fn owner_matches(d: &Design, scope: ScopeId) -> bool {
+fn owner_matches(
+    d: &Design,
+    scope: ScopeId,
+    listing: &std::collections::HashMap<ItemRef, ScopeId>,
+) -> bool {
     let s = d.scopes[scope.index()];
     let kind_ok = match s.kind {
         ScopeKind::Subckt => s.owner.kind == ItemKind::Subckt,
@@ -212,7 +227,7 @@ fn owner_matches(d: &Design, scope: ScopeId) -> bool {
         ScopeKind::Loop => s.owner.kind == ItemKind::Loop,
         ScopeKind::File => false,
     };
-    if !kind_ok || !d.scope_items[s.parent.index()].contains(&s.owner) {
+    if !kind_ok || listing.get(&s.owner) != Some(&s.parent) {
         return false;
     }
     let mut handles = Vec::new();
@@ -248,14 +263,16 @@ fn expression_rows(out: &mut Out<'_>) -> Vec<bool> {
     for (i, &tag) in x.tags.iter().enumerate() {
         let (sub, a, b) = (x.subs[i] as usize, x.a[i], x.b[i]);
         let names = d.names.len() as u32;
-        let in_pool = |start: u32, len: u32| start as usize + len as usize <= d.expr_pool.len();
+        let in_pool = |start: u32, len: u32| {
+            start as usize + len as usize <= d.expr_pool.len() && (len > 0 || start == 0)
+        };
         let (range_ok, arity_ok) = match tag {
             ExprTag::Num => (
                 match x.nums.get(a as usize) {
                     Some(l) => {
                         if !l.shape_ok() {
                             out.report(Violation::LiteralShape, Span::NONE, i as u32);
-                        } else if !l.value().is_finite() {
+                        } else if !l.finite() {
                             out.report(Violation::NonFinite, Span::NONE, i as u32);
                         }
                         true
@@ -332,17 +349,20 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
     let d = out.design;
     let mut walk = ExprWalk::new(d);
     let mut handles = Vec::new();
-    for (item, _) in d.reachable() {
+    // `map_refs` reaches a row's references through `&mut Design`, and `check` only reads: it
+    // reads them from one copy of the design (O(design), once per check; A9)
+    let mut scratch = d.clone();
+    for (item, scope) in d.reachable() {
         if (item.index as usize) >= table_len(d, item.kind) {
             continue; // reported with the scope's list
         }
         handles.clear();
         let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
         for_kind!(item.kind, R => {
-            let mut row: R = d.row(item.index);
+            let row: R = d.row(item.index);
             row.handles(d, &mut handles);
-            row.map_refs(&mut |r, kind| refs.push((*r, kind)));
-            row.check(d, item, out.diags);
+            R::map_refs(&mut scratch, item, &mut |r, kind| refs.push((*r, kind)));
+            row.check(d, item, scope, out.diags);
         });
         let span = d.span_of(item);
         for (r, kind) in refs {
@@ -371,7 +391,10 @@ fn handle(
     walk: &mut ExprWalk,
 ) {
     let d = out.design;
-    let in_pool = |start: u32, len: u32, pool: usize| start as usize + len as usize <= pool;
+    // a list lies in its pool, and an empty one is `List::EMPTY` (start 0)
+    let in_pool = |start: u32, len: u32, pool: usize| {
+        start as usize + len as usize <= pool && (len > 0 || start == 0)
+    };
     match h {
         Handle::Name(n) => name(out, span, n),
         Handle::Names(l) => {

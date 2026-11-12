@@ -8,8 +8,6 @@
 //!
 //! Contents: `pub struct IrText` (`impl Read`, `impl Write`), `pub const SUFFIX: &str`
 
-use std::sync::OnceLock;
-
 use super::{Read, Reference, Sources, Write};
 use crate::ir;
 
@@ -40,24 +38,41 @@ impl Read for IrText {
     }
 
     /// Each file's text through `ir::parse`, in `src`'s order; the text's own `file` lines name
-    /// the design's files.
+    /// the design's files. A text that opens no `file` block (empty, comments only, or lines a
+    /// `P9001` refused) still gets one: an empty file at its `Sources` path (the entries in
+    /// `src.form()`, the others as libraries), as the `Read` contract asks.
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
         assert!(!src.files().is_empty(), "IrText::read: a file to read");
-        for (_, text) in src.files() {
+        let entries = src.entries().len();
+        for (k, (path, text)) in src.files().iter().enumerate() {
+            let before = out.design().files().count();
             ir::parse(text, out, diags);
+            let opened = out.design().files().count() > before;
+            if !opened && out.design().find_file(path).is_none() {
+                let role = if k < entries {
+                    src.form()
+                } else {
+                    ir::Role::Library
+                };
+                out.file(path, role);
+            }
         }
+        assert!(
+            out.design().files().count() > 0,
+            "IrText::read: a file per text"
+        );
+    }
+
+    /// Yes: its `file` blocks name the design's files.
+    fn names_its_files(&self) -> bool {
+        true
     }
 }
 
 impl Write for IrText {
     /// Every feature.
     fn features(&self) -> &'static ir::FeatureSet {
-        static ALL: OnceLock<ir::FeatureSet> = OnceLock::new();
-        ALL.get_or_init(|| {
-            (0..ir::Feature::COUNT).fold(ir::FeatureSet::EMPTY, |set, i| {
-                set.with(ir::Feature::from_index(i))
-            })
-        })
+        &ir::FeatureSet::ALL
     }
 
     /// `ir::dump` of `file`: its `file` line and its items.
