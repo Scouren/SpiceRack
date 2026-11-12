@@ -166,6 +166,11 @@ pub(crate) fn generate_model(
             .map(|l| l.family)
             .collect()
     };
+    // and only a family the set has (A15 K5)
+    let families: Vec<ModelFamily> = families
+        .into_iter()
+        .filter(|&f| r.f.contains(Feature::Family(f)))
+        .collect();
     if families.is_empty() {
         return ItemRef::NONE;
     }

@@ -104,6 +104,9 @@ Ref }`.
   `Module`, …: fix the list from `INV-constructs` §F and D68). A level number is a dialect's
   spelling of a family: readers map (type word, level) → family, writers map back. There is no
   "neutral level".
+- Every model sets `Feature::Family(family)` (A15 K5, R32): a target that has no such family
+  lacks the feature, so its refusal is a feature, not an `admits` check; a version of a family
+  a target lacks stays the dialect's own check.
 - `ModelFamily::Other` carries the type word as written for a family the IR does not know; a
   writer of another dialect refuses it.
 - Parameter names in `params` are lowercase and are the family's own names (the model's

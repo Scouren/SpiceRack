@@ -194,8 +194,10 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
     *set = set.union(got);
 }
 
-/// Adds the model's circuit extras.
+/// Adds the model's family (`Feature::Family`) and its circuit extras.
 pub(crate) fn model_features(m: &Model, set: &mut FeatureSet) {
+    // A15 K5 (R32): every model is a feature of its family
+    *set = set.with(Feature::Family(m.family));
     if m.bin_of != NameId::NONE {
         *set = set.with(Feature::Circuit(X::ModelBin));
     }

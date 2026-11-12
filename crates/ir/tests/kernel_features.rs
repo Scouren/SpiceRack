@@ -52,6 +52,7 @@ fn index_and_from_index_are_inverses() {
         CircuitExtra::ALL.len(),
         RunExtra::ALL.len(),
         OptionKey::ALL.len(),
+        spicerack_ir::ModelFamily::ALL.len(),
     ];
     assert_eq!(Feature::COUNT as usize, groups.iter().sum::<usize>());
     let mut seen = vec![false; Feature::COUNT as usize];
@@ -65,9 +66,9 @@ fn index_and_from_index_are_inverses() {
         Feature::Item(ItemKind::Measure).index(),
         ItemKind::Measure as u16
     );
-    // the groups in declaration order: the last feature is the last option key
+    // the groups in declaration order: the last feature is the last model family (A15 K5)
     let last = Feature::from_index(Feature::COUNT - 1);
-    assert!(matches!(last, Feature::Option(_)), "{last:?}");
+    assert!(matches!(last, Feature::Family(_)), "{last:?}");
     assert_ne!(
         Feature::Func(Func::Sin).index(),
         Feature::FuncDyn(Func::Sin).index()
