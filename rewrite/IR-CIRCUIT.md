@@ -51,7 +51,7 @@ terminal count (fixed or a range), whether `model` is required, and its detail r
 | linear controlled | VCVS, VCCS, CCCS, CCVS | `Controlled { gain, sense: NameId }` | terminals (out+, out−, ctl+, ctl−) or (out+, out−) + the sensing element's name |
 | polynomial | one kind, `output: V \| I`, `control: Voltage \| Current` | `Poly { dimension, controls: NameList, coeffs: ExprList }` | stays `Poly`; expanding it is a pass |
 | table | one kind | `Table { input: ExprId, points: ExprList, law: TableLaw, output }` | linear between points, ends held; ngspice's native TABLE rounds corners: its own law |
-| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr, tc_base }` (`tc_base: TcBase`, A15 C2: `Fixed27` only with a coefficient; `tc_law: TcLaw`, A17: `Reciprocal` only on a `ChargeCapacitor` with a coefficient, ngspice `C … q=` dividing the charge by the polynomial) | positive current flows from the first terminal through the source to the second |
+| behavioural | one kind | `Behav { output: OutKind::{Voltage, Current, Charge}, expr, tc_base }` (`tc_base: TcBase`, A15 C2: `Fixed27` only with a coefficient; `tc_law: TcLaw`, A17: `Reciprocal` only on a `ChargeCapacitor` with a coefficient, ngspice `C … q=` dividing the charge by the polynomial; a `Behav` whose expression reads a parameter outside `ToReal`/`ToInt` sets `BehavUntypedParam`, A33, R56: VACASK types every identifier there) | positive current flows from the first terminal through the source to the second |
 | Laplace | one kind | `Laplace { num: ExprList, den: ExprList, output }` | terminals (out+, out−, in+, in−); coefficients in ascending powers of `s`, absolute gain already applied |
 | semiconductors | diode, BJT, MOSFET, JFET, MESFET | `Semi { area, flags, ic, temp_abs, dtemp }` or none | terminal ranges: BJT 3–5, MOSFET 3–7, diode 2–3 (thermal); everything else is a named instance parameter |
 | switches | voltage switch, current switch | `Switch { initial: SwitchState, sense: NameId }` | the initial state seeds the operating point only |
@@ -96,9 +96,23 @@ frequencies in hertz, phases in degrees.
 | `Exp` | `v1 v2 td1 tau1 td2 tau2 td2_from given_zero` | `td2` counts from `td2_from: TdFrom::{Zero, Td1}` (A12 C2: SPICE from 0, VACASK from `td1`; the reader no longer adds) (5.08) |
 | `Pwl` | `points` (t, v pairs, absolute times), `delay`, `repeat_from`, `repeat_join` | relative times are accumulated by the reader; before the first point the first value holds, after the last the last value, unless `repeat` says otherwise; no reader writes a point (A22, R42: it would repeat an operand and give two t = 0 points when the first time evaluates to 0); a simulator with another rule before the first point gets a mode member when its slice shows it (none today); `PwlJoin::Extrapolate` (VACASK `period=`): on [xN, period) and on [0, x1) of the wrapped time τ, the line through (xN, yN) and (period + x1, y1) evaluated at τ itself; each join of a periodic PWL sets a feature, `Jump` there `PwlPeriodJump` (A24: VACASK only extrapolates) (VACASK 36be560, `src_pwl.sim`: (1u, 1) (2u, 3) with period 4u gives 4.333 at 0, 3.833 at 0.75u, 1 at 1u, 2.667 at 2.5u, 1.733 at 3.9u, 4.267 at 4.1u; (0, 0) (1u, 1) with period 2u gives 0.5 at 1.5u and 3.5u; a delay shifts τ and the operating point reads the line at τ = 0; VACASK refuses x1 = 0 with xN = period and y1 ≠ yN, and xN > period: its writer's refusals) (5.09–5.11) |
 | `Sffm` | `offset amplitude carrier_freq mod_index signal_freq delay phase_c_deg phase_m_deg law pre given_zero` | named, never positional; `law` as §1 states the clamp and the defaults only; what it is before the delay is `pre: PreDelay` as for `Sin` and `Am` (A12 C3: VACASK holds its value at `delay`, ngspice is 0 for t ≤ delay, the delay included) (5.01, 5.02) |
-| `Am` | the general formula of 5.03 with every term a field, `pre` | each dialect's AM is a restriction of it |
+| `Am` | the general formula of 5.03 with every term a field, `pre` | each dialect's AM is a restriction of it; a `mod_offset` other than the real literal 1 (an Int `1i` included) sets `AmModOffset` (A31: VACASK's AM is `sinedc + ampl·sin(carrier)·(1 + modindex·sin(mod))`) |
 | `TrNoise`, `TrRandom` | ngspice's fields | time domain only, superposed on a given DC value; a `TrRandom` before its first draw and at the operating point is its offset (A17) |
 | `Pattern` | `bits levels delay rise fall sample repeats repeat_start` | 5.22 |
+
+A PWL never pairs `Ramp` with `Period`, nor `RampWidth` or `Extrapolate` with `From` (`check`: no
+simulator states them; A30 finding 4).
+
+**The reference evaluator** (AMEND-A12 A30, `wave_eval.rs`): `source_value(design, source,
+At::{OperatingPoint, Time(t)}, bindings)` and `wave_value(design, wave, t, bindings)` give a
+source's value by its wave's law and modes, on `eval`'s `Bindings` (`TSTEP`/`TSTOP` for the
+`SpiceDefault` defaults, `temp`/`tnom` for the source's temperature factor), or a
+`WaveDomain` (a field's `eval` domain, `Unbound`, `Random` after t = 0, `File`, `Undefined`).
+`wave_value`'s doc is the specification of every law below, each boundary written out; a law
+no run pins is marked unmeasured there (the LTspice ramp join and sine cycles, the Spectre
+ramp width, the bit pattern). Its proof is the areas' runs: 48 ngspice-45 values
+(`dialect-ngspice` read/sources decks) and 205 VACASK 36be560 values (`vc-sources` settle
+`src_*`, `dcw`) reproduced to 1e-12 (`tests/wave_eval.rs`). Writers and readers never call it.
 
 **The zero rule** (AMEND-A12 A17, R35). `Pulse`, `Sin`, `Exp`, `Sffm`, `Am` and `TrRandom`
 carry `given_zero: GivenZero::{AsGiven, SpiceDefault}` (features `GivenZeroAsGiven`,
@@ -138,6 +152,11 @@ ngspice reader writes `delay` 0 and `pre: HoldDelayValue`.
 
 `Model { name, family: ModelFamily, polarity: Polarity, params: ParamList, bin_of: NameId, ako:
 Ref }`.
+
+A model of a versioned family of a model standard (`circuit_tables::needs_version`: every
+versioned family but `Module` and `Other`) states its `version` (`check`, round 7: "no version"
+would be each simulator's own default). The generator draws it from `circuit_tables::VERSIONS`,
+ngspice-45's accepted versions per family with their source lines (its vocabulary, not a rule).
 
 - `ModelFamily` is the **equation family**, a closed enum (`Resistor`, `Capacitor`, `Diode`,
   `GummelPoon`, `Vbic`, `Hicum`, `Mos1`, `Mos2`, `Mos3`, `Mos6`, `Mos9`, `Bsim3`, `Bsim4`,

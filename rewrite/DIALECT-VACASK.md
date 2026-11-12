@@ -351,6 +351,37 @@ asserts an old code (R9).
 | R2005 | refusal | `$mfactor` on a subckt that does not declare it | RUN n2 |
 | W2001 | note | an analysis given a generated name | §4 |
 
+### 7.1 The writer's refusals by class (R21; state of the trunk candidate)
+
+`Write::admits` refuses only what no feature states, each code at its item (A25), in one of three
+classes: invalid on every simulator known (a candidate IR invariant), valid elsewhere but not on
+VACASK (a candidate feature), or VACASK's own limit.
+
+| Code | Owner | What it refuses | Class |
+|---|---|---|---|
+| W2105 (subckt half) | S4.1 | an instance whose terminal count is not its subckt's ports | IR invariant (the lead's ruling) |
+| W2203 | S4.2 | a source-like element with instance parameters | IR invariant, to be confirmed by S4.2 |
+| W2006 | S4.0 | `to_real` other than over a parameter read in a behavioural source's expression (in a parameter expression of class Temp: gap (c), deferred by R52) | feature |
+| W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp` or `rpar` (ngspice's B has them) | feature |
+| W2108 | S4.1 | an element whose kind is not the one its model's family gives | feature |
+| W2201 | S4.2 | an AM whose modulation offset is not the literal 1 (goes with A31's `AmModOffset`) | feature |
+| W2304 | S4.3 | an option row of a key only another simulator has | feature |
+| W2305 | S4.3 | a reset of a class other than the saves | feature |
+| W2002 | S4.0 | a device library whose path is no file of its family | VACASK's own |
+| W2004 | S4.0 | a load whose extension does not state its kind (R48 d) | VACASK's own |
+| W2007 | S4.0 | a source with a DC value and a wave that the alternation cannot state (R42) | VACASK's own |
+| W2008 | S4.0 | an integer literal past 32 bits (R54) | VACASK's own |
+| W2101 | S4.1 | a name with white space or a line break | VACASK's own |
+| W2102 | S4.1 | a parameter the shipped module lacks; a user module's `version=` | VACASK's own |
+| W2103 | S4.1 | two libraries of one family whose files hold different modules | VACASK's own |
+| W2104 | S4.1 | a master no visible model or subckt statement names (VACASK takes the kind from the master) | VACASK's own |
+| W2105 (module half) | S4.1 | a device against its shipped module's terminal count | VACASK's own |
+| W2107 | S4.1 | a model of a family no run proved a VACASK module implements (R41 a) | VACASK's own |
+| W2303 | S4.3 | a save shape VACASK has no directive for (R29, S12) | VACASK's own |
+
+W2301 and W2302 are notes (a name the writer gave), not refusals. They go with ir-run's
+`AnalysisUnnamed`, `DcAxisUnnamed` and `LoopUnnamed`, which `FEATURES` will lack.
+
 ## 8. Tests (each names its oracle)
 
 - **Reader fixtures** `tests/fixtures/dialect/vacask/read/<clause>.sim` + `.ir`, the IR written
@@ -466,3 +497,4 @@ Still open:
 | dp1 | `subckt s(a a)` | "Terminal '1' is not unique.": a subckt naming a port twice is `InvalidInSource` R2001 (found by the mutation law) |
 | ip1–ip5 | behavioural sources over `parameters pi=3 pr=2.7 pw=3.0 pn=-2.7`: `$intparam(pi)/2`, `$intparam(pr)`, `$intparam(pw)/2`, `$intparam(pn)`, `$realparam(pi)/2`, `pi/2`, `sin(pi)`, `$intparam(pr)/2`; `$intparam` of 3e9, 2147483647.5, 1e20; `v=ps` with `ps="x"`; `$intparam` in a parameter; `$intparam(pa+1)` | 1, 2, 1, −2, 1.5, 1.5, sin 3, 1: `$intparam` is `to_int`, `$realparam` and a bare name `to_real` (R56); −2147483648, 2147483647, −2147483648 (R54's domain); "Cannot convert string into real."; "Function '$intparam' not found."; "$intparam() requires a single identifier argument." (P2010) |
 | fx | SPICE text in a VACASK file: `.model dn d is=1e-14`, `save v(p0)` at the top, `+ is=1`, `.subckt s a b` | "Syntax error, unexpected string." (and "Parser syntax error … expecting (" for `save`): every statement no reader rule reads is one VACASK rejects: today it stays `Unread` P2004 (all of them in the corpus' 37 ngspice-format files); `InvalidInSource` waits for `write_run::control_span` to tell a top-level `save` from a control block's |
+| ca1, ca2 | `parameters p=sin(1, 2)`, `p=atan2(1)` | "Function 'sin' accepts at most 1 argument(s).", "Function 'atan2' requires at least 2 argument(s)).": a call of another argument count is `InvalidInSource` P2011 (the IR's CallArity X0019) |

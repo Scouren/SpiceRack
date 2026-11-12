@@ -1,0 +1,6 @@
+# The IR of vc-sources:tests/fixtures/dialect/vacask/settle/src_exp.sim, by the mapping of the
+# VACASK reader's fixture read/sources/exp.ir (td2 counted from delay: TdFrom::Td1; `dc` dropped).
+file "src_exp.sim" deck
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource wave=exp(v1=0 v2=1 td1=1u tau1=1u td2=2u tau2=0.5u td2_from=td1) dc_rule=wave_at_zero
+  element vsource v2 (b 0) model=vsource wave=exp(v1=2 v2=1 td1=-1u tau1=1u td2=1u tau2=1u td2_from=td1) dc_rule=wave_at_zero

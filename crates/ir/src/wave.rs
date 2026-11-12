@@ -128,7 +128,8 @@ pub enum PwlRepeat {
     /// which may fall between points; lt `REPEAT` blocks).
     From,
     /// The value at t is the pattern at (t − delay) mod `repeat_at` (va `period=`, sp
-    /// `pwlperiod`).
+    /// `pwlperiod`); before the delay it is the value at t − delay = 0 (VACASK run src-pwl, the
+    /// op included; `wave_eval::wave_value` states the law).
     Period,
 }
 

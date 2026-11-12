@@ -18,7 +18,7 @@
 //! Cites: VD expr-operators, expr-functions, expr-special, expr-constants,
 //! dev-builtin-behavioral (Functions); R13 (sugar).
 //!
-//! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`, `PARAM_READ_ARG`,
+//! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`, `CALL_ARITY`, `PARAM_READ_ARG`,
 //! `PROBE_IN_PARAM`, `check_expr`, `expr` (crate-private)
 
 use super::name;
@@ -53,6 +53,8 @@ pub(super) const NOT_A_NUMBER: ir::Code = ir::Code::new(b'P', 2001);
 pub(super) const NOT_FINITE: ir::Code = ir::Code::new(b'P', 2002);
 /// An integer literal past 32 bits, which VACASK wraps (run iw1).
 pub(super) const WIDE_INT: ir::Code = ir::Code::new(b'P', 2009);
+/// A function called with another number of arguments than it takes (runs ca1, ca2).
+pub(super) const CALL_ARITY: ir::Code = ir::Code::new(b'P', 2011);
 /// A `$intparam`/`$realparam` whose argument is not one identifier (run ip2: "$intparam()
 /// requires a single identifier argument.").
 pub(super) const PARAM_READ_ARG: ir::Code = ir::Code::new(b'P', 2010);
@@ -138,6 +140,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             cite: "DIALECT-VACASK Appendix A run iw1",
             explain: "VACASK's integers are 32 bits and a wider literal wraps (`2147483648` is -2147483648, `99999999999` is 1215752191); the IR's integer does not wrap. Write it with a point to make it real.",
             kind: ir::Kind::Note,
+        },
+    ),
+    (
+        CALL_ARITY,
+        ir::Info {
+            title: "a function called with another number of arguments than it takes",
+            cite: "DIALECT-VACASK Appendix A runs ca1, ca2; IR-KERNEL CallArity (X0019)",
+            explain: "VACASK rejects such a call (\"Function 'sin' accepts at most 1 argument(s).\", \"Function 'atan2' requires at least 2 argument(s)).\"); the statement is kept as text and the deck refused.",
+            kind: ir::Kind::Refusal,
         },
     ),
     (
@@ -374,7 +385,12 @@ fn check(
                 (_, _, "sign") => 2,
                 _ => return Err(private),
             };
-            if args.len() != want || (dynamic && tables::DYNAMIC_LACKS.contains(&name.as_str())) {
+            // A call of another argument count: "Function 'sin' accepts at most 1 argument(s)."
+            // (runs ca1, ca2; the IR's CallArity X0019).
+            if args.len() != want {
+                return Err(refuse(CALL_ARITY, InvalidInSource));
+            }
+            if dynamic && tables::DYNAMIC_LACKS.contains(&name.as_str()) {
                 return Err(private);
             }
             args.iter().try_for_each(|&a| down(a))

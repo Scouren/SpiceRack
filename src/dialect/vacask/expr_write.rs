@@ -18,8 +18,8 @@ use super::number;
 use crate::ir;
 
 /// A real conversion VACASK cannot spell: `to_real` anywhere but over a parameter read in a
-/// behavioural source's expression, or a bare parameter read in one (it reads back as
-/// `to_real`). A passive's value is not one (R52), whatever its handle's kind.
+/// behavioural source's expression (a passive's value is not one: R52). A bare parameter read
+/// there is `CircuitExtra::BehavUntypedParam`, which `FEATURES` lacks (A33).
 pub(super) const NO_REAL: ir::Code = ir::Code::new(b'W', 2006);
 
 /// An integer literal past 32 bits, which VACASK would wrap (run iw1).
@@ -204,16 +204,15 @@ fn write(design: &ir::Design, e: ir::ExprId, behavioural: bool, out: &mut String
 }
 
 /// What VACASK cannot spell in root `e`: an integer literal past 32 bits ([`WIDE_INT`]); a real
-/// conversion it lacks ([`NO_REAL`]): in a behavioural source's expression (`circuit`) a parameter read
-/// that is not the operand of a `to_real`, or a `to_real` of anything else; in any other field a
-/// `to_real`.
+/// conversion it lacks ([`NO_REAL`]): in a behavioural source's expression (`circuit`) a
+/// `to_real` of anything but a parameter read; in any other field a `to_real`.
 fn refusal(design: &ir::Design, e: ir::ExprId, circuit: bool) -> Option<ir::Code> {
     if e.is_none() {
         return None;
     }
-    let mut todo = vec![(e, false)];
+    let mut todo = vec![e];
     // Bounded: each row of the (acyclic) expression tree is taken once per parent.
-    while let Some((x, under_real)) = todo.pop() {
+    while let Some(x) = todo.pop() {
         match design.expr(x) {
             ir::Expr::Num(id) => {
                 let l = design.num(id);
@@ -221,25 +220,17 @@ fn refusal(design: &ir::Design, e: ir::ExprId, circuit: bool) -> Option<ir::Code
                     return Some(WIDE_INT);
                 }
             }
-            ir::Expr::Param(_) if circuit && !under_real => return Some(NO_REAL),
             ir::Expr::Call(ir::Func::ToReal, args) => {
                 let arg = design.exprs(args)[0];
                 if !circuit || !matches!(design.expr(arg), ir::Expr::Param(_)) {
                     return Some(NO_REAL);
                 }
-                todo.push((arg, true));
             }
-            // `$intparam(p)` in a behavioural source (R56).
-            ir::Expr::Call(ir::Func::ToInt, args)
-                if circuit && matches!(design.expr(design.exprs(args)[0]), ir::Expr::Param(_)) =>
-            {
-                todo.push((design.exprs(args)[0], true));
-            }
-            ir::Expr::Unary(_, a) => todo.push((a, false)),
-            ir::Expr::Binary(_, a, b) => todo.extend([(a, false), (b, false)]),
-            ir::Expr::Ternary(a, b, c) => todo.extend([(a, false), (b, false), (c, false)]),
+            ir::Expr::Unary(_, a) => todo.push(a),
+            ir::Expr::Binary(_, a, b) => todo.extend([a, b]),
+            ir::Expr::Ternary(a, b, c) => todo.extend([a, b, c]),
             ir::Expr::Call(_, args) | ir::Expr::Draw(_, _, _, args) | ir::Expr::List(args) => {
-                todo.extend(design.exprs(args).iter().map(|&a| (a, false)));
+                todo.extend_from_slice(design.exprs(args));
             }
             _ => {}
         }

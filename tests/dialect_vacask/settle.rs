@@ -496,3 +496,15 @@ fn fx_spice_text_is_no_vacask_statement() {
         "Syntax error, unexpected string."
     ));
 }
+
+#[test]
+fn ca_a_call_of_another_argument_count_is_rejected() {
+    assert!(says(
+        &run("vacask", "ca1.sim"),
+        "Function 'sin' accepts at most 1 argument(s)."
+    ));
+    assert!(says(
+        &run("vacask", "ca2.sim"),
+        "Function 'atan2' requires at least 2 argument(s))."
+    ));
+}

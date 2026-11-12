@@ -1,0 +1,8 @@
+call arity
+load "spice/resistor.osdi"
+model res sp_resistor
+parameters p=atan2(1)
+r1 (n 0) res r=1
+control
+  analysis op1 op
+endc
