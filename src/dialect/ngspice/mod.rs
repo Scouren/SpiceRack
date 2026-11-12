@@ -28,6 +28,7 @@
 //! `pub const FEATURES: ir::FeatureSet`, `pub use codes::info`; `impl Read for Ngspice`,
 //! `impl Write for Ngspice`
 
+mod bind;
 mod codes;
 mod cst;
 mod declare;

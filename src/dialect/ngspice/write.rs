@@ -113,6 +113,8 @@ pub(super) fn write(
 /// `Write::admits` (R21): a refusal for each reachable item ngspice cannot spell for a reason no
 /// feature states, by the item's area (one exhaustive dispatch, as `write`'s).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
+    // a string or list anywhere but a model (W1006): one walk over every item
+    write_structure::admits(design, diags);
     for (item, scope) in design.reachable() {
         match item.kind {
             ir::ItemKind::Title
@@ -124,7 +126,7 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             | ir::ItemKind::Section
             | ir::ItemKind::If
             | ir::ItemKind::Param
-            | ir::ItemKind::Func => write_structure::admits(design, item, scope, diags),
+            | ir::ItemKind::Func => {}
             ir::ItemKind::Element => write_elements::admits(design, item, diags),
             ir::ItemKind::Model => write_models::admits(design, item, scope, diags),
             ir::ItemKind::Statistics

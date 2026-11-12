@@ -221,7 +221,8 @@ pub fn read(
         let table = ir::item::Opaque::table(design);
         for (i, row) in table.rows().iter().enumerate() {
             if row.class == ir::OpaqueClass::Unread {
-                diags.push(STRICT_UNREAD, table.span(index(i)), 0);
+                let item = ir::ItemRef::new(ir::ItemKind::Opaque, index(i));
+                diags.push_at(STRICT_UNREAD, design, item, 0);
             }
         }
     }
@@ -246,20 +247,19 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
     let mut dropped = Vec::new();
     for (item, scope) in foreign(design, to) {
         let row: ir::item::Opaque = design.row(item.index);
-        let span = design.span_of(item);
         match row.class {
             ir::OpaqueClass::Inert => {
-                diags.push(INERT_DROPPED, span, 0);
+                diags.push_at(INERT_DROPPED, design, item, 0);
                 dropped.push((item, scope));
             }
             ir::OpaqueClass::Hint => {
-                diags.push(HINT_DROPPED, span, 0);
+                diags.push_at(HINT_DROPPED, design, item, 0);
                 dropped.push((item, scope));
             }
             ir::OpaqueClass::Unread
             | ir::OpaqueClass::Private
             | ir::OpaqueClass::InvalidInSource
-            | ir::OpaqueClass::Script => diags.push(ir::diag::UNSUPPORTED, span, opaque),
+            | ir::OpaqueClass::Script => diags.push_at(ir::diag::UNSUPPORTED, design, item, opaque),
         }
     }
     if !dropped.is_empty() {

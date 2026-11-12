@@ -10,57 +10,109 @@
 //! generates no `Opaque` (an opaque's class is its reader's judgement of the text, which a
 //! generated text cannot carry).
 //!
+//! A generated design the row refuses is shrunk to what it admits, not skipped (A25, R48;
+//! `common/laws.rs`): the items its refusals name are dropped, then what `ir::check` no longer
+//! accepts, to a fixpoint; a refusal at no item skips the seed, counted by code. The reach list
+//! asks every `Item`, `Elem`, `Wave`, `Analysis` and `Family` kind the writer claims to appear
+//! in some admitted design; the names never reached are compared with [`KNOWN_REACH`].
+//!
 //! Oracles: generated designs (`ir::gen::generate(seed, row's features, size)`, valid and legal
 //! for the set by construction) and their canonical IR text (`ir::dump`, which has no spans:
 //! `≅`); fixed seeds, each printed in the failing message.
 //!
 //! Contents: tests only.
 
-use spicerack::dialect::{self, BUILTIN, DialectRow, Policy, Read, Sources, Write};
+#[path = "common/laws.rs"]
+mod law_harness;
+
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
+use law_harness::{
+    SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers, write_all,
+    writers,
+};
+use spicerack::dialect::{self, DialectRow, Read, Write};
 use spicerack::ir;
-use spicerack::ir::r#gen::{Size, generate};
+use spicerack::ir::r#gen::generate;
 
 /// The seeds every generated law runs (printed on failure).
 const SEEDS: std::ops::Range<u64> = 0..64;
-
-/// A moderate design: the merge tier's size (REWRITE-PLAN §7.5).
-const SIZE: Size = Size {
-    items: 48,
-    scope_depth: 3,
-    expr_depth: 4,
-    files: 3,
-};
 
 /// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
 /// that fails a law it is not listed for fails, and so does a listed row that passes. Each
 /// dialect branch lists its own rows here; the `ir` row fails none.
 const KNOWN: &[(&str, &str, &str)] = &[
     (
-        "l3",
-        "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
-    ),
-    (
-        "l4",
-        "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
-    ),
-    (
         "l5",
         "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
+        "R28 against L5: numparam reads `mil` as milli, so a Mil literal in a numparam expression is respelled exactly in exponent form (5128.59mil -> 1302661.86e-7, seed 0): the same number, another form, and L5 compares forms; for the lead to rule",
     ),
     (
         "l7",
         "ngspice",
         "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)",
     ),
-    (
-        "l8",
-        "ngspice",
-        "no admitted design: every seed holds a string value outside a model version (W1006) and most a model parameter, bin or value ngspice lacks (W1202-W1205), see the S3.0 integration report",
-    ),
 ];
+
+/// The seeds the reach list draws from: more than a law's, since it asks for every kind once.
+const REACH_SEEDS: std::ops::Range<u64> = 0..512;
+
+/// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
+/// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
+const KNOWN_REACH: &[(&str, &str)] = &[
+    // ngspice: every admitted design over REACH_SEEDS drops these by an area's admits refusal
+    // (reported to the areas with the S3 integration report)
+    ("ngspice", "Item(Measure)"),
+    ("ngspice", "Elem(Resistor)"),
+    ("ngspice", "Elem(Capacitor)"),
+    ("ngspice", "Elem(VSource)"),
+    ("ngspice", "Elem(ISource)"),
+    ("ngspice", "Elem(Port)"),
+    ("ngspice", "Elem(Table)"),
+    ("ngspice", "Wave(Pulse)"),
+    ("ngspice", "Wave(Sin)"),
+    ("ngspice", "Wave(Exp)"),
+    ("ngspice", "Wave(Pwl)"),
+    ("ngspice", "Wave(Sffm)"),
+    ("ngspice", "Wave(Am)"),
+    ("ngspice", "Wave(TrNoise)"),
+    ("ngspice", "Wave(TrRandom)"),
+    ("ngspice", "Analysis(Dc)"),
+    ("ngspice", "Analysis(Ac)"),
+    ("ngspice", "Analysis(Noise)"),
+    ("ngspice", "Analysis(SensAc)"),
+    ("ngspice", "Analysis(Sp)"),
+    ("ngspice", "Analysis(Four)"),
+    ("ngspice", "Analysis(Pss)"),
+    ("ngspice", "Family(Mesa)"),
+];
+
+/// A writer that spells every feature, refuses every item but elements in `admits`, and panics
+/// on a capacitor (the shrink self-test's planted bug).
+struct Panicky;
+
+impl Write for Panicky {
+    fn features(&self) -> &'static ir::FeatureSet {
+        &ir::FeatureSet::ALL
+    }
+
+    fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, _: &mut ir::Diags) {
+        let capacitor = design.reachable().iter().any(|(i, _)| {
+            i.kind == ir::ItemKind::Element
+                && design.row::<ir::Element>(i.index).kind == ir::ElemKind::Capacitor
+        });
+        assert!(!capacitor, "the planted bug: a capacitor");
+        ir::dump(design, file, out);
+    }
+
+    fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
+        for (item, _) in design.reachable() {
+            if item.kind != ir::ItemKind::Element {
+                diags.push_at(ir::Code::new(b'W', 9001), design, item, 0);
+            }
+        }
+    }
+}
 
 // ---- private ----
 
@@ -107,12 +159,16 @@ fn l1_an_empty_text_is_one_file_with_no_item() {
 #[test]
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
     laws("l3", |row, writer| {
-        let mut admitted = 0;
+        let mut tally = Tally::new();
         for seed in SEEDS.take(8) {
-            let Some(design) = admitted_design(seed, row, writer) else {
-                continue;
+            let design = match admitted(seed, row, writer) {
+                Ok(d) => d,
+                Err(code) => {
+                    tally.skip(code);
+                    continue;
+                }
             };
-            admitted += 1;
+            tally.admit();
             let files = write_all(&design, row);
             let once = canonical(&read_all(row, &files));
             let threads: Vec<String> = std::thread::scope(|s| {
@@ -127,48 +183,13 @@ fn l3_one_read_and_four_threads_give_the_same_bytes() {
                 return Err(format!("seed {seed}: the threads differ"));
             }
         }
-        some(admitted)
+        tally.some()
     });
 }
 
 #[test]
 fn l4_write_is_total_over_a_design_legalize_accepted() {
-    laws("l4", |row, writer| {
-        let claimed = generated(row, writer);
-        let (mut skipped, mut seen) = (Vec::new(), ir::FeatureSet::EMPTY);
-        for seed in SEEDS {
-            let mut design = generate(seed, &claimed, SIZE);
-            let mut diags = ir::Diags::new();
-            dialect::legalize(&mut design, row, &mut diags);
-            if diags.rows().iter().any(|d| dialect::refuses(d.code)) {
-                skipped.push(seed);
-                continue;
-            }
-            seen = seen.union(ir::features_used(&design));
-            for file in design.files() {
-                let _ = dialect::write(&design, file, row, &mut diags);
-            }
-            let refusals: Vec<_> = diags
-                .rows()
-                .iter()
-                .filter(|d| dialect::refuses(d.code))
-                .collect();
-            if !refusals.is_empty() {
-                return Err(format!("seed {seed}: {refusals:?}"));
-            }
-        }
-        // The skip cannot make the law vacuous: every item kind the writer claims is admitted in
-        // some generated design.
-        for &kind in &ir::ItemKind::ALL {
-            let f = ir::Feature::Item(kind);
-            if claimed.contains(f) && !seen.contains(f) {
-                return Err(format!(
-                    "no admitted design holds {kind:?} (skipped {skipped:?})"
-                ));
-            }
-        }
-        Ok(())
-    });
+    laws("l4", l4_on);
 }
 
 #[test]
@@ -177,12 +198,16 @@ fn l5_read_of_write_is_the_design() {
         if row.read.is_none() {
             return Ok(());
         }
-        let mut admitted = 0;
+        let mut tally = Tally::new();
         for seed in SEEDS {
-            let Some(design) = admitted_design(seed, row, writer) else {
-                continue;
+            let design = match admitted(seed, row, writer) {
+                Ok(d) => d,
+                Err(code) => {
+                    tally.skip(code);
+                    continue;
+                }
             };
-            admitted += 1;
+            tally.admit();
             let back = read_all(row, &write_all(&design, row));
             if canonical(&back) != canonical(&design) {
                 return Err(format!(
@@ -192,7 +217,7 @@ fn l5_read_of_write_is_the_design() {
                 ));
             }
         }
-        some(admitted)
+        tally.some()
     });
 }
 
@@ -261,12 +286,16 @@ fn l7_legalized_designs_use_only_the_writers_features() {
 fn l8_a_file_is_written_the_same_whatever_the_other_files() {
     let ir_row = dialect::by_name("ir").expect("the ir row");
     laws("l8", |row, writer| {
-        let mut admitted = 0;
+        let mut tally = Tally::new();
         for seed in SEEDS {
-            let Some(design) = admitted_design(seed, row, writer) else {
-                continue;
+            let design = match admitted(seed, row, writer) {
+                Ok(d) => d,
+                Err(code) => {
+                    tally.skip(code);
+                    continue;
+                }
             };
-            admitted += 1;
+            tally.admit();
             let entry = design.entry();
             let path = design.str(design.file(entry).path).to_string();
             let mut alone = ir::Diags::new();
@@ -281,8 +310,104 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
                 return Err(format!("seed {seed}: the file is written otherwise"));
             }
         }
-        some(admitted)
+        tally.some()
     });
+}
+
+/// Every `Item`, `Elem`, `Wave`, `Analysis` and `Family` feature a row's writer claims is
+/// used by at least one design the laws run on (shrunk to admitted, over every seed); the
+/// names never reached are compared with [`KNOWN_REACH`], strictly both ways.
+#[test]
+fn reach_every_kind_the_row_claims() {
+    let mut unreached: Vec<(String, String)> = Vec::new();
+    for (row, writer) in writers() {
+        let mut seen = ir::FeatureSet::EMPTY;
+        for seed in REACH_SEEDS {
+            if let Ok(design) = admitted(seed, row, writer) {
+                seen = seen.union(ir::features_used(&design));
+            }
+        }
+        let claimed = generated(row, writer).minus(seen);
+        for f in claimed.iter().filter(|f| kind(*f)) {
+            unreached.push((row.name.to_string(), format!("{f:?}")));
+        }
+    }
+    let known: Vec<(String, String)> = KNOWN_REACH
+        .iter()
+        .map(|(r, f)| (r.to_string(), f.to_string()))
+        .collect();
+    assert_eq!(
+        unreached, known,
+        "kinds claimed and never reached, against KNOWN_REACH"
+    );
+}
+
+/// The self-test of shrink to admitted (A25): a row whose `admits` refuses every item but
+/// elements admits no generated design as it comes, and its writer panics on a capacitor;
+/// shrunk, L4 runs and sees the panic.
+#[test]
+fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
+    let row: &'static DialectRow = Box::leak(Box::new(DialectRow {
+        name: "panicky",
+        text_family: dialect::ANY_FAMILY,
+        read: None,
+        write: Some(&Panicky),
+    }));
+    let unshrunk = SEEDS.filter(|&seed| {
+        let mut design = generate(seed, &generated(row, &Panicky), SIZE);
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row, &mut diags);
+        !diags.rows().iter().any(|d| dialect::refuses(d.code))
+    });
+    assert_eq!(unshrunk.count(), 0, "as generated, the row admits nothing");
+    let found = l4_on(row, &Panicky).expect_err("L4 sees the writer's panic");
+    assert!(found.contains("panicked"), "{found}");
+}
+
+/// L4 on one row: each seed shrunk to admitted, every file written; a refusal or a writer's
+/// panic is the failure (with its seed).
+fn l4_on(row: &DialectRow, writer: &dyn Write) -> Result<(), String> {
+    let mut tally = Tally::new();
+    for seed in SEEDS {
+        let design = match admitted(seed, row, writer) {
+            Ok(d) => d,
+            Err(code) => {
+                tally.skip(code);
+                continue;
+            }
+        };
+        tally.admit();
+        let mut diags = ir::Diags::new();
+        let wrote = catch_unwind(AssertUnwindSafe(|| {
+            for file in design.files() {
+                let _ = dialect::write(&design, file, row, &mut diags);
+            }
+        }));
+        if wrote.is_err() {
+            return Err(format!("seed {seed}: the writer panicked"));
+        }
+        let refusals: Vec<_> = diags
+            .rows()
+            .iter()
+            .filter(|d| dialect::refuses(d.code))
+            .collect();
+        if !refusals.is_empty() {
+            return Err(format!("seed {seed}: {refusals:?}"));
+        }
+    }
+    tally.some()
+}
+
+/// Whether `f` is a kind the reach list covers.
+fn kind(f: ir::Feature) -> bool {
+    matches!(
+        f,
+        ir::Feature::Item(_)
+            | ir::Feature::Elem(_)
+            | ir::Feature::Wave(_)
+            | ir::Feature::Analysis(_)
+            | ir::Feature::Family(_)
+    )
 }
 
 /// Runs `law` on every row with a writer and compares the rows it fails on with the known
@@ -326,106 +451,6 @@ fn check_known(name: &str, failing: &[&str], messages: &[String]) {
         "{name}: failing rows against KNOWN\n{}",
         messages.join("\n")
     );
-}
-
-/// `Ok` when at least one generated design was admitted (else the law ran on nothing).
-fn some(admitted: usize) -> Result<(), String> {
-    if admitted == 0 {
-        return Err("no generated design was admitted: the law ran on nothing".to_string());
-    }
-    Ok(())
-}
-
-/// The set a law generates over: the writer's features, without `Opaque`
-/// for a row that is not lossless (an opaque's class is its reader's judgement of the text,
-/// which a generated text cannot carry).
-fn generated(row: &DialectRow, writer: &dyn Write) -> ir::FeatureSet {
-    let set = *writer.features();
-    if row.text_family == dialect::ANY_FAMILY {
-        return set;
-    }
-    set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(ir::ItemKind::Opaque)))
-}
-
-/// Design `seed` over [`generated`], legalized for `row`; `None` when `legalize` refuses it.
-fn admitted_design(seed: u64, row: &DialectRow, writer: &dyn Write) -> Option<ir::Design> {
-    let mut design = generate(seed, &generated(row, writer), SIZE);
-    let mut diags = ir::Diags::new();
-    dialect::legalize(&mut design, row, &mut diags);
-    (!diags.rows().iter().any(|d| dialect::refuses(d.code))).then_some(design)
-}
-
-/// Every file of `design` written by `row` as one source set: each file its own text at the
-/// path the design gives it, the entry first (its role setting the form), then file order.
-fn write_all(design: &ir::Design, row: &DialectRow) -> Sources {
-    let mut diags = ir::Diags::new();
-    let entry = design.entry();
-    let mut src = Sources::new();
-    for f in std::iter::once(entry).chain(design.files().filter(|&f| f != entry)) {
-        let path = design.str(design.file(f).path).to_string();
-        src.add(&path, &dialect::write(design, f, row, &mut diags));
-    }
-    src.set_form(match design.file(entry).role {
-        ir::Role::Deck => ir::Role::Deck,
-        ir::Role::Library | ir::Role::VerilogA | ir::Role::Missing => ir::Role::Library,
-    });
-    src
-}
-
-/// `src` read back by `row`, leniently.
-fn read_all(row: &DialectRow, src: &Sources) -> ir::Design {
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    dialect::read(src, row, Policy::Lenient, &mut design, &mut diags);
-    design
-}
-
-/// The rows with a reader.
-fn readers() -> impl Iterator<Item = (&'static DialectRow, &'static dyn Read)> {
-    let rows = BUILTIN.iter().filter_map(|r| r.read.map(|read| (r, read)));
-    assert!(
-        BUILTIN.iter().any(|r| r.read.is_some()),
-        "a row with a reader"
-    );
-    rows
-}
-
-/// The rows with a writer.
-fn writers() -> impl Iterator<Item = (&'static DialectRow, &'static dyn Write)> {
-    let rows = BUILTIN
-        .iter()
-        .filter_map(|r| r.write.map(|write| (r, write)));
-    assert!(
-        BUILTIN.iter().any(|r| r.write.is_some()),
-        "a row with a writer"
-    );
-    rows
-}
-
-/// `text` read by `row`, leniently, as one file.
-fn read_text(row: &DialectRow, text: &str) -> (ir::Design, ir::Diags) {
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    dialect::read(
-        &Sources::one("law", text),
-        row,
-        Policy::Lenient,
-        &mut design,
-        &mut diags,
-    );
-    (design, diags)
-}
-
-/// One file as IR text.
-fn one_file(design: &ir::Design, file: ir::FileId) -> String {
-    let mut out = String::new();
-    ir::dump(design, file, &mut out);
-    out
-}
-
-/// `≅`: the canonical IR text of every file (no spans in it).
-fn canonical(design: &ir::Design) -> String {
-    design.files().map(|f| one_file(design, f)).collect()
 }
 
 /// `len` pseudo-random bytes of seed `seed` (splitmix64), as text: mostly IR-text bytes, some

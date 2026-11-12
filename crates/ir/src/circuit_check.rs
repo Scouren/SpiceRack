@@ -89,29 +89,29 @@ pub(crate) fn verdict(design: &Design, e: &Element) -> Verdict {
 
 /// Appends `e`'s violations (module header).
 pub(crate) fn check_element(e: &Element, design: &Design, at: ItemRef, out: &mut Diags) {
-    let span = design.span_of(at);
     let (lo, hi) = e.kind.terminals();
     let count = e.terminals.len();
     if count < lo as usize || count > hi as usize {
-        out.push(violation_code(Violation::TerminalCount), span, at.index);
+        out.push_at(
+            violation_code(Violation::TerminalCount),
+            design,
+            at,
+            at.index,
+        );
     }
     let v = verdict(design, e);
     if !v.rows {
-        out.push(violation_code(Violation::DetailRow), span, at.index);
+        out.push_at(violation_code(Violation::DetailRow), design, at, at.index);
     }
     if !v.domain {
-        out.push(violation_code(Violation::FieldDomain), span, at.index);
+        out.push_at(violation_code(Violation::FieldDomain), design, at, at.index);
     }
 }
 
 /// Appends `m`'s `FieldDomain` violation, if any.
 pub(crate) fn check_model(m: &Model, design: &Design, at: ItemRef, out: &mut Diags) {
     if !model_ok(design, m) {
-        out.push(
-            violation_code(Violation::FieldDomain),
-            design.span_of(at),
-            at.index,
-        );
+        out.push_at(violation_code(Violation::FieldDomain), design, at, at.index);
     }
 }
 

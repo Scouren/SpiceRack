@@ -66,8 +66,7 @@ const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
 /// (R21): a card form (`W1300`, `W1301`) or a value that reads the temperature (`W1302`).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
-    let span = design.span_of(item);
-    let mut refuse = |code| diags.push(code, span, 0);
+    let mut refuse = |code| diags.push_at(code, design, item, 0);
     let mut values = Vec::new();
     // a `FromHere` state item is `RunExtra::StateFromHere`, which FEATURES lack
     match item.kind {
