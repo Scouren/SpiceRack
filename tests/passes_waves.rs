@@ -122,7 +122,13 @@ fn times(d: &ir::Design, s: &ir::source::Source) -> Vec<f64> {
             at
         }
         ir::Wave::Sin(x) => vec![v(x.delay).unwrap_or(0.0)],
-        ir::Wave::Exp(x) => [v(x.td1), v(x.td2)].into_iter().flatten().collect(),
+        ir::Wave::Exp(x) => {
+            let (a, b) = (v(x.td1), v(x.td2));
+            let sum = a.zip(b).map(|(a, b)| a + b);
+            let mut at: Vec<f64> = [a, b, sum].into_iter().flatten().collect();
+            at.extend(at.clone().iter().map(|t| t * 1.5 + 1e-9));
+            at
+        }
         _ => Vec::new(),
     };
     for t in edges.into_iter().filter(|t| t.is_finite()) {
@@ -173,7 +179,28 @@ fn compare(
                     }
                 }
                 (Err(x), Err(y)) => assert_eq!(x, y, "{name} {item:?} at {at:?}"),
-                _ => panic!("{name} {item:?} at {at:?}: {a:?} before, {b:?} after"),
+                _ => {
+                    let mut t = String::new();
+                    for f in was.files() {
+                        ir::dump(&was, f, &mut t);
+                    }
+                    let mut u = String::new();
+                    for f in design.files() {
+                        ir::dump(&design, f, &mut u);
+                    }
+                    let pick = |x: &str| {
+                        x.lines()
+                            .filter(|l| l.contains("wave=exp"))
+                            .map(String::from)
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    };
+                    panic!(
+                        "{name} {item:?} at {at:?}: {a:?} before, {b:?} after\n{}\n{}",
+                        pick(&t),
+                        pick(&u)
+                    )
+                }
             }
         }
     }
@@ -345,4 +372,44 @@ fn given_zero_to_as_given_keeps_every_value() {
     );
     assert_eq!(tally.worst, 0, "the defaults are the same numbers");
     assert!(tally.sources > 3);
+}
+
+#[test]
+fn exp_td2_both_ways_keep_every_value() {
+    // drawn exponentials (literal delays, some whose difference does not round back) and
+    // generated ones; bit for bit (the absolute rule's sum is the evaluator's own sum; the
+    // relative rule converts only where td1 + (td2 - td1) is td2)
+    let mut h = 0x9E37_79B9_7F4A_7C15u64;
+    let mut next = move |n: u64| {
+        h ^= h << 13;
+        h ^= h >> 7;
+        h ^= h << 17;
+        h % n
+    };
+    for (name, from) in [
+        ("exp_td2_relative", ""),
+        ("exp_td2_absolute", " td2_from=td1"),
+    ] {
+        let mut tally = Tally::default();
+        for _ in 0..300 {
+            let (d1, d2) = (1 + next(999), 1 + next(999));
+            let (e1, e2) = (next(4) + 6, next(4) + 6);
+            let text = format!(
+                "file \"p.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=exp(v1=0.2 v2=-1.3 td1={d1}e-{e1} tau1=3n td2={d2}e-{e2} tau2=7n{from})\n"
+            );
+            compare(name, deck(&text), &mut tally, None);
+        }
+        generated(
+            name,
+            sources_only(&[ir::WaveKind::Exp], &[]),
+            &mut tally,
+            None,
+        );
+        eprintln!(
+            "{name}: {} sources, {} instants, worst {} ulp",
+            tally.sources, tally.points, tally.worst
+        );
+        assert_eq!(tally.worst, 0, "{name}: bit for bit");
+        assert!(tally.sources > 50, "{name}");
+    }
 }

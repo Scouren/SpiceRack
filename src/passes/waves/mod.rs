@@ -18,10 +18,12 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6; `rewrite/AMEND-A12.md` A30.
 //!
-//! Contents: `pub mod given_zero_to_as_given`, `pub mod pulse_spice_to_vacask`, `pub(super) const PASSES: &[Pass]` (`rows.rs`),
+//! Contents: `pub mod exp_td2_absolute`, `pub mod exp_td2_relative`, `pub mod given_zero_to_as_given`, `pub mod pulse_spice_to_vacask`, `pub(super) const PASSES: &[Pass]` (`rows.rs`),
 //! `pub(super) const CODES: &[(ir::Code, ir::Info)]` and the codes (`codes.rs`)
 
 mod codes;
+pub mod exp_td2_absolute;
+pub mod exp_td2_relative;
 pub mod given_zero_to_as_given;
 mod nodes;
 pub mod pulse_spice_to_vacask;
