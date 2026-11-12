@@ -46,7 +46,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
-    ("l5", "ngspice", "seed 11 Untyped: a loop over a list holding a long literal (`-73.384558234620672336478e-8`) is written as `foreach sr1 …` and read back as one Unread opaque (P1408: the script's word literal takes no long literal); a finding for ng-control. (A37's outer-read cause is gone: the generator draws FormalOuterRead only for a set that holds it)"),
+    ("l5", "ngspice", "seed 19 Untyped: a whole-run `option no_init` in a `.lib` section is written as `.control` / `option noinit` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area. (Seed 11's causes are gone: a script number word keeps its long digits, settle loop_long.sp; an element-value loop over `g149` is refused by the writer, W1407)"),
     ("l7", "ngspice", "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)"),
     ("l5", "vacask", "seed 51 Untyped: a transient's given print step is written without it and reads back NONE (VACASK has no output interval: run outstep/tstep, \"Parameter 'outstep' not found.\"); waits for R67/A41: the ir agent's TranPrintStep, which VACASK's FEATURES lacks, and the passes agent's rule that drops the step with its note. (Seed 1's W2104 for sources, seed 12's node set with no analysis, seed 15's source-DC path and behavioural mult, seed 20's nested mc, seed 37's current as a dcxf output: fixed by admits W2104, W2308, W2309, W2106, W2310, W2311; the lin count `x - 1` reads back as `x`)"),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
