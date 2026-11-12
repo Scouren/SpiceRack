@@ -25,7 +25,7 @@ nz   = tb.noise("vout", "0", "Vin", variation="dec", points=20, start_frequency=
 | Method | Returns |
 | --- | --- |
 | `operating_point()` | `OperatingPoint` |
-| `dc(Vsrc=slice(start, stop, step), ...)` | `DcAnalysis`; two keywords give a nested sweep: the first is the inner one (`dc.sweep`, once per outer value), the second the outer one (`dc["sweep1"]`). `temp=slice(...)` sweeps temperature |
+| `dc(Vsrc=slice(start, stop, step), ...)` | `DcAnalysis`; two keywords give a nested sweep: the first is the inner one (`dc.sweep`, once per outer value), the second the outer one (`dc["sweep1"]`). `temp=slice(...)` sweeps temperature, a top-level resistor's name (`Rl=slice(...)`) its resistance (ngspice, ESPice, Spectre, VACASK) |
 | `ac(variation, number_of_points, start_frequency, stop_frequency)` | `AcAnalysis` |
 | `transient(step_time, end_time, start_time=None, max_time=None, use_initial_condition=False)` | `TransientAnalysis` |
 | `noise(output_node, ref_node, src, variation, points, start_frequency, stop_frequency)` | `NoiseAnalysis`. `output_node` and `ref_node` are node names (`"out"`; `"v(out)"` names the same node); any other form raises `ValueError` |

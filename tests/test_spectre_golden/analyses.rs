@@ -30,6 +30,13 @@ fn spectre_dc_sweeps_pick_the_documented_selector() {
     );
     assert_eq!(dc("temp"), "dc1 dc param=temp start=0 stop=5 step=100m");
     assert_eq!(dc("rload"), "dc1 dc param=rload start=0 stop=5 step=100m");
+    // ZERO-LEDGER P3-040: a resistor the top holds is swept by its own `r`
+    // (`[REF]` p.408: `dev`, `param`), never as a parameter of its name.
+    let element = "t\nVin in 0 1\nR1 in out 1k\nRl out 0 3k\n.dc Rl 1k 3k 1k\n.end\n";
+    assert_eq!(
+        last_block(element).unwrap(),
+        "dc1 dc dev=rl param=r start=1k stop=3k step=1k"
+    );
 }
 
 /// `[REF]` p.43-44 (ac) and p.416-417 (tran): `Name ac ...` /

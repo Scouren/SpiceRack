@@ -23,7 +23,7 @@ use crate::syntax::behaviour::{NamedRules, OptionTo};
 use crate::syntax::diag::Code;
 use crate::syntax::render::capability::{Action, Construct};
 use crate::syntax::render::read::{Ana, Card, Comp, DcSweep, Sweep, Val, step_points};
-use crate::syntax::render::swept::{Swept, step_swept};
+use crate::syntax::render::swept::{Swept, dc_value, step_swept};
 
 impl W<'_, '_> {
     /// The `control` block: options, then per analysis the stepped sweeps
@@ -207,7 +207,7 @@ impl W<'_, '_> {
                         0 => "vsweep".to_string(),
                         i => format!("sweep{i}"),
                     };
-                    match sweep_line(&scale, src, *start, *stop, *step) {
+                    match sweep_line(&scale, &self.dc_what(src), *start, *stop, *step) {
                         Some(l) => out.push(l),
                         None => {
                             self.refuse(Code::W0015, tok);
@@ -228,13 +228,10 @@ impl W<'_, '_> {
                         0 => "vsweep".to_string(),
                         i => format!("sweep{i}"),
                     };
+                    let what = self.dc_what(&ax.src);
                     let line = match (&ax.sweep, ax.sweep.values()) {
-                        (DcSweep::Lin(a, b, c), _) => sweep_line(&scale, &ax.src, *a, *b, *c),
-                        (_, Some(v)) => Some(format!(
-                            "sweep {scale} instance=\"{}\" parameter=\"dc\" {}",
-                            ax.src.to_ascii_lowercase(),
-                            values(&v)
-                        )),
+                        (DcSweep::Lin(a, b, c), _) => sweep_line(&scale, &what, *a, *b, *c),
+                        (_, Some(v)) => Some(format!("sweep {scale} {what} {}", values(&v))),
                         (_, None) => None,
                     };
                     let Some(line) = line else {
@@ -457,6 +454,21 @@ impl W<'_, '_> {
 // ---- private ----
 
 impl W<'_, '_> {
+    /// What a `.dc` over `src` sweeps, as a `sweep`'s target: the `temp`
+    /// option (`docs/cmd-sweep.md`); a top-level R, C or L with no model
+    /// its own value ([`dc_value`]: `parameter="r"`, run on VACASK); else
+    /// instance `src`'s `dc`.
+    fn dc_what(&self, src: &str) -> String {
+        let low = src.to_ascii_lowercase();
+        if low == "temp" {
+            return "option=\"temp\"".into();
+        }
+        match dc_value(self.rd, self.deck, &self.names, src) {
+            Some(p) => format!("instance=\"{low}\" parameter=\"{p}\""),
+            None => format!("instance=\"{low}\" parameter=\"dc\""),
+        }
+    }
+
     /// ` ic={"n", v, …}`: each node and its value ([`W::vval`]), upstream
     /// VACASK's mixed list (36be560; a run of `ic={"out", 0.5}` starts out
     /// at 0.5 V). The fork's `["n"; v]` is its "unexpected ;", `["n", v]`
@@ -542,10 +554,10 @@ fn alter_lines(alters: &[(String, &str)], dc: bool) -> Vec<String> {
         .collect()
 }
 
-/// A DC sweep of instance `src`'s `dc` from `start` by `step` over the
+/// A DC sweep of `what` ([`W::dc_what`]) from `start` by `step` over the
 /// whole intervals that fit (its last point `stop` within rounding);
 /// `None` for a zero step or a count out of range.
-fn sweep_line(scale: &str, src: &str, start: f64, stop: f64, step: f64) -> Option<String> {
+fn sweep_line(scale: &str, what: &str, start: f64, stop: f64, step: f64) -> Option<String> {
     if step == 0.0 {
         return None;
     }
@@ -560,11 +572,6 @@ fn sweep_line(scale: &str, src: &str, start: f64, stop: f64, step: f64) -> Optio
     let last = match (last - stop).abs() <= 1e-9 * step.abs() {
         true => stop,
         false => last,
-    };
-    // SPICE's `.dc temp` is the `temp` option's sweep (`docs/cmd-sweep.md`).
-    let what = match src.eq_ignore_ascii_case("temp") {
-        true => "option=\"temp\"".to_string(),
-        false => format!("instance=\"{}\" parameter=\"dc\"", src.to_ascii_lowercase()),
     };
     Some(format!(
         "sweep {scale} {what} from={} to={} mode=\"lin\" points={}",

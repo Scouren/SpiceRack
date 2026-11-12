@@ -1582,3 +1582,30 @@ def test_p3_036_save_currents_is_written_by_netlist_and_keeps_the_saves():
     tb.save_currents = True
     with pytest.warns(UserWarning, match="W0024"):
         assert "savecurrents" not in tb.netlist("ltspice").lower()
+
+
+@pytest.mark.needs("vacask")
+def test_p3_040_a_dc_sweep_of_a_resistor_sweeps_its_resistance():
+    """ZERO-LEDGER P3-040: `tb.dc(Rl=slice(...))` sweeps resistor Rl (ngspice's `.dc` takes a
+    source, a resistor or `temp`). Spectre got `dc param=Rl`, a netlist parameter nothing
+    declares, and VACASK `instance="rl" parameter="dc"`, which a resistor does not have (the run
+    wrote no dc1.raw). Oracle: closed form, 1 V over 1k + Rl is Rl / (1k + Rl): 0.5, 2/3, 0.75,
+    which ngspice-45, Xyce 7.10 and ESPice 0.3.0 give (research/impl/evidence/P3-040); the
+    Spectre line is Spectre Reference 19.1 p.408 (`dev`, `param`)."""
+    import spicerack as ps
+
+    def bench(backend):
+        c = ps.Circuit("div")
+        c.V("in", "in", "0", 1.0)
+        c.R("1", "in", "out", 1e3)
+        c.R("l", "out", "0", 3e3)
+        tb = ps.Testbench(c)
+        tb.with_backend(backend)
+        return tb
+
+    dc = bench("vacask").dc(Rl=slice(1e3, 3e3, 1e3))
+    assert dc.sweep == pytest.approx([1e3, 2e3, 3e3], rel=1e-12)
+    assert dc["out"] == pytest.approx([0.5, 2 / 3, 0.75], rel=1e-9)
+    tb = bench("spectre")
+    tb.add_dc(Rl=slice(1e3, 3e3, 1e3))
+    assert "dc1 dc dev=rl param=r start=1k stop=3k step=1k" in tb.netlist("spectre").splitlines()

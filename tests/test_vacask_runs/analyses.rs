@@ -410,3 +410,38 @@ fn p4_122_maxord_1_is_backward_euler_on_vacask() {
     assert!(want > 1.3 && want < 1.6, "ngspice's peak: {want}");
     close(peak(&run(deck), "a"), want, 5e-3);
 }
+
+/// ZERO-LEDGER P3-040. ngspice-45 manual `.dc` (`srcnam`: a source, a
+/// resistor or the temperature); Xyce RG 7.10 `.DC` (a device by its
+/// default parameter, a `LIST`); VACASK `docs/cmd-sweep.md` (a sweep of
+/// an instance's parameter, of an option). Oracle: closed form, 1 V over
+/// 1k + Rl is Rl / (1k + Rl), which ngspice-45, Xyce 7.10 and ESPice
+/// 0.3.0 give on the sources (research/impl/evidence/P3-040). The sweep
+/// was `instance="rl" parameter="dc"`, a parameter no resistor has
+/// ("Failed to bind sweep parameters."), and a list over `temp`
+/// `instance="temp"`.
+#[test]
+fn p3_040_a_dc_sweep_of_a_resistor_sweeps_its_resistance() {
+    let top = "Vin in 0 1\nR1 in out 1k\nRl out 0 3k";
+    let divider = |raw: &RawData| {
+        let (rl, out) = (col(raw, "vsweep"), col(raw, "out"));
+        for (rl, out) in rl.iter().zip(&out) {
+            close(*out, rl / (1e3 + rl), 1e-9);
+        }
+        rl
+    };
+    let ranged = run(&format!("t\n{top}\n.dc Rl 1k 3k 1k\n.end\n"));
+    assert_eq!(divider(&ranged), [1e3, 2e3, 3e3]);
+    let xyce = Lang::XYCE.lexicon().expect("a reader");
+    let list = format!("t\n{top}\n.dc Rl list 1k 3k\n.print dc v(out)\n.end\n");
+    let listed = emit_from(&list, Dialect::Xyce, xyce).expect("written");
+    assert_eq!(divider(&run_text(&listed)), [1e3, 3e3]);
+    // A list over `temp` is the option's sweep: R2's tc1 doubles it at 127.
+    let temp = "t\nVin in 0 1\nR1 in out 1k\nR2 out 0 1k tc1=0.01\n.dc temp list 27 127\n\
+        .print dc v(out)\n.end\n";
+    let raw = run_text(&emit_from(temp, Dialect::Xyce, xyce).expect("written"));
+    let out = col(&raw, "out");
+    assert_eq!(out.len(), 2, "{out:?}");
+    close(out[0], 0.5, 1e-9);
+    close(out[1], 2.0 / 3.0, 1e-9);
+}

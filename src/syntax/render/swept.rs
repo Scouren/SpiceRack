@@ -9,12 +9,15 @@
 //! the name comes first: Xyce 7.10, run,
 //! `research/impl/evidence/P4-121/summary.txt`); LTspice help `.STEP`
 //! (`param <name>` names a parameter); Spectre Reference 19.1 p.406
-//! (`sweep param=` with no `dev`: a netlist parameter).
+//! (`sweep param=` with no `dev`: a netlist parameter), p.408 (`dev`,
+//! `param`: a device instance's parameter); ngspice-45 manual `.dc`
+//! (`srcnam`: a source, a resistor or the temperature).
 //!
 //! Contents:
 //! - `pub(super) enum Swept`
 //! - `fn swept(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Swept`
 //! - `fn step_swept(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Swept`
+//! - `fn dc_value(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Option<char>`
 
 use super::names::Names;
 use super::read::{Card, Comp, Deck, Rd};
@@ -102,5 +105,24 @@ pub(super) fn step_swept(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Swe
         Swept::Temp => Swept::Temp,
         _ if by_syntax => Swept::Param,
         s => s,
+    }
+}
+
+/// The parameter (`r`, `c` or `l`) a `.dc` over `name` sweeps where
+/// `name` is a top-level R, C or L card with no model ([`Swept::Value`]:
+/// ngspice's `.dc` takes a resistor, Xyce's a device by its default
+/// parameter). `None` for any other name, an empty one too, and for every
+/// name of a Spectre or VACASK source, whose `dc` names a source or a
+/// parameter by its syntax.
+pub(super) fn dc_value(rd: &Rd, deck: &Deck, names: &Names, name: &str) -> Option<char> {
+    if rd.named() || name.is_empty() {
+        return None;
+    }
+    match swept(rd, deck, names, name) {
+        Swept::Value(p) => {
+            assert!(matches!(p, 'r' | 'c' | 'l'), "dc_value: r, c or l");
+            Some(p)
+        }
+        Swept::Temp | Swept::Param | Swept::Source { .. } | Swept::Other | Swept::Unseen => None,
     }
 }
