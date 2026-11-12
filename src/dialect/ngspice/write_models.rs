@@ -86,6 +86,11 @@ pub(super) fn admits(
     }
     let version = (!m.version.is_none()).then(|| version_text(design, m.version));
     let device = if named {
+        // a module's or code model's version has no field on ngspice: the reader keeps a
+        // `version=` there as one of its parameters (l4 seed 49)
+        if version.is_some() {
+            refuse(VERSION);
+        }
         None
     } else {
         let has = families::version(m.family).is_some();
