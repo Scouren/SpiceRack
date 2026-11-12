@@ -95,6 +95,10 @@ pub(crate) fn parse_element(
         DetailKind::Switch => cx.read_detail::<Switch>(&mut head),
         DetailKind::Line => cx.read_detail::<Line>(&mut head),
     };
+    if kind == ElemKind::Unresolved {
+        // never linked (`master_kind` is `None`), so `name?`'s held mark is cleared here
+        head.model.def = crate::id::DefId::NONE;
+    }
     b.push(scope, head, span)
 }
 

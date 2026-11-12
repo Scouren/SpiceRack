@@ -43,11 +43,13 @@ use crate::design::{Design, DetailRow};
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::facts::Handle;
 use crate::id::{ExprId, ExprList, NameId, NameList, ParamList, Ref};
+use crate::item::DefKind;
 use crate::line::Line;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, Parasitics, Passive};
 use crate::semi::{Semi, Switch};
 use crate::source::{Distof, PortSpec, Source};
+use crate::text_expr::{self, Ctx};
 use crate::wave::{Am, Exp, Pattern, Pulse, Pwl, Sffm, Sin, TrNoise, TrRandom, WaveKind, WaveRef};
 
 /// The IR-text word of every `ElemKind`, in `ALL` order.
@@ -170,6 +172,10 @@ pub(crate) const WAVE_WORDS: [&str; WaveKind::COUNT] = [
     "pulse", "sin", "exp", "pwl", "sffm", "am", "trnoise", "trrandom", "pattern",
 ];
 
+// ponytail: a detached context until A9 passes the item's `Ctx` to `dump` (then resolved
+// references are written bare where lookup binds them, instead of `name#k`).
+const CTX: Ctx = Ctx::detached();
+
 /// Row `index` of `D`'s table, or `None` when out of range (the walks are total over any table
 /// contents: a bad index is `check`'s report, never a panic).
 pub(crate) fn get_row<D: DetailRow>(design: &Design, index: u32) -> Option<D> {
@@ -228,7 +234,6 @@ pub(crate) fn dump_element(e: &Element, design: &Design, out: &mut String) {
         "{:?}: terminal count {count}",
         e.kind
     );
-    out.push_str("element ");
     out.push_str(KIND_WORDS[e.kind as usize]);
     out.push(' ');
     write_name(design, e.name, out);
@@ -236,7 +241,13 @@ pub(crate) fn dump_element(e: &Element, design: &Design, out: &mut String) {
     write_names(design, e.terminals, out);
     if e.model.name != NameId::NONE {
         out.push_str(" model=");
-        write_ref(design, e.model, out);
+        // the unresolved kind is never linked: any kind writes its name the same way
+        write_ref(
+            design,
+            e.model,
+            e.kind.master_kind().unwrap_or(DefKind::Subckt),
+            out,
+        );
     }
     if !e.params.is_empty() {
         out.push_str(" params=");
@@ -266,7 +277,6 @@ pub(crate) fn dump_element(e: &Element, design: &Design, out: &mut String) {
 
 /// Writes `model <name> <family> …` (module header).
 pub(crate) fn dump_model(m: &Model, design: &Design, out: &mut String) {
-    out.push_str("model ");
     write_name(design, m.name, out);
     out.push(' ');
     out.push_str(FAMILY_WORDS[m.family as usize]);
@@ -287,11 +297,11 @@ pub(crate) fn dump_model(m: &Model, design: &Design, out: &mut String) {
     }
     if m.ako.name != NameId::NONE {
         out.push_str(" ako=");
-        write_ref(design, m.ako, out);
+        write_ref(design, m.ako, DefKind::Model, out);
     }
     if m.module.name != NameId::NONE {
         out.push_str(" module=");
-        write_ref(design, m.module, out);
+        write_ref(design, m.module, DefKind::Module, out);
     }
     if m.version != ExprId::NONE {
         out.push_str(" version=");
@@ -404,35 +414,51 @@ fn dump_field(design: &Design, key: &str, field: Field<'_>, out: &mut String) {
     }
 }
 
-// The kernel's IR-text writers, the inverses of `Words`' readers (requested from the kernel
-// owner for M3). ponytail: placeholders until M3 lands; each becomes a one-line forward.
+// The kernel's IR-text writers (`text_expr.rs`) and the list forms the `Words` readers read.
 
-#[allow(clippy::ptr_arg)] // placeholder: the forward will push to `out`
 fn write_name(design: &Design, name: NameId, out: &mut String) {
-    todo!("kernel M3: text::write_name")
+    text_expr::write_name(design.str(name), out);
 }
 
-#[allow(clippy::ptr_arg)] // placeholder: the forward will push to `out`
 fn write_names(design: &Design, list: NameList, out: &mut String) {
-    todo!("kernel M3: text::write_names")
+    out.push('(');
+    for (k, &n) in design.names(list).iter().enumerate() {
+        if k > 0 {
+            out.push(' ');
+        }
+        write_name(design, n, out);
+    }
+    out.push(')');
 }
 
-#[allow(clippy::ptr_arg)] // placeholder: the forward will push to `out`
-fn write_ref(design: &Design, r: Ref, out: &mut String) {
-    todo!("kernel M3: text::write_ref")
+fn write_ref(design: &Design, r: Ref, kind: DefKind, out: &mut String) {
+    text_expr::write_ref(design, r, kind, &CTX, out);
 }
 
-#[allow(clippy::ptr_arg)] // placeholder: the forward will push to `out`
 fn write_value(design: &Design, e: ExprId, out: &mut String) {
-    todo!("kernel M3: text::write_value")
+    text_expr::write_value(design, e, &CTX, out);
 }
 
-#[allow(clippy::ptr_arg)] // placeholder: the forward will push to `out`
 fn write_exprs(design: &Design, list: ExprList, out: &mut String) {
-    todo!("kernel M3: text::write_exprs")
+    out.push('[');
+    for (k, &e) in design.exprs(list).iter().enumerate() {
+        if k > 0 {
+            out.push_str(", ");
+        }
+        text_expr::write_expr(design, e, &CTX, out);
+    }
+    out.push(']');
 }
 
-#[allow(clippy::ptr_arg)] // placeholder: the forward will push to `out`
 fn write_params(design: &Design, list: ParamList, out: &mut String) {
-    todo!("kernel M3: text::write_params")
+    out.push('(');
+    for (k, &(name, value)) in design.params(list).iter().enumerate() {
+        if k > 0 {
+            out.push(' ');
+        }
+        write_name(design, name, out);
+        out.push('=');
+        write_value(design, value, out);
+    }
+    out.push(')');
 }

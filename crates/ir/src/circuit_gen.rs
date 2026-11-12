@@ -120,9 +120,10 @@ pub(crate) fn generate_model(
         Polarity::None
     };
     let mut pairs: Vec<(String, ExprId)> = Vec::new();
-    for _ in 0..r.g.below(3) {
+    // values first, then keys: the order `Words::params` creates them in
+    let values: Vec<ExprId> = (0..r.g.below(3)).map(|_| r.ex()).collect();
+    for value in values {
         let key = r.g.fresh_name(r.b);
-        let value = r.ex();
         pairs.push((r.b.design().str(key).to_owned(), value));
     }
     let params = if pairs.is_empty() {
