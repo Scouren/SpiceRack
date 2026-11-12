@@ -217,3 +217,40 @@ fn inlining_every_call_adds_no_feature() {
 
     let _ = ScopeKind::File;
 }
+
+#[test]
+fn a_root_counts_in_its_class_except_in_a_behavioural_source() {
+    // R66 / A40, the pair deck's shape (oracle: the ruling's three cases, worked by hand): a
+    // passive's constant value counts static though its field may read the circuit; the same
+    // value reading the temperature, and the same tree in a behavioural source, count dynamic
+    use crate::expr::BinOp::{DivTyped, Mul};
+    let forms = |line: String| {
+        let d = read(&format!(
+            "file \"t.sp\" deck\n  param rbase = 1k\n  param num = 3\n  param den = 2\n  {line}\n"
+        ));
+        let used = features_used(&d);
+        let has = |f| used.contains(f);
+        [
+            has(Feature::Binary(Mul)),
+            has(Feature::Binary(DivTyped)),
+            has(Feature::BinaryDyn(Mul)),
+            has(Feature::BinaryDyn(DivTyped)),
+        ]
+    };
+    let resistor = |v: &str| format!("element resistor r1 (a b) value=({v})");
+    let behav = |v: &str| format!("element behav b1 (a 0) expr=({v}) output=current");
+    let value = "rbase * num /: den";
+    let warm = "rbase * num /: den * $temp";
+    let (stat, dynamic) = ([true, true, false, false], [false, false, true, true]);
+    assert_eq!(forms(resistor(value)), stat, "a constant passive value");
+    assert_eq!(
+        forms(resistor(warm)),
+        dynamic,
+        "a value reading the temperature"
+    );
+    assert_eq!(
+        forms(behav(value)),
+        dynamic,
+        "a behavioural source's expression"
+    );
+}

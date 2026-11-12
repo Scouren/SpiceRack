@@ -348,7 +348,21 @@ sections may now be nested where the set allows. `Placed(_, Title)` never occurs
 only in a deck's top, which `check` now enforces too (`FieldDomain`; the builder asserts it and IR
 text refuses it, so only a pass moving the item reaches the check).
 
-**A19 (2026-11-12): a field that may read the circuit counts the dynamic form (R38).** An
+**A40 (2026-11-12): a root's form follows its class, except in a behavioural source (R66;
+amends A19 and A26).** `ExprUse` has a third member, `Behavioural`: the expression of an element
+whose detail is a `Behav` row (a behavioural source, a charge-defined capacitor, a flux-defined
+inductor), its row's one `Handle::ExprDyn`; the circuit rows' `map_exprs` reports it, and the
+kernel reads the same from the handles (`circuit_fields::is_behavioural`). A root counts
+dynamic when its class is `Temp` or above or its use is `Behavioural`, static otherwise: a
+passive's constant value, a table's input, a measure threshold count static, though their
+fields may read the circuit. `Handle::ExprDyn` keeps its meaning for `check`. The generator
+draws the dynamic form for a dynamic-class tree and around a `Behav` row's expression
+(`Gen::dyn_form`), the static form everywhere else. Spec example
+(`form_tests::a_root_counts_in_its_class_except_in_a_behavioural_source`): `value=(rbase * num
+/: den)` on a resistor counts `Binary(Mul)` and `Binary(DivTyped)`; with `* $temp`, or as a
+behavioural source's `expr`, the `*Dyn` members.
+
+**A19 (2026-11-12, amended by A40): a field that may read the circuit counts the dynamic form (R38).** An
 expression a row lists as `Handle::ExprDyn` counts its functions and operators as `FuncDyn`,
 `BinaryDyn` and `UnaryDyn` whatever its class; elsewhere the form follows the class as before
 (dynamic when `Temp` or `Circuit`). A constant in a B source's expression is the dynamic form,
@@ -361,7 +375,7 @@ threshold).
 `map_refs` and `refs`:
 
 ```rust
-pub enum ExprUse { Constant, Circuit }
+pub enum ExprUse { Constant, Circuit, Behavioural } // Behavioural: A40
 fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)); // default: no root
 ```
 
@@ -395,8 +409,9 @@ false for it; every generic caller goes through the design (`literal_value`, `li
 form. `Extra::LongLiteral` marks one; the generator makes them only when the set has it.
 
 **A26 (2026-11-12): the expression door takes a form.** `pub enum Form { Static, Dynamic }` and
-`root_form(design, root, use) -> Form`: `Dynamic` when the root's field may read the circuit
-(`ExprUse::Circuit`) or its tree is of class `Temp` or above; the one decision, which
+`root_form(design, root, use) -> Form`: `Dynamic` when the root is a behavioural source's
+expression (`ExprUse::Behavioural`, A40; before A40, any `ExprUse::Circuit` field) or its tree
+is of class `Temp` or above; the one decision, which
 `features_used` makes through the same private rule. `rewrite_exprs_in(design, form, rule)` is
 `rewrite_exprs` restricted to the roots of one form (decided before the pass appends anything):
 a root of the other form keeps its id, and a subtree shared by roots of both forms is rewritten
