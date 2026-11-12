@@ -31,7 +31,7 @@ pub fn long_literal_to_shortest(design: &mut ir::Design, diags: &mut ir::Diags) 
         let value = b.design().literal_value(l);
         Some(b.literal(ir::Literal::from_f64(value)))
     });
-    for span in held {
-        diags.push(DIGITS_ROUNDED, span, u32::from(feature.index()));
+    for item in held {
+        diags.push_at(DIGITS_ROUNDED, design, item, u32::from(feature.index()));
     }
 }

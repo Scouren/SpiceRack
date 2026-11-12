@@ -26,7 +26,7 @@ pub fn draws_always_to_sampling(design: &mut ir::Design, diags: &mut ir::Diags) 
         let args = b.design().exprs(args).to_vec();
         Some(b.draw(dist, ir::DrawWhen::Sampling, per, &args))
     });
-    for span in held {
-        diags.push(PLAIN_RUN_NOMINAL, span, u32::from(feature.index()));
+    for item in held {
+        diags.push_at(PLAIN_RUN_NOMINAL, design, item, u32::from(feature.index()));
     }
 }
