@@ -106,9 +106,7 @@ fn map_exprs_visits_the_roots_handles_lists() {
     // known gap, a named marker: the owners' rows write their part in round 4 (A23); a kind
     // that stops drifting fails this until its line goes
     let not_yet = [
-        ItemKind::Model,
         ItemKind::Statistics,
-        ItemKind::Element,
         ItemKind::Analysis,
         ItemKind::Loop,
         ItemKind::Alter,

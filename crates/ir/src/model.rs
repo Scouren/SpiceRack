@@ -21,7 +21,7 @@
 use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
@@ -380,6 +380,10 @@ impl RowFacts for Model {
             f(&mut row.module, DefKind::Module);
         }
         design.editor().set(at.index, row);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        crate::circuit_fields::model_map_exprs(design, at.index, f)
     }
 
     fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {

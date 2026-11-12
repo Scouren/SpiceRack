@@ -36,7 +36,7 @@ use crate::check::Violation;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
 use crate::design::{Design, DetailRow};
 use crate::diag::{Diags, violation_code};
-use crate::facts::{Handle, RowFacts};
+use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
@@ -610,6 +610,10 @@ impl RowFacts for Element {
             f(&mut row.model, kind);
         }
         design.editor().set(at.index, row);
+    }
+
+    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
+        crate::circuit_fields::element_map_exprs(design, at.index, f)
     }
 
     fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
