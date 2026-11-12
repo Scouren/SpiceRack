@@ -119,6 +119,11 @@ fn admits_refuses_what_ngspice_cannot_spell() {
         ("model a mesa polarity=n params=(vto=1)", "W1203"),
         ("model a bsim4 polarity=n version=\"4.9\"", "W1202"),
         ("model a hisim_hv polarity=n version=\"3.0\"", "W1202"),
+        // no version on a versioned family: written without one, ngspice's reader would read
+        // its default back (b4set.c:205, b3soiddset.c:69, hicum2setup.c:45): L5 seed 0
+        ("model a bsim4 polarity=n", "W1202"),
+        ("model a b3_soi_dd polarity=n", "W1202"),
+        ("model a hicum2 polarity=n", "W1202"),
         ("model a mos1 polarity=n params=(vto=1 bogus=2)", "W1203"),
         ("model a.1 mos1 polarity=n bin_of=a", "W1204"),
         (
