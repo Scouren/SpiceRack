@@ -214,7 +214,11 @@ laws run on.
   property, why) (R55): the covering property is a seeded test in the owning area's test file
   that builds admissible designs of the kind through the builder and checks write, read back
   and `eq_meaning`, with floors on designs run and designs holding the kind; the law fails when
-  the name is empty or no file under `tests/` defines `fn <name>(` (a text search). So a writer's `admits`
+  the name is empty or no file under `tests/` defines `fn <name>(` (a text search). A row whose
+  reason starts with `interim` names a fixture fixpoint instead: the reach law passes it and
+  prints it on every run; the trunk merge takes such rows as they are; the dialect gates (S3.5
+  for ngspice, S4.5 for VACASK) fail on any `interim` row, by then each kind being reached by
+  the generated laws or covered by its seeded property. So a writer's `admits`
   pushes each refusal at its item (`Diags::push_at`); a refusal at no item costs the seed. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden
