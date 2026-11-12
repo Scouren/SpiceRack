@@ -304,3 +304,68 @@ fn p1_066_the_binned_comparators_are_the_capmod_family() {
         "the lines citing proof/s-bsim3-default-capmod.md"
     );
 }
+
+/// ZERO-LEDGER P1-066. Oracle: the CMC reference table beside each deck
+/// (`<deck>.reference`, `Freq N(coll)` in V²/Hz): the output noise at 1 kHz
+/// is sqrt(N(coll)) of the first row. Xyce 7.10.0's value is the
+/// reference's; ngspice-45's hicum2 is 2.45 %, 5.99 % and 3.48 % under it
+/// at biases 2, 3 and 4 of the six model cards that turn self-heating on
+/// (`flsh=1`). The lines of `ngspice-xyce` that cite the proof are those 18
+/// decks, by name. Checks: 18 × 2 + 1.
+#[test]
+fn p1_066_hicum_noise_with_self_heating_is_ngspices() {
+    /// `cmcqa/hicum/hicum_noise_npn_<card>_ac_<bias>.sp`: the cards with
+    /// `flsh=1`.
+    const CARDS: [&str; 6] = [
+        "cornoise",
+        "full_sh",
+        "full_subcoupl",
+        "full_subcoupl_peri_bias",
+        "full_subcoupl_peri_con",
+        "full_subtran",
+    ];
+    /// Bias; `onoise_spectrum` at 1 kHz in V/√Hz on ngspice-45 and on Xyce
+    /// 7.10.0 (2026-11-11, `full_subcoupl`; the cards agree to 11 digits);
+    /// how far ngspice is under the reference.
+    const AT_1K: [(u32, f64, f64, f64); 3] = [
+        (2, 1.1523105743045234e-10, 1.1809686702025586e-10, 0.02454),
+        (3, 1.5281348231615892e-10, 1.6257564393229386e-10, 0.05993),
+        (4, 1.5613271234089656e-10, 1.617558963376606e-10, 0.03483),
+    ];
+    let root = std::env::var("SPICE_BENCH").expect("$SPICE_BENCH (nix develop .#testing)");
+    let mut want = BTreeSet::new();
+    for card in CARDS {
+        for (bias, ngspice, xyce, under) in AT_1K {
+            let deck = format!("cmcqa/hicum/hicum_noise_npn_{card}_ac_{bias}.sp");
+            let path = format!("{root}/{deck}.reference");
+            let table = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+            let row = table
+                .lines()
+                .find(|r| r.starts_with("1000 "))
+                .expect("the 1 kHz row");
+            let cell = row.split_whitespace().nth(1).expect("N(coll)");
+            let reference = cell.parse::<f64>().expect("a number").sqrt();
+            assert!(
+                (xyce / reference - 1.0).abs() < 5e-4,
+                "{deck}: Xyce {xyce} against the reference {reference}"
+            );
+            let off = 1.0 - ngspice / reference;
+            assert!(
+                (off - under).abs() < 1e-4,
+                "{deck}: ngspice is {off} under the reference"
+            );
+            want.insert(deck);
+        }
+    }
+    let cites =
+        " simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md ";
+    let dir = env!("CARGO_MANIFEST_DIR");
+    let file = format!("{dir}/tests/fixtures/cross_sim/ngspice-xyce.txt");
+    let list = std::fs::read_to_string(&file).unwrap_or_else(|e| panic!("{file}: {e}"));
+    let cited: BTreeSet<String> = list
+        .lines()
+        .filter(|l| l.contains(cites))
+        .filter_map(|l| l.split_whitespace().next().map(str::to_string))
+        .collect();
+    assert_eq!(cited, want, "the lines citing proof/hicum-l2-noise-sh.md");
+}

@@ -106,24 +106,24 @@ cmcqa/hicum/hicum_fout_npn_1D_npn_full_subcoupl.sp mismatch # plots ["op"] becam
 cmcqa/hicum/hicum_fout_npn_1D_npn_full_subcoupl_peri_bias.sp mismatch # plots ["op"] became ["dc"]
 cmcqa/hicum/hicum_fout_npn_1D_npn_full_subcoupl_peri_con.sp mismatch # plots ["op"] became ["dc"]
 cmcqa/hicum/hicum_fout_npn_1D_npn_full_subtran.sp mismatch # plots ["op"] became ["dc"]
-cmcqa/hicum/hicum_noise_npn_cornoise_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_cornoise_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_cornoise_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_sh_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_sh_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_sh_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_bias_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_bias_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_bias_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subtran_ac_2.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subtran_ac_3.sp mismatch # plots ["noise", "total"] became ["noise"]
-cmcqa/hicum/hicum_noise_npn_full_subtran_ac_4.sp mismatch # plots ["noise", "total"] became ["noise"]
+cmcqa/hicum/hicum_noise_npn_cornoise_ac_2.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.1523105743045234+0i vs 1.1809686702025588+0i at 1000 (tol 2.307e-3)
+cmcqa/hicum/hicum_noise_npn_cornoise_ac_3.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5281348231615892+0i vs 1.6257564393229387+0i at 1000 (tol 3.058e-3)
+cmcqa/hicum/hicum_noise_npn_cornoise_ac_4.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5613271234089654+0i vs 1.6175589633766059+0i at 1000 (tol 3.125e-3)
+cmcqa/hicum/hicum_noise_npn_full_sh_ac_2.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.1523105743028863+0i vs 1.1809686702025588+0i at 1000 (tol 2.307e-3)
+cmcqa/hicum/hicum_noise_npn_full_sh_ac_3.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5281348230881502+0i vs 1.6257564393229387+0i at 1000 (tol 3.058e-3)
+cmcqa/hicum/hicum_noise_npn_full_sh_ac_4.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5613271237446869+0i vs 1.6175589633766059+0i at 1000 (tol 3.125e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_ac_2.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.1523105743045234+0i vs 1.1809686702025588+0i at 1000 (tol 2.307e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_ac_3.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5281348231615892+0i vs 1.6257564393229387+0i at 1000 (tol 3.058e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_ac_4.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5613271234089654+0i vs 1.6175589633766059+0i at 1000 (tol 3.125e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_bias_ac_2.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.152310574304525+0i vs 1.1809686702025588+0i at 1000 (tol 2.307e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_bias_ac_3.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5281348231615897+0i vs 1.6257564393229387+0i at 1000 (tol 3.058e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_bias_ac_4.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5613271234089652+0i vs 1.6175589633766059+0i at 1000 (tol 3.125e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_2.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.1523105743045234+0i vs 1.1809686702025588+0i at 1000 (tol 2.307e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_3.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5281348231615892+0i vs 1.6257564393229387+0i at 1000 (tol 3.058e-3)
+cmcqa/hicum/hicum_noise_npn_full_subcoupl_peri_con_ac_4.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5613271234089654+0i vs 1.6175589633766059+0i at 1000 (tol 3.125e-3)
+cmcqa/hicum/hicum_noise_npn_full_subtran_ac_2.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.1523105743045234+0i vs 1.1809686702025588+0i at 1000 (tol 2.307e-3)
+cmcqa/hicum/hicum_noise_npn_full_subtran_ac_3.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5281348231615892+0i vs 1.6257564393229387+0i at 1000 (tol 3.058e-3)
+cmcqa/hicum/hicum_noise_npn_full_subtran_ac_4.sp simulator-differs:reference-data reason=HICUM-L2-NOISE-SH proof=hicum-l2-noise-sh.md # noise inoise_spectrum: 1.5613271234089654+0i vs 1.6175589633766059+0i at 1000 (tol 3.125e-3)
 ngspice/examples/control_structs/if-batchmode.sp target-fails # no raw file .cross_sim_out.raw: Netlist error: There was 1 undefined symbol in .PRINT command: ALL | Simulation aborted due to error.  There are 0 MSG_FATAL err
 ngspice/examples/ddt/ddt-test3.sp target-fails # Parse error: Bad num_points: cannot parse integer from empty string
 ngspice/examples/hicum2/hic2_noise.sp target-fails # no raw file .cross_sim_out.raw: Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.sp | Netlist error in file: .cross_sim_deck.s
