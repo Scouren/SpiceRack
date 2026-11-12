@@ -1,0 +1,10 @@
+stb probe the top instance
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+control
+  analysis s1 acstb probe="__topinst__" from=1 to=1k mode="dec" points=1
+endc
