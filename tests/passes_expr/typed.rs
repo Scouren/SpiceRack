@@ -209,3 +209,45 @@ fn an_integer_quotient_reaches_ngspice_as_its_truncation() {
     // `print` shows six significant digits: the tolerance is its rounding
     assert!((amps * 49.0 + 1.0).abs() < 1e-5, "{amps}: {deck}");
 }
+
+/// An unbound read has no known tag (the file that defines it may make it an Int): every rule
+/// that reads the tag table must be right for both. `sqr(x?)` with `x` bound to an Int whose
+/// square leaves the Int range (2⁵² + 1 in the boundary set) is the red case the IR round's
+/// generator found for `sqr_to_mul` (seed 144: `-sqr(g54)`).
+#[test]
+fn the_typed_rules_are_right_for_both_tags_of_an_unbound_read() {
+    let rules: [(&str, &str); 8] = [
+        ("sqr_to_mul", "sqr(x?)"),
+        ("toreal_to_mul", "to_real(x?) * 3"),
+        ("toint_to_trunc", "to_int(x? * 1.5)"),
+        ("sgnzeropos_to_ternary", "sgn_zero_pos(x?) * 3"),
+        ("ramp_to_ternary", "ramp(x?) * 3"),
+        ("div_to_div_typed", "x? / y?"),
+        ("div_typed_to_div", "x? /: 2.5"),
+        ("int_literal_to_plain", "x? * 3i"),
+    ];
+    for (name, body) in rules {
+        let text = format!("file \"p.sp\" deck\n  param r = {body}\n");
+        let points = keeps_boundary_values(name, &text, ANY);
+        eprintln!("{name} on {body}: {points} boundary points");
+    }
+}
+
+/// The tag table reads only live calls for a formal's tag (rows are appended, a rewritten call
+/// stays in the table): after `int_literal_to_plain` writes `@f(7i)` as `@f(7)`, the formal is
+/// Real, so `sqr_to_mul` writes `x * x`; the dead `@f(7i)` made it either, `1 * x * x`.
+#[test]
+fn a_dead_call_row_does_not_widen_a_formals_tag() {
+    let text = "file \"p.sp\" deck\n  func f(x) = sqr(x)\n  param q = @f(7i)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    for name in ["int_literal_to_plain", "sqr_to_mul"] {
+        let pass = passes::all().find(|p| p.name == name).expect("registered");
+        (pass.run)(&mut design, &mut diags);
+    }
+    let mut out = String::new();
+    ir::dump(&design, design.entry(), &mut out);
+    assert!(out.contains("func f(x) = x * x"), "{out}");
+}
