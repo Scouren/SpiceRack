@@ -229,15 +229,22 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 
 ### 6.1 ngspice → VACASK
 
+Every expression rule is two rows (A26): `<rule>` for the `Func`/`Binary` form and `<rule>_dyn` for `FuncDyn`/`BinaryDyn`; the rows below name the rule once. The expression rows follow the rows registered on pass-expr 6b5b936f (its audit of this section).
+
 | Feature | Pass | IR → IR (one sentence) | Requires | Proof | Old rule it replaces |
 |---|---|---|---|---|---|
-| `Binary(Div)` | `div_to_div_typed` | `Div(a,b)` → `DivTyped(a,b)`, with `a` wrapped as `Mul(1., a)` unless an operand is real by the typing table | `Binary(DivTyped)` | eval (typed) | none: `respell` copied `/`, so ngspice `{1/3}` was 0 on VACASK (RUN i1): ledger |
+| `Binary(Div)` | `div_to_div_typed`, `_dyn` | `Div(a,b)` → `DivTyped(a,b)`, with `a` wrapped as `Mul(1., a)` unless an operand is surely Real by the tag table (pass-expr 6b5b936f) | `Binary(DivTyped)` | eval (typed) | none: `respell` copied `/`, so ngspice `{1/3}` was 0 on VACASK (RUN i1): ledger |
 | `Func(PowAbs)` | `powabs_to_pow` | `PowAbs(x,y)` → `Pow(Abs(x), y)` | `Func(Pow)`, `Func(Abs)` | eval | `abs_power_out` |
-| `Func(RoundHalfEven)` | `round_half_even_to_away` | `nint` → a ternary on `x − floor(x) == ½` and the parity of `floor(x)` around `RoundHalfAway` | `Floor`, `Fmod`, `RoundHalfAway`, `Ternary` | eval | none (old copied `nint`, which VACASK lacks) |
-| `Func(Sgn)` | `sgn_to_ternary` | `Sgn(x)` → `x>0 ? 1 : (x<0 ? -1 : 0)` | `Ternary`, `Gt`, `Lt` | eval | none: `sgn(0)` 0 → 1 (RUN e1): ledger |
-| `Func(Step)`, `Ramp`, `Pwl` | `step_to_ternary`, `pwl_to_ternary` | each by its definition as ternaries of its argument | `Ternary` | eval | none |
-| `DrawWhen(Always)`, `DrawPer(Reference)` | `draws_always_to_sampling` | relabel `Always` → `Sampling` with a note (a plain run then uses the nominal); `Reference` → `CallSite` only where the joint distribution is unchanged (each draw-holding parameter read once, or no sampling loop), else refused (R22) | `DrawWhen(Sampling)`, `DrawPer(CallSite)` | sim(VACASK) nominal; eval | `VacaskCalls` (the same text, now with its note) |
-| `Expr(TStep)`, `Expr(TStop)` | `substitute_tran_leaves` | each leaf → the design's one transient's step or stop; two transients → refused | one `Tran` | sim(ngspice) | none: a given-zero `TF` was written `fall=0`, which VACASK holds (RUN p1): ledger |
+| `Func(RoundHalfEven)` | `round_half_even_to_away`, `_dyn` | `x - floor(x) == 0.5 ? 2 * round_half_away(x * 0.5) : round_half_away(x)` (pass-expr 6b5b936f) | `Ternary`, `Eq`, `Sub`, `Mul`, `Floor`, `RoundHalfAway` (no `Fmod`) | eval | none (old copied `nint`, which VACASK lacks) |
+| `Func(Sgn)` | `sgn_to_ternary`, `_dyn` | `Sgn(x)` → `x > 0 ? 1 : x < 0 ? -1 : 0`; U0105 when the operand may hold a draw (pass-expr 6b5b936f) | `Ternary`, `Gt`, `Lt` | eval | none: `sgn(0)` 0 → 1 (RUN e1): ledger |
+| `Func(Step)` | `step_to_ternary`, `_dyn` | by its definition as a ternary of its argument (pass-expr 6b5b936f) | `Ternary` | eval | none |
+| `Func(StepHalf)` | `step_half_to_ternary`, `_dyn` | ngspice's `u` (½ at 0) by its definition (pass-expr 6b5b936f) | `Ternary` | eval | none |
+| `Func(Ramp)` | `ramp_to_ternary`, `_dyn` | by its definition; `Mul` for an operand that may be Int (pass-expr 6b5b936f) | `Ternary`, `Mul` | eval | none |
+| `Func(Pwl)` | `pwl_to_ternary`, `_dyn` | a ternary chain, only on strictly increasing literal points, else U0106 (pass-expr 6b5b936f) | `Ternary` | eval | none |
+| `Func(PowSigned)`, `Sqrt` of `Abs`, `Ln` of `Abs`, `ExpLin14`, `Sqr` | `pow_signed_to_ternary`, `sqrt_abs_to_sqrt`, `ln_abs_to_ln`, `explin14_to_ternary`, `sqr_to_mul` (each with `_dyn`) | being written on the lead's word: VACASK lacks these (pass-expr 6b5b936f) | — | eval | none |
+| `DrawWhen(Always)` | `draws_always_to_sampling`, `_dyn` | relabel `Always` → `Sampling` with note U0109 (a plain run then uses the nominal) | `DrawWhen(Sampling)` | sim(VACASK) nominal; eval | `VacaskCalls` (the same text, now with its note) |
+| `DrawPer(Reference)` | `draws_per_reference_to_call_site`, `_dyn` | `Reference` → `CallSite` only for `Sampling` draws in a design with no `MonteCarlo` loop; the case "each draw-holding parameter read once" is not implemented and is refused U0110 (R22; pass-expr 6b5b936f) | `DrawPer(CallSite)` | eval | — |
+| `Expr(TStep)`, `Expr(TStop)` | `substitute_tstep`, `substitute_tstop` (each with `_dyn`) | each leaf → the design's one transient's `print_step` (TStep) or stop; literals only, else U0108; two transients → refused (pass-expr 6b5b936f) | one `Tran` | sim(ngspice) | none: a given-zero `TF` was written `fall=0`, which VACASK holds (RUN p1): ledger |
 | `PulseSpice` | `pulse_spice_to_vacask` | relabel to `Vacask` when `rise > 0`, `fall > 0` and `period` is 0 or > rise+fall+width; else refused (at `period` = rise+fall+width ngspice repeats and VACASK refuses: RUN q13) | `PulseVacask` | sim(VACASK) after `substitute_tran_leaves` | `vacask_wave` Pulse, which wrote `period=0` there: one pulse where ngspice repeats (RUN q13): ledger |
 | `PulseCycles` | `pulse_cycles_to_pwl` | the counted pulses → one PWL | `Wave(Pwl)` | sim(ngspice) | `pulse_as_pwl`, `vacask_wave` counted |
 | `SffmNgspice` | `sffm_ngspice_to_spice3` | law `Spice3`, `pre: Zero` when `mdi ≤ fc/fm` (else `wave_to_behavioural`) | `SffmSpice3` | sim(ngspice) | `sffm_slots` |
@@ -256,7 +263,8 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 | `MultInstance` | `instance_mult_to_param` | the subckt gets a formal `mult__` (default 1), each element in it `mult × mult__`, the instance passes `mult__ = m` | `MultSemi`, `MultResistor`, … | sim(ngspice) | — (VACASK refuses an undeclared `$mfactor`, RUN n2) |
 | `EnclosingRef` | `hoist_nested_subckts` | a nested subckt that reads an enclosing scope's parameter or model → hoisted to the top, the read parameters as formals passed by each instance, the models moved with it, names that collide renamed | `NestedSubckt` off | sim(ngspice) | `read/blocks.rs` hoist |
 | `FormalReadsParam` | `formal_defaults_to_instances` | every instance passes every such formal, its default rewritten over the instance's actuals; the formal's own default becomes a constant | — | sim(ngspice) | none |
-| `Item(Func)`, `LocalFunc` | `inline_funcs` | each call → the body with its arguments substituted (ngspice's own textual rule, S 2.26) | — | eval | W0106 refusal (now translates) |
+| `Item(Func)`, `Placed(Subckt, Func)` | `inline_funcs` (waits for A28: a body counts in its callers' form) | each call → the body with its arguments substituted (ngspice's own textual rule, S 2.26); removes `Expr(UserCall)`, requires nothing; a second row drops a `Func` nothing calls. `LocalFunc` is no feature (A15 `Placed`) (pass-expr 6b5b936f) | — | eval | W0106 refusal (now translates) |
+| `Extra::LongLiteral` | `long_literal_to_shortest`, either direction | a `Long` literal → the correctly rounded shortest double, with a note; VACASK keeps the digits (run lr1), so only a target without it needs it (A18; pass-expr 6b5b936f) | — | eval | none |
 | element with no model (G2), sources and couplings included | `explicit_family_models` | one parameterless `Model` per (scope, family) for model-less elements, named after the family (renamed on collision) | — | sim(ngspice) | `Need` in `named/vacask.rs` |
 | model with no `DeviceLibrary` of its family (G2) | `device_libraries` | one `DeviceLibrary{family, path: NONE}` per family in use with a library file, at the top | `Item(DeviceLibrary)` | sim(VACASK) | implied loads in `named/vacask.rs` |
 | `TranCapNgspice`, `print_step` | `tran_explicit_cap` | `max_step := min(print_step, (stop − record_start)/50)` when `NONE`; `initial_step := print_step`; `print_step := NONE` | `TranMaxStep`, `TranInitialStep` | sim(VACASK) | `vacask_analysis` Tran (`step=` tstep, `maxstep`) |
@@ -275,15 +283,18 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 
 | Feature | Pass | IR → IR | Requires | Proof | Old rule |
 |---|---|---|---|---|---|
-| `Binary(DivTyped)` | `div_typed_to_div` | by the tag table over the whole design (every instance's actuals): an operand real → `Div`; both int → `Trunc(Div(a, b))` (never `IntDiv`: ngspice's `\` is trunc(\|a/b\|), so `IntDiv` has no speaker); mixed across instances → refused | `Binary(Div)`, `Func(Trunc)` | eval (typed) | none (old copied `/`) |
-| `Func(ToInt)` | `toint_to_trunc` | `Trunc` once no `DivTyped` reads its type | — | eval | none |
-| `Func(Pow)` | `pow_to_powabs` | whole literal exponent: even `PowAbs`, odd `Mul(Sgn(x), PowAbs)`; other literal: `PowAbs` (equal on `Pow`'s domain, R12); other exponent with a base not provably ≥ 0: refused | `Func(PowAbs)`, `Func(Sgn)` | eval | `abs_power_in` |
-| bit operators | `fold_constant_bitops` | an integer-constant subtree → its literal; else refused | — | eval | `caret_reread` W0002 |
-| `Func(RoundHalfAway)` | `round_half_away_to_floor` | sign-aware `floor` + a `x − floor(x) ≥ ½` ternary (never `floor(x+½)`, wrong at ½−ulp) | `Floor`, `Ternary` | eval | none |
-| `Func(Atan2)`, `Func(Hypot)` | `atan2_to_atan`, `hypot_to_sqrt` | quadrant ternary; `sqrt(x²+y²)` (≤ 2 ulp, measured, not exact) | `Atan`, `Sqrt` | eval | old rewrite (VS §2) |
-| `FuncDyn(Idt)` | `idt_to_integrator` | a `Behav` current into a new node with a 1 F capacitor and an `Ic` of the initial value | `Elem(Capacitor)`, `IcEveryOp` | sim(VACASK) both forms (S 2.18: 9e-9 on ngspice) | none |
-| `Expr(Tnom)` | `tnom_to_env` | → the design's one `Env.tnom` | one `Env` | eval | none |
-| `DrawWhen(Sampling)` outside every `MonteCarlo` | `sampling_draws_to_nominal` | `Draw` → its nominal argument | — | sim(VACASK) (RUN g2) | `stat_nominal` analogue |
+| `Binary(DivTyped)` | `div_typed_to_div`, `_dyn` | by the tag table over the whole design (every instance's actuals): an operand real → `Div`; both int → `Trunc(Div(a, b))` (never `IntDiv`: ngspice's `\` is trunc(\|a/b\|), so `IntDiv` has no speaker); mixed across instances → note U0101, and every Int quotient waits | `Div` and `Trunc` in both forms (tags cross forms, so it rewrites every `DivTyped` once its own form is present; pass-expr 6b5b936f) | eval (typed) | none (old copied `/`) |
+| `Func(ToInt)` | `toint_to_trunc`, `_dyn` | `Trunc`; U0103 while any `DivTyped` stands (pass-expr 6b5b936f) | — | eval | none |
+| `Func(Pow)` | `pow_to_powabs`, `_dyn` | whole literal exponent: even → `PowAbs`, odd → `PowSigned` (not `Mul(Sgn(x), PowAbs)`: that gives +0 at x = −0 and reads x twice); other literal → `PowAbs` (equal on `Pow`'s domain, R12); a non-literal exponent → `PowAbs` only when the base is never negative or −0, else U0104 (pass-expr 6b5b936f) | `Func(PowAbs)`, `Func(PowSigned)` | eval | `abs_power_in` |
+| `Func(SgnZeroPos)` | `sgnzeropos_to_ternary`, `_dyn` | VACASK's `sgn` → `x >= 0 ? 1 : -1` typed as `x` (pass-expr 6b5b936f: a row §6 lacked) | `Ternary`, `Ge` | eval | none |
+| `Func(ToReal)` | `toreal_to_mul`, `_dyn` | `ToReal(x)` → `Mul(1., x)` (A21; pass-expr 6b5b936f) | `Mul` | eval | none |
+| `Extra::LongLiteral` | `long_literal_to_shortest` | as in 6.1 | — | eval | none |
+| bit operators | `fold_constant_bitops` (12 rows: bitand, bitor, bitxor, shl, shr, bitnot, each with `_dyn`) | literal operands only (nested bit ops fold over legalize's rounds) → a `Plain` literal; else U0107 (pass-expr 6b5b936f) | — | eval | `caret_reread` W0002 |
+| `Func(RoundHalfAway)` | `round_half_away_to_floor`, `_dyn` | by sign, with `floor` or `ceil` (never `floor(x+½)`, wrong at ½−ulp) | `Ternary`, `Ge`, `Sub`, `Add`, `Floor`, `Ceil` (pass-expr 6b5b936f) | eval | none |
+| `Func(Atan2)`, `Func(Hypot)` | refused (R50: not exact) | over 184041 points: at most 1 ulp where both operands are nonzero within 1e±150, but a domain error where the original has a value at 21656 points (atan2) and 79062 (hypot), and atan2 loses a zero's sign at 218 (pass-expr 6b5b936f) | — | — | old rewrite (VS §2) |
+| `FuncDyn(Idt)` | `idt_to_integrator` (the waves group's, not pass-expr's) | a `Behav` current into a new node with a 1 F capacitor and an `Ic` of the initial value | `Elem(Capacitor)`, `IcEveryOp` | sim(VACASK) both forms (S 2.18: 9e-9 on ngspice) | none |
+| `Expr(Tnom)` | `tnom_to_env`, `_dyn` | → the design's one whole-run `Env` with a literal `tnom`; no `Env` is refused (the default tnom is each simulator's own; pass-expr 6b5b936f) | one whole-run `Env` | eval | none |
+| `DrawWhen(Sampling)` outside every `MonteCarlo` | `sampling_draws_to_nominal`, `_dyn` | `Draw` → its nominal argument (`1 * nominal` while a `DivTyped` stands and the nominal may be Int); U0110 when a `MonteCarlo` loop exists (pass-expr 6b5b936f) | `Mul` in both forms | sim(VACASK) (RUN g2) | `stat_nominal` analogue |
 | `Draw(CallSite)` inside `mc` | refused | ngspice's draws are per reference; the two-layer idiom (DESIGN-mc-lowering) is a later pass | — | — | none |
 | `PulseVacask` | `pulse_vacask_to_spice` | `fall ≤ 0` → width = period − rise and an ideal fall at the period's end (period ≤ 0: width = `TStop`), law `Spice` | `PulseSpice` | sim(VACASK) after form with fall>0 | none (old read the pulse as SPICE's) |
 | `TdFrom::Td1` | `exp_td2_absolute` | `td2` → `Add(td1, td2)`, `td2_from: Zero` | — | eval | named_waves |
