@@ -293,7 +293,7 @@ pub(crate) fn mult_class(kind: ElemKind) -> X {
         | E::FreqTable
         | E::Delay => X::MultControlled,
         E::Diode | E::Bjt | E::Mosfet | E::Jfet | E::Mesfet | E::Igbt => X::MultSemi,
-        E::Instance => X::MultInstance,
+        E::Instance => X::MultInstanceParallel, // the law's own member: `element_features`
         E::CodeModel | E::ModuleModel | E::Module => X::MultModule,
         E::ChargeCapacitor
         | E::FluxInductor

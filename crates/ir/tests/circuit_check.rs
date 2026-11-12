@@ -22,13 +22,13 @@ mod tests {
         TableSource,
     };
     use spicerack_ir::diag::violation_code;
-    use spicerack_ir::passive::{Coupling, IcMode, Passive};
+    use spicerack_ir::passive::{Coupling, IcMode, Passive, TcBase, TcLaw};
     use spicerack_ir::semi::{InitialState, Switch};
     use spicerack_ir::source::DcRule;
     use spicerack_ir::wave::{PulseLaw, Pwl, PwlJoin, PwlRepeat};
     use spicerack_ir::{
-        Builder, Code, DefId, Design, Diags, ElemKind, Element, ExprId, List, ModelFamily, NO_ROW,
-        NameId, Polarity, Ref, ScopeId, Span, Violation, WaveRef, check,
+        Builder, Code, DefId, Design, Diags, ElemKind, Element, ExprId, List, ModelFamily, MultLaw,
+        NO_ROW, NameId, Polarity, Ref, ScopeId, Span, Violation, WaveRef, check,
     };
 
     /// Builds a design with `f` and returns `check`'s codes.
@@ -64,6 +64,7 @@ mod tests {
             params: List::EMPTY,
             mult: ExprId::NONE,
             detail,
+            mult_law: MultLaw::Parallel,
         };
         b.push(top, row, Span::NONE);
     }
@@ -104,6 +105,7 @@ mod tests {
             params: List::EMPTY,
             mult: ExprId::NONE,
             detail,
+            mult_law: MultLaw::Parallel,
         };
         b.push(top, row, Span::NONE);
     }
@@ -226,7 +228,7 @@ mod tests {
     #[test]
     fn every_field_domain_rule_is_reported_alone() {
         type Case = fn(&mut Builder<'_>, ScopeId);
-        let cases: [(&str, Case); 33] = [
+        let cases: [(&str, Case); 38] = [
             ("diode without a model", |b, top| {
                 let s = b.detail(semi());
                 push(b, top, ElemKind::Diode, &["a", "0"], None, s);
@@ -251,6 +253,7 @@ mod tests {
                     params: List::EMPTY,
                     mult: ExprId::NONE,
                     detail: NO_ROW,
+                    mult_law: MultLaw::Parallel,
                 };
                 b.push(top, row, Span::NONE);
             }),
@@ -538,6 +541,77 @@ mod tests {
                     Span::NONE,
                 );
             }),
+            ("a constant resistor measured from 27 degrees", |b, top| {
+                let one = n(b, 1);
+                let r = b.detail(Passive {
+                    value: one,
+                    tc1: one,
+                    tc_base: TcBase::Fixed27,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            }),
+            ("a reciprocal temperature law on a resistor", |b, top| {
+                let value = b.v("a", None);
+                let one = n(b, 1);
+                let r = b.detail(Passive {
+                    value,
+                    tc1: one,
+                    tc_law: TcLaw::Reciprocal,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
+            }),
+            ("a behavioural base with no coefficient", |b, top| {
+                let one = n(b, 1);
+                let row = spicerack_ir::controlled::Behav {
+                    tc_base: TcBase::Fixed27,
+                    ..behav(one, spicerack_ir::controlled::OutKind::Voltage)
+                };
+                let v = b.detail(row);
+                push(b, top, ElemKind::Behav, &["a", "0"], None, v);
+            }),
+            ("ngspice's multiplier law on a resistor", |b, top| {
+                let one = n(b, 1);
+                let detail = b.detail(Passive {
+                    value: one,
+                    ..Passive::PLAIN
+                });
+                let name = unique(b, top);
+                let terminals = b.names(&["a", "b"]);
+                let row = Element {
+                    kind: ElemKind::Resistor,
+                    name,
+                    terminals,
+                    model: Ref {
+                        name: NameId::NONE,
+                        def: DefId::NONE,
+                    },
+                    params: List::EMPTY,
+                    mult: one,
+                    detail,
+                    mult_law: MultLaw::NgspiceAppend,
+                };
+                b.push(top, row, Span::NONE);
+            }),
+            ("ngspice's multiplier law with no multiplier", |b, top| {
+                let name = unique(b, top);
+                let model = Ref {
+                    name: b.name("sub"),
+                    def: DefId::NONE,
+                };
+                let row = Element {
+                    kind: ElemKind::Instance,
+                    name,
+                    terminals: List::EMPTY,
+                    model,
+                    params: List::EMPTY,
+                    mult: ExprId::NONE,
+                    detail: NO_ROW,
+                    mult_law: MultLaw::NgspiceAppend,
+                };
+                b.push(top, row, Span::NONE);
+            }),
         ];
         for (what, case) in cases {
             assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");
@@ -567,6 +641,7 @@ mod tests {
             params: List::EMPTY,
             mult: ExprId::NONE,
             detail,
+            mult_law: MultLaw::Parallel,
         };
         b.push(scope, row, Span::NONE);
     }

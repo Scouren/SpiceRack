@@ -40,7 +40,7 @@
 use crate::circuit_fields::{Field, Fields, Side};
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
 use crate::design::{Design, DetailRow};
-use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
+use crate::element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
 use crate::facts::Handle;
 use crate::id::{ExprId, NameId};
 use crate::item::DefKind;
@@ -256,6 +256,9 @@ pub(crate) fn dump_element(e: &Element, design: &Design, ctx: &Ctx, out: &mut St
     if e.mult != ExprId::NONE {
         out.push_str(" mult=");
         text::write_value(design, e.mult, ctx, out);
+    }
+    if e.mult_law != MultLaw::Parallel {
+        out.push_str(" mult_law=ngspice_append");
     }
     match e.kind.detail() {
         DetailKind::None => assert!(e.detail == NO_ROW, "{:?} has a detail row", e.kind),

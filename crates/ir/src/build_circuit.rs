@@ -14,7 +14,7 @@
 //! use spicerack_ir::source::{DcRule, Source};
 //! use spicerack_ir::wave::{Pulse, PulseLaw};
 //! use spicerack_ir::{
-//!     check, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, NameId,
+//!     check, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, MultLaw, NameId,
 //!     NumForm, Polarity, Ref, Role, Span, NO_ROW,
 //! };
 //!
@@ -51,7 +51,9 @@
 //! let terminals = b.names(&["in", "out"]);
 //! let name = b.name("x1");
 //! let master = Ref { name: div_def.name, def: spicerack_ir::DefId(0) };
-//! let head = ElemHead { name, terminals, model: master, params: List::EMPTY, mult: two };
+//! let head = ElemHead {
+//!     name, terminals, model: master, params: List::EMPTY, mult: two, mult_law: MultLaw::Parallel,
+//! };
 //! b.instance(top, ElemKind::Instance, head, span);
 //!
 //! // `.model dmod d (is=1e-14 n=1.05)`: (type word, level) → family by the reader's table
@@ -86,7 +88,7 @@
 use crate::build::Builder;
 use crate::circuit_check::{model_ok, verdict};
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, OutKind, Poly, TableSource};
-use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
+use crate::element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
 use crate::id::{ExprId, ItemRef, List, NameId, NameList, ParamList, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::line::Line;
@@ -112,9 +114,11 @@ pub struct ElemHead {
     pub params: ParamList,
     /// Multiplicity; `NONE` = 1.
     pub mult: ExprId,
+    /// How `mult` multiplies (A15 C1): `Parallel` unless an `Instance` states ngspice's law.
+    pub mult_law: MultLaw,
 }
 
-const _: () = assert!(size_of::<ElemHead>() == 32);
+const _: () = assert!(size_of::<ElemHead>() == 36);
 
 impl Builder<'_> {
     /// Interns a header's name, terminals and parameters; `master` becomes an unresolved
@@ -146,6 +150,7 @@ impl Builder<'_> {
             model,
             params,
             mult,
+            mult_law: MultLaw::Parallel,
         }
     }
 
@@ -191,6 +196,7 @@ impl Builder<'_> {
             params: head.params,
             mult: head.mult,
             detail,
+            mult_law: head.mult_law,
         };
         let v = verdict(self.design(), &row);
         assert!(

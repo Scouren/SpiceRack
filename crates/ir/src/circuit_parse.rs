@@ -71,6 +71,7 @@ pub(crate) fn parse_element(
         params: List::EMPTY,
         mult: ExprId::NONE,
         detail: NO_ROW,
+        mult_law: crate::element::MultLaw::Parallel,
     };
     let mut cx = Cx {
         words: &mut *words,
@@ -262,6 +263,12 @@ impl Cx<'_, '_, '_> {
                     }
                     "mult" => {
                         h.mult = self.words.value(self.scope, self.b, self.diags);
+                        continue;
+                    }
+                    "mult_law" => {
+                        let mut law = h.mult_law;
+                        self.read_field(Field::Choice(&mut law));
+                        h.mult_law = law;
                         continue;
                     }
                     _ => {}

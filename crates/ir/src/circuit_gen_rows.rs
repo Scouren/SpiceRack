@@ -21,7 +21,7 @@ use crate::id::{List, NameId};
 use crate::library::DeviceLibrary;
 use crate::line::Line;
 use crate::model::ModelFamily;
-use crate::passive::{IcMode, Parasitics, Passive};
+use crate::passive::{IcMode, Parasitics, Passive, TcBase, TcLaw};
 use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::span::Span;
 use crate::wave::WaveRef;
@@ -106,6 +106,8 @@ impl R<'_, '_> {
             parasitics,
             ic_mode,
             noisy,
+            tc_base: TcBase::Tnom,
+            tc_law: TcLaw::Direct,
         }
     }
 
@@ -233,6 +235,7 @@ impl R<'_, '_> {
             dtemp,
             rpar,
             output,
+            tc_base: TcBase::Tnom,
         }
     }
 

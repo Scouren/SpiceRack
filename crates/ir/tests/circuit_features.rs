@@ -19,7 +19,7 @@ mod tests {
         Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, OutKind, Quantity,
         TableLaw, TableSource,
     };
-    use spicerack_ir::passive::{Coupling, IcMode, Parasitics, Passive};
+    use spicerack_ir::passive::{Coupling, IcMode, Parasitics, Passive, TcBase, TcLaw};
     use spicerack_ir::semi::{InitialState, Switch};
     use spicerack_ir::source::{DcRule, Distof, Source};
     use spicerack_ir::wave::{
@@ -255,6 +255,33 @@ mod tests {
         b.line(top, ElemKind::LosslessLine, h, row, Span::NONE);
     }
 
+    /// A behavioural source with a `tc1` (when `tc`) measured from `base`.
+    fn behav_tc(b: &mut Builder<'_>, top: ScopeId, tc: bool, base: TcBase) {
+        let e = n(b, 1);
+        let tc1 = opt(b, tc);
+        let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+        let row = spicerack_ir::controlled::Behav {
+            tc1,
+            tc_base: base,
+            ..behav(e, OutKind::Voltage)
+        };
+        b.behav(top, ElemKind::Behav, h, row, Span::NONE);
+    }
+
+    /// A capacitor whose value reads the circuit, with a `tc1` applied by `law`.
+    fn dynamic_cap(b: &mut Builder<'_>, top: ScopeId, law: TcLaw) {
+        let value = b.v("a", None);
+        let tc1 = n(b, 1);
+        let h = b.head("c1", &["a", "0"], None, &[], ExprId::NONE);
+        let row = Passive {
+            value,
+            tc1,
+            tc_law: law,
+            ..Passive::PLAIN
+        };
+        b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
+    }
+
     fn pulse_law(b: &mut Builder<'_>, top: ScopeId, law: PulseLaw) {
         let one = n(b, 1);
         let w = b.wave(spicerack_ir::wave::Pulse { law, ..pulse(one) });
@@ -426,9 +453,22 @@ mod tests {
             let m = opt(b, on);
             semi_el(b, t, ElemKind::Diode, &["a", "0"], m, semi())
         }),
-        (X::MultInstance, |b, t, on| {
+        (X::MultInstanceParallel, |b, t, on| {
             let m = opt(b, on);
             let h = b.head("e1", &["a"], Some("sub"), &[], m);
+            b.instance(t, ElemKind::Instance, h, Span::NONE);
+        }),
+        (X::MultInstanceNgspiceAppend, |b, t, on| {
+            let m = n(b, 2);
+            let law = if on {
+                spicerack_ir::MultLaw::NgspiceAppend
+            } else {
+                spicerack_ir::MultLaw::Parallel
+            };
+            let h = spicerack_ir::ElemHead {
+                mult_law: law,
+                ..b.head("e1", &["a"], Some("sub"), &[], m)
+            };
             b.instance(t, ElemKind::Instance, h, Span::NONE);
         }),
         (X::MultModule, |b, t, on| {
@@ -1319,6 +1359,16 @@ mod tests {
                 },
                 Span::NONE,
             );
+        }),
+        (X::TcBaseTnom, |b, t, on| behav_tc(b, t, on, TcBase::Tnom)),
+        (X::TcBaseFixed27, |b, t, on| {
+            behav_tc(b, t, true, if on { TcBase::Fixed27 } else { TcBase::Tnom })
+        }),
+        (X::TcLawDirect, |b, t, on| {
+            dynamic_cap(b, t, if on { TcLaw::Direct } else { TcLaw::Reciprocal })
+        }),
+        (X::TcLawReciprocal, |b, t, on| {
+            dynamic_cap(b, t, if on { TcLaw::Reciprocal } else { TcLaw::Direct })
         }),
     ];
 

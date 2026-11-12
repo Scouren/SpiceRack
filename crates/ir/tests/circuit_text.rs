@@ -277,6 +277,7 @@ mod tests {
                 model,
                 params: List::EMPTY,
                 mult,
+                mult_law: spicerack_ir::MultLaw::Parallel,
             };
             b.instance(top, ElemKind::Instance, h, Span::NONE);
         });
@@ -422,6 +423,40 @@ mod tests {
                 family: ModelFamily::Bsim4,
             };
             b.device_library(top, lib, Span::NONE);
+        });
+    }
+
+    #[test]
+    fn ngspice_multiplier_and_behavioural_temperature_laws() {
+        let text = "file \"t.sp\" deck\n  subckt div (a b)\n  element instance x1 (in out) model=div \
+                    mult=2 mult_law=ngspice_append\n  element capacitor c1 (a 0) value=(v(a)) tc1=1m \
+                    tc_base=fixed27 tc_law=reciprocal\n";
+        same(text, |b, top| {
+            b.subckt(top, "div", &["a", "b"], &[], Span::NONE);
+            let name = b.name("x1");
+            let terminals = b.names(&["in", "out"]);
+            let div = b.name("div");
+            let mult = n(b, 2);
+            let h = ElemHead {
+                name,
+                terminals,
+                model: Ref::unresolved(div),
+                params: List::EMPTY,
+                mult,
+                mult_law: spicerack_ir::MultLaw::NgspiceAppend,
+            };
+            b.instance(top, ElemKind::Instance, h, Span::NONE);
+            let h = head(b, "c1", &["a", "0"]);
+            let value = b.v("a", None);
+            let tc1 = k(b, 1, -3);
+            let row = Passive {
+                value,
+                tc1,
+                tc_base: spicerack_ir::passive::TcBase::Fixed27,
+                tc_law: spicerack_ir::passive::TcLaw::Reciprocal,
+                ..Passive::PLAIN
+            };
+            b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
         });
     }
 }

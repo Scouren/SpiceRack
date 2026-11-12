@@ -24,7 +24,7 @@ use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
     Quantity, TableLaw, TableSource,
 };
-use crate::element::{DetailKind, ElemKind, NO_ROW};
+use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
@@ -124,6 +124,7 @@ pub(crate) fn generate_element(
         model,
         params: List::EMPTY,
         mult,
+        mult_law: MultLaw::Parallel,
     };
     let detail = r.detail(kind, two_terminal, out, ctl);
     r.b.element(scope, kind, head, detail, Span::NONE)
