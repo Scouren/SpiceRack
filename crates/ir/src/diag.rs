@@ -287,6 +287,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a definition the index holds for an item no scope lists",
             "a pass took an item out of a list, or moved it, without the editor's remove_item or move_item: a lookup would still find its definition.",
         ),
+        Violation::CallArity => (
+            "a call whose arguments do not match its function's formals",
+            "a user function is called with more or fewer arguments than it has formals; every simulator we know refuses it.",
+        ),
     }
 }
 

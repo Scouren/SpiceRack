@@ -93,6 +93,10 @@ pub enum Violation {
     /// `Editor::remove_item` and `Editor::move_item`), or a reference is bound to a definition
     /// the index does not hold. `arg`: the definition.
     StaleDefinition,
+    /// A user call bound to a function whose formals number differently from its arguments
+    /// (the lead's ruling on A28's finding b: no simulator we know accepts one). `arg`: the call's
+    /// expression.
+    CallArity,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -103,7 +107,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::StaleDefinition as usize + 1] = [
+    pub const ALL: [Violation; Violation::CallArity as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -122,6 +126,7 @@ impl Violation {
         Violation::DuplicateElement,
         Violation::DefinitionCycle,
         Violation::StaleDefinition,
+        Violation::CallArity,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
