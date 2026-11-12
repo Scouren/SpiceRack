@@ -425,6 +425,11 @@ once, at its item (a definition neither a deps-first nor a readers-first worklis
 what it reads give, so the cycle no longer makes every reader `Circuit` and a `ProbeContext`
 report.
 
+**A28 (2026-11-12): `idt` takes an initial value.** `Func::Idt` takes one or two operands:
+`idt(x)` is `∫₀ᵗ x dt` from 0, `idt(x, ic)` starts from `ic`, and the operating point reads
+`ic` (VACASK run bp3). One row per meaning: a literal 0 initial value is the absent one, and
+`check` refuses it (`LiteralShape`, at the item). The generator draws the one-operand form.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

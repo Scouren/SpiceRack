@@ -58,7 +58,8 @@ pub enum Violation {
     /// A literal's value is not finite (`1e400`). `arg`: the expression.
     NonFinite,
     /// A literal breaks an invariant of `Literal` (mantissa range, `frac`, an `exp10` its form
-    /// does not allow, a non-canonical zero). `arg`: the expression.
+    /// does not allow, a non-canonical zero), or an `idt` whose initial value is a literal 0 (the
+    /// absent one written again, A28; at the item). `arg`: the expression.
     LiteralShape,
     /// A name used by a row is empty. `arg`: the name.
     EmptyName,
@@ -461,6 +462,14 @@ fn expression(
             }
             Expr::Call(f, _) if f.reads_circuit() && !dynamic => {
                 out.report(Violation::ProbeContext, item, node.0)
+            }
+            // A28: `idt(x, 0)` is `idt(x)` written twice
+            Expr::Call(Func::Idt, args)
+                if d.exprs(args).get(1).is_some_and(
+                    |&ic| matches!(d.expr(ic), Expr::Num(n) if d.literal_value(d.num(n)) == 0.0),
+                ) =>
+            {
+                out.report(Violation::LiteralShape, item, node.0)
             }
             Expr::Param(r) if r.is_resolved() && !param_target_ok(d, item, r) => {
                 out.report(Violation::RefTarget, item, r.def.0)
