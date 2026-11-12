@@ -434,10 +434,7 @@ fn inline_funcs_keeps_every_value() {
     let generated = keeps_generated_values("inline_funcs", call, true);
     eprintln!("inline_funcs: {points} boundary points, {generated} generated roots");
     assert!(generated > 0);
-    assert_eq!(
-        notes("inline_funcs", "refused"),
-        [code(113), code(113), code(113)]
-    );
+    assert_eq!(notes("inline_funcs", "refused"), [code(113)]);
     assert_eq!(notes("drop_unused_funcs", "plain"), [code(114)]);
 }
 

@@ -1,4 +1,2 @@
-# a draw read twice; a recursive function (r's own body also calls r)
-U0113
-U0113
+# a draw the body reads twice (a recursive function is X0017, DefinitionCycle, since round 7)
 U0113

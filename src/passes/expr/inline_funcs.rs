@@ -128,13 +128,8 @@ fn drop_uncalled(design: &mut ir::Design, may: &[bool]) {
         }
         let mut editor = design.editor();
         for (item, scope) in unused {
-            let items = editor.items_mut(scope);
-            let before = items.len();
-            items.retain(|&i| i != item);
-            assert!(
-                items.len() + 1 == before,
-                "the function stood once in its scope"
-            );
+            // the door takes its definition out of the index too (a stale one is X0018)
+            editor.remove_item(scope, item);
         }
     }
     unreachable!("each round drops a function or ends")
