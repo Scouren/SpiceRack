@@ -36,7 +36,7 @@
 mod behavioural;
 mod masters;
 
-pub(super) use masters::{Declared, Found, Master, Source, find};
+pub(super) use masters::{Aimed, Declared, Found, Master, find};
 
 use super::expr_read::{self, Context, Refusal};
 use super::families::{self, Name};
@@ -136,8 +136,8 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     (
         TOO_MANY,
         ir::Info {
-            title: "a subcircuit instance with more terminals than its subcircuit has ports",
-            cite: "settle fwd_long (VACASK 36be560: \"Too many terminals specified at instantiation.\"); R61, A36",
+            title: "an instance with more terminals than its subcircuit or shipped module has",
+            cite: "settle fwd_long, fwd_module (VACASK 36be560: \"Too many terminals specified at instantiation.\"); R61, A36",
             explain: "VACASK rejects an instance that connects more nodes than its subcircuit declares ports.",
             kind: ir::Kind::Refusal,
         },
@@ -428,11 +428,13 @@ fn device(
     if let Some(m) = families::module(word)
         && who.1.len() != usize::from(m.terminals)
     {
-        let class = match who.1.len() < usize::from(m.terminals) {
-            true => ir::OpaqueClass::Private,
-            false => ir::OpaqueClass::InvalidInSource,
+        // Settle fwd_module: more terminals than a shipped module has is the same error as a
+        // subcircuit's ("Too many terminals specified at instantiation.").
+        let (class, code) = match who.1.len() < usize::from(m.terminals) {
+            true => (ir::OpaqueClass::Private, TERMINALS),
+            false => (ir::OpaqueClass::InvalidInSource, TOO_MANY),
         };
-        return read::opaque(l, n, class, Some(TERMINALS));
+        return read::opaque(l, n, class, Some(code));
     }
     let mut slots = Vec::with_capacity(entries.len());
     for (key, _) in entries {

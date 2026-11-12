@@ -15,3 +15,4 @@ l1 (l1 0) l inductance=1m temp=77 scale=3
 rb (n1 0) r r=1k bogus=1
 rn (n1 0) r r=1k noisy=2
 rt (n1) r r=1k
+rl (n1 n2 0) r r=1k

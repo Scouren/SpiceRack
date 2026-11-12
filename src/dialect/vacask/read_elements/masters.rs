@@ -9,9 +9,9 @@
 //! own).
 //!
 //! And each instance's master and `type` word, so a `sweep` can tell an independent source's DC
-//! value from a device parameter (R64: `Declared::source`, `Declared::has_instance`, `Declared::by_section`).
+//! value from a device parameter (R64: `Aimed`, `Declared::aim`, `Declared::by_section`).
 //!
-//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`, `Declared::has_instance`, `Declared::by_section`
+//! Contents: `Declared`, `Master`, `Found`, `declare`, `find`, `Aimed`, `Declared::aim`, `Declared::by_section`
 //! (crate-private to the dialect)
 
 use std::collections::{HashMap, HashSet};
@@ -32,23 +32,30 @@ pub(in crate::dialect::vacask) struct Declared {
     /// `(holder, instance name)` → its master's name (`None`: a behavioural source) and its
     /// `type="…"` word, if given.
     instances: HashMap<(Holder, String), Inst>,
-    /// The subcircuits an `elaborate circuit("…")` of a control block names: their instances
-    /// join the top level (VD cir-elaboration; corpus demo/bsim3-ptm/amp.sim sweeps `vin` of
-    /// the elaborated `namp`).
-    elaborated: Vec<String>,
+    /// Each `elaborate circuit("…")` of a control block, in order: its file, its start byte and
+    /// the subcircuits it names, whose instances stand at the top level from there to the next
+    /// one (VD cir-elaboration; corpus demo/bsim3-ptm/amp.sim sweeps `vin` of `namp`).
+    elaborated: Vec<(ir::FileId, u32, Vec<String>)>,
     /// The file names (the path's last part) some `include "…" section=…` names: such a file is
     /// read by section, so its text outside every section is skipped (settle
     /// star_outside_section); a file included whole reads it all (settle plain_include).
     section_included: HashSet<String>,
 }
 
-/// What an instance of a `vsource` or `isource` model is, for a sweep of its `dc` (R64).
+/// What a run statement's instance parameter aims at ([`Declared::aim`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::dialect::vacask) enum Source {
-    /// `type="dc"`, given or by default: the sweep moves its value (settle run/sweep_source).
-    Dc,
-    /// A waveform type: VACASK ignores `dc`, so the sweep moves nothing (the same deck).
-    Wave,
+pub(in crate::dialect::vacask) enum Aimed {
+    /// No file declares the instance (settle run/nosuch_alter: "Instance not found."), or a
+    /// shipped module's instance has no such parameter (dev_nosuch).
+    Missing,
+    /// The `dc` of a source of type dc: its DC value (R64; settle run/sweep_source).
+    SourceDc,
+    /// The `dc` of a waveform source, which VACASK ignores (the same deck's negative row).
+    SourceWave,
+    /// The value parameter of a resistor, capacitor or inductor (R64b).
+    ElementValue,
+    /// Any other parameter of a device.
+    Device,
 }
 
 /// What a master is.
@@ -166,8 +173,9 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
                         if ast.tag(b) == Tag::Card && head == "elaborate" {
                             let names = ast.fields(b).iter().skip(1);
                             let strings = names.filter(|&&f| ast.tag(Node(f)) == Tag::Str);
-                            out.elaborated
-                                .extend(strings.map(|&f| read::field_name(cst, f)));
+                            let subs = strings.map(|&f| read::field_name(cst, f)).collect();
+                            let start = cst.tokens.start(ast.main_token(b)) - cst.shift;
+                            out.elaborated.push((cst.file, start, subs));
                         }
                     }
                 }
@@ -208,35 +216,70 @@ pub(in crate::dialect::vacask) fn find(
 }
 
 impl Declared {
-    /// The instance `path:element` (`path` the subcircuit instances from the top) when it is
-    /// an instance of a `vsource` or `isource` model, each master found by VACASK's rule (the
-    /// holder's own, then the top's); `None` for any other instance or a name no file declares.
-    pub(in crate::dialect::vacask) fn source(
+    /// What a run statement's `instance="path:element" parameter="param"` at byte `pos` of
+    /// `file` aims at (R64, R64b, R70): no instance any file declares; the DC value of a
+    /// `vsource`/`isource` of type dc (one of a waveform type, whose `dc` VACASK ignores); the
+    /// value of a resistor, capacitor or inductor (`r`, `c`, `l`); or another device parameter.
+    /// Each master found by VACASK's rule (the holder's own, then the top's); at the top level
+    /// the instances of the subcircuits the last `elaborate circuit(…)` before `pos` names too.
+    pub(in crate::dialect::vacask) fn aim(
         &self,
         path: &[String],
         element: &str,
-    ) -> Option<Source> {
-        let (at, (master, wave)) = self.instance(path, element)?;
-        match self.master(at, master.as_deref()?)? {
-            Master::Model(word) if word == "vsource" || word == "isource" => {
-                Some(match wave.as_deref() {
-                    None | Some("dc") => Source::Dc,
-                    Some(_) => Source::Wave,
-                })
+        param: &str,
+        (file, pos): (ir::FileId, u32),
+    ) -> Aimed {
+        let Some((at, (master, wave))) = self.instance(path, element, (file, pos)) else {
+            return Aimed::Missing;
+        };
+        let word = match master.as_deref().and_then(|m| self.master(at, m)) {
+            Some(Master::Model(word)) => word.as_str(),
+            _ => return Aimed::Device,
+        };
+        let value =
+            super::super::families::module(word).map(|m| super::super::families::kind(m.family));
+        // A value parameter by any of its names (`sp_resistor`'s `r` is its `resistance`).
+        let same = |a: &str| {
+            super::super::families::canonical(word, param)
+                == super::super::families::canonical(word, a)
+        };
+        let param = match () {
+            _ if same("r") => "r",
+            _ if same("c") => "c",
+            _ if same("l") => "l",
+            _ => param,
+        };
+        match (word, param, value) {
+            ("vsource" | "isource", "dc", _) => match wave.as_deref() {
+                None | Some("dc") => Aimed::SourceDc,
+                Some(_) => Aimed::SourceWave,
+            },
+            (_, "r", Some(ir::ElemKind::Resistor))
+            | (_, "c", Some(ir::ElemKind::Capacitor))
+            | (_, "l", Some(ir::ElemKind::Inductor)) => Aimed::ElementValue,
+            // A shipped module's instance parameters are known (`families/params.txt`): another
+            // name is VACASK's error (settle run/dev_nosuch: "Parameter 'zz' not found."). A
+            // loaded module's are not, so its names pass.
+            _ if !matches!(
+                super::super::families::instance_name_in(word, param),
+                super::super::families::Name::Ir(_)
+            ) =>
+            {
+                Aimed::Missing
             }
-            _ => None,
+            _ => Aimed::Device,
         }
     }
 
-    /// Whether some file declares the instance `path:element`, as VACASK finds a run
-    /// statement's `instance=` (settle run/nosuch_alter, nosuch_sweep: "Instance not found.").
-    pub(in crate::dialect::vacask) fn has_instance(&self, path: &[String], element: &str) -> bool {
-        self.instance(path, element).is_some()
-    }
-
     /// The holder and entry of instance `path:element`: each path step an instance whose master
-    /// is a subcircuit, found by VACASK's rule.
-    fn instance(&self, path: &[String], element: &str) -> Option<(Holder, &Inst)> {
+    /// is a subcircuit, found by VACASK's rule; a top-level name also among the instances of the
+    /// subcircuits the epoch's `elaborate` names (the last one before `pos` in `file`).
+    fn instance(
+        &self,
+        path: &[String],
+        element: &str,
+        (file, pos): (ir::FileId, u32),
+    ) -> Option<(Holder, &Inst)> {
         let mut at = Holder::Top;
         // Bounded by the path's length.
         for inst in path {
@@ -249,11 +292,14 @@ impl Declared {
         if let Some(entry) = self.instances.get(&(at, element.to_string())) {
             return Some((at, entry));
         }
-        // An elaborated subcircuit's instances stand at the top level too.
         if !path.is_empty() || at != Holder::Top {
             return None;
         }
-        self.elaborated.iter().find_map(|sub| {
+        let epoch = self
+            .elaborated
+            .iter()
+            .rfind(|(f, start, _)| *f == file && *start < pos)?;
+        epoch.2.iter().find_map(|sub| {
             let own = *self.bodies.get(&(Holder::Top, sub.clone()))?;
             self.instances
                 .get(&(own, element.to_string()))

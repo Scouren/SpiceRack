@@ -1,0 +1,27 @@
+# Oracle: R64b, R70; settle run/elab_targets (VACASK 36be560: after `elaborate circuit("pa")`
+# the sweep of `vin`'s `dc` moves pa's source, of `r1`'s `r` pa's resistor, and the alters set
+# them; after `elaborate circuit("pb")` `vin` is pb's resistor, its `r` swept): a run target's
+# kind is the epoch's instance's: a dc source's DC value, a passive's value.
+# codes:
+file "elab_targets.sim" deck
+  title "targets through elaboration"
+  device_library resistor
+  device_library capacitor
+  model res resistor
+  model cap capacitor
+  model vsource source_v
+  subckt pa ()
+    element vsource vin (g 0) model=vsource dc=1i
+    element resistor r1 (g h) model=res value=1k
+    element resistor r2 (h 0) model=res value=1k
+  subckt pb ()
+    element resistor vin (g 0) model=res value=1k
+    element vsource vs (g 0) model=vsource dc=2i
+  elaborate (pa)
+  analysis dc name=d1 (source_dc vin) (list values=[1i, 2i]) name=sv
+  analysis dc name=d2 (element_value r1) (list values=[1k, 3k]) name=sr
+  alter (source_dc vin) value=4i
+  alter (element_value r1) value=3k
+  analysis op name=o1
+  elaborate (pb)
+  analysis dc name=d3 (element_value vin) (list values=[1k, 2k]) name=sw

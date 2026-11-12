@@ -1,0 +1,7 @@
+an mc sample count from a parameter
+parameters k=2
+control
+  mc m1 samples=k
+    analysis op1 op
+  endmc
+endc

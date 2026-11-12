@@ -27,7 +27,7 @@ pub(super) fn loop_(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
             let s: ir::plan::SweepLoop = d.detail(row.detail);
             w.out.push_str("sweep ");
             name::spell(&name, Place::Other, w.out);
-            target(d, s.target, w.out);
+            target(d, w.epoch, s.target, w.out);
             range(d, s.sweep, w.out);
             w.out.push('\n');
             // A sweep inside a sweep stands on the line below it, unindented (VD cmd-sweep
@@ -70,7 +70,7 @@ pub(super) fn alter(w: &mut Writer<'_, '_>, row: ir::Alter) {
     w.line();
     let out = &mut *w.out;
     match t.kind {
-        ir::TargetKind::DeviceParam => {
+        ir::TargetKind::DeviceParam | ir::TargetKind::SourceDc | ir::TargetKind::ElementValue => {
             let mut path = name_of(d, t.path);
             if !path.is_empty() {
                 path.push(':');
@@ -89,10 +89,13 @@ pub(super) fn alter(w: &mut Writer<'_, '_>, row: ir::Alter) {
     }
     out.push_str(") ");
     let key = match t.kind {
-        ir::TargetKind::Param => t.a.name,
-        _ => t.b,
+        ir::TargetKind::Param => d.str(t.a.name),
+        // R64b: a dc source's `dc`, a passive's `r`, `c` or `l`.
+        ir::TargetKind::SourceDc => "dc",
+        ir::TargetKind::ElementValue => super::value_word(d, w.epoch, t),
+        _ => d.str(t.b),
     };
-    name::spell(d.str(key), Place::Other, out);
+    name::spell(key, Place::Other, out);
     out.push('=');
     write_expr(d, row.value, out);
     out.push('\n');

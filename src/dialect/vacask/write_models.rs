@@ -27,7 +27,7 @@ pub(super) const LACKED: ir::Code = ir::Code::new(b'W', 2102);
 pub(super) fn model(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let d = w.design;
     let row: ir::Model = d.row(at.index);
-    let module = word(d, &row);
+    let module = word(d, &w.words, &row);
     w.line();
     w.out.push_str("model ");
     name::spell(d.str(row.name), Place::Other, w.out);
@@ -60,19 +60,24 @@ pub(super) fn model(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
 }
 
 /// The module word a model is written with.
-pub(super) fn word(d: &ir::Design, row: &ir::Model) -> String {
+pub(super) fn word(d: &ir::Design, words: &families::Words, row: &ir::Model) -> String {
     match row.family {
         ir::ModelFamily::Module => d.str(row.module.name).to_string(),
         // Two libraries of different modules: `admits` refused the design.
-        f => families::design_word(d, f).unwrap_or_default().to_string(),
+        f => words.get(f).unwrap_or_default().to_string(),
     }
 }
 
 /// Appends a refusal for each reachable model VACASK cannot spell for a reason no feature
 /// states (R21): a name holding white space, or a parameter its module lacks.
-pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags) {
+pub(super) fn admit(
+    design: &ir::Design,
+    words: &families::Words,
+    at: ir::ItemRef,
+    diags: &mut ir::Diags,
+) {
     let row: ir::Model = design.row(at.index);
-    let module = word(design, &row);
+    let module = word(design, words, &row);
     if module.is_empty() {
         diags.push_at(LIBRARIES, design, at, 0);
     }

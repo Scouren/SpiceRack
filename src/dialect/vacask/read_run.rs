@@ -141,6 +141,11 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::AlterParam))
 // an alter applies where it stands (R70/A43)
 .with(ir::Feature::Run(ir::RunExtra::AlterParamAtOnce))
+// R64b: a dc source's `dc`, a passive's value
+.with(ir::Feature::Run(ir::RunExtra::AlterSourceDc))
+.with(ir::Feature::Run(ir::RunExtra::AlterElementValue))
+.with(ir::Feature::Run(ir::RunExtra::LoopElementValue))
+.with(ir::Feature::Run(ir::RunExtra::DcAxisElementValue))
 .with(ir::Feature::Run(ir::RunExtra::LoopDeviceParam))
 .with(ir::Feature::Run(ir::RunExtra::LoopModelParam))
 .with(ir::Feature::Run(ir::RunExtra::LoopOption))

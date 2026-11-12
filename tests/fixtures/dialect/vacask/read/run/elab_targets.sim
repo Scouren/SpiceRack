@@ -1,0 +1,28 @@
+targets through elaboration
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+model vsource vsource
+subckt pa()
+  vin (g 0) vsource dc=1
+  r1 (g h) res r=1k
+  r2 (h 0) res r=1k
+ends
+subckt pb()
+  vin (g 0) res r=1k
+  vs (g 0) vsource dc=2
+ends
+control
+  elaborate circuit("pa")
+  sweep sv instance="vin" parameter="dc" values=[1, 2]
+    analysis d1 op
+  sweep sr instance="r1" parameter="r" values=[1k, 3k]
+    analysis d2 op
+  alter instance("vin") dc=4
+  alter instance("r1") r=3k
+  analysis o1 op
+  elaborate circuit("pb")
+  sweep sw instance="vin" parameter="r" values=[1k, 2k]
+    analysis d3 op
+endc
