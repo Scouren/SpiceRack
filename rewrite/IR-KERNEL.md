@@ -445,6 +445,17 @@ parameter list (a subcircuit's formals included). Live items only. Reported by `
 the item that brings the second spelling (`case::case_clashes`); an element `IS` beside a key or
 parameter `is` is two namespaces and no clash.
 
+**Round 7b (2026-11-12): the passes' doors for definitions and one tree.**
+`Editor::remove_item(scope, item)` unlists an item and takes its definitions out of the index;
+`Editor::move_item(from, item, to, at)` re-lists it and re-keys its definitions and body scopes
+to `to` (one file; the new key free); `Editor::redefine(def, item)` re-points a definition to
+another defining item (a local parameter made a formal); `Editor::rename_def(def, name)` re-keys
+one. References bound to a definition keep its `DefId` through all four. `check` reports
+`StaleDefinition` (X0018) for an index entry in a live scope whose item no live scope lists, and
+for a reference bound to a definition the index does not hold: a pass that drops through
+`Editor::items_mut` fails it. `rewrite_tree(b, root, rule)` rewrites one root with its own memo
+and returns the new root; `Builder::param_ref_to(def)` builds a bound read.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

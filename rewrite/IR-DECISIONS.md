@@ -435,3 +435,9 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - Replaces the pool-wide `case_clash`. `case::case_clashes` returns the live items that bring a second spelling; `features_used` sets the feature when there is one, and `check_legal` reports it at each such item, so the two still agree. A net clash against a global net is reported at the item naming the local net (the global's `Global` item is the first spelling's).
 - Nets are what the kernel can name without the owners' rows beyond `Element.terminals`: element terminals, subcircuit ports (in the body), global nets. A net named only in a probe or an analysis (`v(A)` beside a terminal `a`) is not yet in the namespace: no reader has produced one, and adding it means walking every probe.
 
+## Round 7b doors 2 and 3
+
+- `items_mut` stays public; its doc says what it does not maintain (the index), and `StaleDefinition` makes a bypass fail. `remove_item` removes only the item's own definitions from the index: definitions inside its dead body are unreachable by any lookup from a live scope, so `check` (live scopes only) leaves them. `remove_item` scans the definitions table, O(definitions) per call; a pass removing many items pays that per item (a per-item index of definitions, when one does).
+- `move_item` re-parents the item's body scopes and asserts both scopes are in one file (a scope's `file` is not rewritten).
+- `rename_def` leaves bound references' names to the pass (else `RefTarget`).
+

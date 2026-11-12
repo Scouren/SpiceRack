@@ -135,6 +135,7 @@ pub fn check(design: &Design, diags: &mut Diags) {
     let before = diags.len();
     let mut out = Out { design, diags };
     crate::check_scopes::files_and_scopes(&mut out);
+    crate::check_scopes::stale_definitions(&mut out);
     definitions(&mut out);
     let bad = expression_rows(&mut out);
     items(&mut out, &bad);
@@ -192,6 +193,13 @@ pub(crate) fn table_len(d: &Design, kind: ItemKind) -> usize {
 }
 
 // ---- private ----
+
+/// Whether the definition index holds `def` under its own key (round 7b: a definition a pass
+/// removed through `Editor::remove_item` is not held).
+fn in_index(d: &Design, def: DefId) -> bool {
+    let row = d.defs[def.index()];
+    d.def_index.get(&(row.scope, row.kind, row.name)) == Some(&def)
+}
 
 /// `ProbeContext` through reads (A15 K3): a constant-in-time field (`Handle::Expr`, a list or
 /// head default) whose expression is of class `Circuit` by a parameter or function it reads.
@@ -374,6 +382,8 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
                 out.report(Violation::HandleRange, item, r.def.0);
             } else if d.defs[r.def.index()].kind != kind || d.defs[r.def.index()].name != r.name {
                 out.report(Violation::RefTarget, item, r.def.0);
+            } else if !in_index(d, r.def) {
+                out.report(Violation::StaleDefinition, item, r.def.0);
             }
         }
         for h in handles.clone() {
@@ -486,6 +496,11 @@ fn expression(
             }
             Expr::Param(r) if r.is_resolved() && !param_target_ok(d, item, r) => {
                 out.report(Violation::RefTarget, item, r.def.0)
+            }
+            Expr::Param(r) | Expr::UserCall(r, _)
+                if r.is_resolved() && def_ok(d, r.def) && !in_index(d, r.def) =>
+            {
+                out.report(Violation::StaleDefinition, item, r.def.0)
             }
             Expr::UserCall(r, _) if r.is_resolved() && !same(d, r, DefKind::Func) => {
                 out.report(Violation::RefTarget, item, r.def.0)

@@ -94,7 +94,7 @@ fn a_valid_design_reports_nothing() {
 #[test]
 fn each_kernel_invariant_has_its_fixture() {
     type Break = fn(&mut Base);
-    let cases: [(Violation, Break); 14] = [
+    let cases: [(Violation, Break); 15] = [
         (Violation::HandleRange, |b| {
             let row = Param {
                 name: NameId(10_000),
@@ -203,6 +203,12 @@ fn each_kernel_invariant_has_its_fixture() {
                 value: read,
             };
             set_param(&mut b.d, b.param, row);
+        }),
+        (Violation::StaleDefinition, |b| {
+            // the parameter dropped through the raw list: its definition stays in the index
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let param = b.param;
+            b.d.editor().items_mut(top).retain(|&i| i != param);
         }),
     ];
     for (want, break_it) in cases {
@@ -396,7 +402,9 @@ fn a_dead_body_is_no_violation() {
         top
     };
     assert_eq!(violations(&d), vec![], "the live design");
-    d.editor().items_mut(top).clear();
+    // through the door (round 7b): the raw list would leave the subckt's definition stale
+    let outer = d.items(top)[0];
+    d.editor().remove_item(top, outer);
     assert_eq!(
         violations(&d),
         vec![],

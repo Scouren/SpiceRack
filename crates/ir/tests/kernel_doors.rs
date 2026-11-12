@@ -48,6 +48,25 @@ fn a_removed_item_leaves_the_index() {
     d.editor().remove_item(top, item);
     assert!(d.lookup(top, DefKind::Param, d.find_name("p")).is_none());
     assert_eq!(violations(&d), vec![]);
+    // a read still bound to the removed definition is stale too
+    let mut r = Design::new();
+    let (top, p) = {
+        let mut b = r.builder();
+        let (_, top) = b.file("t.sp", Role::Deck);
+        let one = b.num(1.0);
+        let p = b.param(top, "p", one, Span::NONE);
+        let def = b
+            .design()
+            .lookup(top, DefKind::Param, b.design().find_name("p"));
+        let read = b.param_ref_to(def);
+        b.param(top, "q", read, Span::NONE);
+        (top, p)
+    };
+    r.editor().remove_item(top, p);
+    assert_eq!(
+        violations(&r),
+        vec![violation_code(Violation::StaleDefinition)]
+    );
 }
 
 #[test]
