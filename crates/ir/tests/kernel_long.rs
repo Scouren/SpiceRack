@@ -157,3 +157,31 @@ fn check_refuses_a_long_literal_that_fits() {
         "a literal that fits is built short"
     );
 }
+
+#[test]
+fn every_zero_spelling_reads_to_one_literal_and_writes_back_to_it() {
+    // the audit's -0 finding: every spelling of a zero reads to the one zero of its type and
+    // writes back to that zero's own spelling, which reads to the same literal (oracle: the
+    // round trip, spelling by spelling)
+    let mut wrong = Vec::new();
+    for word in [
+        "-0",
+        "-0.0",
+        "-0e3",
+        "-0k",
+        "-0mil",
+        "-0i",
+        "0",
+        "0.000",
+        "-0.0000000000000000000",
+    ] {
+        let (d, e) = read(word);
+        let once = text(&d);
+        let (d2, e2) = read(once.split(" = ").nth(1).unwrap_or("").trim());
+        let same = d.literal_eq(num(&d, e), num(&d2, e2)) && text(&d2) == once;
+        if !same || once.contains("-0") {
+            wrong.push(format!("{word}: wrote {}", once.trim()));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
