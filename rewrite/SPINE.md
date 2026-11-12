@@ -194,7 +194,8 @@ laws run on.
 - `tests/dialect_laws.rs`: for every row of `BUILTIN`, the laws of REWRITE-PLAN §4.2 that apply
   to its sides (L1–L8; L6 over a corpus only under `--features corpus`; L9 belongs to each
   dialect's own simulator tests). Generated designs come from `ir::gen::generate(seed,
-  row.write.features(), size)`; seeds are fixed and printed on failure. L4 reads: `write` is
+  row.write.features(), size)`; seeds are fixed and printed on failure. L5 and L6 compare by meaning in normal form (both sides written as IR text and read back,
+  then `eq_meaning`: a reader's push order is its text's, not the generator's). L4 reads: `write` is
   total over a design `legalize` accepted. A generated design the row refuses is shrunk to what
   it admits (A25, R48): the items its refusals name (`Diag::item`) are dropped from their
   listing scopes, then the items `ir::check` no longer accepts, to a fixpoint bounded by the item

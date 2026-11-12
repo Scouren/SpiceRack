@@ -19,7 +19,8 @@
 //! `pub fn read_text(row: &DialectRow, text: &str) -> (ir::Design, ir::Diags)`,
 //! `pub fn readers() -> impl Iterator`, `pub fn writers() -> impl Iterator`,
 //! `pub fn one_file(design: &ir::Design, file: ir::FileId) -> String`,
-//! `pub fn canonical(design: &ir::Design) -> String`
+//! `pub fn canonical(design: &ir::Design) -> String`,
+//! `pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool`
 
 use std::collections::BTreeMap;
 
@@ -204,6 +205,15 @@ pub fn one_file(design: &ir::Design, file: ir::FileId) -> String {
 /// `≅`: the canonical IR text of every file (no spans in it).
 pub fn canonical(design: &ir::Design) -> String {
     design.files().map(|f| one_file(design, f)).collect()
+}
+
+/// `≅` for L5/L6 (R28): both designs in normal form (written as IR text and read back, so
+/// their ids follow the canonical order whatever order a reader pushed in), then
+/// `Design::eq_meaning` (real literals equal by value).
+pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool {
+    let ir_row = dialect::by_name("ir").expect("the ir row");
+    let normal = |d: &ir::Design| read_all(ir_row, &write_all(d, ir_row));
+    normal(a).eq_meaning(&normal(b))
 }
 
 // ---- private ----
