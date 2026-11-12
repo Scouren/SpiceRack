@@ -6,8 +6,8 @@
 //! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`
 
 use super::{
-    dc_axes_to_loops, fs, ic_next_only, loop_end, names_dropped, names_given, run_items_together,
-    save_set_to_all, sweep_forms, tc, tran_print_step, wr,
+    dc_axes_to_loops, device_ic, fs, ic_next_only, loop_end, names_dropped, names_given,
+    run_items_together, save_set_to_all, sweep_forms, tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -208,6 +208,24 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a circuit item between run items that holds run items",
             cite: "rewrite/AMEND-A12.md A22",
             explain: "The target lists a file's run items together. A circuit item between them would move before them, but it holds run items in its body or includes a file that does, and the move would reorder those, so it is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        device_ic::DEVICE_IC_MOVED,
+        ir::Info {
+            title: "a capacitor's initial condition moved into the uic transients' conditions",
+            cite: "rewrite/AMEND-A12.md A22; the runs beside device_ic_to_tran_ic's fixtures",
+            explain: "The target has no initial condition on a capacitor. Under uic this capacitor's voltage now starts every uic transient as a stated node voltage; the transient starts from stated conditions, and its point at t = 0 is no solution of the circuit on either simulator.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        device_ic::DEVICE_IC_KEPT,
+        ir::Info {
+            title: "a device initial condition the target's node conditions cannot state",
+            cite: "rewrite/AMEND-A12.md A22",
+            explain: "Under uic SPICE starts each storage element from its own state; the target starts from node voltages. They agree only when the node voltages the conditions assign give every capacitor exactly its own initial condition (zero without one) and leave every other element with a state of its own, and every voltage source, on nodes at zero. Here they do not (or the condition is an inductor's or a semiconductor's, inside a subcircuit, or not a literal), so the item is refused.",
             kind: ir::Kind::Note,
         },
     ),

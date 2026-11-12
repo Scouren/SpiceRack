@@ -1,0 +1,6 @@
+cap ic=2 to ground under uic
+* settle (device_ic_to_tran_ic): ngspice-45 -b -r: v(a) 1.999800 at 1e-7, 1.213542 at 0.5m, 0.735753 at 1m
+r1 a 0 1k
+c1 a 0 1u ic=2
+.tran 10u 1m uic
+.end

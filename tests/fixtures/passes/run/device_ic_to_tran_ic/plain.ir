@@ -1,0 +1,8 @@
+file "a.sp" deck
+  element resistor r1 (a 0) value=1k
+  element resistor r2 (b 0) value=2k
+  element capacitor c1 (a 0) value=1u ic=2 ic_mode=uic_only
+  element resistor r3 (c 0) value=1k
+  element capacitor c2 (c b) value=1u ic=0.5 ic_mode=uic_only
+  analysis op
+  analysis tran stop=3m print_step=10u max_step=10u uic
