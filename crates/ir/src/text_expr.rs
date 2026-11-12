@@ -10,7 +10,7 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §9 (text), §7.2 (A4: references), §7.3 (A3: literals).
 //!
-//! Contents: `pub struct Ctx` (`Ctx::detached`), `pub fn write_expr`, `pub fn write_value`,
+//! Contents: `pub struct Ctx`, `pub fn write_expr`, `pub fn write_value`,
 //! `pub fn write_literal`, `pub fn write_num`, `pub fn write_name`, `pub fn write_string`, `pub fn write_ref`,
 //! `pub fn write_names`, `pub fn write_exprs`, `pub fn write_params`;
 //! crate: `pub(crate) const LETTERS`, `pub(crate) fn binary_prec(BinOp) -> u8`, `pub(crate) fn func_text(Func) -> &'static str`
@@ -55,17 +55,6 @@ pub(crate) const LETTERS: [(i16, &str); 12] = [
 const UNARY: u8 = 12;
 const ATOM: u8 = 13;
 const TERNARY: u8 = 1;
-
-impl Ctx {
-    /// A context with no scope: every resolved reference is written `name#k` (always exact).
-    pub const fn detached() -> Ctx {
-        Ctx {
-            scope: ScopeId::NONE,
-            item: ItemRef::NONE,
-            formals: DefId::NONE,
-        }
-    }
-}
 
 /// Appends `e` in canonical spelling. Total over a design that passes `check`.
 pub fn write_expr(design: &Design, e: ExprId, ctx: &Ctx, out: &mut String) {
