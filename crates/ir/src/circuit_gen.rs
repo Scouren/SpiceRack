@@ -70,6 +70,9 @@ struct R<'r, 'b> {
     b: &'r mut Builder<'b>,
     f: &'r FeatureSet,
     scope: ScopeId,
+    /// The model drawn first for this element (R48 d), named by `fitting_model` before any
+    /// other: a draw among every generated model could miss it.
+    drawn: Option<Ref>,
 }
 
 /// Pushes one random element into `scope`, or returns `ItemRef::NONE` when the set allows no
@@ -85,6 +88,7 @@ pub(crate) fn generate_element(
         b,
         f: features,
         scope,
+        drawn: None,
     };
     let kinds: Vec<ElemKind> = ElemKind::ALL.into_iter().filter(|&k| r.can(k)).collect();
     if kinds.is_empty() {
@@ -105,7 +109,10 @@ pub(crate) fn generate_element(
             .collect();
         // ponytail: the model does not count against the item budget (as a required title)
         if !fits.is_empty() && r.g.below(8) != 0 {
-            r.push_model(&fits);
+            let item = r.push_model(&fits);
+            let name = r.b.design().row::<crate::model::Model>(item.index).name;
+            let def = r.b.design().lookup(scope, DefKind::Model, name);
+            r.drawn = Some(Ref { name, def });
         }
     }
     // decisions that fix the terminal count, before anything is created
@@ -139,8 +146,11 @@ pub(crate) fn generate_element(
         .flatten();
     let ports = bound.and_then(|m| master_ports(r.b.design(), m));
     let terminals = r.terminals(kind, two_terminal, ports);
+    // an instance whose master was not drawn first stays unresolved: its terminals were drawn
+    // without ports (a later draw could bind another subcircuit, R61/A36)
     let model = match bound {
         Some(m) => m,
+        None if kind == ElemKind::Instance => Ref::unresolved(r.g.fresh_name(r.b)),
         None => r.master(kind),
     };
     // an instance's multiplier comes with its law (A15 C1)
@@ -183,6 +193,7 @@ pub(crate) fn generate_model(
         b,
         f: features,
         scope,
+        drawn: None,
     };
     let families = r.model_families();
     if families.is_empty() {

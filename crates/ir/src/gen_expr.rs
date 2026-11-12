@@ -97,7 +97,7 @@ impl Gen {
             let node = if depth + 1 >= self.size.expr_depth as usize || self.chance(3) {
                 None
             } else {
-                self.operator(b, here, dynamic)
+                self.operator(b, here, dynamic, *owes)
             };
             let mut value = match node {
                 Some((node, need)) if need > 0 => {
@@ -120,7 +120,15 @@ impl Gen {
                     self.class = self.class.max(self.own_class(&node));
                     build(b, node, Vec::new())
                 }
-                Some(_) | None => self.leaf(b, here, &probes, dynamic, owes),
+                Some(_) | None => {
+                    // an operand of a typed operator is mostly an integer literal when the set
+                    // has them, so a wrong type tag shows (the `passes` agent's finding)
+                    self.int_bias =
+                        self.int_literals && stack.last().is_some_and(|f| typed(&f.node));
+                    let leaf = self.leaf(b, here, &probes, dynamic, owes);
+                    self.int_bias = false;
+                    leaf
+                }
             };
             // hand the value up, building every frame it completes
             loop {
@@ -183,6 +191,9 @@ impl Gen {
         });
         let tag = if std::mem::take(need_probe) {
             probes[self.below(probes.len() as u32) as usize]
+        } else if self.int_bias && features.contains(Feature::Expr(ExprTag::Num)) && !self.chance(4)
+        {
+            ExprTag::Num
         } else {
             let leaves: Vec<ExprTag> = CONSTANT
                 .into_iter()
@@ -315,6 +326,7 @@ impl Gen {
         b: &Builder<'_>,
         features: &FeatureSet,
         dynamic: bool,
+        owing: bool,
     ) -> Option<(Node, usize)> {
         let has = |f| features.contains(f);
         // R66: the tree's class decides the form, except in a behavioural source's expression
@@ -358,8 +370,16 @@ impl Gen {
         }
         if has(Feature::Expr(ExprTag::UserCall)) {
             let def = self.pick_def(b.design(), self.scope, DefKind::Func);
-            // without parameter reads, a bound call reads none either (its body may; R68/A42)
-            let def = if !def.is_none() && self.may_read(def) && self.param_reads {
+            // without parameter reads, a bound call reads none either (its body may; R68/A42);
+            // and a tree that still owes its probe calls no function whose every formal goes
+            // unread: the probe could land only in a slot its class skips, leaving a constant
+            // tree with dynamic operators (`floor(@g(exp($temp)))`, kernel_gen subset 9 seed 17)
+            let pays = |d: DefId| {
+                !owing
+                    || crate::class::formals_read(b.design(), d)
+                        .is_none_or(|read| read.contains(&true))
+            };
+            let def = if !def.is_none() && self.may_read(def) && self.param_reads && pays(def) {
                 def
             } else {
                 DefId::NONE
@@ -415,6 +435,24 @@ impl Gen {
 }
 
 /// Builds an operator row from its operands (in order).
+/// Whether `node` is an operator whose result depends on its operands' types: a typed or
+/// integer division, a bit operator, a conversion.
+fn typed(node: &Node) -> bool {
+    matches!(
+        node,
+        Node::Binary(
+            BinOp::DivTyped
+                | BinOp::IntDiv
+                | BinOp::BitAnd
+                | BinOp::BitOr
+                | BinOp::BitXor
+                | BinOp::Shl
+                | BinOp::Shr
+        ) | Node::Unary(UnOp::BitNot)
+            | Node::Call(Func::ToReal | Func::ToInt)
+    )
+}
+
 fn build(b: &mut Builder<'_>, node: Node, kids: Vec<ExprId>) -> ExprId {
     match node {
         Node::Unary(op) => b.unary(op, kids[0]),

@@ -221,6 +221,9 @@ impl R<'_, '_> {
     /// A visible model of a family `kind` takes (`takes`; a builtin one only with
     /// `BuiltinMaster`), drawn as `Gen::pick_def` draws, or none found.
     pub(super) fn fitting_model(&mut self, kind: ElemKind) -> Option<Ref> {
+        if let Some(r) = self.drawn {
+            return Some(r);
+        }
         let design = self.b.design();
         let def = self.g.pick_model_for(design, self.scope, kind);
         let builtin = bound_family(

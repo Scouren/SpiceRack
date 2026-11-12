@@ -163,7 +163,7 @@ impl RowFacts for Include {
         diags: &mut Diags,
     ) -> ItemRef {
         let w = words;
-        let Some(path) = w.string(diags) else {
+        let Some(path) = w.path(diags) else {
             return ItemRef::NONE;
         };
         let section = if w.key() == Some("section") {
@@ -274,7 +274,7 @@ impl RowFacts for Load {
                 return ItemRef::NONE;
             }
         };
-        let Some(path) = w.string(diags) else {
+        let Some(path) = w.path(diags) else {
             return ItemRef::NONE;
         };
         let mut modules = Vec::new();

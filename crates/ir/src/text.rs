@@ -477,7 +477,7 @@ fn file_line(
     if kw != "file" {
         return false;
     }
-    let Some(path) = w.string(diags) else {
+    let Some(path) = w.path(diags) else {
         return false;
     };
     let role = match w.next() {

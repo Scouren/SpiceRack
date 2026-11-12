@@ -12,7 +12,7 @@
 //! `Words::name(&mut self, &mut Builder<'_>, &mut Diags) -> NameId`,
 //! `Words::names(&mut self, &mut Builder<'_>, &mut Diags) -> NameList`,
 //! `Words::number(&mut self, &mut Diags) -> Option<Literal>`,
-//! `Words::string(&mut self, &mut Diags) -> Option<Cow<'t, str>>`,
+//! `Words::string(&mut self, &mut Diags) -> Option<Cow<'t, str>>`, `Words::path(&mut self, &mut Diags) -> Option<Cow<'t, str>>`,
 //! `Words::reference(&mut self, &mut Builder<'_>, &mut Diags) -> Ref`,
 //! `Words::value(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
 //! `Words::expr(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
@@ -151,6 +151,19 @@ impl<'t> Words<'t> {
         self.next();
         self.error_at(at, diags);
         None
+    }
+
+    /// A double-quoted string that names something (a file, an include, a load's path): as
+    /// [`Words::string`], and refused when empty, since a name is never empty (the builder
+    /// asserts it; the mutation law found `include ""`).
+    pub fn path(&mut self, diags: &mut Diags) -> Option<Cow<'t, str>> {
+        let at = self.pos;
+        let s = self.string(diags)?;
+        if s.is_empty() {
+            self.error_at(at, diags);
+            return None;
+        }
+        Some(s)
     }
 
     /// A reference: `name` (unresolved; `link` binds it after the whole text), `name?` (held

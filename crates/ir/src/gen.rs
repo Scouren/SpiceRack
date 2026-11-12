@@ -80,6 +80,9 @@ pub struct Gen {
     /// Whether `literal` may make an `Int` literal (the set has `Extra::IntLiteral`; set by
     /// `expr` from its feature set).
     pub(crate) int_literals: bool,
+    /// Whether the leaf being drawn is an operand of a typed operator (`gen_expr`): then it is an
+    /// integer literal three times in four.
+    pub(crate) int_bias: bool,
     /// Whether a literal may be `Long` (the set has `Extra::LongLiteral`; set by `expr`).
     pub(crate) long_literals: bool,
     /// Whether a read may bind a definition in an enclosing subcircuit's body (the set has
@@ -209,7 +212,12 @@ impl Gen {
     /// trailing zeros in `frac`, so every writer's number spelling and the literal round trip are
     /// exercised.
     pub fn literal(&mut self) -> Literal {
-        if self.int_literals && self.chance(4) {
+        let int = if self.int_bias {
+            !self.chance(4)
+        } else {
+            self.chance(4)
+        };
+        if self.int_literals && int {
             let n = self.below(2001) as i64 - 1000;
             return Literal {
                 mantissa: n,
@@ -366,6 +374,7 @@ impl Gen {
             dynamic: false,
             reads: Reads::Constant,
             int_literals: false,
+            int_bias: false,
             long_literals: false,
             enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
             param_reads: true,
