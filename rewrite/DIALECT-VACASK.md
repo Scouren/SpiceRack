@@ -3,7 +3,8 @@
 The second dialect, from a second syntax family: it tests whether the contract (`Read`, `Write`,
 `FEATURES`, passes that know no dialect) holds outside SPICE cards, and whether pair rules really
 become passes. Read `REWRITE-PLAN.md` §2–§5, §7, `rewrite/SPINE.md`, `IR-KERNEL.md` (A1–A10),
-`IR-CIRCUIT.md`, `IR-RUN.md`, `RULINGS.md` (R1–R15) and `DIALECT-NGSPICE.md` first. Everything
+`IR-CIRCUIT.md`, `IR-RUN.md`, `RULINGS.md` (R1–R22), `AMEND-A12.md` (what this plan asked of the
+IR; accepted with rulings R16–R22) and `DIALECT-NGSPICE.md` first. Everything
 here is about VACASK 36be560 (`/nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026`,
 `nix develop .#testing`). A rule is a fact of that binary with its evidence, never a memory of
 what the old writers did.
@@ -89,14 +90,14 @@ S4.0 first; S4.1–S4.4 in parallel; S4.5 last.
 | comments | `//` to end of line, `/* */` (S 14.02) | `Comment` |
 | include | textual; `section=` makes it a library call; inside a subckt what it defines is local (C A9; VD input-include) | `Include{path, section}` in its scope |
 | section | `section n … endsection` (C A14) | `Section` |
-| load | top level only; `.osdi` or `.va` (compiled by OpenVAF-r); `map=` renames modules; parameter and terminal names lowercased (VD cir-loading) | a shipped library file (`spice/*.osdi`, `spice/{sn,full}/*.osdi`, VACASK's own `resistor capacitor inductor diode bsim3v3 bsim4v8 psp103v4 vbic_1p3* tline_ideal …` under `lib/vacask/mod`) → `Load{Library, family}` (§5 G2); any other → `Load{Osdi\|VerilogA, path}`; `map=` other than the default → `Opaque` `Private` |
+| load | top level only; `.osdi` or `.va` (compiled by OpenVAF-r); `map=` renames modules; parameter and terminal names lowercased (VD cir-loading) | a shipped library file (`spice/*.osdi`, `spice/{sn,full}/*.osdi`, VACASK's own `resistor capacitor inductor diode bsim3v3 bsim4v8 psp103v4 vbic_1p3* tline_ideal …` under `lib/vacask/mod`) → `DeviceLibrary{family, path}` (A12 C5, R17; `path` `NONE` for the family's default file, a variant path as written); any other → `Load{Osdi\|VerilogA, path}`; `map=` other than the default → `Opaque` `Private` |
 | embed | `embed "f" <<<MARK … >>>MARK` writes a file (VD input-embed) | read by a `load` → `Opaque` `Private` (the module text has no IR home; VS V27); read by nothing → `Inert` (C A20) |
 | subckt | `subckt n (ports) … ends`; may nest; `global`, `ground`, `load`, `embed`, `control` forbidden inside (VD cir-subckt) | `Subckt`; nested → `Extra::NestedSubckt` |
 | parameters | a value that folds to a constant at parse time (literals, builtin constants, functions of them) is a formal an instance may override; one that reads a parameter or variable is dependent and cannot be overridden (VD cir-subckt; RUN c1: `2*3`, `M_PI`, `sqrt(4)` overridable, `q*2` "Parameter 'x' not found"; RUN t2) | in a subckt: constant → `Subckt.params`; dependent → a local `Param` item; at the top → `Param` |
 | `var` | a circuit variable, global, below parameters in lookup (VD expr-cirvars, cmd-var: right-hand sides use the values before the statement) | before the first analysis or elaborate and not shadowed by a top `Param` → top `Param`; later → `Alter{Param}`; shadowed → `Private` |
 | global | top only; ground nodes are global (VD cir-nodes) | `Global` |
 | `@if/@elseif/@else/@end` | elaboration-time; bodies hold instances, models, nested `@if` only; nonzero number or non-empty string is true (VD cir-conditional) | `If` chain; a string condition → `Private` |
-| model | `model n module params`; the module is a builtin or loaded (VD cir-masters) | `Model{family, polarity, params, module}` by `tables.rs`: `sp_resistor` Resistor, `sp_capacitor` Capacitor, `sp_inductor` Inductor, `sp_diode` Diode (`level=3` DiodeLevel3), `sp_bjt` GummelPoon, `sp_mos1/2/3/6/9` Mos1…Mos9, `sp_bsim3v3` Bsim3 (3.3.0), `sp_bsim4v8` Bsim4 (4.8.x only, S 7.04), `sp_jfet1` JfetShichman, `sp_jfet2` JfetParkerSkellern, `sp_mes1` Mesfet, `sp_vdmos` Vdmos, `vbic13`/`vbic13_5t` Vbic (1.3), `psp103va` Psp103, `bsimbulk` BsimBulk (C D47, F5; VD dev-spice); `type=±1` → `Polarity` (S 7.21); `model_<p>`/`instance_<p>` → the family's `<p>` (C F15); any other module → `ModelFamily::Module` + `Model.module` |
+| model | `model n module params`; the module is a builtin or loaded (VD cir-masters) | `Model{family, polarity, params, module}` by `tables.rs`; a builtin (`vsource isource vcvs vccs ccvs cccs mutual`) → a parameterless `Model` of the builtin's family (naming: §10 Q15, with `ir-circuit`); `sp_resistor` Resistor, `sp_capacitor` Capacitor, `sp_inductor` Inductor, `sp_diode` Diode (`level=3` DiodeLevel3), `sp_bjt` GummelPoon, `sp_mos1/2/3/6/9` Mos1…Mos9, `sp_bsim3v3` Bsim3 (3.3.0), `sp_bsim4v8` Bsim4 (4.8.x only, S 7.04), `sp_jfet1` JfetShichman, `sp_jfet2` JfetParkerSkellern, `sp_mes1` Mesfet, `sp_vdmos` Vdmos, `vbic13`/`vbic13_5t` Vbic (1.3), `psp103va` Psp103, `bsimbulk` BsimBulk (C D47, F5; VD dev-spice); `type=±1` → `Polarity` (S 7.21); `model_<p>`/`instance_<p>` → the family's `<p>` (C F15); any other module → `ModelFamily::Module` + `Model.module` |
 | instance | `name (nodes) master params`; OSDI and subckt terminals may be left unconnected (VD cir-instance); an unknown parameter is a hard error (S 7.11) | `Element` with the kind of its master; `Instance` for a subckt, `ModuleModel` for a user module |
 | `$mfactor` | parallel copies; current branches ×m, a voltage branch's voltage unchanged and its reported current per copy (VD cir-mfactor); on a subckt instance only when the subckt declares `$mfactor` (RUN n2: "Parameter '$mfactor' not found") | on a device → `Element.mult` (`CircuitExtra::Mult*`); on a subckt instance → an ordinary parameter |
 | R, C, L | `sp_resistor` takes `r temp dtemp l w tc tc2 tce bv_max scale noisy` (RUN t1 dump); `sp_capacitor` has no `ic` (`render/named/vacask_ic.rs` header, run); no `ac=` (S 6.17) | `Passive{value, temp_abs, dtemp, tc1, tc2, tce, scale, noisy}` |
@@ -117,10 +118,10 @@ S4.0 first; S4.1–S4.4 in parallel; S4.5 last.
 
 | Area | VACASK's meaning (evidence) | IR |
 |---|---|---|
-| literals | digits, `.`, exponent `e`/`E`, one scale `a f p n u m k K M x X meg G T mil`, then letters/`_` ignored after a scale only; `1k5`, `1e3k`, `1d3` are no numbers; `0x…` hex; `inf`, `nan` (S 1.01–1.07, 1.13; VD input-numbers; RUN f1: `1M`=1e6, `2x`=2e6, `1mil`=2.54e-5) | `Literal` as written (R1); hex → its value, `Plain`; `inf`/`nan` → `InvalidInSource` (the NaN gate, C9) |
-| integer type | digits only (or hex) is an integer literal; a point, exponent or scale makes a real (RUN f1: `2./3` 0.667; RUN i1: `1/3` 0, `1k/3` 333.3) | `NumForm::Int` for an integer literal (§5 G1) |
+| literals | digits, `.`, exponent `e`/`E`, one scale `a f p n u m k K M x X meg G T mil`, then letters/`_` ignored after a scale only; `1k5`, `1e3k`, `1d3` are no numbers; `0x…` hex; `inf`, `nan` (S 1.01–1.07, 1.13; VD input-numbers; RUN f1: `1M`=1e6, `2x`=2e6, `1mil`=2.54e-5) | `Literal` as written (R1); hex → its value, `Int` (RUN f1: `0x10/3` = 5); `inf`/`nan` → `InvalidInSource` (the NaN gate, C9) |
+| integer type | digits only (or hex) is an integer literal; a point, exponent or scale makes a real (RUN f1: `2./3` 0.667; RUN i1: `1/3` 0, `1k/3` 333.3) | `NumForm::Int` for an integer literal, hex included (A12 K1) |
 | `/` | truncating when both operands are integers **at evaluation**: `-7/2` −3, `a/b` with `a=1 b=3` 0 (RUN i1); the type follows the actual value: `x/2` is 1 for `x=3`, 1.5 for `x=3.0` (RUN t3) | `BinOp::DivTyped` (§5 G1), always: the reader does not type (§6 does) |
-| result types | int: `int()`, `sgn`, comparisons, `+ - *` and unary `-` of ints, `min`/`max` of ints, a ternary's chosen branch; real: `**`, `integer()`, `floor`, `ceil`, `round`, `abs` (RUN f2) | the typing table of `DivTyped`'s definition (§5 G1) |
+| result types | int: `int()`, `sgn`, comparisons, `&& \|\| !`, bit operators and shifts, `+ - *` and unary `-` of ints, `min`/`max` when every operand is int, a ternary's chosen branch; real: `**`, `pow`, `integer()`, `floor`, `ceil`, `round`, `abs`, `atan2`, `hypot`, `min(3, 5.0)` (RUN f2, f3) | A12 K1's tag table (it matches every row of f2 and f3) |
 | operators | `? :` lowest, right; `\|\| && \| ^ & == != < <= > >= << >> + - * /` left; `**` right; unary `- ! ~` bind tighter than `**`: `-2**2` = 4; `2**3**2` = 512; `^` bitwise XOR (`7^3` = 4) (VD expr-operators; RUN e1) | tree as grouped; `Pow`; `BitXor`, `BitAnd`, `BitOr`, `Shl`, `Shr`, `BitNot`; `Not`; no `%` |
 | ternary | C grouping: `1?0?4:8:16` = 8 (RUN e1) | `Ternary` |
 | functions | `log`=`ln` natural, `log10`, `sqrt`, `exp`, `pow`=`**` (signed: `(-2)**3` = −8, RUN e1), `abs`, `floor`, `ceil`, `round` half away (2.5→3, −2.5→−3), `integer` truncates, `int` truncates to an int, `fmod` dividend's sign (−1), trig, hyperbolic, `atan2`, `hypot`, 2-argument `min`/`max` (VD expr-functions; RUN e1, f2) | `Ln`, `Log10`, `Sqrt`, `Exp`, `Pow`, `Abs`, `Floor`, `Ceil`, `RoundHalfAway`, `Trunc`, `ToInt` (§5 G1), `Fmod`, …, `Atan2`, `Hypot`, `Min`, `Max` |
@@ -135,7 +136,7 @@ S4.0 first; S4.1–S4.4 in parallel; S4.5 last.
 
 | Statement | VACASK's meaning (evidence) | IR |
 |---|---|---|
-| `options k=v` | accumulate, applied before the next analysis (VD cmd-overview) | `reltol abstol vntol chgtol gmin gshunt scale` → `OptionRow` portable keys; `temp`/`tnom` → `Env`; `tran_method` trap/euler/gear2/bdf2/am/gear + `tran_maxord` → `MethodTrap\|MethodEuler\|MethodGear` + `MaxOrd`; `op_itl` Itl1, `tran_itl` Itl4, `homotopy_gminsteps` GminSteps, `homotopy_srcsteps` SrcSteps, `op_skipinitial=1` NoOpIter (C I5; `syntax/dialects/vacask.rs:181-237`); `rawfile` and output-only keys → `Inert`; every other (`tran_lteratio`, `tran_rmax`, `tolscale`, `nr_*`, `homotopy_*`, `smsig_*`, `solver`, `omp`, …) → `OptionKey::Private` (§10 Q4) |
+| `options k=v` | accumulate, applied before the next analysis (VD cmd-overview) | `reltol abstol vntol chgtol gmin gshunt scale` → `OptionRow` portable keys; `temp`/`tnom` → `Env`; `tran_method` trap/euler/gear2/bdf2/am/gear + `tran_maxord` → `MethodTrap\|MethodEuler\|MethodGear` + `MaxOrd`; `op_itl` Itl1, `tran_itl` Itl4, `homotopy_gminsteps` GminSteps, `homotopy_srcsteps` SrcSteps, `op_skipinitial=1` NoOpIter (C I5; `syntax/dialects/vacask.rs:181-237`); `rawfile` and output-only keys → `Inert`; solver knobs (`tran_lteratio`, `tran_rmax`, `tran_fs`, `tran_minpts`, `nr_*`, `homotopy_*` other than the two above, `smsig_*`, `solver`, `omp`, …) → one `Opaque` of class `Hint` per `options` line (R19, A12 K3); accuracy targets VACASK alone has (`tolscale`, `tolmode`, `relref`) → `Private` (R19; the corpus has one deck with `tolscale`, `demo/sc/lpfilter.sim`, at its default 1, beside `tolmode="mixed"`) |
 | `analysis n op` | (VD cmd-analysis-op) | `Analysis{Op, name}` |
 | `sweep` + `analysis n op` | one raw file over the grid (VD cmd-sweep) | `Dc{axes}`: the last `sweep` line is the innermost axis (VD "Nested sweeps"); targets `instance=… parameter="dc"` SourceDc, principal parameter ElementValue, other DeviceParam, `model=` ModelParam, `option="temp"` Temp (S 4.04), other option Option, `variable=`/`__topinst__` Param |
 | `sweep` + any other analysis | re-runs that one analysis only; the swept value is **restored** afterwards (RUN s1: the op after sweeps over 2 and 3 reads 1; VD says "left at its last value": the run wins); `points` counts intervals (VD; S 8.06) | `Loop{Sweep, after: Restore}` whose body is the analysis; `lin points=n` → `n+1` values (spelling); bounds may read an outer swept variable (S 8.22) |
@@ -171,8 +172,9 @@ endc` holding the run items in order (one per file, VD cmd-overview). The writer
   same tree; `Temp` `$temp`, `Tnom` `$tnom`, `Time` `$abstime`; no braces;
 - writes names exactly, quoting with `'…'` any name that is no identifier or holds `:`
   (C B19; VD cmd-save), and `0` for ground;
-- spells `Load{Library, family}` as the library file of the family (`tables.rs`), and each
-  `Model` with its module word; never invents a load or a model (§6 does);
+- spells `DeviceLibrary{family, path}` as `load` of `path`, or of the family's default file
+  (`tables.rs`), and each `Model` with its module word; never invents a load or a model (§6
+  does);
 - spells `Dc{axes}` as `sweep` lines (innermost last) + `analysis … op`; a `Loop{Sweep}` as its
   `sweep` lines repeated before every analysis of its body (a sweep binds one analysis, VD
   cmd-sweep); `Loop{MonteCarlo}` as `mc … endmc`; `NodeSet` lists on the analyses they apply to;
@@ -187,18 +189,20 @@ endc` holding the run items in order (one per file, VD cmd-overview). The writer
 `PulseCycles`, `SffmNgspice`, `MultInstance`, `DrawWhen(Always)`, `RunExtra::LoopKeepLast`,
 `TranCapNgspice`, and every element with no model of a kind VACASK serves only through a module
 (§5 G2). Each lacked feature has a pass (§6) or a citation row in
-`tests/fixtures/dialect/vacask/citations.toml`.
+`tests/fixtures/dialect/vacask/citations.toml`. What no feature states (a model parameter the
+module lacks, which VACASK rejects: S 7.11) is refused by `Write::admits` (R21, A12 S1) from the
+parameter tables in `tables.rs`.
 
 ## 5. IR gaps
 
 R8: a gap gets its typed row in the slice of the second dialect that has the meaning. G1–G4 and
 G6–G11 are typed here because ngspice reads or writes the meaning through a §6 pass in this
-slice (Q3 asks the lead to confirm that reading of R8).
+slice (R18 confirms that reading of R8).
 
 | Gap | VACASK meaning (evidence) | Proposal | Owner | Now? |
 |---|---|---|---|---|
-| G1 typed arithmetic | integer literals, truncating `/` on integer values, result types per operator and function (§3.3; RUN i1, t3, f2) | `NumForm::Int`; `BinOp::DivTyped` (C's division on the operands' types); `Func::ToInt` (trunc, integer-typed); the reference evaluator carries an int/real tag per value; the typing table in `DivTyped`'s doc | kernel | now (Q1) |
-| G2 device library | a device of a family is the simulator's own build of it, named by a `load` of a shipped file and a `model` (VD cir-loading, dev-spice; RUN n2) | `LoadKind::Library` with `family: ModelFamily` and `path` (`NONE` = the target's default file for that family; `spice/sn/…` kept as written); a design feature "a model of family F with no `Library` load of F" and "an element of a module-only kind with no model" for the passes of §6 | kernel (`Load`), circuit (the features) | now (Q2) |
+| G1 typed arithmetic | integer literals, truncating `/` on integer values, result types per operator and function (§3.3; RUN i1, t3, f2) | `NumForm::Int`; `BinOp::DivTyped` (C's division on the operands' types); `Func::ToInt` (trunc, integer-typed); the reference evaluator carries an int/real tag per value; the typing table in `DivTyped`'s doc | kernel | accepted: A12 K1 (R16) |
+| G2 device library | a device of a family is the simulator's own build of it, named by a `load` of a shipped file and a `model` (VD cir-loading, dev-spice; RUN n2) | item `DeviceLibrary{family, path}` (`path` `NONE` = the target's default file; `spice/sn/…` kept as written); a design feature "a model of family F with no `DeviceLibrary` of F" and an item feature "an element with no model" | circuit | accepted: A12 C5 (R17) |
 | G3 pulse law | `fall ≤ 0` no falling edge, `period ≤ 0` one pulse, `rise > 0` (RUN p1, p2) | `Pulse.law: PulseLaw::{Spice, Vacask}`; features `CircuitExtra::PulseSpice`, `PulseVacask` | circuit | now |
 | G4 EXP `td2` | counted from `delay` (S 5.08). IR-CIRCUIT §3 says "its reader adds": that puts `delay` in two fields, which R13(b) forbids | `Exp.td2_from: TdFrom::{Zero, Td1}` + features | circuit | now (amends IR-CIRCUIT §3) |
 | G5 PWL shaping | `scale offset stretch tdphase` (VD; S 5.33 says fold at read: that repeats an operand in every point, R13(b)) | `Pwl.{scale, offset, stretch, phase_deg}`; Spectre has the first three (S 5.33) | circuit | Spectre slice; `Private` now (0 `type="pwl"` decks in the corpus) |
@@ -208,7 +212,7 @@ slice (Q3 asks the lead to confirm that reading of R8).
 | G9 enclosing scope | ngspice binds a nested subckt's reference to an enclosing subckt's parameter or model; VACASK never does (RUN n1, m1) | `Extra::EnclosingRef` (a `Ref` bound in an enclosing, non-top subckt scope), set by `features_used` | kernel | now |
 | G10 dependent formal | a formal default that reads a parameter (ngspice `params: y={x*2}`); VACASK cannot override it (RUN c1, t2) | `Extra::FormalReadsParam` | kernel | now |
 | G11 loop over op | VACASK spells a `Dc` as `sweep` + `op`, so a `Loop{Sweep}` whose body is one `Op` has no other spelling | `RunExtra::LoopOverOp` | run | now |
-| G12 solver hints | VACASK-only options that tune convergence or accuracy only (`tran_lteratio`, `tran_rmax`, `nr_*`, `homotopy_*`, `tolscale`, …): the old writer dropped them with W0024 (VS V14) | `OptionRow.hint: bool`, dropped with a note by `legalize` like `Inert` (R11) | run | Q4 |
+| G12 solver hints | VACASK-only options that tune convergence or accuracy only (`tran_lteratio`, `tran_rmax`, `nr_*`, `homotopy_*`, `tolscale`, …): the old writer dropped them with W0024 (VS V14) | `OpaqueClass::Hint`: another family drops it with its own note | kernel | accepted: A12 K3 (R19) |
 | G13 vectors | vector and list values, indexing, vector sweeps (VD expr-vectors; S 3.08) | `Private` | — | later |
 | G14 behavioural extras | `expr=`/`declarations=`/`evaluation=`/`discipline=`; `white_noise`, `flicker_noise` | R13 says a function is a `Func` member: `WhiteNoise`, `FlickerNoise` when a second dialect has them; `Private` statement now (0 in the corpus) | kernel | later (Q11) |
 | G15 `$scale` | the `scale` option as an operand (VD expr-special) | kernel leaf `ScaleOpt` | kernel | later; 0 in the corpus |
@@ -227,14 +231,13 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 | Feature | Pass | IR → IR (one sentence) | Requires | Proof | Old rule it replaces |
 |---|---|---|---|---|---|
 | `Binary(Div)` | `div_to_div_typed` | `Div(a,b)` → `DivTyped(a,b)`, with `a` wrapped as `Mul(1., a)` unless an operand is real by the typing table | `Binary(DivTyped)` | eval (typed) | none: `respell` copied `/`, so ngspice `{1/3}` was 0 on VACASK (RUN i1): ledger |
-| `Binary(IntDiv)` | `intdiv_to_trunc` | `IntDiv(a,b)` → `Trunc(Div(a,b))` | `Func(Trunc)`, `Binary(Div)` | eval | none |
 | `Func(PowAbs)` | `powabs_to_pow` | `PowAbs(x,y)` → `Pow(Abs(x), y)` | `Func(Pow)`, `Func(Abs)` | eval | `abs_power_out` |
 | `Func(RoundHalfEven)` | `round_half_even_to_away` | `nint` → a ternary on `x − floor(x) == ½` and the parity of `floor(x)` around `RoundHalfAway` | `Floor`, `Fmod`, `RoundHalfAway`, `Ternary` | eval | none (old copied `nint`, which VACASK lacks) |
 | `Func(Sgn)` | `sgn_to_ternary` | `Sgn(x)` → `x>0 ? 1 : (x<0 ? -1 : 0)` | `Ternary`, `Gt`, `Lt` | eval | none: `sgn(0)` 0 → 1 (RUN e1): ledger |
 | `Func(Step)`, `Ramp`, `Pwl` | `step_to_ternary`, `pwl_to_ternary` | each by its definition as ternaries of its argument | `Ternary` | eval | none |
-| `DrawWhen(Always)` | refused | a fresh sample at every reference in a plain run has no VACASK form (VACASK draws only inside `mc`) | — | — | `VacaskCalls` wrote the call, so VACASK ran the nominal: ledger (Q5) |
+| `DrawWhen(Always)`, `DrawPer(Reference)` | `draws_always_to_sampling` | relabel `Always` → `Sampling` with a note (a plain run then uses the nominal); `Reference` → `CallSite` only where the joint distribution is unchanged (each draw-holding parameter read once, or no sampling loop), else refused (R22) | `DrawWhen(Sampling)`, `DrawPer(CallSite)` | sim(VACASK) nominal; eval | `VacaskCalls` (the same text, now with its note) |
 | `Expr(TStep)`, `Expr(TStop)` | `substitute_tran_leaves` | each leaf → the design's one transient's step or stop; two transients → refused | one `Tran` | sim(ngspice) | none: a given-zero `TF` was written `fall=0`, which VACASK holds (RUN p1): ledger |
-| `PulseSpice` | `pulse_spice_to_vacask` | relabel to `Vacask` when `rise > 0`, `fall > 0` and `period` is 0 or > rise+fall+width; else refused | `PulseVacask` | sim(VACASK) after `substitute_tran_leaves` | `vacask_wave` Pulse (it wrote period 0 when period ≤ rise+fall+width: Q13) |
+| `PulseSpice` | `pulse_spice_to_vacask` | relabel to `Vacask` when `rise > 0`, `fall > 0` and `period` is 0 or > rise+fall+width; else refused (at `period` = rise+fall+width ngspice repeats and VACASK refuses: RUN q13) | `PulseVacask` | sim(VACASK) after `substitute_tran_leaves` | `vacask_wave` Pulse, which wrote `period=0` there: one pulse where ngspice repeats (RUN q13): ledger |
 | `PulseCycles` | `pulse_cycles_to_pwl` | the counted pulses → one PWL | `Wave(Pwl)` | sim(ngspice) | `pulse_as_pwl`, `vacask_wave` counted |
 | `SffmNgspice` | `sffm_ngspice_to_spice3` | law `Spice3`, `pre: Zero` when `mdi ≤ fc/fm` (else `wave_to_behavioural`) | `SffmSpice3` | sim(ngspice) | `sffm_slots` |
 | `AmPreZero`, `SinPreOffset`, `SffmPre(Zero)` with `delay > 0` | `wave_to_behavioural` | the source → a `Behav` voltage or current of `Time` with the pre-delay value stated | `Elem(Behav)`, `FuncDyn(Sin)`, `Expr(Time)` | sim(VACASK) both forms | W0108 refusal of a delayed AM with offset |
@@ -245,7 +248,7 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 | `Elem(Poly)` | `poly_to_behav` | the polynomial in SPICE's term order → a `Behav` expression | `Elem(Behav)` | sim(ngspice) | `vacask_cards::poly` |
 | `Elem(Table)` | `table_to_ternary` | `TableLaw::Exact` → a linear-segment ternary chain; `NgspiceRounded` refused | `Ternary` | eval | W0102 refusal (now `Exact` translates) |
 | `Elem(ChargeCapacitor)` | `charge_to_behav` | `q` → `Behav{Current, Ddt(q)}` | `Elem(Behav)`, `FuncDyn(Ddt)` | sim(ngspice) (P4-017) | `Card::Charge` arm |
-| `Elem(Port)` | `port_to_source_r` | EMF source + series `z0` resistor + an internal node | `Elem(VSource)`, `Elem(Resistor)` | sim(ngspice) | RfPort arm (the `acsp` port convention is to settle: Q10) |
+| `Elem(Port)` | `port_to_source_r` | EMF source + series `z0` resistor + an internal node; `Sp.ports` names the (source, resistor) pairs, VACASK's `acsp` port (VD cmd-analysis-acsp; RUN sp2: S11 = S21 = 0.5 on both, the closed form) | `Elem(VSource)`, `Elem(Resistor)` | sim(ngspice) | RfPort arm |
 | `Elem(Laplace)`, switches, lossy lines, code models | refused | VACASK has none (C D23, D29–D35) | — | — | W0011, W0105 |
 | `IcUicOnly` | `device_ic_to_nodeset` | each `Passive.ic` → a differential `NodeSet{Ic}` on every transient with `uic`; dropped where no transient has `uic` (ngspice ignores it, S 8.21) | `IcDifferential`, `IcNextOnly` | sim(ngspice) | `vacask_ic::held_ics` |
 | `PassiveAc`, `SemiInitial` | refused | `ac=` is "not found" (S 6.17); VACASK has no `off` (S 6.28) | — | — | refusal; `off` (Q11) |
@@ -253,8 +256,8 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 | `EnclosingRef` | `hoist_nested_subckts` | a nested subckt that reads an enclosing scope's parameter or model → hoisted to the top, the read parameters as formals passed by each instance, the models moved with it, names that collide renamed | `NestedSubckt` off | sim(ngspice) | `read/blocks.rs` hoist |
 | `FormalReadsParam` | `formal_defaults_to_instances` | every instance passes every such formal, its default rewritten over the instance's actuals; the formal's own default becomes a constant | — | sim(ngspice) | none |
 | `Item(Func)`, `LocalFunc` | `inline_funcs` | each call → the body with its arguments substituted (ngspice's own textual rule, S 2.26) | — | eval | W0106 refusal (now translates) |
-| element with no model (G2) | `explicit_family_models` | one parameterless `Model` per (scope, family) for model-less elements, named `<family>` (renamed on collision) | — | sim(ngspice) | `Need` in `named/vacask.rs` |
-| model with no `Library` load (G2) | `library_loads` | one `Load{Library, family, path: NONE}` per family in use, at the top | `Item(Load)` | sim(VACASK) | implied loads in `named/vacask.rs` |
+| element with no model (G2), sources and couplings included | `explicit_family_models` | one parameterless `Model` per (scope, family) for model-less elements, named after the family (renamed on collision) | — | sim(ngspice) | `Need` in `named/vacask.rs` |
+| model with no `DeviceLibrary` of its family (G2) | `device_libraries` | one `DeviceLibrary{family, path: NONE}` per family in use with a library file, at the top | `Item(DeviceLibrary)` | sim(VACASK) | implied loads in `named/vacask.rs` |
 | `TranCapNgspice`, `print_step` | `tran_explicit_cap` | `max_step := min(print_step, (stop − record_start)/50)` when `NONE`; `initial_step := print_step`; `print_step := NONE` | `TranMaxStep`, `TranInitialStep` | sim(VACASK) | `vacask_analysis` Tran (`step=` tstep, `maxstep`) |
 | `Analysis(Dc)` with a target VACASK sweeps | — (writer) | `sweep` + `op` | — | sim | Dc/DcAxes arms |
 | `Analysis(Tf)` | `tf_to_dcxf` | `Tf{output, source}` → `DcXf{output}` (the source's entry is the backend's) | `Analysis(DcXf)` | sim(VACASK) | Tf arm (`dcxf out=`) |
@@ -269,7 +272,7 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 
 | Feature | Pass | IR → IR | Requires | Proof | Old rule |
 |---|---|---|---|---|---|
-| `Binary(DivTyped)` | `div_typed_to_div` | by the typing table over the whole design (every instance's actuals): both real → `Div`, both int → `IntDiv` (in a dynamic expression `Trunc(Div)`), mixed across instances → refused | `Binary(Div)`, `Binary(IntDiv)` | eval (typed) | none (old copied `/`) |
+| `Binary(DivTyped)` | `div_typed_to_div` | by the tag table over the whole design (every instance's actuals): an operand real → `Div`; both int → `Trunc(Div(a, b))` (never `IntDiv`: ngspice's `\` is trunc(\|a/b\|), so `IntDiv` has no speaker); mixed across instances → refused | `Binary(Div)`, `Func(Trunc)` | eval (typed) | none (old copied `/`) |
 | `Func(ToInt)` | `toint_to_trunc` | `Trunc` once no `DivTyped` reads its type | — | eval | none |
 | `Func(Pow)` | `pow_to_powabs` | whole literal exponent: even `PowAbs`, odd `Mul(Sgn(x), PowAbs)`; other literal: `PowAbs` (equal on `Pow`'s domain, R12); other exponent with a base not provably ≥ 0: refused | `Func(PowAbs)`, `Func(Sgn)` | eval | `abs_power_in` |
 | bit operators | `fold_constant_bitops` | an integer-constant subtree → its literal; else refused | — | eval | `caret_reread` W0002 |
@@ -296,10 +299,12 @@ tolerance (§8); a pass that would duplicate an operand holding a `Draw` refuses
 | `Analysis(DcInc)` | `dcinc_to_ac0` | → `Ac` at one point of 0 Hz; refused when a source has `phase ≠ 0` and the design has another AC analysis | `Analysis(Ac)` | sim(VACASK) (VS V23: 9.561172e-1 both) | misclassified W0015 |
 | `Analysis(DcXf)` | `dcxf_to_tf` | one `Tf` per independent source | `Analysis(Tf)` | sim(ngspice) | VS V24 |
 | `Xf`, `Stb`, `Hb`, `Pss`, `Pac`, `Pnoise`, `TranNoise` | refused | ngspice-45 pinned has none of them (S 14.10: no `.pss`) | — | — | W0015 |
-| `Sp` | — | ngspice `.sp` when the ports are every `portnum` in order, else refused (VS §2) | — | sim | — |
-| `Load{Library}` | `drop_library_loads` | removed: ngspice has the family built in | — | sim(both) | `own_loads`, A19 |
+| `Sp` over (source, resistor) pairs | `source_r_to_port` | each pair → one `Port{index, z0 = the resistor's value}`, in list order; fewer than two ports refused (ngspice: "we need at least two", RUN sp2) | `Elem(Port)` | sim(both): RUN sp2 | — |
+| `Item(DeviceLibrary)` | `drop_device_libraries` | removed: ngspice has the family built in; a variant path (`spice/sn/…`) refused | — | sim(both) | `own_loads`, A19 |
+| a parameterless `Model` of a source, controlled source or coupling family | `drop_builtin_models` | removed, each element's `model` set to `NONE` (ngspice has no model for a source) | — | sim(both) | the reader's implied models |
 | `Model.module` of a user OSDI | — (writer) | ngspice `pre_osdi` + `N` card (C A18, B24) | — | sim | OsdiLoad |
-| `Option(Private)` of VACASK, hints (G12) | refused or dropped (Q4) | — | — | — | W0024 note |
+| `Option(Private)` of VACASK | refused (`tolscale`: one corpus deck) | — | — | — | W0024 note |
+| `Opaque` `Hint` | `legalize` drops it with its note (R19) | — | — | — | W0024 note |
 | `Inert` opaques (`print`, `clear saves`, `ground`, `elaborate changes`) | `legalize` drops with a note (R11) | — | — | — | W0120 |
 
 Old rules with no pass: `foreign_text` (the spine's foreign-`Opaque` refusal), `brace_groups`,
@@ -373,64 +378,37 @@ asserts an old code (R9).
 
 Then one row per pair in `ROUTES`.
 
-## 10. Open questions for the lead
+## 10. Questions: the rulings, and what is still open
 
-1. **VACASK's arithmetic is typed, and the IR's is not** (RUN i1, t3, f2). `1/3` is 0, and
-   whether `x/2` truncates depends on the type of the value an instance passes. No field of
-   today's IR can state it; the reader cannot type statically (types follow instance actuals,
-   possibly in other files). Proposal G1: `NumForm::Int`, `BinOp::DivTyped`, `Func::ToInt`, a
-   typed reference evaluator; the passes do the typing over the whole design; the VACASK writer
-   spells whole `Plain` literals as `2.`. The alternative (reader types, refuses what it cannot)
-   loses parameterised subckts. Either way the old pipeline gives wrong numbers today for any
-   ngspice deck with a division of whole numbers. Needs the kernel owner's yes.
-2. **"FEATURES is the reader's image" and "passes know no dialect" do not cover VACASK's device
-   library.** Every device needs `load "spice/x.osdi"` and `model m sp_x` that only name the
-   simulator's own family; a writer that invents them breaks L5, a pass that adds them must know
-   VACASK's file names. Proposal G2: `LoadKind::Library{family}` with path `NONE` meaning "the
-   target's default file", so `explicit_family_models` and `library_loads` stay neutral and the
-   reader and writer stay inverse. The `spice/sn/` and `spice/full/` variants keep their path
-   (they change noise and output variables, VD dev-spice) and are refused off VACASK. Is this
-   the shape you want?
-3. **R8 read narrowly blocks this slice.** G3 (pulse law), G7 (DC from the waveform), G8
-   (`elaborate`) are VACASK's own meanings with no second reader; kept `Opaque` they would refuse
-   43 pulse decks and 49 elaborate decks the old pipeline writes to ngspice. I read R8 as
-   satisfied when ngspice writes the meaning through a §6 pass. Confirm, or rule otherwise.
-4. **Solver-only options.** The old writer dropped VACASK-only options with a note (W0024, VS
-   V14); with `OptionKey::Private` they become refusals off VACASK (a regression on corpus decks
-   with `tran_lteratio`, `nr_*`, `tolscale`). Proposal G12 (`hint` flag, dropped like `Inert`).
-   `tolscale` scales tolerances: hint or `Private`?
-5. **ngspice draws in a plain run.** ngspice samples at every reference; VACASK only inside `mc`.
-   Refusing is right by the contract; the old pipeline wrote the call and VACASK ran the nominal.
-   Refuse, or a note-carrying `draws_to_nominal`?
-6. **Per-module parameter names.** VACASK hard-errors on a parameter its module lacks (S 7.11),
-   so the writer must refuse it, which L4 forbids for `Gen(FEATURES)` unless `Gen` draws
-   parameter names from each family's schema. A family schema table (S 7.11's proposal) is a
-   circuit-owner table: now, or a writer refusal row (W2xxx) tolerated by L4?
-7. **IR-CIRCUIT §3 contradicts R13**: "VACASK counts `td2` from `td1`: its reader adds" puts
-   `delay` in two fields (R13 b). G4 replaces it with a mode field.
-8. **The docs contradict the binary twice where it matters**: a sweep restores the swept value
-   (RUN s1; VD cmd-sweep says "left at its last value"); `hb immax` and the PWL wrap (S 14.10).
-   The run wins (R5); the settle fixtures pin them.
-9. **One meaning, two nodes?** VACASK `sweep` + `op` writes one raw file over the grid, which is
-   `Dc`; the same over another analysis is `Loop`. The reader reads the first as `Dc` and G11
-   makes `Loop`-around-`Op` a feature VACASK lacks. The run owner should say whether `Dc{axes}`
-   and `Loop{Sweep}{Op}` are one meaning (then one node, and ngspice's `.dc` vs `foreach` is
-   spelling).
-10. **Unsettled, each with the run that settles it**: the `acsp` port convention (`port_to_source_r`
-    needs it: run `acsp` on a 50 Ω vsource-plus-resistor port against ngspice `.sp`); whether
-    `tran_lteratio` 3.5 equals ngspice's `trtol` 7 (`cmp.rs` assumes VACASK shares TRTOL; run a
-    stiff RC at both settings); the result type of `min`/`max` of an int and a real and of
-    `atan2` (RUN f2 covered the rest).
-11. **`off` and R13's "no Opaque in an expression"**: `Semi.initial` only seeds Newton; refuse it
-    (as written here) or drop with a note? And `white_noise`/`$scale` (0 corpus uses) need kernel
-    members under R13 or a statement-level `Private` exception.
-12. **Coordination with S3**: G7 asks the ngspice reader to state "no DC given" as
-    `DcRule::WaveAtZero` instead of an expression of the wave's fields.
-13. **Old pulse clamp**: the old writer wrote `period=0` (one pulse) when period ≤
-    rise+fall+width; SPICE repeats seamlessly at equality. Run `PULSE(0 1 0 1u 1u 2u 4u)` on
-    ngspice against the old VACASK text to confirm it was a wrong number; here it is refused.
-14. **The backend reads the written deck** (`src/backend/vacask.rs`: analysis names, outer sweeps,
-    relative paths) until S12, which constrains the writer's analysis names and sweep spelling.
+Answered by R16–R22 and AMEND-A12 (ir-rewrite ee2fbca0), applied above:
+
+| Q | Ruling | Where it lands here |
+|---|---|---|
+| 1 typed arithmetic | yes (R16, A12 K1); hex is `Int`; int/int is `Trunc(Div)`, never `IntDiv` | §3.3, §5 G1, §6 |
+| 2 device library | yes, as the circuit item `DeviceLibrary{family, path}` (R17, A12 C5) | §3.2, §4, §5 G2, §6 |
+| 3 R8 | typed when a second dialect **or a pass** reads or writes it (R18) | §5 |
+| 4 solver options | `OpaqueClass::Hint` (R19, A12 K3); `tolscale` `Private` (one deck) | §3.4, §6 |
+| 5 plain-run draws | relabelled with a note; per-call-site only where the distribution is unchanged (R22) | §6.1 |
+| 6 parameter names | `Write::admits` (R21, A12 S1) fed by `tables.rs`; L5 needs name pools per family (the hook's shape goes to the spine owner) | §4 |
+| 7 EXP `td2` | `td2_from` (A12 C2) | §5 G4 |
+| 8 docs against binary | the run wins; settle fixtures pin both | §8 |
+| 9 `Dc` against `Loop{Op}` | two meanings (R20); G11 stands; results' shape is S12's | §5 G11 |
+| 10 `acsp` port, `tran_lteratio` | settled by runs sp2, lte (Appendix A); `tran_lteratio` is a `Hint` | §6 |
+| 11 `off`, noise functions, `$scale` | `off` refused; the others `Private` statements | §3, §6 |
+| 12 ngspice DC rule | `DcRule` (A12 C4); the lead tells S3 | §5 G7 |
+| 13 pulse at period = rise+fall+width | settled by run q13: ngspice repeats, VACASK refuses, the old `period=0` was a wrong number; refused | §6.1 |
+| 14 backend reads the deck | the generated names stand until S12 | §4 |
+
+Still open:
+
+15. **Families of the builtin devices** (A12 C5, to agree with `ir-circuit`): VACASK needs a
+    `model` for `vsource`, `isource`, `vcvs`, `vccs`, `ccvs`, `cccs` and `mutual` (RUN n2), and no
+    `ModelFamily` names them. Proposal: one member per builtin, `SourceV`, `SourceI`, `Vcvs`,
+    `Vccs`, `Ccvs`, `Cccs`, `Mutual`, each "the simulator's built-in device of that element kind,
+    no parameters", so that one model serves one element kind and `drop_builtin_models` and
+    `explicit_family_models` stay neutral.
+16. **`tran_lteratio` against `trtol`**: run lte shows no difference on an RC (the span/50 cap
+    binds); the estimators' equality stays unproven, which is why it is a `Hint`.
 
 ## Appendix A. Runs made for this plan (VACASK 36be560)
 
@@ -455,3 +433,7 @@ Then one row per pair in `ROUTES`.
 | s1 | `sweep` of `v1 dc` over 2, 3 before `op`, then another `op` | 2, 3, then 1 |
 | g2 | `r=agauss(5,1,1)` outside `mc` | 5 |
 | tr1 | `tran stop=10m step=1u`, and with `start=6m`, no `maxstep` | largest step 2e-4 and 8e-5: (stop − start)/50 |
+| f3 | `print` of `min(3,5.0) min(3.0,5) max(3,1.0) max(3.0,1) atan2(3,1) hypot(3,4) pow(3,1) (-3) (!0) (3&&5) (7&3) (3<<1) sinh(0) (3+0.0) (5-2) (0?3:4.0)`, each `/2` (`3<<1` over 4) | 1.5 1.5 1.5 1.5 0.6245 2.5 1.5 −1 0 0 1 1 0 1.5 1 2: `min`/`max` int only when every operand is |
+| q13 | pulse 0→1, rise 1u, fall 1u, width 2u, period 4u (= rise+fall+width) on ngspice-45 and on VACASK | ngspice at 0.5/3.5/4.5/5.5 µs: 0.5/0.5/0.5/1.0 (repeats); VACASK: "Period of pulse transient must be greater than rise+fall+width." |
+| sp2 | two ports, z0 50 Ω, 100 Ω in series: ngspice `V … portnum n z0 50` + `.sp`; VACASK `vsource` + 50 Ω series `resistor` pairs + `acsp ports=[…]` | S11 = S21 = 0.5 on both (closed form 2·50/(2·50+100)); a one-port ngspice deck: "Only one RF Port is found, we need at least two!" |
+| lte | RC 1k·1u charged by a 1 ns step, `tran stop=5m step=1u` at `tran_lteratio` 3.5 and 7; ngspice `.tran 1u 5m` | VACASK 77 points, worst error to 1 − e^(−t/τ) 2.8e-4 at both ratios; ngspice 5022 points, 5.0e-7 |
