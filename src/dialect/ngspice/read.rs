@@ -260,7 +260,6 @@ impl<'a, 'd> Lower<'a, 'd> {
     /// Each dot-card analysis of the file in file order ([`Lower::deck_has_card_analysis`]'s
     /// cards): its keyword without the dot (`tran`), and how many statements of
     /// [`Lower::deck_script`] stand before it.
-    #[allow(dead_code, reason = "the control area's script meas calls it (S3.4)")]
     pub(super) fn deck_card_analyses(&self) -> &[(String, usize)] {
         &self.script.card_analyses
     }

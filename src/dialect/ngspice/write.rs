@@ -141,12 +141,12 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             ir::ItemKind::Save | ir::ItemKind::Print | ir::ItemKind::Measure => {
                 write_outputs::admits(design, item, diags);
             }
-            ir::ItemKind::Load | ir::ItemKind::Loop | ir::ItemKind::Alter => {
+            ir::ItemKind::Load | ir::ItemKind::Loop | ir::ItemKind::Alter | ir::ItemKind::Reset => {
                 write_control::admits(design, item, diags);
             }
-            // ngspice spells none of these yet (FEATURES lacks them): nothing to refuse beyond the
-            // feature; `Reset` is the control area's when its arms land (round 6, A27)
-            ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate | ir::ItemKind::Reset => {}
+            // ngspice spells none of these (FEATURES lacks them): nothing to refuse beyond the
+            // feature
+            ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate => {}
         }
     }
 }
@@ -231,15 +231,14 @@ fn dispatch(w: &mut Out<'_>, item: ir::ItemRef) {
         ir::ItemKind::Analysis => write_run::analysis(w, item),
         ir::ItemKind::Loop => write_control::loop_(w, item),
         ir::ItemKind::Alter => write_control::alter(w, item),
+        ir::ItemKind::Reset => write_control::reset(w, item),
         ir::ItemKind::Option => write_run::option(w, item),
         ir::ItemKind::Env => write_run::env(w, item),
         ir::ItemKind::NodeSet => write_run::node_set(w, item),
         ir::ItemKind::Save => write_outputs::save(w, item),
         ir::ItemKind::Print => write_outputs::print(w, item),
         ir::ItemKind::Measure => write_outputs::measure(w, item),
-        ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate | ir::ItemKind::Reset => {
-            unspelled(item)
-        }
+        ir::ItemKind::DeviceLibrary | ir::ItemKind::Elaborate => unspelled(item),
     }
 }
 

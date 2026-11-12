@@ -3,4 +3,5 @@ file "script_param_loop.sp" deck
   title "script_param_loop"
   param p = 1k
   loop sweep keep_last name=val (param p) (list values=[1k, 3k])
+    reset values options temp tnom saves
     analysis op

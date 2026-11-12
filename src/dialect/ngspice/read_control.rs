@@ -43,6 +43,13 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::Alter),
     Feature::Item(ItemKind::Loop),
     Feature::Item(ItemKind::Load),
+    Feature::Item(ItemKind::Reset),
+    Feature::Run(RunExtra::ResetValues),
+    Feature::Run(RunExtra::ResetOptions),
+    Feature::Run(RunExtra::ResetTemp),
+    Feature::Run(RunExtra::ResetTnom),
+    Feature::Run(RunExtra::ResetSaves),
+    Feature::Placed(ScopeKind::Loop, ItemKind::Reset),
     Feature::Run(RunExtra::LoopKeepLast),
     Feature::Run(RunExtra::LoopNamed),
     Feature::Run(RunExtra::LoopOverOp),
@@ -293,6 +300,12 @@ fn planned(lw: &Lower<'_, '_>, me: usize) -> Result<Vec<plan::Op>, ir::Code> {
         "control: the statement is one of the deck's script"
     );
     let blocks: Vec<script::Block> = texts.iter().map(|t| script::block(t)).collect();
-    let mut by_block = plan::plan(&blocks, lw.deck_has_card_analysis())?;
+    let cards = lw.deck_card_analyses();
+    debug_assert_eq!(
+        lw.deck_has_card_analysis(),
+        !cards.is_empty(),
+        "the declare step's two card facts agree"
+    );
+    let mut by_block = plan::plan(&blocks, cards)?;
     Ok(std::mem::take(&mut by_block[me]))
 }
