@@ -1,7 +1,7 @@
 //! The laws every registered pass meets (`rewrite/SPINE.md` §4), generic over
 //! `passes::GROUPS`, over generated designs that use the pass's `removes` feature and over ones
 //! that do not:
-//! - P1: `ir::check` is clean after it;
+//! - P1: `ir::check` is clean after it, and every code it emits has a catalogue row;
 //! - P2: every item still carrying `removes` (by `ir::check_legal`, per `Diag::item`) has
 //!   exactly one coded note of that pass (`Pass::notes`) at that item (`Diag::item`, not the span: a
 //!   generated item has none), and every other item has lost it (`check_legal` reports the run
@@ -29,11 +29,13 @@
 
 #[path = "common/memcap.rs"]
 mod memcap;
-#[path = "common/p2_twice.rs"]
-mod p2_twice;
+#[path = "common/p2.rs"]
+mod p2;
 
 use std::path::Path;
 
+use p2::p2_on;
+use spicerack::dialect;
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
 use spicerack::passes::{self, GROUPS, Pass};
@@ -176,9 +178,13 @@ fn p1_check_is_clean_after_the_pass() {
             (pass.run)(&mut design, &mut diags);
             let mut found = ir::Diags::new();
             ir::check(&design, &mut found);
-            match found.is_empty() {
-                true => Ok(()),
-                false => Err(format!("seed {seed}: {:?}", found.rows())),
+            // and every code the pass emits has a catalogue row (`dialect::info`)
+            let rows = diags.rows().iter().map(|d| d.code);
+            let bare: Vec<ir::Code> = rows.filter(|&c| dialect::info(c).is_none()).collect();
+            match (found.is_empty(), bare.is_empty()) {
+                (true, true) => Ok(()),
+                (false, _) => Err(format!("seed {seed}: {:?}", found.rows())),
+                (true, false) => Err(format!("seed {seed}: codes no catalogue holds: {bare:?}")),
             }
         })
     });
@@ -363,37 +369,6 @@ fn carrying(design: &ir::Design, feature: ir::Feature) -> Vec<ir::ItemRef> {
         .iter()
         .filter(|d| d.code == ir::diag::UNSUPPORTED && d.arg == index);
     rows.map(|d| d.item).collect()
-}
-
-/// P2 on one pass: every item still carrying `removes` after it has exactly one of its notes at
-/// that item (`Diag::item`).
-fn p2_on(pass: &Pass) -> Result<(), String> {
-    each_with(pass, |seed, mut design| {
-        let mut diags = ir::Diags::new();
-        (pass.run)(&mut design, &mut diags);
-        for item in carrying(&design, pass.removes) {
-            // exactly one (R69 d): a note repeated at one item is the user reading it twice
-            let notes = diags
-                .rows()
-                .iter()
-                .filter(|d| d.item == item && pass.notes.contains(&d.code))
-                .count();
-            match notes {
-                1 => {}
-                0 => {
-                    return Err(format!(
-                        "seed {seed}: the item {item:?} keeps it with no note"
-                    ));
-                }
-                n => {
-                    return Err(format!(
-                        "seed {seed}: the item {item:?} keeps it with {n} notes"
-                    ));
-                }
-            }
-        }
-        Ok(())
-    })
 }
 
 /// The leaky self-test pass: one note, at the first comment, and no change.
