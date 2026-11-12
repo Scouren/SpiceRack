@@ -1,0 +1,9 @@
+file "a.sp" deck
+  subckt inner (p q)
+    element capacitor c1 (p q) value=1p
+  subckt outer (a b)
+    subckt inner (x y)
+      element resistor r1 (x y) value=1
+    element instance x1 (a b) model=inner
+  element instance x2 (n 0) model=outer
+  element instance x3 (n 0) model=inner

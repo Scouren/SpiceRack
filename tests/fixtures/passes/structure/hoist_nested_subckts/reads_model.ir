@@ -1,0 +1,6 @@
+file "a.sp" deck
+  subckt outer (a b)
+    model rm resistor params=(r=1)
+    subckt inner (x y)
+      element resistor r1 (x y) model=rm value=1
+    element instance x1 (a b) model=inner

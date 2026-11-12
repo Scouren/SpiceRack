@@ -59,6 +59,9 @@ pub fn drop_builtin_models(design: &mut ir::Design, diags: &mut ir::Diags) {
                     .any(|(r, _)| r.is_resolved() && design.def(r.def).item == item)
         })
         .collect();
+    // ponytail: the dropped model's `DefKind::Model` entry stays in the definition index (a
+    // stale entry a later lookup of its name would find); `ir-kernel`'s item-removal door
+    // (A32 follow-up, `Editor::remove_item`) replaces this `retain` and undefines it.
     let mut editor = design.editor();
     for (item, scope) in drop {
         let items = editor.items_mut(scope);

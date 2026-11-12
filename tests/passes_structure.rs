@@ -25,6 +25,8 @@ const PENDING_PAIRS: &[&str] = &[
     "device_libraries",
     "drop_builtin_models",
     "drop_device_libraries",
+    "hoist_nested_subckts",
+    "hoist_enclosing_refs",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -258,6 +260,64 @@ fn drop_device_libraries_drops_only_libraries() {
     eprintln!("drop_device_libraries: {ran} generated designs");
 }
 
+/// The hoist keeps what every read binds: a row reference binds the same definition after it,
+/// and a parameter read either binds the same definition or a formal of the same name in the
+/// head of the subcircuit that now holds the read, which every instance of that subcircuit
+/// passes as a read of the old definition.
+#[test]
+fn hoist_nested_subckts_keeps_what_every_read_binds() {
+    let nested = ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt);
+    let mut ran = 0;
+    for seed in SEEDS {
+        let mut design = generate(seed, &ir::FeatureSet::ALL, SIZE);
+        if !ir::features_used(&design).contains(nested) {
+            continue;
+        }
+        ran += 1;
+        let refs_before = refs(&design);
+        let reads_before = param_reads(&design);
+        let mut diags = ir::Diags::new();
+        passes::structure::hoist_nested_subckts::hoist_nested_subckts(&mut design, &mut diags);
+        let mut found = ir::Diags::new();
+        ir::check(&design, &mut found);
+        assert!(found.is_empty(), "seed {seed}: {:?}", found.rows());
+        let refs_after = refs(&design);
+        for (item, before) in &refs_before {
+            let after = refs_after.iter().find(|(i, _)| i == item).map(|(_, r)| r);
+            assert_eq!(
+                after,
+                Some(before),
+                "seed {seed}: {item:?} rebound or dropped"
+            );
+        }
+        let reads_after = param_reads(&design);
+        for ((item, old), new) in reads_before.iter().zip(&reads_after) {
+            assert_eq!(item, &new.0, "seed {seed}: the reads keep their order");
+            if old == &new.1 {
+                continue;
+            }
+            let (o, n) = (design.def(*old), design.def(new.1));
+            assert_eq!(o.name, n.name, "seed {seed}: a formal of the same name");
+            assert_eq!(
+                n.item.kind,
+                ir::ItemKind::Subckt,
+                "seed {seed}: a head formal"
+            );
+            assert!(
+                instances_pass(&design, n.item, n.name, *old),
+                "seed {seed}: every instance passes the old definition"
+            );
+        }
+        let still = ir::features_used(&design).contains(nested);
+        assert!(
+            !still || !diags.is_empty(),
+            "seed {seed}: left nested with no note"
+        );
+    }
+    assert!(ran > 0, "no generated design had a nested subcircuit");
+    eprintln!("hoist_nested_subckts: {ran} generated designs");
+}
+
 #[test]
 fn legalize_gives_every_model_less_element_a_model_and_a_library() {
     let text = "file \"a.sp\" deck\n  element resistor r1 (a 0) value=1k\n  element vsource v1 (a 0) dc=1\n  element lossless_line t1 (a 0 b 0) z0=50 td=1n\n";
@@ -316,6 +376,61 @@ fn refs(design: &ir::Design) -> Vec<(ir::ItemRef, Vec<(ir::Ref, ir::DefKind)>)> 
             (item, out)
         })
         .collect()
+}
+
+/// Every bound parameter read of every reachable item's expressions, in item and tree order:
+/// (item, definition).
+fn param_reads(design: &ir::Design) -> Vec<(ir::ItemRef, ir::DefId)> {
+    let mut out = Vec::new();
+    let mut handles = Vec::new();
+    for (item, _) in design.reachable() {
+        handles.clear();
+        design.item_handles(item, &mut handles);
+        let mut stack: Vec<ir::ExprId> = Vec::new();
+        for h in &handles {
+            match *h {
+                ir::Handle::Expr(e) | ir::Handle::ExprDyn(e) => stack.push(e),
+                ir::Handle::Exprs(l) => stack.extend_from_slice(design.exprs(l)),
+                ir::Handle::Params(l) => stack.extend(design.params(l).iter().map(|p| p.1)),
+                _ => {}
+            }
+        }
+        stack.retain(|e| !e.is_none());
+        stack.reverse();
+        // bounded: a tree's rows lie below its root, each visited once per path
+        while let Some(e) = stack.pop() {
+            match design.expr(e) {
+                ir::Expr::Param(r) if r.is_resolved() => out.push((item, r.def)),
+                ir::Expr::Call(_, l)
+                | ir::Expr::UserCall(_, l)
+                | ir::Expr::Draw(_, _, _, l)
+                | ir::Expr::List(l) => stack.extend(design.exprs(l).iter().rev()),
+                ir::Expr::Unary(_, a) => stack.push(a),
+                ir::Expr::Binary(_, a, b) => stack.extend([b, a]),
+                ir::Expr::Ternary(c, a, b) => stack.extend([b, a, c]),
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// Whether every reachable instance of the subcircuit `subckt` passes `name` as a read of `old`.
+fn instances_pass(
+    design: &ir::Design,
+    subckt: ir::ItemRef,
+    name: ir::NameId,
+    old: ir::DefId,
+) -> bool {
+    elements(design).all(|i| {
+        let e = design.row::<ir::Element>(i.index);
+        let of = e.kind == ir::ElemKind::Instance
+            && e.model.is_resolved()
+            && design.def(e.model.def).item == subckt;
+        !of || design.params(e.params).iter().any(|&(n, v)| {
+            n == name && matches!(design.expr(v), ir::Expr::Param(r) if r.def == old)
+        })
+    })
 }
 
 fn elements(design: &ir::Design) -> impl Iterator<Item = ir::ItemRef> + '_ {
