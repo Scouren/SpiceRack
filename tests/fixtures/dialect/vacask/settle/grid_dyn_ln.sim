@@ -1,0 +1,21 @@
+ln on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b187 (d187 0) v=ln(0.5*($temp/$temp))
+r187 (d187 0) r r=1k
+b188 (d188 0) v=ln(1.0*($temp/$temp))
+r188 (d188 0) r r=1k
+b189 (d189 0) v=ln(2.5*($temp/$temp))
+r189 (d189 0) r r=1k
+b190 (d190 0) v=ln(1e-3*($temp/$temp))
+r190 (d190 0) r r=1k
+b191 (d191 0) v=ln(1e3*($temp/$temp))
+r191 (d191 0) r r=1k
+b194 (d194 0) v=ln(3*($temp/$temp))
+r194 (d194 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

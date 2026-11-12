@@ -1,0 +1,35 @@
+floor on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b234 (d234 0) v=floor(-2.5*($temp/$temp))
+r234 (d234 0) r r=1k
+b235 (d235 0) v=floor(-1.0*($temp/$temp))
+r235 (d235 0) r r=1k
+b236 (d236 0) v=floor(-0.5*($temp/$temp))
+r236 (d236 0) r r=1k
+b237 (d237 0) v=floor(-0.0*($temp/$temp))
+r237 (d237 0) r r=1k
+b238 (d238 0) v=floor(0.0*($temp/$temp))
+r238 (d238 0) r r=1k
+b239 (d239 0) v=floor(0.5*($temp/$temp))
+r239 (d239 0) r r=1k
+b240 (d240 0) v=floor(1.0*($temp/$temp))
+r240 (d240 0) r r=1k
+b241 (d241 0) v=floor(2.5*($temp/$temp))
+r241 (d241 0) r r=1k
+b242 (d242 0) v=floor(1e-3*($temp/$temp))
+r242 (d242 0) r r=1k
+b243 (d243 0) v=floor(1e3*($temp/$temp))
+r243 (d243 0) r r=1k
+b244 (d244 0) v=floor(-3*($temp/$temp))
+r244 (d244 0) r r=1k
+b245 (d245 0) v=floor(0*($temp/$temp))
+r245 (d245 0) r r=1k
+b246 (d246 0) v=floor(3*($temp/$temp))
+r246 (d246 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

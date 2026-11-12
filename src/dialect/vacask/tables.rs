@@ -6,7 +6,7 @@
 //! Cites: VD expr-constants (the values); the store's `lib/vacask/mod` listing (36be560);
 //! `rewrite/DIALECT-VACASK.md` §3.2 (load), §4.
 //!
-//! Contents: `CONSTANTS`, `SOURCE_MODULES`, `STATIC_FUNCS`, `DYNAMIC_LACKS`, `DYNAMIC_FUNCS`, `DYNAMIC_BINARY`,
+//! Contents: `CONSTANTS`, `SOURCE_MODULES`, `STATIC_FUNCS`, `DYNAMIC_LACKS`, `BEHAVIOURAL_LACKS`, `DYNAMIC_FUNCS`, `DYNAMIC_BINARY`,
 //! `SPICE_FILES`, `OWN_FILES`, `library`, `default_file`, `function`, `draw`, `binary` (crate-private)
 
 use crate::ir;
@@ -58,7 +58,6 @@ pub(super) const STATIC_FUNCS: &[ir::Func] = &[
     ir::Func::Asin,
     ir::Func::Acos,
     ir::Func::Atan,
-    ir::Func::Atan2,
     ir::Func::Sinh,
     ir::Func::Cosh,
     ir::Func::Tanh,
@@ -75,6 +74,11 @@ pub(super) const STATIC_FUNCS: &[ir::Func] = &[
 /// ponytail: only a direct `$temp` makes it dynamic here; a parameter that reads one (R14's
 /// transitive class) is not traced yet (S4.1, with the behavioural sources).
 pub(super) const DYNAMIC_LACKS: &[&str] = &["round", "integer", "fmod"];
+
+/// The functions a parameter expression of `$temp` holds (run85) and a behavioural source cannot:
+/// OpenVAF does not translate them (settle `beh_int`: "'$rtoi' was not found in the current
+/// scope"; `beh_sign`: "Function sign() with arity 2 cannot be translated to Verilog-A."; R76a).
+pub(super) const BEHAVIOURAL_LACKS: &[&str] = &["int", "sign"];
 
 /// The functions and operators of VACASK's behavioural sources (VD dev-builtin-behavioral).
 pub(super) const DYNAMIC_FUNCS: &[ir::Func] = &[
@@ -216,6 +220,7 @@ pub(super) fn function(name: &str) -> Option<(ir::Func, usize)> {
         "asin" => (F::Asin, 1),
         "acos" => (F::Acos, 1),
         "atan" => (F::Atan, 1),
+        // R76a: the dynamic form only; the reader writes the static one out (`atan2.rs`).
         "atan2" => (F::Atan2, 2),
         "sinh" => (F::Sinh, 1),
         "cosh" => (F::Cosh, 1),

@@ -1,0 +1,17 @@
+acosh on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b136 (d136 0) v=acosh(1.0)
+r136 (d136 0) r r=1k
+b137 (d137 0) v=acosh(2.5)
+r137 (d137 0) r r=1k
+b139 (d139 0) v=acosh(1e3)
+r139 (d139 0) r r=1k
+b142 (d142 0) v=acosh(3)
+r142 (d142 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

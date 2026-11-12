@@ -13,6 +13,7 @@
 mod memcap;
 
 mod corpus;
+mod grid;
 mod probe;
 mod read;
 mod settle;

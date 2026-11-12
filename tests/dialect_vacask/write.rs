@@ -17,7 +17,22 @@ const DIR: &str = "tests/fixtures/dialect/vacask/write";
 const SETTLE: &str = "tests/fixtures/dialect/vacask/settle";
 
 /// Settle decks whose round trip fails today, by name, and why. Strict both ways.
-const SETTLE_KNOWN: &[(&str, &str)] = &[];
+const SETTLE_KNOWN: &[(&str, &str)] = &[
+    (
+        "atan2_zero.sim",
+        "VACASK's parameter atan2(0, 0) is NaN (the analysis then aborts on it); the reader's \
+     expansion (R76a) divides 0 by 0 there, which VACASK's `/` refuses (\"Division by zero.\"): \
+     the IR has no NaN to write, so the deck fails at another place",
+    ),
+    (
+        "grid_fold_atan2.sim",
+        "atan2(y, -0.0): the cited exception of grid.rs's KNOWN_GRID (R76a)",
+    ),
+    (
+        "grid_static.sim",
+        "atan2(y, -0.0): the cited exception of grid.rs's KNOWN_GRID (R76a)",
+    ),
+];
 
 // ---- private ----
 
@@ -91,6 +106,7 @@ fn vacask(deck: &str) -> (String, Vec<(String, Vec<u8>)>, bool) {
         .find("OpenBLAS CPUs:")
         .and_then(|k| text[k..].find('\n').map(|e| k + e + 1))
         .map_or(text.clone(), |k| text[k..].to_string());
+    let printed = without_tmp_names(&printed);
     let mut raws: Vec<(String, Vec<u8>)> = std::fs::read_dir(dir.path())
         .unwrap()
         .map(|e| e.unwrap().path())
@@ -220,4 +236,18 @@ fn round_trip(deck: &Path) -> Result<(), String> {
         }
         Ok(())
     }
+}
+
+/// `text` with each OpenVAF temporary directory's random suffix (`.tmpE3haeq`) cut to `.tmp`:
+/// a compile error names the file it wrote there (settle `beh_int`).
+fn without_tmp_names(text: &str) -> String {
+    let (mut out, mut rest) = (String::with_capacity(text.len()), text);
+    while let Some(k) = rest.find(".tmp") {
+        out.push_str(&rest[..k + 4]);
+        rest = &rest[k + 4..];
+        let suffix = rest.bytes().take_while(u8::is_ascii_alphanumeric).count();
+        rest = &rest[suffix..];
+    }
+    out.push_str(rest);
+    out
 }

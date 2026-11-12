@@ -1,0 +1,35 @@
+sgn on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b299 (d299 0) v=sgn(-2.5)
+r299 (d299 0) r r=1k
+b300 (d300 0) v=sgn(-1.0)
+r300 (d300 0) r r=1k
+b301 (d301 0) v=sgn(-0.5)
+r301 (d301 0) r r=1k
+b302 (d302 0) v=sgn(-0.0)
+r302 (d302 0) r r=1k
+b303 (d303 0) v=sgn(0.0)
+r303 (d303 0) r r=1k
+b304 (d304 0) v=sgn(0.5)
+r304 (d304 0) r r=1k
+b305 (d305 0) v=sgn(1.0)
+r305 (d305 0) r r=1k
+b306 (d306 0) v=sgn(2.5)
+r306 (d306 0) r r=1k
+b307 (d307 0) v=sgn(1e-3)
+r307 (d307 0) r r=1k
+b308 (d308 0) v=sgn(1e3)
+r308 (d308 0) r r=1k
+b309 (d309 0) v=sgn(-3)
+r309 (d309 0) r r=1k
+b310 (d310 0) v=sgn(0)
+r310 (d310 0) r r=1k
+b311 (d311 0) v=sgn(3)
+r311 (d311 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

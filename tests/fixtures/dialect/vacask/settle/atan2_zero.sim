@@ -1,0 +1,9 @@
+atan2 at the origin, parameter evaluator
+model vsource vsource
+vp8 (p8 0) vsource dc=atan2(0.0, 0.0)
+control
+  options rawfile="ascii"
+  var q8=atan2(0.0, 0.0)
+  print ("c8", q8)
+  analysis op1 op
+endc
