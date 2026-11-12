@@ -65,6 +65,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     F::Wave(ir::WaveKind::TrNoise),
     F::Wave(ir::WaveKind::TrRandom),
     F::Circuit(X::ElementWithoutModel),
+    F::Circuit(X::GivenZeroSpiceDefault),
     F::Circuit(X::MultISource),
     F::Circuit(X::SourceDistof),
     F::Circuit(X::PulseSpice),
@@ -417,6 +418,7 @@ fn push(lw: &mut Lower<'_, '_>, st: Stmt, head: &str, nodes: &[&str; 2], r: Read
         model: ir::Ref::unresolved(ir::NameId::NONE),
         params: ir::List::EMPTY,
         mult,
+        mult_law: ir::MultLaw::Parallel,
     };
     let row = ir::source::Source {
         dc,

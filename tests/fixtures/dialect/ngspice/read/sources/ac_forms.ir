@@ -1,4 +1,4 @@
-# codes: P1157 P1157 P1157 P1157 P1001 P1001
+# codes: P1157 P1157 P1157 P1157 P1001
 file "ac_forms.sp" deck
   title "ac_forms"
   comment " oracle: vsrctemp.c (ac with no magnitude is 1, no phase 0), vsrc.c (acmag, acphase), run: ac lin 1 1 1 gives 1, 2/90 deg, 3, and m 3 times ac 1 45 on the I card"
@@ -8,5 +8,5 @@ file "ac_forms.sp" deck
   element vsource V4 (d 0) dc=0 ac_mag=2 ac_phase_deg=90
   element vsource V5 (e 0) dc=0 ac_mag=1 ac_phase_deg=30
   element isource I6 (f 0) mult=3 dc=2 ac_mag=1 ac_phase_deg=45
-  opaque ngspice unread "R6 f 0 1"
+  element resistor R6 (f 0) value=1
   opaque ngspice unread ".control\nac lin 1 1 1\nprint v(a) v(b) v(c) v(d) v(e) v(f)\n.endc"

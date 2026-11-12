@@ -1,13 +1,12 @@
 # oracle: read_sources' forms (vsrcload.c, isrcload.c positional orders; ngspice manual 4.1), written by hand
-# A17: each wave gains given_zero=spice_default (or its final key) when the circuit owner lands it
 file "waves.sp" deck
   title "waves"
-  element vsource v1 (a 0) dc=1 ac_mag=2 ac_phase_deg=0 wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=0 width=5u period=10u cycles=3)
-  element isource i2 (b 0) mult=2 wave=sffm(offset=0 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k phase_m_deg=30 phase_c_deg=45 law=ngspice pre=hold_delay_value) dc_rule=wave_at_zero
-  element vsource v3 (c 0) wave=sffm(offset=0 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k delay=1u law=ngspice pre=zero) dc_rule=wave_at_zero
+  element vsource v1 (a 0) dc=1 ac_mag=2 ac_phase_deg=0 wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=0 width=5u period=10u cycles=3 given_zero=spice_default)
+  element isource i2 (b 0) mult=2 wave=sffm(offset=0 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k phase_m_deg=30 phase_c_deg=45 law=ngspice pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource v3 (c 0) wave=sffm(offset=0 amplitude=1 carrier_freq=10k mod_index=2 signal_freq=1k delay=1u law=ngspice pre=zero given_zero=spice_default) dc_rule=wave_at_zero
   element vsource v4 (d 0) wave=pwl(points=[0, 0, 1u, (k * 2)] delay=2u repeat_at=0 repeat=from) dc_rule=wave_at_zero
-  element vsource v5 (e 0) wave=trrandom(ts=1u td=0 p1=2 kind=poisson) dc_rule=wave_at_zero
-  element vsource v6 (f 0) wave=am(offset=0 amplitude=1 mod_offset=1 mod_index=0.5 mod_freq=1k pre=zero) dc_rule=wave_at_zero
+  element vsource v5 (e 0) wave=trrandom(ts=1u td=0 p1=2 kind=poisson given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource v6 (f 0) wave=am(offset=0 amplitude=1 mod_offset=1 mod_index=0.5 mod_freq=1k pre=zero given_zero=spice_default) dc_rule=wave_at_zero
   element port v7 (g 0) dc=0 ac_mag=1 ac_phase_deg=90 port=(index=1 z0=50) distof=(f1_mag=0.1 f1_phase_deg=0)
-  element vsource v8 (h 0) wave=sin(offset=0 amplitude=1 freq=1k delay=0 damping=1k pre=hold_delay_value) dc_rule=wave_at_zero
-  element vsource v9 (i 0) wave=exp(v1=0 v2=1 td1=0 tau1=1u) dc_rule=wave_at_zero
+  element vsource v8 (h 0) wave=sin(offset=0 amplitude=1 freq=1k delay=0 damping=1k pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero
+  element vsource v9 (i 0) wave=exp(v1=0 v2=1 td1=0 tau1=1u given_zero=spice_default) dc_rule=wave_at_zero

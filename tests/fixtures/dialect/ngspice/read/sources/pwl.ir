@@ -1,5 +1,4 @@
 # codes: P1160 P1001
-# A17: each wave gains given_zero=spice_default (or its final key) when the circuit owner lands it
 file "pwl.sp" deck
   title "pwl"
   comment " oracle: vsrcpar.c VSRC_PWL, VSRC_TD, VSRC_R (r a listed time before the last; below -0.5 no repeat), vsrcload.c PWL (first value held before the first point); runs: `pwl(0 0 1u 1 r=0 td=1u)`, `td 1u r 0`, quoted values, a continuation line"

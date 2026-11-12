@@ -115,7 +115,8 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
     // each field emitted in its row's declaration order (the IR text's), from its position
     let none = ir::ExprId::NONE;
     let mut at = |k: usize| emit_opt(lw, st, wave.vals.get(k));
-    // A17: every wave below is `GivenZero::SpiceDefault` (the circuit owner's field, pending)
+    // ngspice's rule for every wave that has one (A17, R35)
+    let gz = w::GivenZero::SpiceDefault;
     let row = match wave.kind {
         K::Pulse => Row::Pulse(w::Pulse {
             v1: at(0),
@@ -127,6 +128,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
             period: at(6),
             cycles: at(7),
             law: w::PulseLaw::Spice,
+            given_zero: gz,
         }),
         K::Sin => Row::Sin(w::Sin {
             offset: at(0),
@@ -139,6 +141,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
             amplitude2: none,
             freq2: none,
             pre: w::PreDelay::HoldDelayValue,
+            given_zero: gz,
         }),
         K::Exp => Row::Exp(w::Exp {
             v1: at(0),
@@ -148,6 +151,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
             td2: at(4),
             tau2: at(5),
             td2_from: w::TdFrom::Zero,
+            given_zero: gz,
         }),
         K::Sffm => {
             // an `I` card's SFFM: no delay, the 6th value the modulation phase (isrcload.c)
@@ -166,6 +170,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
                 phase_c_deg: at(phc),
                 phase_m_deg: at(phm),
                 law: w::SffmLaw::Ngspice,
+                given_zero: gz,
                 pre: if wave.current {
                     w::PreDelay::HoldDelayValue
                 } else {
@@ -188,6 +193,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
                 phase_m_deg: at(6),
                 phase_c_deg: at(7),
                 mod_time: w::AmModTime::Delay,
+                given_zero: gz,
                 pre: w::PreDelay::Zero,
             })
         }
@@ -226,6 +232,7 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
             p1: at(2),
             p2: at(3),
             kind: wave.random,
+            given_zero: gz,
         }),
         K::Pattern => unreachable!("ngspice has no pattern source"),
     };
