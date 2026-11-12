@@ -307,6 +307,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a subcircuit that instantiates itself",
             "an instance's subcircuit reaches the subcircuit holding the instance, directly or through others, so the hierarchy has no finite elaboration; ngspice and VACASK refuse it.",
         ),
+        Violation::TargetAlias => (
+            "a device-parameter target that names an element's value or a source's dc",
+            "a resistor's r, a capacitor's c, an inductor's l is an element-value target and an independent source's dc a source-dc target: one meaning has one form, so the text reads back as what was written.",
+        ),
         Violation::StringOrListField => (
             "a typed field that holds a string or a list",
             "a row's own expression field is a number, except the fields its row names as strings (a model's version, an alter's value, a private option's value); a list is a value only of a parameter, a formal's default or a parameter list.",

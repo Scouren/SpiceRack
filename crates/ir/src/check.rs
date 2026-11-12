@@ -121,6 +121,10 @@ pub enum Violation {
     /// An instance on a cycle of subcircuits (no finite elaboration; ngspice-45 and VACASK
     /// refuse it: `hierarchy.rs`). The circuit owner's. `arg`: the instance's row.
     InstanceCycle,
+    /// A device-parameter target that provably names an element's value or a source's DC
+    /// value, which `ElementValue` and `SourceDc` state (one meaning, one form: its text reads
+    /// back as the other kind; `link::target_aliases`). The run owner's. `arg`: the element name.
+    TargetAlias,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -131,7 +135,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::InstanceCycle as usize + 1] = [
+    pub const ALL: [Violation; Violation::TargetAlias as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -156,6 +160,7 @@ impl Violation {
         Violation::InstancePortCount,
         Violation::RunArgumentClass,
         Violation::InstanceCycle,
+        Violation::TargetAlias,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -186,6 +191,9 @@ pub fn check(design: &Design, diags: &mut Diags) {
         }
         for at in crate::hierarchy::cycle_instances(design) {
             out.report(Violation::InstanceCycle, at, at.index);
+        }
+        for (at, element) in crate::link::target_aliases(design) {
+            out.report(Violation::TargetAlias, at, element.0);
         }
         probe_classes(&mut out);
     }
