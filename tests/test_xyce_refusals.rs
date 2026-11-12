@@ -48,14 +48,14 @@ fn p1_066_an_ngspice_level_xyce_has_no_device_for_is_refused() {
                     k => format!("{polarity}{k}"),
                 };
                 let deck = one_device(line, &kind, level);
-                spec_refusal(cite, &deck, ng, xy, &[Code::W0053, Code::W0050]);
+                spec_refusal(cite, &deck, ng, xy, &[Code::W0050, Code::W0053]);
             }
         }
     }
     // The spelling of spice-bench `ngspice/tests/bsim1/test.sp`.
     let bsim1 =
         one_device("m1 d g 0 0 m1 l=1u w=1u", "nmos", 4).replace("level=4", "LEVEL=4.00000E+000");
-    spec_refusal(cite, &bsim1, ng, xy, &[Code::W0053, Code::W0050]);
+    spec_refusal(cite, &bsim1, ng, xy, &[Code::W0050, Code::W0053]);
     // Levels both have stay written: MOSFET 1, BJT 1, MESFET 1.
     for (line, kind) in [
         ("m1 d g 0 0 m1 l=1u w=1u", "nmos"),
