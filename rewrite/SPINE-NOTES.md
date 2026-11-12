@@ -167,6 +167,17 @@ Each line: question → choice → why.
     generator's stream (round 5 changed it). A rule's rows share one file; a fixture folder is a
     row's name (SPINE §4).
 
+38. R55 → `KNOWN_REACH` rows are (row, kind, covering property, why); the reach law also fails a
+    row whose property is empty or not defined as `fn <name>(` in any file under `tests/` (a text
+    search: it names a test, it does not run it). Self-test with an empty, a missing and a defined
+    name.
+
+39. L5/L6 in normal form → `same_meaning(a, b)` (`tests/common/laws.rs`): each side written as IR
+    text and read back, then `eq_meaning`. `eq_meaning` compares tables id for id, and a
+    multi-file reader pushes in its text's order (VACASK creates every file first), so 62 of 64
+    VACASK seeds failed on id order alone (vacask-plan's finding). Request for ir-kernel: an
+    order-insensitive `eq_meaning`, or the normal form as a kernel function, then this goes.
+
 ## Requests (ruled by the lead)
 
 1. Strict code: the spine's own (`S0101`). Done.

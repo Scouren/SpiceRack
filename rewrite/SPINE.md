@@ -194,14 +194,19 @@ laws run on.
 - `tests/dialect_laws.rs`: for every row of `BUILTIN`, the laws of REWRITE-PLAN §4.2 that apply
   to its sides (L1–L8; L6 over a corpus only under `--features corpus`; L9 belongs to each
   dialect's own simulator tests). Generated designs come from `ir::gen::generate(seed,
-  row.write.features(), size)`; seeds are fixed and printed on failure. L4 reads: `write` is
+  row.write.features(), size)`; seeds are fixed and printed on failure. L5 and L6 compare by meaning in normal form (both sides written as IR text and read back,
+  then `eq_meaning`: a reader's push order is its text's, not the generator's). L4 reads: `write` is
   total over a design `legalize` accepted. A generated design the row refuses is shrunk to what
   it admits (A25, R48): the items its refusals name (`Diag::item`) are dropped from their
   listing scopes, then the items `ir::check` no longer accepts, to a fixpoint bounded by the item
   count, and the laws run on the rest; a refusal at no item skips the seed, counted by code in
   the failure text. A law that runs on no design fails. The reach list: every `Item`, `Elem`,
   `Wave`, `Analysis` and `Family` kind of the writer's features is used by some admitted design
-  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list. So a writer's `admits`
+  over 512 seeds; the names never reached are a strict `KNOWN_REACH` list of (row, kind, covering
+  property, why) (R55): the covering property is a seeded test in the owning area's test file
+  that builds admissible designs of the kind through the builder and checks write, read back
+  and `eq_meaning`, with floors on designs run and designs holding the kind; the law fails when
+  the name is empty or no file under `tests/` defines `fn <name>(` (a text search). So a writer's `admits`
   pushes each refusal at its item (`Diags::push_at`); a refusal at no item costs the seed. In this slice the only
   row is `ir`.
 - `tests/layering.rs`: reads every `use crate::…` line under `src/` and fails on a forbidden

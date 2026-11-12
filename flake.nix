@@ -497,6 +497,9 @@
           XYCE_CORPUS = "${xyceRegression}/Netlists";
           VACASK_CORPUS = vacaskCorpus;
           LTSPICE_CORPUS = spiceDatasets;
+          # tests/dialect_ngspice_corpus.rs (nightly, --features corpus): the example decks of
+          # the same pinned ngspice the shell runs, its source unpacked (no new input).
+          NGSPICE_EXAMPLES = "${pkgs.srcOnly pkgs.ngspice}/examples";
 
           # examples 20 and 21: sky130 and gf180mcu, a ciel-layout PDK_ROOT.
           PDK_ROOT = pdks;

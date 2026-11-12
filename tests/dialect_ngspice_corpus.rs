@@ -179,7 +179,11 @@ const DECKS_MAX: usize = 4096;
 fn every_example_deck_reads_checks_legalizes_and_round_trips() {
     let root = examples();
     let decks = decks(&root);
-    assert!(!decks.is_empty(), "{}: no deck", root.display());
+    assert!(
+        root.is_dir() && !decks.is_empty(),
+        "{}: no deck (unsupported fails)",
+        root.display()
+    );
     let row = dialect::by_name("ngspice").expect("the ngspice row");
     let mut failing: Vec<(String, &str, String)> = Vec::new();
     let mut counts = [0usize; 5];
@@ -212,7 +216,13 @@ fn every_example_deck_reads_checks_legalizes_and_round_trips() {
         .iter()
         .map(|(n, s, w)| format!("{n} {s}: {w}"))
         .collect();
-    assert_eq!(got, want, "failing decks against KNOWN\n{}", why.join("\n"));
+    assert_eq!(
+        got,
+        want,
+        "failing decks of ngspice {} examples against KNOWN\n{}",
+        version(&root),
+        why.join("\n")
+    );
 }
 
 /// `NGSPICE_EXAMPLES`: unsupported fails.
@@ -220,6 +230,26 @@ fn examples() -> PathBuf {
     let dir = std::env::var_os("NGSPICE_EXAMPLES")
         .expect("NGSPICE_EXAMPLES is set by `nix develop .#testing` (unsupported fails)");
     PathBuf::from(dir)
+}
+
+/// The ngspice version the examples belong to: `ngspice_major_version` and
+/// `ngspice_minor_version` as the source's `configure.ac` defines them (`m4_define([...], [45])`),
+/// so a pin bump that changes the decks shows in the failure text.
+fn version(root: &Path) -> String {
+    let text = std::fs::read_to_string(root.join("../configure.ac")).unwrap_or_default();
+    let defined = |name: &str| {
+        let head = format!("m4_define([{name}],");
+        let line = text.lines().find(|l| l.starts_with(&head))?;
+        let arg = line[head.len()..].trim_matches(|c: char| "[]() ".contains(c));
+        Some(arg.to_string())
+    };
+    match (
+        defined("ngspice_major_version"),
+        defined("ngspice_minor_version"),
+    ) {
+        (Some(major), Some(minor)) => format!("{major}.{minor}"),
+        _ => "(unknown version)".to_string(),
+    }
 }
 
 /// Every `.cir` and `.sp` file under `root`, sorted.

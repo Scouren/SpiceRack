@@ -28,8 +28,8 @@ mod law_harness;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use law_harness::{
-    SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers, write_all,
-    writers,
+    SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers,
+    same_meaning, write_all, writers,
 };
 use spicerack::dialect::{self, DialectRow, Read, Write};
 use spicerack::ir;
@@ -45,7 +45,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l5",
         "ngspice",
-        "seed 0: a bsim4, b3_soi_dd or hicum2 model with no version reads back with ngspice's default version (models); a Load's modules list is lost on write (control); an Alter value 840127mil reads back as 213392258e-7, equal by value (R28), so eq_meaning on an Alter's value is in question (spine); each reported to its owner",
+        "seed 0: a bsim4, b3_soi_dd or hicum2 model with no version reads back with ngspice's default version (models: before the lead, an IR invariant proposed); an Alter value 840127mil reads back as 213392258e-7, equal by value (R28): eq_meaning on an Alter's value (spine)",
     ),
     (
         "l7",
@@ -60,28 +60,45 @@ const SEARCH_MAX: u64 = 1024;
 /// The seeds the reach list draws from: more than a law's, since it asks for every kind once.
 const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 
-/// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
-/// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str)] = &[
-    // ngspice: every admitted design over REACH_SEEDS drops these by an area's admits refusal
-    // (the list goes to the lead with each kind's blocking refusal after A25 item 4 and A28)
-    ("ngspice", "Elem(Capacitor)"),
-    ("ngspice", "Elem(Inductor)"),
-    ("ngspice", "Elem(VSource)"),
-    ("ngspice", "Elem(Table)"),
-    ("ngspice", "Wave(Pulse)"),
-    ("ngspice", "Wave(Sin)"),
-    ("ngspice", "Wave(Exp)"),
-    ("ngspice", "Wave(Sffm)"),
-    ("ngspice", "Wave(Am)"),
-    ("ngspice", "Wave(TrNoise)"),
-    ("ngspice", "Wave(TrRandom)"),
-    ("ngspice", "Analysis(Dc)"),
-    ("ngspice", "Analysis(Noise)"),
-    ("ngspice", "Analysis(SensAc)"),
-    ("ngspice", "Analysis(Pss)"),
-    ("ngspice", "Family(Mesa)"),
+/// The kinds a row claims and no admitted generated design reaches (R55): (row, feature as
+/// `Debug` prints it, the covering property, why). The covering property is a seeded test in
+/// the owning area's test file that builds admissible designs of the kind through the builder
+/// and checks write, read back and `eq_meaning`, with floors on designs run and designs
+/// holding the kind; its function name must be found as `fn <name>` in a file under `tests/`.
+/// Strict both ways (`reach_every_kind_the_row_claims`).
+const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
+    ("ngspice", "Elem(Capacitor)", FIXPOINT, ELEMENTS),
+    ("ngspice", "Elem(Inductor)", FIXPOINT, ELEMENTS),
+    ("ngspice", "Elem(VSource)", FIXPOINT, SOURCES),
+    ("ngspice", "Elem(Table)", FIXPOINT, ELEMENTS),
+    ("ngspice", "Wave(Pulse)", FIXPOINT, SOURCES),
+    ("ngspice", "Wave(Sin)", FIXPOINT, SOURCES),
+    ("ngspice", "Wave(Exp)", FIXPOINT, SOURCES),
+    ("ngspice", "Wave(Sffm)", FIXPOINT, SOURCES),
+    ("ngspice", "Wave(Am)", FIXPOINT, SOURCES),
+    ("ngspice", "Wave(TrNoise)", FIXPOINT, SOURCES),
+    ("ngspice", "Wave(TrRandom)", FIXPOINT, SOURCES),
+    ("ngspice", "Analysis(Dc)", FIXPOINT, RUN),
+    ("ngspice", "Analysis(Noise)", FIXPOINT, RUN),
+    ("ngspice", "Analysis(SensAc)", FIXPOINT, RUN),
+    ("ngspice", "Analysis(Pss)", FIXPOINT, RUN),
+    ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
 ];
+
+/// ngspice's interim covering property for an unreached kind (until round 7: then a seeded
+/// property or reached): each area's fixture fixpoint, which reads, writes and reads back a
+/// fixture of the kind.
+const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
+/// Why, per area: every admitted generated design drops the kind by that area's refusal.
+const ELEMENTS: &str =
+    "interim: dialect_ngspice_elements' fixtures (capacitor_inductor, controlled)";
+/// See [`ELEMENTS`].
+const SOURCES: &str =
+    "interim: dialect_ngspice_sources' fixtures (pulse, sin, exp, sffm, am, noise)";
+/// See [`ELEMENTS`].
+const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, noise, sens, pss)";
+/// See [`ELEMENTS`].
+const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).
@@ -205,9 +222,9 @@ fn l5_read_of_write_is_the_design() {
             };
             tally.admit();
             let back = read_all(row, &write_all(&design, row));
-            // By meaning (R28): real literals equal by value, whatever their form; the IR text
-            // is only the failure's evidence.
-            if !back.eq_meaning(&design) {
+            // By meaning (R28), in normal form (each side through the IR text): real literals
+            // equal by value, ids in canonical order; the IR text is the failure's evidence.
+            if !same_meaning(&back, &design) {
                 return Err(format!(
                     "seed {seed}:\n{}\nread back as\n{}",
                     canonical(&design),
@@ -236,7 +253,7 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
             let once = read_text(row, text).0;
             let twice = read_all(row, &write_all(&once, row));
             assert!(
-                twice.eq_meaning(&once),
+                same_meaning(&twice, &once),
                 "{} corpus text {k} (by meaning, R28):\n{}\nread back as\n{}",
                 row.name,
                 canonical(&once),
@@ -333,12 +350,78 @@ fn reach_every_kind_the_row_claims() {
     }
     let known: Vec<(String, String)> = KNOWN_REACH
         .iter()
-        .map(|(r, f)| (r.to_string(), f.to_string()))
+        .map(|(r, f, _, _)| (r.to_string(), f.to_string()))
         .collect();
     assert_eq!(
         unreached, known,
         "kinds claimed and never reached, against KNOWN_REACH"
     );
+    let uncovered = uncovered(KNOWN_REACH, &test_sources());
+    assert!(
+        uncovered.is_empty(),
+        "KNOWN_REACH rows with no covering property:\n{}",
+        uncovered.join("\n")
+    );
+}
+
+/// The covering-property check's self-test: an empty name and a name no test file defines are
+/// refused; a name that is defined passes.
+#[test]
+fn a_known_unreached_kind_names_a_covering_property_that_exists() {
+    let sources = test_sources();
+    let rows: &[(&str, &str, &str, &str)] = &[
+        ("x", "Item(Loop)", "", "no name"),
+        (
+            "x",
+            "Item(Save)",
+            "no_such_covering_property_anywhere",
+            "missing",
+        ),
+        (
+            "x",
+            "Item(Env)",
+            "reach_every_kind_the_row_claims",
+            "defined",
+        ),
+    ];
+    let found = uncovered(rows, &sources);
+    assert_eq!(found.len(), 2, "{found:?}");
+    assert!(
+        found[0].contains("Item(Loop)") && found[1].contains("Item(Save)"),
+        "{found:?}"
+    );
+}
+
+/// The rows of `rows` whose covering property is empty or not defined (`fn <name>` in no
+/// source of `sources`: a text search, enough to name a test by its function).
+fn uncovered(rows: &[(&str, &str, &str, &str)], sources: &[String]) -> Vec<String> {
+    let defined = |name: &str| sources.iter().any(|t| t.contains(&format!("fn {name}(")));
+    rows.iter()
+        .filter(|(_, _, name, _)| name.is_empty() || !defined(name))
+        .map(|(row, kind, name, _)| format!("{row} {kind}: covering property `{name}` not found"))
+        .collect()
+}
+
+/// The text of every `.rs` file under `tests/`.
+fn test_sources() -> Vec<String> {
+    let mut out = Vec::new();
+    let mut todo = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests")];
+    // Bounded by the tree: each directory is read once.
+    while let Some(dir) = todo.pop() {
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                todo.push(p);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                out.extend(std::fs::read_to_string(&p).ok());
+            }
+        }
+    }
+    assert!(!out.is_empty(), "test_sources: the tests/ tree");
+    out
 }
 
 /// The self-test of shrink to admitted (A25): a row whose `admits` refuses every item but

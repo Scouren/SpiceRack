@@ -1,4 +1,4 @@
-# codes: P1160 P1001
+# codes: P1160 P1406 P1406
 file "pwl.sp" deck
   title "pwl"
   comment " oracle: vsrcpar.c VSRC_PWL, VSRC_TD, VSRC_R (r a listed time before the last; below -0.5 no repeat), vsrcload.c PWL (first value held before the first point); runs: `pwl(0 0 1u 1 r=0 td=1u)`, `td 1u r 0`, quoted values, a continuation line"
@@ -7,4 +7,7 @@ file "pwl.sp" deck
   element vsource V2 (b 0) wave=pwl(points=[0, 0, 1u, 1, 2u, 0] delay=1u repeat_at=1u repeat=from) dc_rule=wave_at_zero
   element vsource V3 (c 0) ac_mag=1 ac_phase_deg=0 wave=pwl(points=[1u, 2, 2u, (2 * top)]) dc_rule=wave_at_zero
   element vsource V4 (d 0) wave=pwl(points=[0, 0, 1u, 1]) dc_rule=wave_at_zero
-  opaque ngspice unread ".control\nop\nprint v(a) v(b) v(c) v(d)\ntran 0.1u 6u\nprint v(a)[25] v(b)[25] v(c)[25] v(a)[50] v(b)[50]\n.endc"
+  analysis op
+  opaque ngspice inert ".control\nprint v(a) v(b) v(c) v(d)\n.endc"
+  analysis tran stop=6u print_step=0.1u cap=ngspice_rule
+  opaque ngspice inert ".control\nprint v(a)[25] v(b)[25] v(c)[25] v(a)[50] v(b)[50]\n.endc"
