@@ -18,7 +18,7 @@
 //! `Gen::expr` (in `gen_expr.rs`),
 //! `Gen::pick_def(&mut self, &Design, ScopeId, DefKind) -> DefId`,
 //! `Gen::budget(&self) -> u32`, `pub enum Reads`; crate: `Gen::fresh(&mut self) -> String`,
-//! `Gen::word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
+//! `Gen::word(&mut self) -> &'static str`, `Gen::line_word(&mut self) -> &'static str`, `Gen::class_of(&self, DefId) -> ExprClass`,
 //! `Gen::note(&mut self, DefId, ExprClass)`
 
 use crate::build::Builder;
@@ -83,6 +83,9 @@ pub struct Gen {
     /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
     /// `Extra::CaseSensitiveNames`).
     pub(crate) case_ok: bool,
+    /// Whether the expression being built must be of class `Constant` (cleared around an `If`
+    /// condition when the set lacks `Extra::IfConditionDynamic`).
+    pub(crate) constant_only: bool,
 }
 
 /// Whether a generated expression may read the circuit (`V`, `I`, `Time`, `Freq`, `Ddt`,
@@ -134,11 +137,20 @@ pub fn generate(seed: u64, features: &FeatureSet, size: Size) -> Design {
         enclosing_ok: features.contains(Feature::Extra(Extra::EnclosingRef)),
         param_reads: true,
         case_ok: features.contains(Feature::Extra(Extra::CaseSensitiveNames)),
+        constant_only: false,
     };
     let mut b = design.builder();
     let files = 1 + g.below(size.files.max(1) as u32);
     for k in 0..files {
-        let role = if k == 0 { Role::Deck } else { Role::Library };
+        // a deck holds a title unless the set has DeckWithoutTitle (A12 K2 addendum); a set
+        // with neither generates libraries only
+        let deck_ok = features.contains(Feature::Item(ItemKind::Title))
+            || features.contains(Feature::Extra(Extra::DeckWithoutTitle));
+        let role = if k == 0 && deck_ok {
+            Role::Deck
+        } else {
+            Role::Library
+        };
         let (_, top) = b.file(&format!("f{k}.sp"), role);
         fill(&mut g, &mut b, top, features);
     }
@@ -282,6 +294,12 @@ impl Gen {
         WORDS[self.below(WORDS.len() as u32) as usize]
     }
 
+    /// A word with no line break, for a title or a comment (A15 K3).
+    pub(crate) fn line_word(&mut self) -> &'static str {
+        let lines: Vec<&'static str> = WORDS.into_iter().filter(|w| !w.contains('\n')).collect();
+        lines[self.below(lines.len() as u32) as usize]
+    }
+
     /// Items still allowed; a row generator that opens a scope fills its body only while this is
     /// positive.
     pub fn budget(&self) -> u32 {
@@ -295,11 +313,13 @@ impl Gen {
 /// order of `text::dump`), choosing kinds the set and the placement allow.
 fn fill(g: &mut Gen, b: &mut Builder<'_>, top: ScopeId, features: &FeatureSet) {
     let deck = b.design().file(b.design().scope(top).file).role == Role::Deck;
-    if deck && features.contains(Feature::Item(ItemKind::Title)) && g.items_left > 0 && g.chance(2)
-    {
-        let text = g.word();
+    let untitled_ok = features.contains(Feature::Extra(Extra::DeckWithoutTitle));
+    let titled = features.contains(Feature::Item(ItemKind::Title))
+        && (!untitled_ok || (g.items_left > 0 && g.chance(2)));
+    if deck && titled {
+        let text = g.line_word();
         b.title(top, text, crate::span::Span::NONE);
-        g.items_left -= 1;
+        g.items_left = g.items_left.saturating_sub(1); // a required title may pass the budget
     }
     // the top takes what the budget leaves; each body a few items
     let first = g.items_left;

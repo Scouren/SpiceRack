@@ -232,6 +232,8 @@ fn event_constructors() {
             value: e(1),
             count: e(2),
             delay: ExprId::NONE,
+            until: ExprId::NONE,
+            skip_initial: false,
         }
     );
     assert_eq!(Event::BOUND.kind, EventKind::Bound);

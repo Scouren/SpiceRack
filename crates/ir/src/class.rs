@@ -15,6 +15,7 @@
 //!
 //! Contents: `pub enum ExprClass`, `pub fn expr_class(&Design, ExprId) -> ExprClass`; crate:
 //! `pub(crate) fn def_classes(&Design) -> &[ExprClass]`,
+//! `pub(crate) fn tree_class(&Design, ExprId, &[ExprClass]) -> ExprClass`,
 //! `pub(crate) fn node_class(&Design, ExprId, &[ExprClass]) -> ExprClass`
 
 use crate::design::Design;
@@ -41,13 +42,29 @@ pub enum ExprClass {
 /// The class of `e` (see the module header). O(its tree) once the design's definition classes
 /// are cached; the first call after a mutation computes them, O(design).
 pub fn expr_class(design: &Design, e: ExprId) -> ExprClass {
-    let table = def_classes(design);
-    let mut walk = ExprWalk::new(design);
-    walk.tree(design, e)
-        .iter()
-        .map(|&n| node_class(design, n, table))
-        .max()
-        .unwrap_or(ExprClass::Constant)
+    tree_class(design, e, def_classes(design))
+}
+
+/// The class of the tree under `root` given the definitions' classes: O(its tree), with no
+/// table sized by the design (so a row may call it per expression). An out-of-range or `NONE`
+/// root is `Constant`. Explicit stack (C11).
+pub(crate) fn tree_class(design: &Design, root: ExprId, table: &[ExprClass]) -> ExprClass {
+    let mut class = ExprClass::Constant;
+    let mut seen: std::collections::HashSet<u32, std::hash::BuildHasherDefault<crate::names::Fx>> =
+        Default::default();
+    let mut stack = vec![root];
+    let mut kids = Vec::new();
+    while let Some(e) = stack.pop() {
+        if e.is_none() || e.index() >= design.expr_count() || !seen.insert(e.0) {
+            continue;
+        }
+        class = class.max(node_class(design, e, table));
+        kids.clear();
+        design.children(e, &mut kids);
+        // children have lower ids, so the walk ends on any table contents
+        stack.extend(kids.iter().copied().filter(|k| *k < e));
+    }
+    class
 }
 
 /// The class of every definition, by `DefId` (`Constant` for kinds an expression does not read),

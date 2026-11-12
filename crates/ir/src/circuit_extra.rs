@@ -29,8 +29,10 @@ pub enum CircuitExtra {
     MultControlled,
     /// `mult` on a diode, BJT, MOSFET, JFET, MESFET or IGBT.
     MultSemi,
-    /// `mult` on a subcircuit instance (ESPice ignores it, B10, 6.01).
-    MultInstance,
+    /// `mult` on a subcircuit instance under `MultLaw::Parallel` (ESPice ignores it, B10, 6.01).
+    MultInstanceParallel,
+    /// `mult` on a subcircuit instance under `MultLaw::NgspiceAppend` (A15 C1, R31).
+    MultInstanceNgspiceAppend,
     /// `mult` on a code model or module instance (VACASK `$mfactor`, B24).
     MultModule,
     /// `mult` on any other kind (port, switch, line, charge or flux element).
@@ -221,15 +223,33 @@ pub enum CircuitExtra {
     /// the model and unbinds the element).
     BuiltinMaster,
     // A13 (R23)
-    /// An element whose name does not begin with its SPICE letter (`letter::spice_letter`,
+    /// An element whose name begins with none of its SPICE letters (`letter::spice_letters`,
     /// ASCII case ignored): a SPICE-card dialect cannot spell it; a pass renames it and every
     /// reference to it.
     NameWithoutLetter,
+    // A15 C2 (R31)
+    /// A behavioural temperature coefficient measured from `tnom` (`TcBase::Tnom` on a `Behav`
+    /// or a circuit-valued passive with `tc1`/`tc2`): ngspice lacks it.
+    TcBaseTnom,
+    /// A behavioural temperature coefficient measured from 27 °C (`TcBase::Fixed27`).
+    TcBaseFixed27,
+    /// A circuit-valued capacitor's temperature factor applied directly (`TcLaw::Direct`).
+    TcLawDirect,
+    /// A circuit-valued capacitor's temperature factor applied as a divisor
+    /// (`TcLaw::Reciprocal`, ngspice).
+    TcLawReciprocal,
+    // A17 (R35)
+    /// A pulse, sine, exponential or SFFM whose zero fields mean what they hold
+    /// (`GivenZero::AsGiven`).
+    GivenZeroAsGiven,
+    /// A pulse, sine, exponential or SFFM under ngspice's zero rule
+    /// (`GivenZero::SpiceDefault`).
+    GivenZeroSpiceDefault,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 97] = [
+    pub const ALL: [CircuitExtra; 104] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -237,7 +257,8 @@ impl CircuitExtra {
         CircuitExtra::MultISource,
         CircuitExtra::MultControlled,
         CircuitExtra::MultSemi,
-        CircuitExtra::MultInstance,
+        CircuitExtra::MultInstanceParallel,
+        CircuitExtra::MultInstanceNgspiceAppend,
         CircuitExtra::MultModule,
         CircuitExtra::MultOther,
         CircuitExtra::IcUicOnly,
@@ -327,6 +348,12 @@ impl CircuitExtra {
         CircuitExtra::ModelWithoutLibrary,
         CircuitExtra::BuiltinMaster,
         CircuitExtra::NameWithoutLetter,
+        CircuitExtra::TcBaseTnom,
+        CircuitExtra::TcBaseFixed27,
+        CircuitExtra::TcLawDirect,
+        CircuitExtra::TcLawReciprocal,
+        CircuitExtra::GivenZeroAsGiven,
+        CircuitExtra::GivenZeroSpiceDefault,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

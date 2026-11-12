@@ -12,7 +12,7 @@
 //! Contents: `pub(crate) trait DetailFacts` (`DetailFacts::handles`, `DetailFacts::features`,
 //! `DetailFacts::fault`, `DetailFacts::dump`, `DetailFacts::parse`, `DetailFacts::generate`),
 //! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
-//! `pub(crate) fn analysis_count`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
+//! `pub(crate) fn base_just_before`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
 //! `pub(crate) fn fault_of`, `pub(crate) fn dump_of`, `pub(crate) fn parse_of`,
 //! `pub(crate) fn gen_of`; `RowFacts` for `Analysis`
 
@@ -32,10 +32,9 @@ use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::plan::target_refs;
-#[cfg(any(test, feature = "gen"))]
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
-use crate::run_words::reachable;
+use crate::run_words::loop_depth;
 use crate::run_words::{put_name, take_enum, take_name, word};
 use crate::text::Words;
 use crate::text_expr::Ctx;
@@ -71,6 +70,15 @@ pub(crate) trait DetailFacts: RunDetail {
         features: &FeatureSet,
     ) -> Option<Self>;
 }
+
+/// The periodic small-signal kinds: each needs an `Hb` or `Pss` before it (R5).
+#[cfg(any(test, feature = "gen"))]
+const PERIODIC: [AnalysisKind; 4] = [
+    AnalysisKind::Pac,
+    AnalysisKind::Pnoise,
+    AnalysisKind::Pxf,
+    AnalysisKind::Pstb,
+];
 
 /// Dispatches a generic call over an analysis kind's detail type (`$none` for the kinds
 /// without one). Exhaustive: a new kind fails to compile here.
@@ -145,15 +153,6 @@ pub(crate) fn base_before(design: &Design, scope: ScopeId, pos: usize) -> bool {
     unreachable!("the scope tree has a cycle")
 }
 
-/// The analyses reachable from every file's top scope.
-#[cfg(any(test, feature = "gen"))]
-pub(crate) fn analysis_count(design: &Design) -> usize {
-    design
-        .files()
-        .map(|f| reachable(design, design.file(f).top, ItemKind::Analysis))
-        .sum()
-}
-
 impl RowFacts for Analysis {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Name(self.name));
@@ -176,8 +175,11 @@ impl RowFacts for Analysis {
         }
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
+        if crate::state_order::nested(design, scope) {
+            *set = set.with(Feature::Run(RunExtra::RunItemNested));
+        }
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
@@ -240,20 +242,21 @@ impl RowFacts for Analysis {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let design = b.design();
+        if crate::state_order::nested(design, scope)
+            && !features.contains(Feature::Run(RunExtra::RunItemNested))
+        {
+            return ItemRef::NONE;
+        }
         let several = features.contains(Feature::Run(RunExtra::SeveralAnalyses));
-        if analysis_count(design) > 0 && !several {
+        // Generation appends, so the table's rows are the design's analyses (no dead rows).
+        if !design.analyses.is_empty() && !several {
             return ItemRef::NONE;
         }
         // Without `LoopScoped`, every loop must wrap every analysis: a new one goes inside
         // every existing loop's body.
         let scoped = features.contains(Feature::Run(RunExtra::LoopScoped));
-        if !scoped
-            && !design
-                .loops
-                .rows()
-                .iter()
-                .all(|l| within(design, scope, l.body))
-        {
+        // Inside every loop's body exactly when the scope's loop depth is the loop count.
+        if !scoped && loop_depth(design, scope) != design.loops.len() {
             return ItemRef::NONE;
         }
         let kinds: Vec<AnalysisKind> = AnalysisKind::ALL
@@ -272,11 +275,41 @@ impl RowFacts for Analysis {
         };
         let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
             .expect("a possible kind's detail generates");
-        b.push(
+        let item = b.push(
             scope,
             Analysis { kind, name, detail },
             crate::span::Span::NONE,
-        )
+        );
+        // A periodic small-signal kind is possible only right after its base: a base this call
+        // made gets one at once (half the time), so none of them depends on the kernel picking an
+        // analysis next. Counted in the budget like any item.
+        if matches!(kind, AnalysisKind::Hb | AnalysisKind::Pss)
+            && several
+            && g.items_left > 1
+            && g.chance(2)
+        {
+            let follow: Vec<AnalysisKind> = PERIODIC
+                .into_iter()
+                .filter(|&k| features.contains(Feature::Analysis(k)))
+                .collect();
+            if !follow.is_empty() {
+                let kind = follow[g.below(follow.len() as u32) as usize];
+                let name = if g.chance(4) {
+                    g.fresh_name(b)
+                } else {
+                    NameId::NONE
+                };
+                let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+                    .expect("a periodic kind generates right after its base");
+                b.push(
+                    scope,
+                    Analysis { kind, name, detail },
+                    crate::span::Span::NONE,
+                );
+                g.items_left -= 1;
+            }
+        }
+        item
     }
 }
 
@@ -331,6 +364,24 @@ pub(crate) fn gen_of<D: DetailFacts>(
     Some(b.detail(row))
 }
 
+/// Whether the last analysis listed in `scope` is an `Hb` or `Pss`: the generator's form of
+/// `base_before` (a periodic small-signal row it generates follows its base in the same scope).
+/// Scans back only to the scope's last analysis: amortized O(1) per generated item.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn base_just_before(design: &Design, scope: ScopeId) -> bool {
+    let last = design
+        .items(scope)
+        .iter()
+        .rev()
+        .find(|it| it.kind == ItemKind::Analysis);
+    last.is_some_and(|it| {
+        matches!(
+            Analysis::table(design).get(it.index).kind,
+            AnalysisKind::Hb | AnalysisKind::Pss
+        )
+    })
+}
+
 // ---- private ----
 
 /// Whether `kind`'s detail generator succeeds here under `features` (its only failures; the
@@ -352,8 +403,7 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
         }
         AnalysisKind::Pss => has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous),
         AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {
-            let d = b.design();
-            base_before(d, scope, d.items(scope).len())
+            base_just_before(b.design(), scope)
         }
         AnalysisKind::Op
         | AnalysisKind::Dc
@@ -374,20 +424,4 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
         | AnalysisKind::DcInc
         | AnalysisKind::TimedOp => true,
     }
-}
-
-/// Whether `scope` is `body` or lies inside it. Bounded by the scope count.
-#[cfg(any(test, feature = "gen"))]
-fn within(design: &Design, scope: ScopeId, body: ScopeId) -> bool {
-    let mut s = scope;
-    for _ in 0..=design.scopes.len() {
-        if s == body {
-            return true;
-        }
-        if s.is_none() {
-            return false;
-        }
-        s = design.scope(s).parent;
-    }
-    unreachable!("the scope tree has a cycle")
 }

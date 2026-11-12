@@ -25,9 +25,13 @@ pub struct Pass {
     pub run: fn(&mut ir::Design, &mut ir::Diags),
 }
 
-/// The registered passes, in the order `legalize` tries them. `deck_title::deck_title` joins
-/// when the kernel's `Extra::DeckWithoutTitle` lands (its test goes red as the cue).
-pub static PASSES: &[Pass] = &[];
+/// The registered passes, in the order `legalize` tries them.
+pub static PASSES: &[Pass] = &[Pass {
+    name: "deck_title",
+    removes: ir::Feature::Extra(ir::Extra::DeckWithoutTitle),
+    requires: ir::FeatureSet::EMPTY,
+    run: deck_title::deck_title,
+}];
 
 /// Rounds of: the features `design` uses and `target` lacks; for each, the first pass of
 /// [`PASSES`] that removes it and whose `requires` `target` has, run and then `ir::check`ed,

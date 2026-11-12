@@ -407,42 +407,15 @@ pub(crate) fn target_valid(t: &Target) -> bool {
 /// Adds the target's features for its use: the use's family member of its kind, an option
 /// target's key, `TargetInInstance`.
 pub(crate) fn target_features(t: &Target, used: TargetUse, set: &mut FeatureSet) {
-    use RunExtra as X;
-    use TargetKind as K;
-    let x = match (used, t.kind) {
-        (TargetUse::Dc, K::SourceDc) => None,
-        (TargetUse::Dc, K::Temp) => Some(X::DcAxisTemp),
-        (TargetUse::Dc, K::Param) => Some(X::DcAxisParam),
-        (TargetUse::Dc, K::SubcktParam) => Some(X::DcAxisSubcktParam),
-        (TargetUse::Dc, K::ElementValue) => Some(X::DcAxisElementValue),
-        (TargetUse::Dc, K::DeviceParam) => Some(X::DcAxisDeviceParam),
-        (TargetUse::Dc, K::ModelParam) => Some(X::DcAxisModelParam),
-        (TargetUse::Dc, K::Option) => Some(X::DcAxisOption),
-        (TargetUse::Loop, K::Temp) => Some(X::LoopTemp),
-        (TargetUse::Loop, K::Param) => Some(X::LoopParam),
-        (TargetUse::Loop, K::SubcktParam) => Some(X::LoopSubcktParam),
-        (TargetUse::Loop, K::SourceDc) => Some(X::LoopSourceDc),
-        (TargetUse::Loop, K::ElementValue) => Some(X::LoopElementValue),
-        (TargetUse::Loop, K::DeviceParam) => Some(X::LoopDeviceParam),
-        (TargetUse::Loop, K::ModelParam) => Some(X::LoopModelParam),
-        (TargetUse::Loop, K::Option) => Some(X::LoopOption),
-        (TargetUse::Alter, K::Temp) => Some(X::AlterTemp),
-        (TargetUse::Alter, K::Param) => Some(X::AlterParam),
-        (TargetUse::Alter, K::SubcktParam) => Some(X::AlterSubcktParam),
-        (TargetUse::Alter, K::SourceDc) => Some(X::AlterSourceDc),
-        (TargetUse::Alter, K::ElementValue) => Some(X::AlterElementValue),
-        (TargetUse::Alter, K::DeviceParam) => Some(X::AlterDeviceParam),
-        (TargetUse::Alter, K::ModelParam) => Some(X::AlterModelParam),
-        (TargetUse::Alter, K::Option) => Some(X::AlterOption),
-    };
+    let x = target_extra(used, t.kind);
     if let Some(x) = x {
         *set = set.with(Feature::Run(x));
     }
-    if t.kind == K::Option {
+    if t.kind == TargetKind::Option {
         *set = set.with(Feature::Option(t.option));
     }
     if t.path.len > 0 {
-        *set = set.with(Feature::Run(X::TargetInInstance));
+        *set = set.with(Feature::Run(RunExtra::TargetInInstance));
     }
 }
 
@@ -552,18 +525,7 @@ pub(crate) fn target_kinds(features: &FeatureSet, used: TargetUse) -> Vec<Target
     TargetKind::ALL
         .into_iter()
         .filter(|&k| {
-            let mut one = FeatureSet::EMPTY;
-            target_features(
-                &Target {
-                    kind: k,
-                    ..Target::TEMP
-                },
-                used,
-                &mut one,
-            );
-            let ok = one
-                .iter()
-                .all(|f| matches!(f, Feature::Option(_)) || features.contains(f));
+            let ok = target_extra(used, k).is_none_or(|x| features.contains(Feature::Run(x)));
             ok && (k != TargetKind::Option || any_key)
         })
         .collect()
@@ -586,4 +548,39 @@ pub(crate) fn gen_ref(g: &mut Gen, b: &mut Builder<'_>, kind: Option<DefKind>) -
         }
     }
     Ref::unresolved(g.fresh_name(b))
+}
+
+// ---- private ----
+
+/// The `RunExtra` a target kind uses for `used`, if any (a DC sweep of a source's DC value is
+/// every target's).
+const fn target_extra(used: TargetUse, kind: TargetKind) -> Option<RunExtra> {
+    use RunExtra as X;
+    use TargetKind as K;
+    match (used, kind) {
+        (TargetUse::Dc, K::SourceDc) => None,
+        (TargetUse::Dc, K::Temp) => Some(X::DcAxisTemp),
+        (TargetUse::Dc, K::Param) => Some(X::DcAxisParam),
+        (TargetUse::Dc, K::SubcktParam) => Some(X::DcAxisSubcktParam),
+        (TargetUse::Dc, K::ElementValue) => Some(X::DcAxisElementValue),
+        (TargetUse::Dc, K::DeviceParam) => Some(X::DcAxisDeviceParam),
+        (TargetUse::Dc, K::ModelParam) => Some(X::DcAxisModelParam),
+        (TargetUse::Dc, K::Option) => Some(X::DcAxisOption),
+        (TargetUse::Loop, K::Temp) => Some(X::LoopTemp),
+        (TargetUse::Loop, K::Param) => Some(X::LoopParam),
+        (TargetUse::Loop, K::SubcktParam) => Some(X::LoopSubcktParam),
+        (TargetUse::Loop, K::SourceDc) => Some(X::LoopSourceDc),
+        (TargetUse::Loop, K::ElementValue) => Some(X::LoopElementValue),
+        (TargetUse::Loop, K::DeviceParam) => Some(X::LoopDeviceParam),
+        (TargetUse::Loop, K::ModelParam) => Some(X::LoopModelParam),
+        (TargetUse::Loop, K::Option) => Some(X::LoopOption),
+        (TargetUse::Alter, K::Temp) => Some(X::AlterTemp),
+        (TargetUse::Alter, K::Param) => Some(X::AlterParam),
+        (TargetUse::Alter, K::SubcktParam) => Some(X::AlterSubcktParam),
+        (TargetUse::Alter, K::SourceDc) => Some(X::AlterSourceDc),
+        (TargetUse::Alter, K::ElementValue) => Some(X::AlterElementValue),
+        (TargetUse::Alter, K::DeviceParam) => Some(X::AlterDeviceParam),
+        (TargetUse::Alter, K::ModelParam) => Some(X::AlterModelParam),
+        (TargetUse::Alter, K::Option) => Some(X::AlterOption),
+    }
 }

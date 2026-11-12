@@ -2,11 +2,11 @@
 //! `.probe`, `save`, `.print`/`.plot` and `.meas` in, rows out; the probes they name are rows of
 //! `probe.rs`, a measure's typed body a row of `measure.rs`.
 //!
-//! The save set is always explicit (`INV-semantics.md` 9.03–9.05): a reader expands its
-//! simulator's default (ngspice: every node when there is no `.save`; HSPICE: nothing without
-//! `.option post`; LTspice: top-level nodes and device currents) and its `all` into `Save` rows
-//! of categories, and the union of the `Save` items in force is the set; no later card erases a
-//! category. A state checkpoint (HSPICE `.save type=nodeset`, Xyce `.SAVE`, `.DCOP output=`) is
+//! The save set is the union of the `Save` items in force; a reader expands its simulator's
+//! `all` into `Save` rows of categories (ngspice: `AllV` and `AllBranchI`), and no later card
+//! erases a category (`INV-semantics.md` 9.04, 9.05). What a deck saves when it names nothing is
+//! not stated: today the IR is silent and the target's default applies (R29, open until the run
+//! side, S12). A state checkpoint (HSPICE `.save type=nodeset`, Xyce `.SAVE`, `.DCOP output=`) is
 //! not a save: it stays `Opaque` of class `Private`.
 //!
 //! Cites: `rewrite/IR-RUN.md` §4; `rewrite/INV-constructs.md` H1–H5, H10, H22, H28;

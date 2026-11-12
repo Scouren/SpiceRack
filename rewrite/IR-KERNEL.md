@@ -271,9 +271,9 @@ value Int or Real (`eval::eval_typed -> Value { number, int }`; `eval` keeps ret
 number; `Bindings::param_value` passes a typed parameter, defaulting to `param` as Real):
 `Num` Int iff its form is; a read its value's; `Neg` its operand's; `Add`, `Sub`, `Mul`, `Min`,
 `Max` Int iff every operand is; comparisons, logic, bit operators and shifts Int; the ternary its
-chosen branch's; `ToInt` Int; `Sgn` Int iff its operand is (run f2 printed `sgn(-3)/2` as 0, so
-the run overrides the amendment's table, R5); everything else Real. An Int beyond ±2⁵³ is a
-domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`. An Int
+chosen branch's; `ToInt` Int; `SgnZeroPos` (−1 for `x < 0`, +1 otherwise, −0.0 included:
+VACASK's `sgn`, runs e1, f4) its operand's; everything else Real, `Sgn` (−1, 0, 1) included. An Int beyond ±2⁵³ is a
+domain error. IR text: an Int literal is `3i`, `DivTyped` is `/:`, `ToInt` is `to_int`, `SgnZeroPos` is `sgn_zero_pos`. An Int
 and a real literal of one value are not `eq_value` (they mean different things).
 
 **A12 K2 (2026-11-12): two features of scope (R18).** `Extra::EnclosingRef`: an item holds a
@@ -284,6 +284,9 @@ item's scope chain, past the nearest `Subckt` scope, with a `Subckt` scope still
 `Extra::FormalReadsParam`: a `Subckt` head default holds a `Param` read anywhere in its tree. The
 generator binds an enclosing definition only when the set has `EnclosingRef`, and puts a `Param`
 leaf in a head default only when it has `FormalReadsParam` (VACASK runs n1, m1, c1, t2).
+`Extra::DeckWithoutTitle` (a design-level feature, reported at `Span::NONE`): a `Deck` file whose
+top scope lists no `Title`. The generator titles every deck when the set lacks it, and makes
+only libraries when the set has neither it nor `Item(Title)`.
 
 **A12 K3 (2026-11-12): `OpaqueClass::Hint` (R19).** Tunes its own simulator's solver (a
 convergence aid, a step-control knob) and names no accuracy target. Appended after `Script`, so
@@ -291,6 +294,25 @@ its code is `S0006` and no earlier code moves; IR text word `hint`. Its note say
 copies it and another family leaves it out, the numbers moving at most within the solver's
 tolerance (not `Inert`'s note: an `Inert` statement moves no number). Dropping it is the spine's
 `legalize`, not the kernel's.
+
+**A15 K2 (2026-11-12): two more extras.** `Extra::FormalWithoutDefault`: a `Subckt` head
+parameter with no default (an instance must pass it). `Extra::IfConditionDynamic`: an `If`
+condition of class `Temp` or `Circuit` (transitive, as the `*Dyn` features are). The generator
+gives every formal a default and makes every condition `Constant` unless the set has the
+feature.
+
+**A15 K3 (2026-11-12): two invariants.** A `Title`'s or `Comment`'s text holds no line break
+(`\n` or `\r`): `FieldDomain`. `ProbeContext` follows the class: a constant-in-time field
+(`Handle::Expr`, a list of them, a head default) whose expression is of class `Circuit` through a
+parameter or function it reads is a violation, as a direct probe is. That pass runs last and only
+on a design with no other violation (the class table reads definitions through their rows).
+The generator writes one-line titles and comments, and a tree under `Reads::Constant` reads no
+`Circuit`-class definition.
+
+**A15 K4 (2026-11-12): literal equality (R28).** `Design::eq_meaning` compares two real
+literals by exact value whatever their forms (`1k` = `1e3` = `1000` = `1000.0`); an `Int` literal
+equals only an `Int` of the same value. `Design::eq_ignoring_spans` stays exact: forms are
+compared. Both were already so; `kernel_literal` pins it.
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

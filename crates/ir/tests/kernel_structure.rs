@@ -97,6 +97,7 @@ fn bind_ref_binds_a_row_reference_pushed_before_its_definition() {
                 params: ParamList::EMPTY,
                 mult: ExprId::NONE,
                 detail: NO_ROW,
+                mult_law: spicerack_ir::MultLaw::Parallel,
             };
             let x1 = b.push(top, row, Span::NONE);
             b.subckt(top, "inv", &[], &[], Span::NONE);
@@ -123,8 +124,10 @@ fn entry_is_total() {
         b.file("lib.sp", Role::Library);
         b.file("top.sp", Role::Deck);
     }
-    assert_eq!(d.entry(), spicerack_ir::FileId(1), "the first deck");
+    // ruled: the entry is file 0 whatever the roles (a kit whose entry is a library that
+    // reaches a deck writes the library, not the deck)
+    assert_eq!(d.entry(), spicerack_ir::FileId(0), "file 0, a library here");
     let mut libs = Design::new();
     libs.builder().file("only.lib", Role::Library);
-    assert_eq!(libs.entry(), spicerack_ir::FileId(0), "no deck: file 0");
+    assert_eq!(libs.entry(), spicerack_ir::FileId(0), "file 0");
 }

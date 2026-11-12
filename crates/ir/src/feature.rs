@@ -3,7 +3,7 @@
 //! out (`features_used`, one scan); legalization compares that set with the target's.
 //!
 //! Every kind is a feature (`Item`, `Elem`, `Wave`, `Analysis`, `Expr`, `Func`, `Binary`,
-//! `Unary`, `Dist`, a draw's `DrawWhen` and `DrawPer`, and each portable `Option` key, A7); a
+//! `Unary`, `Dist`, a draw's `DrawWhen` and `DrawPer`, each portable `Option` key, A7, and each model `Family`, A15 K5); a
 //! function or operator used inside an expression that holds a `V`, `I`, `Time` or `Freq` leaf is its `*Dyn` feature instead (Addendum A1: legality is per context);
 //! `Extra` (kernel), `CircuitExtra` (`circuit_extra.rs`) and `RunExtra` (`run_extra.rs`) list
 //! the features that are fields, not kinds, each in its owner's file (A7). Feature indices are dense, in that
@@ -33,7 +33,8 @@ use crate::element::ElemKind;
 use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
-use crate::item::{ItemKind, ScopeKind};
+use crate::item::{ItemKind, Role, ScopeKind};
+use crate::model::ModelFamily;
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 use crate::wave::WaveKind;
@@ -79,6 +80,10 @@ pub enum Feature {
     /// only its own dialect's private options, and that dialect check is the writer's, not the
     /// feature set's.
     Option(OptionKey),
+    /// A model of an equation family (AMEND-A12 A15 K5, R32): "this simulator has no such
+    /// model" is a feature a target lacks, as `Elem`, `Wave` and `Analysis` are. Set by the
+    /// circuit owner's `Model` row.
+    Family(ModelFamily),
 }
 
 /// The kernel's features that are fields or placements, not kinds. The circuit and run owners'
@@ -112,6 +117,15 @@ pub enum Extra {
     /// A `Subckt` head default holds a `Param` read (A12 K2: VACASK lets an instance override
     /// only a formal whose default folds to a constant).
     FormalReadsParam,
+    /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
+    /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
+    /// empty one are the same text there).
+    DeckWithoutTitle,
+    /// A `Subckt` head parameter with no default (A15 K2: an instance must pass it).
+    FormalWithoutDefault,
+    /// An `If` condition of class `Temp` or `Circuit` (A15 K2: a netlist chosen by a value no
+    /// constant fold decides).
+    IfConditionDynamic,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -134,7 +148,7 @@ pub(crate) struct ExprWalk {
 
 const WORDS: usize = (Feature::COUNT as usize).div_ceil(64);
 /// The member count of each `Feature` group, in declaration order.
-const COUNTS: [usize; 18] = [
+const COUNTS: [usize; 19] = [
     ItemKind::COUNT,
     ElemKind::COUNT,
     WaveKind::COUNT,
@@ -153,6 +167,7 @@ const COUNTS: [usize; 18] = [
     CircuitExtra::COUNT,
     RunExtra::COUNT,
     OptionKey::COUNT,
+    ModelFamily::COUNT,
 ];
 
 impl Feature {
@@ -171,7 +186,8 @@ impl Feature {
         + Extra::COUNT
         + CircuitExtra::COUNT
         + RunExtra::COUNT
-        + OptionKey::COUNT) as u16;
+        + OptionKey::COUNT
+        + ModelFamily::COUNT) as u16;
 
     /// The dense index: the variant's offset (the counts of the variants before it, in
     /// declaration order) plus the member's position in its `ALL`.
@@ -195,6 +211,7 @@ impl Feature {
             Feature::Circuit(m) => (15, m as usize),
             Feature::Run(m) => (16, m as usize),
             Feature::Option(m) => (17, m as usize),
+            Feature::Family(m) => (18, m as usize),
         };
         assert!(
             member < COUNTS[group],
@@ -233,6 +250,7 @@ impl Feature {
             15 => Feature::Circuit(CircuitExtra::ALL[i]),
             16 => Feature::Run(RunExtra::ALL[i]),
             17 => Feature::Option(OptionKey::ALL[i]),
+            18 => Feature::Family(ModelFamily::ALL[i]),
             _ => unreachable!(),
         }
     }
@@ -240,7 +258,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; 11] = [
+    pub const ALL: [Extra; Extra::IfConditionDynamic as usize + 1] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -252,6 +270,9 @@ impl Extra {
         Extra::IntLiteral,
         Extra::EnclosingRef,
         Extra::FormalReadsParam,
+        Extra::DeckWithoutTitle,
+        Extra::FormalWithoutDefault,
+        Extra::IfConditionDynamic,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -358,6 +379,17 @@ pub fn features_used(design: &Design) -> FeatureSet {
 pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
     if case_clash(design) {
         *set = set.with(Feature::Extra(Extra::CaseSensitiveNames));
+    }
+    let untitled = |f| {
+        let file = design.file(f);
+        file.role == Role::Deck
+            && !design
+                .items(file.top)
+                .iter()
+                .any(|i| i.kind == ItemKind::Title)
+    };
+    if design.files().any(untitled) {
+        *set = set.with(Feature::Extra(Extra::DeckWithoutTitle));
     }
     crate::element::design_features(design, set);
     crate::analysis::design_features(design, set);

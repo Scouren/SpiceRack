@@ -299,7 +299,7 @@ impl Machine<'_> {
                 let int = match f {
                     Func::Min | Func::Max => all_int,
                     Func::ToInt => true,
-                    Func::Sgn => all_int, // run f2: `sgn(-3)/2` printed 0
+                    Func::SgnZeroPos => all_int, // VACASK runs f2, f4: its operand's
                     _ => false,
                 };
                 Value { number: n, int }
@@ -543,6 +543,13 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Ddt | Func::Idt => unreachable!("refused before their arguments are evaluated"),
         Func::Pwl => return pwl(xs).ok_or(out),
         Func::ToInt => x.trunc(),
+        Func::SgnZeroPos => {
+            if x < 0.0 {
+                -1.0
+            } else {
+                1.0
+            }
+        }
     };
     Ok(v)
 }

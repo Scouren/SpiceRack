@@ -18,6 +18,8 @@
 //! `pub struct MeasureFind`, `pub struct MeasureDeriv`, `pub struct MeasureStat`,
 //! `pub struct MeasureParam`; on each enum: `ALL`, `COUNT`; `Event::BOUND`,
 //! `Event::at(ExprId) -> Event`, `Event::cross(Probe, Edge, ExprId, ExprId) -> Event`
+//! IR text of an event: `(cross rise|fall|cross [last] [skip_initial] <probe> value=v [count=v]
+//! [delay=v] [until=v])`, `(at value=v)`, `(bound)`.
 //! - the measures' event facts: `pub(crate) fn event_handles`, `pub(crate) fn event_features`,
 //!   `pub(crate) fn event_valid`, `pub(crate) fn point`, `pub(crate) fn dump_event`,
 //!   `pub(crate) fn parse_event`, `pub(crate) fn gen_event`
@@ -78,6 +80,10 @@ pub struct Event {
     pub edge: Edge,
     /// `Cross`: the last crossing instead of the `count`-th (`LAST`).
     pub last: bool,
+    /// `Cross`: the first crossing after the analysis's first interval, the one ngspice takes
+    /// when no `RISE`/`FALL`/`CROSS` is given (`com_measure2.c`; an explicit `CROSS=1` counts a
+    /// crossing in that interval, so this is never count 1: R30). `count` is `NONE`.
+    pub skip_initial: bool,
     /// `Cross`: the probe that crosses. Unread otherwise (an `Expr` probe with no expression).
     pub signal: Probe,
     /// `Cross`: the threshold (it may read the circuit: `WHEN v(a)=v(b)`). `At`: the position
@@ -88,6 +94,9 @@ pub struct Event {
     pub count: ExprId,
     /// `Cross`: crossings before this position are not counted (`TD=`), or `NONE`.
     pub delay: ExprId,
+    /// `Cross`: crossings after this position are not searched (ngspice `TO=` on a crossing,
+    /// A15 R2), or `NONE` for the analysis's end.
+    pub until: ExprId,
 }
 
 /// How an [`Event`] is found.
@@ -130,6 +139,10 @@ pub enum Stat {
     Rms,
     /// The integral along the sweep axis (trapezoidal).
     Integ,
+    /// Where on the sweep axis the least value is (ngspice `MIN_AT`).
+    MinAt,
+    /// Where on the sweep axis the greatest value is (ngspice `MAX_AT`).
+    MaxAt,
 }
 
 /// `TrigTarg` detail: `targ`'s position minus `trig`'s.
@@ -186,12 +199,12 @@ pub struct MeasureParam {
     pub value: ExprId,
 }
 
-const _: () = assert!(size_of::<Event>() == 40);
-const _: () = assert!(size_of::<MeasureTrigTarg>() == 80);
-const _: () = assert!(size_of::<MeasureWhen>() == 40);
-const _: () = assert!(size_of::<MeasureFind>() == 64);
-const _: () = assert!(size_of::<MeasureDeriv>() == 64);
-const _: () = assert!(size_of::<MeasureStat>() == 108);
+const _: () = assert!(size_of::<Event>() == 44);
+const _: () = assert!(size_of::<MeasureTrigTarg>() == 88);
+const _: () = assert!(size_of::<MeasureWhen>() == 44);
+const _: () = assert!(size_of::<MeasureFind>() == 68);
+const _: () = assert!(size_of::<MeasureDeriv>() == 68);
+const _: () = assert!(size_of::<MeasureStat>() == 116);
 const _: () = assert!(size_of::<MeasureParam>() == 4);
 
 impl Event {
@@ -211,6 +224,8 @@ impl Event {
         value: ExprId::NONE,
         count: ExprId::NONE,
         delay: ExprId::NONE,
+        until: ExprId::NONE,
+        skip_initial: false,
     };
 
     /// The position `value` on the sweep axis.
@@ -266,13 +281,15 @@ impl Edge {
 
 impl Stat {
     /// Every statistic, in declaration order.
-    pub const ALL: [Stat; 6] = [
+    pub const ALL: [Stat; 8] = [
         Stat::Avg,
         Stat::Min,
         Stat::Max,
         Stat::Pp,
         Stat::Rms,
         Stat::Integ,
+        Stat::MinAt,
+        Stat::MaxAt,
     ];
     /// Statistic count.
     pub const COUNT: usize = Self::ALL.len();
@@ -286,6 +303,7 @@ pub(crate) fn event_handles(e: &Event, out: &mut Vec<Handle>) {
         Handle::ExprDyn(e.value),
         Handle::Expr(e.count),
         Handle::Expr(e.delay),
+        Handle::Expr(e.until),
     ]);
 }
 
@@ -297,6 +315,8 @@ pub(crate) fn event_features(design: &Design, e: &Event, set: &mut FeatureSet) {
     probe_features(&e.signal, set);
     flag(set, e.last, RunExtra::MeasLast);
     flag(set, !e.delay.is_none(), RunExtra::MeasDelay);
+    flag(set, !e.until.is_none(), RunExtra::MeasUntil);
+    flag(set, e.skip_initial, RunExtra::MeasSkipInitial);
     flag(
         set,
         reads_circuit(design, e.value),
@@ -307,16 +327,14 @@ pub(crate) fn event_features(design: &Design, e: &Event, set: &mut FeatureSet) {
 /// Whether the event holds exactly the fields its kind reads.
 pub(crate) fn event_valid(e: &Event) -> bool {
     let unread = e.signal == Event::BOUND.signal;
+    // A crossing is picked one way: by count, last, or the default (skip_initial).
+    let picks = u8::from(!e.count.is_none()) + u8::from(e.last) + u8::from(e.skip_initial);
+    let no_cross_fields =
+        e.count.is_none() && e.delay.is_none() && e.until.is_none() && !e.last && !e.skip_initial;
     match e.kind {
-        EventKind::Cross => {
-            probe_valid(&e.signal) && !e.value.is_none() && (e.last == e.count.is_none())
-        }
-        EventKind::At => {
-            unread && !e.value.is_none() && e.count.is_none() && e.delay.is_none() && !e.last
-        }
-        EventKind::Bound => {
-            unread && e.value.is_none() && e.count.is_none() && e.delay.is_none() && !e.last
-        }
+        EventKind::Cross => probe_valid(&e.signal) && !e.value.is_none() && picks == 1,
+        EventKind::At => unread && !e.value.is_none() && no_cross_fields,
+        EventKind::Bound => unread && e.value.is_none() && no_cross_fields,
     }
 }
 
@@ -332,11 +350,13 @@ pub(crate) fn dump_event(design: &Design, ctx: &Ctx, e: &Event, out: &mut String
     if e.kind == EventKind::Cross {
         put_word(out, &word(e.edge));
         put_flag(out, e.last, "last");
+        put_flag(out, e.skip_initial, "skip_initial");
         dump_probe(design, ctx, &e.signal, out);
     }
     put_expr(out, design, ctx, "value", e.value);
     put_expr(out, design, ctx, "count", e.count);
     put_expr(out, design, ctx, "delay", e.delay);
+    put_expr(out, design, ctx, "until", e.until);
     out.push(')');
 }
 
@@ -357,11 +377,13 @@ pub(crate) fn parse_event(
     if e.kind == EventKind::Cross {
         e.edge = take_enum(words, &Edge::ALL, diags)?;
         e.last = take_word(words, "last");
+        e.skip_initial = take_word(words, "skip_initial");
         e.signal = parse_probe(words, scope, b, diags)?;
     }
     e.value = take_expr(words, "value", scope, b, diags);
     e.count = take_expr(words, "count", scope, b, diags);
     e.delay = take_expr(words, "delay", scope, b, diags);
+    e.until = take_expr(words, "until", scope, b, diags);
     close(words, diags).then_some(e)
 }
 
@@ -389,7 +411,8 @@ pub(crate) fn gen_event(
     let value = g.expr(b, features, reads);
     let edge = Edge::ALL[g.below(3) as usize];
     let last = has(features, RunExtra::MeasLast) && g.chance(3);
-    let count = if last {
+    let skip_initial = !last && has(features, RunExtra::MeasSkipInitial) && g.chance(3);
+    let count = if last || skip_initial {
         ExprId::NONE
     } else {
         g.expr(b, features, Reads::Constant)
@@ -399,9 +422,16 @@ pub(crate) fn gen_event(
     } else {
         ExprId::NONE
     };
+    let until = if has(features, RunExtra::MeasUntil) && g.chance(3) {
+        g.expr(b, features, Reads::Constant)
+    } else {
+        ExprId::NONE
+    };
     Event {
         last,
+        skip_initial,
         delay,
+        until,
         ..Event::cross(signal, edge, value, count)
     }
 }

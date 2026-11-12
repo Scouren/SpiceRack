@@ -203,8 +203,11 @@ fn the_full_set_runs_every_property() {
     // a `ddt`/`idt` makes its tree read the circuit (class `Circuit`), so it only ever counts as
     // `FuncDyn`: no valid design holds these two
     let unreachable = [Feature::Func(Func::Ddt), Feature::Func(Func::Idt)];
+    // known gaps, a marker: none left (the run owner's generators reach `LoopOverOp`)
+    let not_yet: [Feature; 0] = [];
     let goal = unreachable
         .iter()
+        .chain(&not_yet)
         .fold(FeatureSet::ALL, |s, f| s.minus(FeatureSet::EMPTY.with(*f)));
     // reaching the rare kinds takes more seeds than the properties need; stops once reached
     for seed in 0..4000u64 {
@@ -214,7 +217,9 @@ fn the_full_set_runs_every_property() {
         reached = reached.union(features_used(&generate(seed, &set, SIZE)));
     }
     let missing: Vec<Feature> = FeatureSet::ALL.minus(reached).iter().collect();
-    assert_eq!(missing, unreachable, "features no seed generated");
+    let mut want: Vec<Feature> = unreachable.iter().chain(&not_yet).copied().collect();
+    want.sort_by_key(|f| f.index());
+    assert_eq!(missing, want, "features no seed generated");
 }
 
 #[test]

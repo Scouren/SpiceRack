@@ -92,11 +92,9 @@ Each line: question → choice → why.
 27. `deck_title` (the first pass) → `src/passes/deck_title.rs`, `pub fn deck_title`: an empty
     `Title` first in each `Deck` whose top scope has none, built with `Builder::title` and moved to
     the front of the list; no diagnostic. Tested as SPINE §4 says (IR text in, IR text out,
-    nothing else moves, only `Item(Title)` can be gained). Not in `PASSES` yet:
-    `Extra::DeckWithoutTitle` is not in the kernel at cf98e0d4. Cue: its test asserts the design
-    loses no feature, which goes red when the kernel reports the member; then the test asserts
-    it loses exactly that, and the row `{removes: Extra(DeckWithoutTitle), requires: EMPTY}` joins
-    `PASSES`.
+    nothing else moves, it gains only `Item(Title)` and loses exactly `Extra::DeckWithoutTitle`),
+    and through `passes::legalize` for a target that lacks the feature. Registered in `PASSES`
+    (`removes: Extra(DeckWithoutTitle)`, `requires: EMPTY`) since kernel 4ff01bbf.
 
 28. `tests/dialect_laws.rs` reconciled → the ngspice scaffold's file (3e97620b) as the base: per-row
     laws checked against a strict `KNOWN` list of (law, row, why), L3/L5/L8 on legalized designs
@@ -155,8 +153,11 @@ index; `ir::diag::info` answers the kernel's codes). Differences found:
   prints `name:3:…` (`a_routed_ir_text_diagnostic_names_its_line` lost its marker).
 - Surprise 4 resolved: `Design::entry()` is total (`FileId::NONE`); `transpile`'s assertion is now the
   reader-bug check it was meant to be.
-- Surprise 6 still open in the kernel: `entry()` is still the first `Deck`. Ruled: file 0.
-  `a_kit_whose_entry_is_a_library_writes_the_library` carries the marker until it lands.
+- Surprise 6 resolved (4ff01bbf): `entry()` is file 0; `a_kit_whose_entry_is_a_library_writes_the_library`
+  lost its marker. No marker is left in the spine's tests.
+- A flaky test fixed (bf132d1b merge): two `test_spine` tests bumped one static counting writer in
+  parallel. Each test now makes its own stub and row (`counting`, `picky`, leaked to `'static`);
+  50 runs of the binary at `--test-threads 16`: 0 failures.
 7. The facade maps `span.file` to the `Sources` entry of that index. For a reader that names its
    files (IR text) one `Sources` text holds several design files, so a row in the second `file`
    block of one text prints `name:0:0:` (its offset is into the first text, its file id 1). Today

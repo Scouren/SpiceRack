@@ -19,12 +19,12 @@ mod tests {
         Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, OutKind, Quantity,
         TableLaw, TableSource,
     };
-    use spicerack_ir::passive::{Coupling, IcMode, Parasitics, Passive};
+    use spicerack_ir::passive::{Coupling, IcMode, Parasitics, Passive, TcBase, TcLaw};
     use spicerack_ir::semi::{InitialState, Switch};
     use spicerack_ir::source::{DcRule, Distof, Source};
     use spicerack_ir::wave::{
-        Am, AmModTime, Exp, Pattern, PreDelay, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
-        TdFrom, TrNoise, TrRandom, TrRandomKind,
+        Am, AmModTime, Exp, GivenZero, Pattern, PreDelay, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm,
+        SffmLaw, TdFrom, TrNoise, TrRandom, TrRandomKind,
     };
     use spicerack_ir::{
         Builder, CircuitExtra as X, Design, DeviceLibrary, ElemKind, ExprId, Feature, FeatureSet,
@@ -102,6 +102,7 @@ mod tests {
             phase_m_deg: v,
             law,
             pre: PreDelay::Zero,
+            given_zero: spicerack_ir::wave::GivenZero::AsGiven,
         }
     }
 
@@ -255,6 +256,43 @@ mod tests {
         b.line(top, ElemKind::LosslessLine, h, row, Span::NONE);
     }
 
+    /// A behavioural source with a `tc1` (when `tc`) measured from `base`.
+    fn behav_tc(b: &mut Builder<'_>, top: ScopeId, tc: bool, base: TcBase) {
+        let e = n(b, 1);
+        let tc1 = opt(b, tc);
+        let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+        let row = spicerack_ir::controlled::Behav {
+            tc1,
+            tc_base: base,
+            ..behav(e, OutKind::Voltage)
+        };
+        b.behav(top, ElemKind::Behav, h, row, Span::NONE);
+    }
+
+    /// A capacitor whose value reads the circuit, with a `tc1` applied by `law`.
+    fn dynamic_cap(b: &mut Builder<'_>, top: ScopeId, law: TcLaw) {
+        let value = b.v("a", None);
+        let tc1 = n(b, 1);
+        let h = b.head("c1", &["a", "0"], None, &[], ExprId::NONE);
+        let row = Passive {
+            value,
+            tc1,
+            tc_law: law,
+            ..Passive::PLAIN
+        };
+        b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
+    }
+
+    /// A source with a pulse whose zero fields follow `rule`.
+    fn zero_rule(b: &mut Builder<'_>, top: ScopeId, rule: GivenZero) {
+        let one = n(b, 1);
+        let w = b.wave(spicerack_ir::wave::Pulse {
+            given_zero: rule,
+            ..pulse(one)
+        });
+        with_wave(b, top, w);
+    }
+
     fn pulse_law(b: &mut Builder<'_>, top: ScopeId, law: PulseLaw) {
         let one = n(b, 1);
         let w = b.wave(spicerack_ir::wave::Pulse { law, ..pulse(one) });
@@ -271,6 +309,7 @@ mod tests {
             td2: v,
             tau2: v,
             td2_from,
+            given_zero: spicerack_ir::wave::GivenZero::AsGiven,
         });
         with_wave(b, top, w);
     }
@@ -295,6 +334,7 @@ mod tests {
                 td2: v,
                 tau2: v,
                 td2_from: TdFrom::Zero,
+                given_zero: spicerack_ir::wave::GivenZero::AsGiven,
             }),
             WaveKind::Pwl => {
                 let r = pwl(b);
@@ -426,9 +466,22 @@ mod tests {
             let m = opt(b, on);
             semi_el(b, t, ElemKind::Diode, &["a", "0"], m, semi())
         }),
-        (X::MultInstance, |b, t, on| {
+        (X::MultInstanceParallel, |b, t, on| {
             let m = opt(b, on);
             let h = b.head("e1", &["a"], Some("sub"), &[], m);
+            b.instance(t, ElemKind::Instance, h, Span::NONE);
+        }),
+        (X::MultInstanceNgspiceAppend, |b, t, on| {
+            let m = n(b, 2);
+            let law = if on {
+                spicerack_ir::MultLaw::NgspiceAppend
+            } else {
+                spicerack_ir::MultLaw::Parallel
+            };
+            let h = spicerack_ir::ElemHead {
+                mult_law: law,
+                ..b.head("e1", &["a"], Some("sub"), &[], m)
+            };
             b.instance(t, ElemKind::Instance, h, Span::NONE);
         }),
         (X::MultModule, |b, t, on| {
@@ -1320,6 +1373,38 @@ mod tests {
                 Span::NONE,
             );
         }),
+        (X::TcBaseTnom, |b, t, on| behav_tc(b, t, on, TcBase::Tnom)),
+        (X::TcBaseFixed27, |b, t, on| {
+            behav_tc(b, t, true, if on { TcBase::Fixed27 } else { TcBase::Tnom })
+        }),
+        (X::TcLawDirect, |b, t, on| {
+            dynamic_cap(b, t, if on { TcLaw::Direct } else { TcLaw::Reciprocal })
+        }),
+        (X::TcLawReciprocal, |b, t, on| {
+            dynamic_cap(b, t, if on { TcLaw::Reciprocal } else { TcLaw::Direct })
+        }),
+        (X::GivenZeroAsGiven, |b, t, on| {
+            zero_rule(
+                b,
+                t,
+                if on {
+                    GivenZero::AsGiven
+                } else {
+                    GivenZero::SpiceDefault
+                },
+            )
+        }),
+        (X::GivenZeroSpiceDefault, |b, t, on| {
+            zero_rule(
+                b,
+                t,
+                if on {
+                    GivenZero::SpiceDefault
+                } else {
+                    GivenZero::AsGiven
+                },
+            )
+        }),
     ];
 
     #[test]
@@ -1376,5 +1461,61 @@ mod tests {
         assert!(set.contains(Feature::Wave(WaveKind::Sin)));
         assert!(!set.contains(Feature::Wave(WaveKind::Pulse)));
         assert!(!set.contains(Feature::Elem(ElemKind::Resistor)));
+    }
+
+    /// A15 K5 (R32): a model sets the feature of its family, and only that one.
+    #[test]
+    fn a_model_sets_its_family() {
+        let with = used(
+            |b, t, _| {
+                let name = b.name("nch");
+                b.model(t, model(name, ModelFamily::Bsim4, Polarity::N), Span::NONE);
+            },
+            true,
+        );
+        assert!(with.contains(Feature::Family(ModelFamily::Bsim4)));
+        assert!(!with.contains(Feature::Family(ModelFamily::Mos1)));
+        let without = used(|b, t, on| at_zero(b, t, WaveKind::Pulse, on), false);
+        assert!(!without.contains(Feature::Family(ModelFamily::Bsim4)));
+    }
+
+    /// ng-elements' finding (A13): a voltage `Behav` may be an E card and a current one a G
+    /// card (ngspice reads `E … vol=`, `G … cur=` as B sources), and a port a V card; such a
+    /// name is no `NameWithoutLetter`, the other controlled letter is.
+    #[test]
+    fn a_behavioural_source_takes_b_or_its_controlled_letter() {
+        let named = |name: &str, out: OutKind| {
+            let mut d = Design::new();
+            let t = deck(&mut d);
+            let mut b = d.builder();
+            let e = n(&mut b, 1);
+            let h = b.head(name, &["o", "0"], None, &[], ExprId::NONE);
+            b.behav(t, ElemKind::Behav, h, behav(e, out), Span::NONE);
+            features_used(&d).contains(Feature::Circuit(X::NameWithoutLetter))
+        };
+        assert!(!named("B1", OutKind::Voltage));
+        assert!(!named("E4", OutKind::Voltage));
+        assert!(!named("G3", OutKind::Current));
+        assert!(named("G3", OutKind::Voltage));
+        assert!(named("E4", OutKind::Current));
+        let port = used(
+            |b, t, _| {
+                let one = n(b, 1);
+                let p = b.detail(port(one, one));
+                let h = b.head("V1", &["a", "0"], None, &[], ExprId::NONE);
+                b.source(
+                    t,
+                    ElemKind::Port,
+                    h,
+                    Source {
+                        port: p,
+                        ..source(one)
+                    },
+                    Span::NONE,
+                );
+            },
+            true,
+        );
+        assert!(!port.contains(Feature::Circuit(X::NameWithoutLetter)));
     }
 }
