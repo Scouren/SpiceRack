@@ -26,6 +26,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::path::Path;
 
 use spicerack::ir;

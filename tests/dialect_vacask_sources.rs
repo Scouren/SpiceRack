@@ -13,6 +13,9 @@
 //! Contents: tests only; the settle tests in `dialect_vacask_sources/settle.rs`, the covering
 //! properties (R55) in `dialect_vacask_sources/property.rs`.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::path::{Path, PathBuf};
 
 use spicerack::dialect::{self, Policy, Sources};

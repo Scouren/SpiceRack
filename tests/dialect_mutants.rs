@@ -13,8 +13,12 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use spicerack::dialect::{BUILTIN, DialectRow, Sources};
 use spicerack::ir;
@@ -45,7 +49,50 @@ const KNOWN: &[(&str, &str, &str)] = &[
 /// splitmix64.
 struct Rng(u64);
 
+/// Set in the child run of the memory cap's self-test.
+const MEMCAP_CHILD: &str = "SPICERACK_MEMCAP_CHILD";
+
+// The self-test's child reserves 64 GiB: past the cap by construction.
+const _: () = assert!(memcap::CAP_BYTES < 64 << 30);
+
 // ---- private ----
+
+/// The memory cap's self-test (`common/memcap.rs`): this binary run again as a child that
+/// reserves 1 GiB at a time, untouched (no page is resident, so the machine is never at risk),
+/// up to 64 GiB. Under the cap it aborts with Rust's allocation-failure message before 8 GiB;
+/// with no cap it would reserve all 64 and exit 0.
+#[test]
+fn an_allocation_past_the_memory_cap_aborts_the_binary() {
+    const NAME: &str = "an_allocation_past_the_memory_cap_aborts_the_binary";
+    if std::env::var_os(MEMCAP_CHILD).is_some() {
+        // no core file for the abort this child is for (it took seconds to write)
+        let none = libc::rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        // SAFETY: `setrlimit` reads one initialized `rlimit` through a valid pointer.
+        unsafe { libc::setrlimit(libc::RLIMIT_CORE, &none) };
+        let mut held = Vec::new();
+        for _ in 0..64 {
+            held.push(std::hint::black_box(Vec::<u8>::with_capacity(1 << 30)));
+        }
+        println!("reserved {} GiB: no cap", held.len());
+        return;
+    }
+    let exe = std::env::current_exe().expect("the test binary's path");
+    let out = Command::new(exe)
+        .args(["--exact", NAME, "--nocapture", "--test-threads=1"])
+        .env(MEMCAP_CHILD, "1")
+        .output()
+        .expect("the test binary runs again");
+    let err = String::from_utf8_lossy(&out.stderr);
+    let text = format!("{}{err}", String::from_utf8_lossy(&out.stdout));
+    assert!(!out.status.success(), "the child ran past the cap:\n{text}");
+    assert!(
+        err.contains("memory allocation of 1073741824 bytes failed"),
+        "the child died of something else:\n{text}"
+    );
+}
 
 #[test]
 fn l1_l2_card_shaped_mutants_read_and_check_clean() {

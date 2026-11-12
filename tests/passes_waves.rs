@@ -10,6 +10,9 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
 use spicerack::ir::wave_eval::{At, source_value};
