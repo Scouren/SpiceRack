@@ -12,6 +12,7 @@
 //! Contents: `pub struct Vacask` (`impl Read`, `impl Write`), `pub static VACASK: Vacask`,
 //! `pub static FEATURES: ir::FeatureSet`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
+mod bind;
 mod codes;
 mod expr_read;
 mod expr_write;

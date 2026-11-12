@@ -8,8 +8,9 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; REWRITE-PLAN §4.3 (one exhaustive match).
 //!
-//! Contents: `Writer` (`Writer::line`), `write` (crate-private)
+//! Contents: `Writer` (`Writer::line`, `Writer::head`), `write` (crate-private)
 
+use super::name::{self, Place};
 use super::{write_elements, write_models, write_run, write_sources, write_structure};
 use crate::ir;
 
@@ -38,6 +39,31 @@ impl Writer<'_, '_> {
     pub(super) fn line(&mut self) {
         for _ in 0..self.depth {
             self.out.push_str("  ");
+        }
+    }
+
+    /// Starts an instance statement: `name (nodes) master` (no master for a behavioural
+    /// source), each name spelled so that VACASK reads it back; the area appends its parameters
+    /// and the newline.
+    #[allow(
+        dead_code,
+        reason = "write_elements (S4.1) and write_sources (S4.2) call it"
+    )]
+    pub(super) fn head(&mut self, row: &ir::Element) {
+        let d = self.design;
+        self.line();
+        name::spell(d.str(row.name), Place::Other, self.out);
+        self.out.push_str(" (");
+        for (k, &t) in d.names(row.terminals).iter().enumerate() {
+            if k > 0 {
+                self.out.push(' ');
+            }
+            name::spell(d.str(t), Place::Node, self.out);
+        }
+        self.out.push(')');
+        if !row.model.name.is_none() {
+            self.out.push(' ');
+            name::spell(d.str(row.model.name), Place::Other, self.out);
         }
     }
 }
@@ -69,7 +95,7 @@ pub(super) fn write(
             .map(|at| design.row::<ir::item::Title>(at.index));
         write_structure::title(&mut w, title);
     }
-    let mut todo: Vec<Task> = items(design, top, 0);
+    let mut todo: Vec<Task> = top_items(design, top);
     // Bounded: each item and closer is pushed once (scopes form a tree, `ir::check`).
     while let Some(task) = todo.pop() {
         match task {
@@ -107,6 +133,41 @@ fn source_like(kind: ir::ElemKind) -> bool {
             | K::Coupling
             | K::LosslessLine
     )
+}
+
+/// The top scope's items, reversed for the stack, with the one `control` … `endc` block around
+/// the range `write_run::control_span` names (VACASK takes one block per file, anywhere at the top:
+/// vc-run's runs), its items one level deeper.
+fn top_items(design: &ir::Design, top: ir::ScopeId) -> Vec<Task> {
+    let span = write_run::control_span(design, top);
+    let mut out = Vec::new();
+    for (k, &at) in design.items(top).iter().enumerate() {
+        if at.kind == ir::ItemKind::Title {
+            continue;
+        }
+        let inside = span.is_some_and(|(first, last)| (first..=last).contains(&k));
+        if span.is_some_and(|(first, _)| first == k) {
+            out.push(Task::Close(0, control_open));
+        }
+        out.push(Task::Item(usize::from(inside), at));
+        if span.is_some_and(|(_, last)| last == k) {
+            out.push(Task::Close(0, control_close));
+        }
+    }
+    out.reverse();
+    out
+}
+
+/// `control`.
+fn control_open(w: &mut Writer<'_, '_>) {
+    w.line();
+    w.out.push_str("control\n");
+}
+
+/// `endc`.
+fn control_close(w: &mut Writer<'_, '_>) {
+    w.line();
+    w.out.push_str("endc\n");
 }
 
 /// The items of `scope` at `depth`, reversed for the stack (the title is line 1's).

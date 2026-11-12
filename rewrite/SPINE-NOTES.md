@@ -82,14 +82,13 @@ Each line: question → choice → why.
     with no `file` line is a `P9001`", does not hold: an empty or comment-only text gives no row).
     `transpile` asserts an entry after a read with no refusal.
 
-26. Which reader's one text holds several files (the law harness) → a method on `Read`,
-    `names_its_files(&self) -> bool`, default `false`, `true` for `IrText`. Not `text_family ==
-    ANY_FAMILY`: that is a writer fact (which `Opaque` it may copy), and a reader-side fact must
-    not ride on it. A method, not an associated `const`: `Read` is used as `dyn Read`. The harness
-    (`written`) writes each file of a design as its own text at the design's path, the entry
-    first, its role setting the `Sources` form (`Sources::set_form`, new); for a reader that names
-    its files, the texts concatenated. `l5_per_file_sources_carry_each_file_at_its_own_path`
-    runs the per-file path today through a wrapper of the IR text with `names_its_files` false.
+26. Each file its own text (law harness) → every row, `ir` included: `write_all` puts each file of a
+    design in one `Sources` at the design's path, the entry first (its role setting the form,
+    `Sources::set_form`), and the row reads them back. IR text needs no exception: each dumped
+    file is a standalone `file` block, so reading the files one text each rebuilds the same
+    design. `Read::names_its_files` (a9b9f257) is therefore removed again: the smallest way to
+    express the exception is none. The harness is the ngspice scaffold's (460dd86f/3e97620b) with
+    mine on top (decision 28).
 27. `deck_title` (the first pass) → `src/passes/deck_title.rs`, `pub fn deck_title`: an empty
     `Title` first in each `Deck` whose top scope has none, built with `Builder::title` and moved to
     the front of the list; no diagnostic. Tested as SPINE §4 says (IR text in, IR text out,
@@ -98,6 +97,19 @@ Each line: question → choice → why.
     loses no feature, which goes red when the kernel reports the member; then the test asserts
     it loses exactly that, and the row `{removes: Extra(DeckWithoutTitle), requires: EMPTY}` joins
     `PASSES`.
+
+28. `tests/dialect_laws.rs` reconciled → the ngspice scaffold's file (3e97620b) as the base: per-row
+    laws checked against a strict `KNOWN` list of (law, row, why), L3/L5/L8 on legalized designs
+    read back from one `Sources`, no generated `Opaque` for a row that is not lossless. On top:
+    the full feature set (no kernel restriction), `admits` and the item-kind anti-vacuity check
+    in L4, the empty-text L1 case (now a per-row reader law, `l1-empty`, through the same
+    `KNOWN` check), the worked example in the L6 corpus, the entry first in `write_all`. `KNOWN`
+    is empty here: this branch has only the `ir` row, and an entry for a row it lacks would fail
+    as an unexpected pass. Each dialect branch keeps its own entries when it merges this.
+29. Golden input set → `tests/fixtures/dialect/` is excluded from the fixtures walk
+    (`inputs.rs`, `FIXTURES_EXCLUDED`, unit test `a_dialect_fixture_is_not_an_input_…`): those
+    are the new pipeline's per-dialect fixtures, read by each dialect's own tests; the old
+    pipeline never had them, so they are no golden input.
 
 ## Requests (ruled by the lead)
 

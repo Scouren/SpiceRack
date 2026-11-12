@@ -221,6 +221,8 @@ fn c_t_formals_and_dependent_parameters() {
     assert!(says(&run("vacask", "c1b.sim"), "Parameter 'x' not found."));
     // A formal of `$temp` is dependent too (run c2).
     assert!(says(&run("vacask", "c2.sim"), "Parameter 'x' not found."));
+    // So is a formal of `$tnom` (run c3).
+    assert!(says(&run("vacask", "c3.sim"), "Parameter 'x' not found."));
     assert!(says(&run("vacask", "t2.sim"), "Parameter 'y' not found."));
     let r = run("vacask", "t1.sim");
     assert!(

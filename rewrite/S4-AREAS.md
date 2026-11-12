@@ -106,10 +106,9 @@ test in the same commit as the rule that cites it):
 
 | Test | Fails because | Goes when |
 |---|---|---|
-| `dialect_laws` `l3_one_read_and_four_threads_give_the_same_bytes`, `l5_read_of_write_is_the_design`, `l8_a_file_is_written_the_same_whatever_the_other_files` | the generator draws `Opaque` rows of other dialects only (`gen_rows.rs`): `write`'s debug assertion "no foreign Opaque for vacask" | the spine owner's harness fix (a row that is not lossless generates no `Opaque`) |
-| `dialect_laws` `l4_write_is_total_over_a_design_legalize_accepted` | the same: every generated design is refused, so no admitted design holds a claimed kind | the same |
-| `dialect_laws` `l7_legalized_designs_use_only_the_writers_features` | `vacask lacks Item(Func)`: no pass (S4.4) and no citations table yet | S4.4's passes and `citations.toml` |
-| `dialect_vacask` `laws::l5_read_of_write_is_the_design_without_foreign_opaques` (marked) | a `global` (or `include`) inside a branch or subcircuit; a formal whose default reads `$temp` (run c2) | A15 `Placed`; `FormalReadsParam` widened to every non-constant default |
+| `dialect_laws` l3 (`vacask`) | seeds 0..8 admit no generated design: its `DeviceLibrary` rows name families VACASK ships no file for (W2002; the kernel sets `Feature::Family` for `Model` rows only) and its loads have paths whose extension does not state their kind (W2004). L4 admits 5 of 64 (refused: W2002 36, W2004 21, W2005 2) | `Feature::Family` for `DeviceLibrary` rows (kernel); a load kind the generator draws from the path |
+| `dialect_laws` l5 (`vacask`) | seed 31: a formal default reading `$tnom` is dependent in VACASK (run c3) and reads back as a local; `FormalNotConstant` counts class Temp, not Tnom | the kernel widens `FormalNotConstant` to Tnom |
+| `dialect_laws` l7 (`vacask`) | `vacask lacks Item(Func)`: no pass (S4.4) and no citations table yet | S4.4's passes and `citations.toml` |
 | `test_spine` `a_kit_whose_entry_is_a_library_writes_the_library` (an unexpected pass) | a stale marker on the spine's branch | the spine owner drops it |
 
 A scale letter VACASK lacks (`c`, `peta`) is already respelled exactly as `e<exp10>` with the same

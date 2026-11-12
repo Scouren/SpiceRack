@@ -117,8 +117,6 @@ pub enum RunExtra {
     LoopKeepLast,
     /// A loop whose targets are restored after it (Spectre, VACASK).
     LoopRestore,
-    /// A loop inside a loop.
-    LoopNested,
     /// A loop whose body does not hold every analysis of the deck.
     LoopScoped,
     /// A loop over temperature.
@@ -178,8 +176,6 @@ pub enum RunExtra {
     IcDifferential,
     /// A node set on every node (ngspice `.nodeset all=`).
     NodesetAll,
-    /// An initial condition or node set in a subcircuit body (applied per instance).
-    NodeSetInSubckt,
     /// An initial condition or node set on a node inside an instance.
     NodeSetHierarchical,
     /// An initial condition on a device's own state (`NodeSetKind::Device`).
@@ -267,9 +263,6 @@ pub enum RunExtra {
     /// target whose state is positional cannot spell it in place (A14; a pass moves it before
     /// the first run item when both are in one file).
     WholeRunMidRun,
-    /// An analysis, option or `Env` listed inside a subcircuit or section body (R26: it is
-    /// still its deck's).
-    RunItemNested,
     /// A probe of every element's branch current (`ProbeKind::AllBranchI`).
     ProbeAllBranchI,
     /// A statistic measure that reports where the extremum is (`Stat::MinAt`, `Stat::MaxAt`).
@@ -283,7 +276,7 @@ pub enum RunExtra {
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 128] = [
+    pub const ALL: [RunExtra; 125] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -334,7 +327,6 @@ impl RunExtra {
         RunExtra::LoopMonteCarlo,
         RunExtra::LoopKeepLast,
         RunExtra::LoopRestore,
-        RunExtra::LoopNested,
         RunExtra::LoopScoped,
         RunExtra::LoopTemp,
         RunExtra::LoopParam,
@@ -364,7 +356,6 @@ impl RunExtra {
         RunExtra::IcNextOnly,
         RunExtra::IcDifferential,
         RunExtra::NodesetAll,
-        RunExtra::NodeSetInSubckt,
         RunExtra::NodeSetHierarchical,
         RunExtra::IcDevice,
         RunExtra::ProbeVdiff,
@@ -407,7 +398,6 @@ impl RunExtra {
         RunExtra::EnvMidRun,
         RunExtra::NodeSetMidRun,
         RunExtra::WholeRunMidRun,
-        RunExtra::RunItemNested,
         RunExtra::ProbeAllBranchI,
         RunExtra::MeasStatAt,
         RunExtra::MeasUntil,
