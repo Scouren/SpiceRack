@@ -118,6 +118,7 @@ fn loops_alters_and_state() {
   nodeset ic transient node=(x1 n) value=1
   nodeset nodeset every_op next_only node=(a) reference=(b) value=0.5
   nodeset device every_op node=(c1) value=0
+  elaborate (div amp)
 ";
     case(text, |b, top| {
         let (t, tn) = (n(b, "85"), n(b, "27"));
@@ -203,6 +204,7 @@ fn loops_alters_and_state() {
             v,
             Span::NONE,
         );
+        b.elaborate(top, &["div", "amp"], Span::NONE);
     });
 }
 
@@ -370,6 +372,8 @@ fn references_in_detail_rows_and_pools_are_linked() {
     analysis dc (param s) (lin start=0 stop=1 step=1)
   loop table (param r) (param s) values=[1, 2]
   statistics process (r gauss spread=1) (s gauss spread=1) process_correlate (r s cc=0.5)
+  subckt c1 ()
+  elaborate (c1)
 ";
     let mut d = spicerack_ir::Design::new();
     let mut diags = Diags::new();
@@ -377,11 +381,8 @@ fn references_in_detail_rows_and_pools_are_linked() {
     assert!(diags.is_empty(), "{:?}", diags.rows());
     let mut bound = 0;
     let mut unbound = Vec::new();
-    for item in d
-        .items(d.file(FileId(0)).top)
-        .iter()
-        .chain(d.items(spicerack_ir::ScopeId(1)))
-    {
+    for item in (0..4).flat_map(|k| d.items(spicerack_ir::ScopeId(k)).to_vec()) {
+        let item = &item;
         let mut refs = Vec::new();
         let mut copy = d.clone();
         copy.editor().map_refs(*item, &mut |r, _| refs.push(*r));

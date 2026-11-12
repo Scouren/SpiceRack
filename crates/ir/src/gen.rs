@@ -394,7 +394,8 @@ fn candidates(
             | ItemKind::NodeSet
             | ItemKind::Save
             | ItemKind::Print
-            | ItemKind::Measure => true,
+            | ItemKind::Measure
+            | ItemKind::Elaborate => true,
         })
         .collect()
 }

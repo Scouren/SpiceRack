@@ -76,6 +76,9 @@ pub enum ItemKind {
     Print,
     /// A measurement. Row `output::Measure` (run).
     Measure,
+    /// The named subcircuits' bodies become the top circuit from here on (A12 R1). Row
+    /// `plan::Elaborate` (run).
+    Elaborate,
 }
 
 /// What a scope is; it fixes which item kind owns it (checked).
@@ -293,7 +296,7 @@ const _: () = assert!(size_of::<Func>() == 16);
 
 impl ItemKind {
     /// Every kind, in declaration order (the order of `Feature::Item` indices).
-    pub const ALL: [ItemKind; 23] = [
+    pub const ALL: [ItemKind; 24] = [
         ItemKind::Title,
         ItemKind::Comment,
         ItemKind::Include,
@@ -317,6 +320,7 @@ impl ItemKind {
         ItemKind::Save,
         ItemKind::Print,
         ItemKind::Measure,
+        ItemKind::Elaborate,
     ];
     /// Kind count.
     pub const COUNT: usize = Self::ALL.len();

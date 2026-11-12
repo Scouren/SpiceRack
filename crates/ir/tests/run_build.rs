@@ -358,6 +358,23 @@ fn a_measure_is_a_definition() {
 }
 
 #[test]
+fn elaborate_names_its_circuits() {
+    let (mut d, top) = deck();
+    let item = d.builder().elaborate(top, &["c1", "c2"], Span::NONE);
+    let row: spicerack_ir::Elaborate = d.row(item.index);
+    let names: Vec<&str> = d.refs(row.circuits).iter().map(|r| d.str(r.name)).collect();
+    assert_eq!(names, ["c1", "c2"]);
+    assert!(d.refs(row.circuits).iter().all(|r| r.def.is_none()));
+}
+
+#[test]
+#[should_panic(expected = "at least one circuit")]
+fn elaborate_of_nothing_asserts() {
+    let (mut d, top) = deck();
+    d.builder().elaborate(top, &[], Span::NONE);
+}
+
+#[test]
 fn statistics_and_dc_hold_their_lists() {
     let (mut d, top) = deck();
     let mut b = d.builder();

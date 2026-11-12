@@ -271,6 +271,10 @@ macro_rules! for_kind {
                 type $R = $crate::output::Measure;
                 $body
             }
+            $crate::ItemKind::Elaborate => {
+                type $R = $crate::plan::Elaborate;
+                $body
+            }
         }
     };
 }

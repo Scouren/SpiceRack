@@ -133,7 +133,9 @@ pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
 pub use option::{Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 pub use option_key::{OptionClass, OptionKey};
 pub use output::{Measure, Print, PrintView, Save};
-pub use plan::{Alter, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList};
+pub use plan::{
+    Alter, Elaborate, Loop, LoopEnd, LoopKind, RefList, Target, TargetKind, TargetList,
+};
 pub use probe::{AcPart, Probe, ProbeKind, ProbeList};
 pub use run_extra::RunExtra;
 pub use span::Span;

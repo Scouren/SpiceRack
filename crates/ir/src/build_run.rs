@@ -76,7 +76,7 @@
 //! - items: `Builder::analysis`, `Builder::op`, `Builder::dc_inc`, `Builder::loop_`,
 //!   `Builder::alter`, `Builder::option`, `Builder::option_private`, `Builder::env`,
 //!   `Builder::node_set`, `Builder::save`, `Builder::print`, `Builder::measure`,
-//!   `Builder::statistics`
+//!   `Builder::statistics`, `Builder::elaborate`
 
 use crate::analysis::{Analysis, AnalysisKind, RunDetail};
 use crate::build::Builder;
@@ -472,6 +472,12 @@ impl Builder<'_> {
         );
         self.define(DefKind::Measure, name, scope, item);
         item
+    }
+
+    /// From here on, the top circuit is the named subcircuits' bodies (references left
+    /// unresolved for the caller's rule). Asserts at least one.
+    pub fn elaborate(&mut self, scope: ScopeId, circuits: &[&str], span: Span) -> ItemRef {
+        todo!()
     }
 
     /// A statistics block (its lists appended with [`Builder::varies`] and
