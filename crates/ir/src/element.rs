@@ -237,7 +237,9 @@ pub struct Element {
     /// Its model or subcircuit master; `def` `NONE` when the card names none or it is
     /// unresolved. Expected definition kind: `ElemKind::master_kind`.
     pub model: Ref,
-    /// Instance parameters with no typed field, by the master's own names, in source order.
+    /// Instance parameters with no typed field, by the master's own names, in source order. On a
+    /// kind with a detail row, no key names one of the row's own fields (its IR name, `m` or
+    /// `mult`, `temp` where the row has `temp_abs`; A19).
     pub params: ParamList,
     /// Multiplicity: the element stands for `mult` copies in parallel (INV-semantics 6.01–6.03,
     /// 5.16; B10, D7, D127). Composes multiplicatively down the hierarchy. A reader lowers

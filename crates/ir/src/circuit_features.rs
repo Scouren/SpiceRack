@@ -14,13 +14,13 @@
 use crate::circuit_check::{bound_family, builtin_kind};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_text::get_row;
+use crate::class::{ExprClass, expr_class};
 use crate::controlled::{
     Behav, DelayLaw, FreqLaw, FreqTable, Laplace, LaplaceForm, OutKind, TableLaw, TableSource,
 };
 use crate::design::Design;
 use crate::element::MultLaw;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
-use crate::expr::Expr;
 use crate::feature::{Feature, FeatureSet};
 use crate::id::{ExprId, NameId};
 use crate::item::ItemKind;
@@ -216,40 +216,10 @@ pub(crate) fn model_features(m: &Model, set: &mut FeatureSet) {
     }
 }
 
-/// Whether the expression holds a `V`, `I`, `Time` or `Freq` leaf or a call of a function that
-/// reads the circuit's history (`Ddt`, `Idt`). Explicit stack (C11).
+/// Whether the expression reads the circuit: its class is `ExprClass::Circuit` (A11, R14:
+/// directly or through a parameter or user function it reads). `NONE` reads nothing.
 pub(crate) fn reads_circuit(design: &Design, root: ExprId) -> bool {
-    if root == ExprId::NONE {
-        return false;
-    }
-    let mut stack = vec![root];
-    // bounded: each expression row is pushed once per parent edge; trees are acyclic (children
-    // have lower ids), so the walk ends after at most every row of the tree
-    while let Some(e) = stack.pop() {
-        match design.expr(e) {
-            Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq => return true,
-            Expr::Call(f, args) => {
-                if f.reads_circuit() {
-                    return true;
-                }
-                stack.extend_from_slice(design.exprs(args));
-            }
-            Expr::UserCall(_, args) | Expr::Draw(_, _, _, args) | Expr::List(args) => {
-                stack.extend_from_slice(design.exprs(args));
-            }
-            Expr::Unary(_, a) => stack.push(a),
-            Expr::Binary(_, a, b) => stack.extend([a, b]),
-            Expr::Ternary(c, t, o) => stack.extend([c, t, o]),
-            Expr::Num(_)
-            | Expr::Str(_)
-            | Expr::Param(_)
-            | Expr::Temp
-            | Expr::TStep
-            | Expr::TStop
-            | Expr::Tnom => {}
-        }
-    }
-    false
+    root != ExprId::NONE && expr_class(design, root) == ExprClass::Circuit
 }
 
 /// The `DcRule::WaveAtZero` member of a wave kind.

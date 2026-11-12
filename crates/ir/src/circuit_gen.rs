@@ -18,7 +18,7 @@
 
 use crate::build::Builder;
 use crate::build_circuit::ElemHead;
-use crate::circuit_check::{builtin_kind, has_polarity};
+use crate::circuit_check::{builtin_kind, has_polarity, versioned};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
@@ -228,7 +228,11 @@ pub(crate) fn generate_model(
     } else {
         NONE_REF
     };
-    let version = if r.g.chance(4) { r.ex() } else { ExprId::NONE };
+    let version = if versioned(family) && r.g.chance(4) {
+        r.ex()
+    } else {
+        ExprId::NONE
+    };
     let word = if matches!(family, ModelFamily::CodeModel | ModelFamily::Other) {
         r.g.fresh_name(r.b)
     } else {

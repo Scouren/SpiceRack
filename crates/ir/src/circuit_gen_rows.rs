@@ -118,7 +118,8 @@ impl R<'_, '_> {
         } else {
             NO_ROW
         };
-        let noisy = !self.maybe(X::PassiveNoiseless);
+        // A19: noiseless only where there is thermal noise to switch off
+        let noisy = !((kind == ElemKind::Resistor || dynamic) && self.maybe(X::PassiveNoiseless));
         Passive {
             value,
             ic,

@@ -238,7 +238,8 @@ pub struct Model {
     pub name: NameId,
     /// Parameters, lowercase, the family's own names, in source order; `level`, `type` and
     /// `version` are never here (they are `family`, `polarity`, `version`), except under
-    /// `Other`.
+    /// `Other`, `Module` and `CodeModel` (their own parameters) and `level` on `Mesa` (a device
+    /// parameter there). No value reads the circuit (the kernel's `ProbeContext`). A19.
     pub params: ParamList,
     /// The base name of a bin (`nch` for `nch.1`; a Spectre model group is a run of bins of
     /// one base); `NONE` when not a bin (F7, 7.14).
@@ -249,9 +250,10 @@ pub struct Model {
     /// The loaded module a `Module` family model instantiates; `name` `NONE` for every other
     /// family. Expects `DefKind::Module` (7.15, 7.16).
     pub module: Ref,
-    /// The family version (`version="4.8"`, a number or a string; 7.04). `NONE` only when the
-    /// family has a single version; a reader whose card is silent writes its simulator's
-    /// default version.
+    /// The family version (`version="4.8"`, a number or a string; 7.04): only on a versioned
+    /// family (`circuit_check::versioned`: BSIM, SOI, HiSIM, PSP, VBIC, HICUM, MEXTRAM, EKV,
+    /// BSIM-BULK, JUNCAP, DIODE_CMC, and the open families), `NONE` on every other (A19). A
+    /// reader whose card is silent on a versioned family writes its simulator's default.
     pub version: ExprId,
     /// The code model's name for `CodeModel`, the type word for `Other`; `NONE` otherwise.
     pub word: NameId,

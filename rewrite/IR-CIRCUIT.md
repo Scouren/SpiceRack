@@ -166,6 +166,21 @@ Ref }`.
 - `ModelFamily::Mesa` (A15 C3): ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet` levels 2 to 4,
   `inpdomod.c`); the level is a parameter of the device.
 
+## 3a. Invariants every simulator holds (AMEND-A12 A19, R38)
+
+`check` reports `FieldDomain` (the generator never makes one): a passive with no value and no
+model; `ac` on a capacitor or inductor; `noisy == false` on a capacitor or inductor whose value
+does not read the circuit; an instance parameter whose key names one of the row's own typed
+fields (`circuit_check::typed_key`: the detail row's IR field names from the field table, `m`
+and `mult`, and `temp` where the row has `temp_abs`; a kind without a detail row, such as a
+subcircuit instance with a declared `m`, has none); a model parameter `level`, `type` or
+`version` on a family that fixes it (all but `Other`, `Module`, `CodeModel`, and `level` on
+`Mesa`); a lossless line outside `Line`'s forms (no `z0`; not exactly one of `td`,
+`freq`+`nl`, `length`+`vel`; half of a pair); a `version` on a family with one version everywhere
+(`circuit_check::versioned`). A model value that reads the circuit is the kernel's
+`ProbeContext` (model values are fields constant in time). "Reads the circuit" is
+`expr_class == Circuit` (A11): through a parameter or user function too.
+
 ## 4a. Device libraries (`library.rs`, AMEND-A12 C5, R17)
 
 `ItemKind::DeviceLibrary` with row `DeviceLibrary { family: ModelFamily, path: NameId }`: the

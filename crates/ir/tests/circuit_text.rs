@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn capacitor_with_ic_parasitics_and_noise() {
         let text = "file \"t.sp\" deck\n  element capacitor c1 (a 0) value=1p ic=0.5 \
-                parasitics=(rser=1m cpar=1) ic_mode=in_op noisy=false\n";
+                parasitics=(rser=1m cpar=1) ic_mode=in_op\n  element resistor r1 (a b) value=1k noisy=false\n";
         same(text, |b, top| {
             let h = head(b, "c1", &["a", "0"]);
             let value = k(b, 1, -12);
@@ -99,10 +99,18 @@ mod tests {
                 ic,
                 parasitics: par,
                 ic_mode: IcMode::InOp,
-                noisy: false,
                 ..Passive::PLAIN
             };
             b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
+            // A19: a noiseless element is a resistor (or circuit-valued)
+            let h = head(b, "r1", &["a", "b"]);
+            let value = k(b, 1, 3);
+            let row = Passive {
+                value,
+                noisy: false,
+                ..Passive::PLAIN
+            };
+            b.passive(top, ElemKind::Resistor, h, row, Span::NONE);
         });
     }
 

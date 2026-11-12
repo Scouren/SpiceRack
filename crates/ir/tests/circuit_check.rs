@@ -72,7 +72,7 @@ mod tests {
     /// Pushes a model of `family` named `name` and returns a reference bound to it.
     fn bound(b: &mut Builder<'_>, top: ScopeId, name: &str, family: ModelFamily) -> Ref {
         let n = b.name(name);
-        let polarity = if family == ModelFamily::Bsim4 {
+        let polarity = if matches!(family, ModelFamily::Bsim4 | ModelFamily::Mesa) {
             Polarity::N
         } else {
             Polarity::None
@@ -846,7 +846,7 @@ mod tests {
             let name = unique(b, top);
             let one = n(b, 1);
             let params = b.params(&[(key, one)]);
-            let polarity = if family == ModelFamily::Bsim4 {
+            let polarity = if matches!(family, ModelFamily::Bsim4 | ModelFamily::Mesa) {
                 Polarity::N
             } else {
                 Polarity::None
@@ -860,7 +860,7 @@ mod tests {
                 Span::NONE,
             );
         }
-        let cases: [(&str, Case); 10] = [
+        let cases: [(&str, Case); 9] = [
             ("a resistor with no value and no model", |b, top| {
                 let r = b.detail(Passive::PLAIN);
                 push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
@@ -907,19 +907,6 @@ mod tests {
                     l,
                 );
             }),
-            ("a model value that reads the circuit", |b, top| {
-                let name = unique(b, top);
-                let va = b.v("a", None);
-                let params = b.params(&[("is", va)]);
-                b.push(
-                    top,
-                    spicerack_ir::Model {
-                        params,
-                        ..model(name, ModelFamily::Diode, Polarity::None)
-                    },
-                    Span::NONE,
-                );
-            }),
             ("a version on a family with one version", |b, top| {
                 let name = unique(b, top);
                 let version = b.string("2");
@@ -936,6 +923,22 @@ mod tests {
         for (what, case) in cases {
             assert_eq!(checked(case), only(Violation::FieldDomain), "{what}");
         }
+        // a model value that reads the circuit: the kernel's `ProbeContext` (a model value is a
+        // field constant in time), not a second report of ours
+        let probe = checked(|b, top| {
+            let name = unique(b, top);
+            let va = b.v("a", None);
+            let params = b.params(&[("is", va)]);
+            b.push(
+                top,
+                spicerack_ir::Model {
+                    params,
+                    ..model(name, ModelFamily::Diode, Polarity::None)
+                },
+                Span::NONE,
+            );
+        });
+        assert_eq!(probe, only(Violation::ProbeContext));
         let legal = checked(|b, top| {
             let one = n(b, 1);
             // a value given by the model alone, a noiseless resistor, a noiseless circuit-valued
