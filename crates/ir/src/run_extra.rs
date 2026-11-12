@@ -368,11 +368,19 @@ pub enum RunExtra {
     /// A `FromHere` save after a run item in listed order (a `WholeRun` one there is
     /// the kind's `*WholeRunMidRun`).
     SaveMidRun,
+    /// An analysis with no statement name (`Analysis::name` `NONE`; VACASK requires one, its
+    /// raw files are named by it). `AnalysisNamed`'s twin.
+    AnalysisUnnamed,
+    /// A DC axis with no name (VACASK's `sweep` requires one). `DcAxisNamed`'s twin.
+    DcAxisUnnamed,
+    /// A loop with no statement name (SPICE `.step`; VACASK's `sweep` requires one).
+    /// `LoopNamed`'s twin.
+    LoopUnnamed,
 }
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 164] = [
+    pub const ALL: [RunExtra; 167] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -537,6 +545,9 @@ impl RunExtra {
         RunExtra::SaveFromHere,
         RunExtra::SaveWholeRun,
         RunExtra::SaveMidRun,
+        RunExtra::AnalysisUnnamed,
+        RunExtra::DcAxisUnnamed,
+        RunExtra::LoopUnnamed,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

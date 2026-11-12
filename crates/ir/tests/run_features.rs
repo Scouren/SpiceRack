@@ -180,6 +180,9 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::SaveFromHere, "  save from_here (v (out))", P),
     (RunExtra::SaveWholeRun, P, "  save from_here (v (out))"),
     (RunExtra::SaveMidRun, "  analysis op\n  save from_here (v (out))", "  save from_here (v (out))\n  analysis op"),
+    (RunExtra::AnalysisUnnamed, "  analysis op", "  analysis op name=o1"),
+    (RunExtra::DcAxisUnnamed, D, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1"),
+    (RunExtra::LoopUnnamed, L, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op"),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
