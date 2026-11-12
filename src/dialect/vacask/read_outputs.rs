@@ -33,6 +33,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Item(ir::ItemKind::Save))
     .with(ir::Feature::Item(ir::ItemKind::NodeSet))
     .with(ir::Feature::Run(ir::RunExtra::SaveAnalysisSet))
+    .with(ir::Feature::Run(ir::RunExtra::SaveFromHere))
+    .with(ir::Feature::Run(ir::RunExtra::SaveMidRun))
     .with(ir::Feature::Run(ir::RunExtra::ProbeAllV))
     .with(ir::Feature::Run(ir::RunExtra::ProbeAllBranchI))
     .with(ir::Feature::Run(ir::RunExtra::ProbeI))
@@ -123,7 +125,8 @@ pub(super) fn save(l: &mut Lower<'_, '_, '_>, n: Node) {
         false => ir::AnalysisKinds::of(&[K::Op, K::Dc, K::Tran]),
     };
     let span = l.stmt;
-    l.b.save(l.scope, analyses, &probes, span);
+    // Runs sv1, sv2: a save holds from where it stands (A27).
+    l.b.save(l.scope, analyses, ir::Applies::FromHere, &probes, span);
 }
 
 /// The entries of list node `v` for `kind`, or `None` when it is no list of (string, value)

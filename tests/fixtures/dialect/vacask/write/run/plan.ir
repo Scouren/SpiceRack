@@ -1,6 +1,6 @@
 # Oracle: VD cmd-alter (`alter instance("name") p=v`, `alter model("name") p=v`), cmd-elaboration
 # (`elaborate circuit("a", "b")`), cmd-save (default, v(), i(), p(inst, var), hierarchical names
-# quoted), cmd-overview (a print or a comment between analyses stays in the block); run e5
+# quoted; `clear saves`, run sv2), cmd-overview (a print or a comment between analyses stays in the block); run e5
 # (default = every node voltage and branch current).
 file "plan.ir" deck
   title "written plan"
@@ -10,8 +10,9 @@ file "plan.ir" deck
   alter (device_param r1 r path=(x1)) value=3k
   alter (model_param res tc) value=1m
   elaborate (a)
-  save analysis=(op dc tran) (all_v) (all_branch_i) (v (a)) (i (v1)) (param (r1) (i)) (v (x1 n))
+  save analysis=(op dc tran) from_here (all_v) (all_branch_i) (v (a)) (i (v1)) (param (r1) (i)) (v (x1 n))
   analysis op name=op1
   comment " between"
   analysis op name=op2
+  reset saves
   opaque vacask inert "abort always"

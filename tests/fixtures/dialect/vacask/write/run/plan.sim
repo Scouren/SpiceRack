@@ -11,5 +11,6 @@ control
   analysis op1 op
   // between
   analysis op2 op
+  clear saves
   abort always
 endc

@@ -157,6 +157,10 @@ fn plan(l: &mut Lower<'_, '_, '_>, n: Node) -> Result<Plan, Why> {
         return Err(BAD);
     }
     let name = read::field_name(l.cst, h.name);
+    // Run dup: a second analysis of one name is "Analysis 'op1' redefinition.".
+    if used(l, &name) {
+        return Err(BAD);
+    }
     let word = ast.name(Name(ast.rhs(Node(h.master)))).to_string();
     match word.as_str() {
         "pss" => return Err(private(PSS_PERIOD)),
@@ -427,4 +431,14 @@ fn tran_row(l: &mut Lower<'_, '_, '_>, t: Tran) -> ir::tran::Tran {
         uic: t.uic,
         startup: false,
     }
+}
+
+/// Whether an analysis of the design already has `name`.
+fn used(l: &Lower<'_, '_, '_>, name: &str) -> bool {
+    let design = l.b.design();
+    let id = design.find_name(name);
+    !id.is_none()
+        && design.reachable().iter().any(|(at, _)| {
+            at.kind == ir::ItemKind::Analysis && design.row::<ir::Analysis>(at.index).name == id
+        })
 }

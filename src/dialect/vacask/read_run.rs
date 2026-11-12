@@ -18,7 +18,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `SAVE_CLEAR`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`), `control`,
+//! `ALTER_TYPE`, `REJECTED`, `ANALYSIS_NAME_MADE`, `SWEEP_NAME_MADE`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`), `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -43,6 +43,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
         ir::ItemKind::Save,
         ir::ItemKind::Alter,
         ir::ItemKind::Elaborate,
+        ir::ItemKind::Reset,
         ir::ItemKind::Comment,
         ir::ItemKind::Opaque,
     ],
@@ -53,6 +54,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Item(ir::ItemKind::Option))
 .with(ir::Feature::Item(ir::ItemKind::Env))
 .with(ir::Feature::Item(ir::ItemKind::Elaborate))
+.with(ir::Feature::Item(ir::ItemKind::Reset))
+.with(ir::Feature::Run(ir::RunExtra::ResetSaves))
 .with(ir::Feature::Analysis(ir::AnalysisKind::Op))
 .with(ir::Feature::Analysis(ir::AnalysisKind::Dc))
 .with(ir::Feature::Analysis(ir::AnalysisKind::Ac))
@@ -153,8 +156,6 @@ pub(super) const ELABORATE_TOP: ir::Code = ir::Code::new(b'P', 2311);
 pub(super) const SWEEP_FORM: ir::Code = ir::Code::new(b'P', 2312);
 /// An `alter` of a source's `type` (the fold of R42 is the scaffold's declare step, not yet).
 pub(super) const ALTER_TYPE: ir::Code = ir::Code::new(b'P', 2313);
-/// `clear saves`: every save before it dropped (run sv2), no IR row yet (A27).
-pub(super) const SAVE_CLEAR: ir::Code = ir::Code::new(b'P', 2314);
 /// A control statement VACASK rejects.
 pub(super) const REJECTED: ir::Code = ir::Code::new(b'P', 2320);
 /// The writer named an unnamed analysis.
@@ -168,6 +169,10 @@ pub(super) const SAVE_CATEGORY: ir::Code = ir::Code::new(b'W', 2303);
 /// An option row of a private key: VACASK's own options are read as Hint or Private opaques
 /// (refused by `write_run::admits`).
 pub(super) const OPTION_ROW_PRIVATE: ir::Code = ir::Code::new(b'W', 2304);
+
+/// A reset of a class other than the saves alone (VACASK's `clear saves`; refused by
+/// `write_run::admits`).
+pub(super) const RESET_CLASS: ir::Code = ir::Code::new(b'W', 2305);
 
 /// This area's rows (the writer's two notes too: `write_run` has no table of its own).
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
@@ -256,13 +261,6 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         ir::Kind::Note,
     ),
     row(
-        SAVE_CLEAR,
-        "a clear saves, kept as its text",
-        "run sv2 (settle/run/save_clear.sim); A27",
-        "`clear saves` drops every save listed before it; the analyses after it keep their default set until the next save. The IR has no row for it yet.",
-        ir::Kind::Note,
-    ),
-    row(
         REJECTED,
         "a control statement VACASK rejects",
         "VD cmd-overview, cmd-sweep, cmd-analysis-*, cmd-options; runs e3, e6, x1, x3",
@@ -288,6 +286,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "an option row of a simulator's own key",
         "R19; DIALECT-VACASK §3.4 options",
         "VACASK's reader keeps its own options as Hint or Private text, never as a private option row; another simulator's private option has no VACASK spelling.",
+        ir::Kind::Refusal,
+    ),
+    row(
+        RESET_CLASS,
+        "a reset VACASK has no statement for",
+        "VD cmd-save, cmd-options-set; run sv2",
+        "VACASK's `clear saves` restores the saves alone; `clear options` also resets what the IR holds as opaque options and the temperatures, so it is kept as text, and no other reset has a spelling.",
         ir::Kind::Refusal,
     ),
     row(

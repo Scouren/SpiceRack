@@ -8,16 +8,13 @@
 //! cmd-alter; run e2); `elaborate circuit("a", …)` is an `Elaborate` of those subcircuits,
 //! `elaborate circuit` and `elaborate changes` happen anyway (Inert, VD cmd-elaboration);
 //! `clear saves` drops every save before it, the analyses after it back on their defaults
-//! (run sv2: Private until the IR states it, A27), `clear options`/`variables`/`clear` are Private;
+//! (run sv2: `Reset` of the saves, A27), `clear options`/`variables`/`clear` are Private;
 //! `var` is Private until the IR has a circuit variable (R43); `print`, `abort`,
 //! `postprocess` move no number (Inert, C K10).
 //!
 //! Contents: `mc`, `statement` (crate-private)
 
-use super::{
-    ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, SAVE_CLEAR, VARIABLE, assign,
-    string,
-};
+use super::{ALTER_TYPE, CLEAR_STATE, ELABORATE_TOP, MC_FIELD, REJECTED, VARIABLE, assign, string};
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::fold;
 use crate::dialect::vacask::read::{self, Lower};
@@ -248,7 +245,11 @@ fn clear(l: &mut Lower<'_, '_, '_>, n: Node) {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(REJECTED));
     }
     match words.first().map(String::as_str) {
-        Some("saves") => read::opaque(l, n, ir::OpaqueClass::Private, Some(SAVE_CLEAR)),
+        Some("saves") => {
+            let span = l.stmt;
+            let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
+            l.b.reset(l.scope, saves, span);
+        }
         None | Some("options" | "variables" | "var") => {
             read::opaque(l, n, ir::OpaqueClass::Private, Some(CLEAR_STATE))
         }

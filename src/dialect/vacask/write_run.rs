@@ -17,7 +17,7 @@
 mod analyses;
 mod plan;
 
-use super::read_run::OPTION_ROW_PRIVATE;
+use super::read_run::{OPTION_ROW_PRIVATE, RESET_CLASS};
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
 use crate::ir;
@@ -50,6 +50,11 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
         ir::ItemKind::Env => plan::env(w, d.row(at.index)),
         ir::ItemKind::Elaborate => plan::elaborate(w, d.row(at.index)),
         ir::ItemKind::Save => write_outputs::save(w, at),
+        // `admits` refuses every other class (W2305).
+        ir::ItemKind::Reset => {
+            w.line();
+            w.out.push_str("clear saves\n");
+        }
         // Spelled on the analysis it applies to.
         ir::ItemKind::NodeSet => {}
         _ => unreachable!("FEATURES lacks {:?}: legalize refused it", at.kind),
@@ -108,6 +113,10 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             && design.row::<ir::OptionRow>(at.index).key == ir::OptionKey::Private
         {
             diags.push_at(OPTION_ROW_PRIVATE, design, at, 0);
+        }
+        let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
+        if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
+            diags.push_at(RESET_CLASS, design, at, 0);
         }
     }
 }
@@ -204,6 +213,7 @@ fn run_item(at: ir::ItemRef) -> bool {
             | ir::ItemKind::Print
             | ir::ItemKind::Measure
             | ir::ItemKind::Elaborate
+            | ir::ItemKind::Reset
     )
 }
 

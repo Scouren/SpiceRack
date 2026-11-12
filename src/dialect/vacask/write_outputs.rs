@@ -92,6 +92,8 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
             true => row.analyses == own,
             false => row.analyses == base,
         };
+        // Runs sv1, sv2: a VACASK save holds from where it stands.
+        spelled &= row.holds == ir::Applies::FromHere;
         if !spelled {
             diags.push_at(SAVE_CATEGORY, design, at, 0);
         }

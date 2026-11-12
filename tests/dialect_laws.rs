@@ -64,7 +64,12 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 /// A row whose reason starts with `interim` names a fixture fixpoint in its place: accepted and
 /// printed on every run until the dialect's gate (S3.5 ngspice, S4.5 VACASK), which fails on it.
 /// Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[];
+const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[(
+    "vacask",
+    "Item(Save)",
+    "generated_save_plans_read_back_to_their_meaning",
+    "W2303: VACASK spells two save shapes only (R29/S12)",
+)];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).

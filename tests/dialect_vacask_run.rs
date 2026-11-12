@@ -477,8 +477,9 @@ fn generated_save_plans_read_back_to_their_meaning() {
     // them, so `Item(Save)` is unreached by the laws and this property covers it): the
     // op/dc/tran set with `v`, `i`, `p` probes in every combination and order (a hierarchical
     // one among them), the wider set with `default` and no `p()`, several saves before and
-    // between analyses. Every design must be admitted; floors keep it from passing on nothing.
-    let (mut designs, mut saves) = (0, 0);
+    // between analyses, each holding from where it stands, a reset of the saves between them
+    // (runs sv1, sv2). Every design must be admitted; floors keep it from passing on nothing.
+    let (mut designs, mut saves, mut resets) = (0, 0, 0);
     for seed in 0..256u64 {
         let text = save_plan(seed);
         let Some((design, _)) = read_ir(&text) else {
@@ -494,10 +495,11 @@ fn generated_save_plans_read_back_to_their_meaning() {
         );
         designs += 1;
         saves += text.matches("\n  save ").count();
+        resets += text.matches("\n  reset saves").count();
     }
     assert!(
-        designs >= 256 && saves >= 512,
-        "{designs} designs, {saves} saves"
+        designs >= 256 && saves >= 512 && resets >= 64,
+        "{designs} designs, {saves} saves, {resets} resets"
     );
 }
 
@@ -557,7 +559,14 @@ fn save_plan(seed: u64) -> String {
             true => "(op dc ac tran dc_inc)",
             false => "(op dc tran)",
         };
-        out.push_str(&format!("  save analysis={set} {}\n", probes.join(" ")));
+        out.push_str(&format!(
+            "  save analysis={set} from_here {}\n",
+            probes.join(" ")
+        ));
+        // A reset of the saves between them (VACASK's `clear saves`, run sv2).
+        if next(4) == 0 {
+            out.push_str("  reset saves\n");
+        }
     }
     out
 }
