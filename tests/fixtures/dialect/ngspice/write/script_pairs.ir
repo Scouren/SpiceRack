@@ -5,3 +5,5 @@ file "script_pairs.sp" deck
   opaque ngspice unread ".control\necho a\necho b\n.endc\n"
   param p = 1
   opaque ngspice unread ".control\nrun\n.endc"
+  opaque ngspice script ".control\nop\n.endc"
+  opaque ngspice script ".control\nif 1\nop\nend\n.endc"
