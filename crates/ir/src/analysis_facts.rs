@@ -13,7 +13,7 @@
 //! `DetailFacts::map_names`,
 //! `DetailFacts::features`,
 //! `DetailFacts::fault`, `DetailFacts::dump`, `DetailFacts::parse`, `DetailFacts::generate`),
-//! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
+//! `pub(crate) fn report`, `pub(crate) fn base_before`,
 //! `pub(crate) fn base_just_before`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
 //! `pub(crate) fn fault_of`, `pub(crate) fn dump_of`, `pub(crate) fn parse_of`,
 //! `pub(crate) fn gen_of`, `pub(crate) fn analysis_name` (gen),
@@ -124,11 +124,6 @@ macro_rules! by_detail {
     };
 }
 
-/// The detail row at `index` of `D`'s table, or `None` when out of range.
-pub(crate) fn detail_get<D: RunDetail>(design: &Design, index: u32) -> Option<D> {
-    D::rows(design).get(index as usize).copied()
-}
-
 /// Appends violation `v` of item `at` (`arg`: the item's row).
 pub(crate) fn report(design: &Design, at: ItemRef, v: Violation, out: &mut Diags) {
     out.push_at(violation_code(v), design, at, at.index);
@@ -177,7 +172,7 @@ impl RowFacts for Analysis {
         if row.kind != AnalysisKind::Dc {
             return;
         }
-        let Some(dc) = detail_get::<Dc>(design, row.detail) else {
+        let Some(dc) = crate::circuit_text::get_row::<Dc>(design, row.detail) else {
             return;
         };
         let start = dc.axes.start as usize;
@@ -202,7 +197,7 @@ impl RowFacts for Analysis {
         if self.kind != AnalysisKind::Dc {
             return;
         }
-        let Some(dc) = detail_get::<Dc>(design, self.detail) else {
+        let Some(dc) = crate::circuit_text::get_row::<Dc>(design, self.detail) else {
             return;
         };
         let start = dc.axes.start as usize;
@@ -375,21 +370,21 @@ impl RowFacts for Analysis {
 
 /// `DetailFacts::handles` of `D`'s row at `index`, when it exists.
 pub(crate) fn handles_of<D: DetailFacts>(design: &Design, index: u32, out: &mut Vec<Handle>) {
-    if let Some(d) = detail_get::<D>(design, index) {
+    if let Some(d) = crate::circuit_text::get_row::<D>(design, index) {
         d.handles(design, out);
     }
 }
 
 /// `DetailFacts::features` of `D`'s row at `index`, when it exists.
 pub(crate) fn features_of<D: DetailFacts>(design: &Design, index: u32, set: &mut FeatureSet) {
-    if let Some(d) = detail_get::<D>(design, index) {
+    if let Some(d) = crate::circuit_text::get_row::<D>(design, index) {
         d.features(design, set);
     }
 }
 
 /// `DetailFacts::fault` of `D`'s row at `index`; `DetailRow` when it does not exist.
 pub(crate) fn fault_of<D: DetailFacts>(design: &Design, index: u32) -> Option<Violation> {
-    match detail_get::<D>(design, index) {
+    match crate::circuit_text::get_row::<D>(design, index) {
         Some(d) => d.fault(design),
         None => Some(Violation::DetailRow),
     }
@@ -397,7 +392,8 @@ pub(crate) fn fault_of<D: DetailFacts>(design: &Design, index: u32) -> Option<Vi
 
 /// `DetailFacts::dump` of `D`'s row at `index` (a checked design has it).
 pub(crate) fn dump_of<D: DetailFacts>(design: &Design, ctx: &Ctx, index: u32, out: &mut String) {
-    let d = detail_get::<D>(design, index).expect("dump of a checked design: the detail exists");
+    let d = crate::circuit_text::get_row::<D>(design, index)
+        .expect("dump of a checked design: the detail exists");
     d.dump(design, ctx, out);
 }
 

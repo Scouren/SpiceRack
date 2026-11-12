@@ -415,7 +415,7 @@ fn four_counts(design: &Design, out: &mut Diags) {
 fn count_from_option(design: &Design, item: ItemRef) -> bool {
     let row = crate::analysis::Analysis::table(design).get(item.index);
     row.kind == crate::analysis::AnalysisKind::Four
-        && crate::analysis_facts::detail_get::<crate::tran::Four>(design, row.detail)
+        && crate::circuit_text::get_row::<crate::tran::Four>(design, row.detail)
             .is_some_and(|f| f.harmonics.is_none())
 }
 

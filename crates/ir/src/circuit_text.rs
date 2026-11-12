@@ -242,7 +242,7 @@ pub(crate) fn dump_element(e: &Element, design: &Design, ctx: &Ctx, out: &mut St
     );
     out.push_str(KIND_WORDS[e.kind as usize]);
     out.push(' ');
-    write_name(design, e.name, out);
+    text::write_name(design.str(e.name), out);
     out.push(' ');
     text::write_names(design, e.terminals, out);
     if e.model.name != NameId::NONE {
@@ -282,7 +282,7 @@ pub(crate) fn dump_element(e: &Element, design: &Design, ctx: &Ctx, out: &mut St
 
 /// Writes `model <name> <family> …` (module header).
 pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String) {
-    write_name(design, m.name, out);
+    text::write_name(design.str(m.name), out);
     out.push(' ');
     out.push_str(FAMILY_WORDS[m.family as usize]);
     if m.polarity != Polarity::None {
@@ -298,7 +298,7 @@ pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String
     }
     if m.bin_of != NameId::NONE {
         out.push_str(" bin_of=");
-        write_name(design, m.bin_of, out);
+        text::write_name(design.str(m.bin_of), out);
     }
     if m.ako.name != NameId::NONE {
         out.push_str(" ako=");
@@ -314,7 +314,7 @@ pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String
     }
     if m.word != NameId::NONE {
         out.push_str(" word=");
-        write_name(design, m.word, out);
+        text::write_name(design.str(m.word), out);
     }
 }
 
@@ -402,7 +402,7 @@ fn dump_field(design: &Design, key: &str, field: Field<'_>, ctx: &Ctx, out: &mut
     out.push('=');
     match field {
         Field::Expr(e) | Field::Dyn(e) => text::write_value(design, *e, ctx, out),
-        Field::Name(n) => write_name(design, *n, out),
+        Field::Name(n) => text::write_name(design.str(*n), out),
         Field::Names(l) => text::write_names(design, *l, out),
         Field::Exprs(l) => text::write_exprs(design, *l, ctx, out),
         Field::Count(c) => out.push_str(&c.to_string()),
@@ -426,9 +426,4 @@ fn dump_field(design: &Design, key: &str, field: Field<'_>, ctx: &Ctx, out: &mut
             }
         }
     }
-}
-
-/// A name in a name position (the kernel's writer takes the text).
-fn write_name(design: &Design, name: NameId, out: &mut String) {
-    text::write_name(design.str(name), out);
 }

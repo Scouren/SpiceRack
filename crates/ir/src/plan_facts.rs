@@ -22,9 +22,7 @@
 use crate::analysis::{Analysis, AnalysisKind};
 #[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::gen_of;
-use crate::analysis_facts::{
-    detail_get, dump_of, fault_of, features_of, handles_of, parse_of, report,
-};
+use crate::analysis_facts::{dump_of, fault_of, features_of, handles_of, parse_of, report};
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
@@ -50,8 +48,8 @@ use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
 use crate::run_names::{names, names_of};
 use crate::run_words::{
-    get, loop_depth, pool, put_expr, put_flag, put_name, take_enum, take_expr, take_name,
-    take_word, trim_lead, word, write_ref,
+    get, loop_depth, put_expr, put_flag, put_name, take_enum, take_expr, take_name, take_word,
+    trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -97,7 +95,7 @@ impl RowFacts for Loop {
                 }
             }
             LoopKind::Table => {
-                let Some(t) = detail_get::<TableLoop>(design, row.detail) else {
+                let Some(t) = crate::circuit_text::get_row::<TableLoop>(design, row.detail) else {
                     return;
                 };
                 let start = t.columns.start as usize;
@@ -121,7 +119,7 @@ impl RowFacts for Loop {
                 }
             }
             LoopKind::Table => {
-                let Some(t) = detail_get::<TableLoop>(design, self.detail) else {
+                let Some(t) = crate::circuit_text::get_row::<TableLoop>(design, self.detail) else {
                     return;
                 };
                 let start = t.columns.start as usize;
@@ -470,7 +468,7 @@ impl RowFacts for Elaborate {
             if k > 0 {
                 out.push(' ');
             }
-            write_ref(out, design, ctx, r, DefKind::Subckt);
+            crate::text_expr::write_ref(design, r, DefKind::Subckt, ctx, out);
         }
         out.push(')');
     }
@@ -491,7 +489,7 @@ impl RowFacts for Elaborate {
         if !words.expect(")", diags) {
             return ItemRef::NONE;
         }
-        let circuits = pool(&mut b.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut b.design.run.refs, &refs);
         b.push(scope, Elaborate { circuits }, words.span())
     }
 
@@ -509,7 +507,7 @@ impl RowFacts for Elaborate {
         let refs: Vec<Ref> = (0..n)
             .map(|_| gen_ref(g, b, Some(DefKind::Subckt)))
             .collect();
-        let circuits = pool(&mut b.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut b.design.run.refs, &refs);
         b.push(scope, Elaborate { circuits }, Span::NONE)
     }
 }

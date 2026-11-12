@@ -94,7 +94,7 @@ use crate::plan::{
 };
 use crate::probe::{Probe, ProbeKind, ProbeList};
 use crate::reset::{Reset, ResetSet};
-use crate::run_words::{loop_depth, pool};
+use crate::run_words::loop_depth;
 use crate::span::Span;
 use crate::stats::{Correlation, CorrelationList, Statistics, Vary, VaryList};
 
@@ -104,28 +104,28 @@ impl Builder<'_> {
     /// Appends a list of probes. Like `push`, it does not check the probes' fields (`check`'s
     /// `FieldDomain` does); the probe constructors below assert them.
     pub fn probes(&mut self, probes: &[Probe]) -> ProbeList {
-        pool(&mut self.design.run.probes, probes)
+        crate::build::pooled(&mut self.design.run.probes, probes)
     }
 
     /// Appends a list of targets (a table loop's columns).
     pub fn targets(&mut self, targets: &[Target]) -> TargetList {
-        pool(&mut self.design.run.targets, targets)
+        crate::build::pooled(&mut self.design.run.targets, targets)
     }
 
     /// Appends a DC sweep's axes, innermost first (fields unchecked, as `probes`; a sweep with
     /// no axis is `check`'s `FieldDomain`).
     pub fn dc_axes(&mut self, axes: &[DcAxis]) -> DcAxisList {
-        pool(&mut self.design.run.dc_axes, axes)
+        crate::build::pooled(&mut self.design.run.dc_axes, axes)
     }
 
     /// Appends a list of variations.
     pub fn varies(&mut self, varies: &[Vary]) -> VaryList {
-        pool(&mut self.design.run.varies, varies)
+        crate::build::pooled(&mut self.design.run.varies, varies)
     }
 
     /// Appends a list of correlations (fields unchecked, as `probes`).
     pub fn correlations(&mut self, correlations: &[Correlation]) -> CorrelationList {
-        pool(&mut self.design.run.correlations, correlations)
+        crate::build::pooled(&mut self.design.run.correlations, correlations)
     }
 
     // ---- values ----
@@ -512,7 +512,7 @@ impl Builder<'_> {
             .iter()
             .map(|c| Ref::unresolved(self.name(c)))
             .collect();
-        let circuits = pool(&mut self.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut self.design.run.refs, &refs);
         self.push(scope, Elaborate { circuits }, span)
     }
 

@@ -13,7 +13,7 @@
 use std::ops::Range;
 
 use crate::analysis::RunDetails;
-use crate::analysis_facts::{DetailFacts, detail_get};
+use crate::analysis_facts::DetailFacts;
 use crate::dc_ac::DcAxisList;
 use crate::design::Design;
 use crate::id::{NameId, NameList};
@@ -148,7 +148,7 @@ pub(crate) fn names_of<D: DetailFacts>(
     index: u32,
     f: &mut dyn FnMut(&mut [NameId]),
 ) {
-    let Some(mut d) = detail_get::<D>(design, index) else {
+    let Some(mut d) = crate::circuit_text::get_row::<D>(design, index) else {
         return;
     };
     d.map_names(&mut names(design, f));

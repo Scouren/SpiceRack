@@ -42,7 +42,7 @@ use crate::run_extra::RunExtra;
 use crate::run_words::has;
 use crate::run_words::{
     close, flag, get, open, put_expr, put_flag, put_ref, put_word, take_enum, take_expr, take_word,
-    trim_lead, word, write_ref,
+    trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -266,7 +266,7 @@ impl RowFacts for Statistics {
                 put_word(out, key);
                 for v in design.varies(list) {
                     out.push_str(" (");
-                    write_ref(out, design, ctx, v.param, DefKind::Param);
+                    crate::text_expr::write_ref(design, v.param, DefKind::Param, ctx, out);
                     put_word(out, &word(v.dist));
                     put_flag(out, v.percent, "percent");
                     put_expr(out, design, ctx, "mean", v.mean);
@@ -284,7 +284,7 @@ impl RowFacts for Statistics {
                 put_word(out, key);
                 for c in design.correlations(list) {
                     out.push_str(" (");
-                    write_ref(out, design, ctx, c.a, DefKind::Param);
+                    crate::text_expr::write_ref(design, c.a, DefKind::Param, ctx, out);
                     put_ref(out, design, ctx, c.b, DefKind::Param);
                     put_expr(out, design, ctx, "cc", c.cc);
                     out.push(')');
