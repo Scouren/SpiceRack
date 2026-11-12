@@ -1,0 +1,2 @@
+file "a.sp" deck
+  analysis tran stop=1u print_step=1n cap=ngspice_rule
