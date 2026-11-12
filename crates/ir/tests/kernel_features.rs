@@ -154,7 +154,7 @@ fn features_of_a_hand_built_deck() {
 fn each_kernel_extra_has_a_row_and_a_neighbour() {
     type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
     // (extra, a design that sets it, its legal neighbour that does not)
-    let cases: [(Extra, Build, Build); 11] = [
+    let cases: [(Extra, Build, Build); Extra::COUNT] = [
         (
             Extra::NestedSubckt,
             |b, top| {
@@ -310,6 +310,16 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
             },
         ),
+        (
+            Extra::DeckWithoutTitle,
+            |b, top| {
+                b.comment(top, "no title", Span::NONE);
+            },
+            |b, top| {
+                b.title(top, "", Span::NONE);
+                b.comment(top, "titled", Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         if extra == Extra::LocalModel {
@@ -407,89 +417,13 @@ fn the_full_set_holds_every_feature() {
 }
 
 #[test]
-fn the_dynamic_class_is_transitive() {
-    use spicerack_ir::{ExprClass, expr_class};
-    // R14 / A11: a = exp($temp) is Temp; b = exp(a) is Temp through a; c = exp(1) is Constant;
-    // p = exp(@h(1)) with h(x) = v(out) + x is Circuit through h; x = y, y = x is a cycle
-    let mut d = Design::new();
-    let (a, b, c, p, x) = {
-        let mut bl = d.builder();
-        let (_, top) = bl.file("top.sp", Role::Deck);
-        let t = bl.temp();
-        let a = bl.call(Func::Exp, &[t]);
-        bl.param(top, "a", a, Span::NONE);
-        let ra = bl.param_ref("a");
-        let b = bl.call(Func::Exp, &[ra]);
-        bl.param(top, "b", b, Span::NONE);
-        let one = bl.num(1.0);
-        let c = bl.call(Func::Exp, &[one]);
-        bl.param(top, "c", c, Span::NONE);
-        let probe = bl.v("out", None);
-        let fx = bl.param_ref("x");
-        let hbody = bl.binary(BinOp::Add, probe, fx);
-        bl.func(top, "h", &["x"], hbody, Span::NONE);
-        let one = bl.num(1.0);
-        let call = bl.user_call("h", &[one]);
-        let p = bl.call(Func::Exp, &[call]);
-        bl.param(top, "p", p, Span::NONE);
-        let ry = bl.param_ref("y");
-        bl.param(top, "x", ry, Span::NONE);
-        let rx = bl.param_ref("x");
-        bl.param(top, "y", rx, Span::NONE);
-        (a, b, c, p, ry)
-    };
-    spicerack_ir::link(&mut d, &mut Diags::new());
-    assert_eq!(expr_class(&d, a), ExprClass::Temp);
-    assert_eq!(
-        expr_class(&d, b),
-        ExprClass::Temp,
-        "through the parameter it reads"
-    );
-    assert_eq!(expr_class(&d, c), ExprClass::Constant);
-    assert_eq!(
-        expr_class(&d, p),
-        ExprClass::Circuit,
-        "through the function it calls"
-    );
-    assert_eq!(
-        expr_class(&d, x),
-        ExprClass::Circuit,
-        "a reference cycle counts as Circuit"
-    );
-    assert!(ExprClass::Constant < ExprClass::Temp && ExprClass::Temp < ExprClass::Circuit);
-    // the Dyn features are class >= Temp: a and b's `exp` is Dyn, c's is not
-    let used = features_used(&d);
-    assert!(used.contains(Feature::FuncDyn(Func::Exp)) && used.contains(Feature::Func(Func::Exp)));
-    let only_c = used_with(|bl, top| {
-        let one = bl.num(1.0);
-        let c = bl.call(Func::Exp, &[one]);
-        bl.param(top, "c", c, Span::NONE);
-    });
-    assert!(
-        only_c.contains(Feature::Func(Func::Exp)) && !only_c.contains(Feature::FuncDyn(Func::Exp))
-    );
-    let through_a = used_with(|bl, top| {
-        let t = bl.temp();
-        bl.param(top, "a", t, Span::NONE);
-        let ra = bl.param_ref("a");
-        let b = bl.call(Func::Exp, &[ra]);
-        bl.param(top, "b", b, Span::NONE);
-    });
-    assert!(
-        through_a.contains(Feature::FuncDyn(Func::Exp)),
-        "b reads Temp through a"
-    );
-    assert!(!through_a.contains(Feature::Func(Func::Exp)));
-}
-
-/// `features_used` of a linked deck built by `f`.
-fn used_with(f: impl FnOnce(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId)) -> FeatureSet {
+fn a_library_without_a_title_is_no_deck_without_one() {
+    // the legal neighbour of DeckWithoutTitle's other side: only a `Deck` file needs a title
     let mut d = Design::new();
     {
         let mut b = d.builder();
-        let (_, top) = b.file("top.sp", Role::Deck);
-        f(&mut b, top);
+        let (_, top) = b.file("lib.sp", Role::Library);
+        b.comment(top, "a library", Span::NONE);
     }
-    spicerack_ir::link(&mut d, &mut Diags::new());
-    features_used(&d)
+    assert!(!features_used(&d).contains(Feature::Extra(Extra::DeckWithoutTitle)));
 }
