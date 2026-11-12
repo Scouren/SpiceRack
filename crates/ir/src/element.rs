@@ -74,25 +74,27 @@ pub enum ElemKind {
     /// `Model` master (a nonlinear core, xy `K … model`). Detail `Coupling`.
     Coupling,
     /// Independent voltage source (D12, E1–E38). Terminals (p, n), exactly 2; positive branch
-    /// current flows into `p`. No master. Detail `Source`.
+    /// current flows into `p`. Optional `Model` master of its builtin family (A12 C5). Detail `Source`.
     VSource,
     /// Independent current source (D13). Terminals (p, n), exactly 2; positive current flows
-    /// from `p` through the source to `n`. No master. Detail `Source`.
+    /// from `p` through the source to `n`. Optional `Model` master of its builtin family (A12 C5). Detail `Source`.
     ISource,
     /// RF port: a source behind a reference impedance (D15, D97, D111). Terminals (p, n),
     /// exactly 2. No master. Detail `Source` with a `PortSpec` row.
     Port,
     /// Voltage-controlled voltage source (D16, D60, D78). Terminals (out+, out−, ctl+, ctl−),
-    /// exactly 4. No master. Detail `Controlled` (`sense` `NONE`).
+    /// exactly 4. Optional `Model` master of its builtin family (A12 C5). Detail `Controlled`
+    /// (`sense` `NONE`).
     Vcvs,
     /// Voltage-controlled current source (D17). Terminals (out+, out−, ctl+, ctl−), exactly
-    /// 4. No master. Detail `Controlled` (`sense` `NONE`).
+    /// 4. Optional `Model` master of its builtin family (A12 C5). Detail `Controlled` (`sense`
+    /// `NONE`).
     Vccs,
-    /// Current-controlled current source (D18). Terminals (out+, out−), exactly 2. No master.
-    /// Detail `Controlled` (`sense` the sensing element).
+    /// Current-controlled current source (D18). Terminals (out+, out−), exactly 2. Optional `Model`
+    /// master of its builtin family (A12 C5). Detail `Controlled` (`sense` the sensing element).
     Cccs,
-    /// Current-controlled voltage source (D18). Terminals (out+, out−), exactly 2. No master.
-    /// Detail `Controlled` (`sense` the sensing element).
+    /// Current-controlled voltage source (D18). Terminals (out+, out−), exactly 2. Optional `Model`
+    /// master of its builtin family (A12 C5). Detail `Controlled` (`sense` the sensing element).
     Ccvs,
     /// Polynomial controlled source (D19, D106). Terminals (out+, out−), exactly 2; the
     /// controls are in the detail. No master. Detail `Poly`.
@@ -514,16 +516,16 @@ impl ElemKind {
             | ElemKind::SingleLossyLine
             | ElemKind::CoupledLines
             | ElemKind::CodeModel
-            | ElemKind::ModuleModel => Some(DefKind::Model),
-            ElemKind::ChargeCapacitor
-            | ElemKind::FluxInductor
+            | ElemKind::ModuleModel
             | ElemKind::VSource
             | ElemKind::ISource
-            | ElemKind::Port
             | ElemKind::Vcvs
             | ElemKind::Vccs
             | ElemKind::Cccs
-            | ElemKind::Ccvs
+            | ElemKind::Ccvs => Some(DefKind::Model),
+            ElemKind::ChargeCapacitor
+            | ElemKind::FluxInductor
+            | ElemKind::Port
             | ElemKind::Poly
             | ElemKind::Table
             | ElemKind::Behav

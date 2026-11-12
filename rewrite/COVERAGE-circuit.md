@@ -332,7 +332,7 @@ conversion); "pass" means a conversion outside this crate. The gaps and proposal
 - A12 C2 → `Exp.td2_from: TdFrom::{Zero, Td1}`; `CircuitExtra::{ExpTd2FromZero, ExpTd2FromTd1}` (E5, 5.08: the reader no longer adds)
 - A12 C3 → `Sffm.pre: PreDelay`; `CircuitExtra::{SffmPreOffset, SffmPreHold, SffmPreZero}`
 - A12 C4 → `Source.dc_rule: DcRule::{Given, WaveAtZero}` (`dc` `NONE` exactly under `WaveAtZero`, which needs a wave); `CircuitExtra::DcGivenWithWave` and `DcAtZero{Pulse, Sin, Exp, Pwl, Sffm, Am, TrNoise, TrRandom, Pattern}` (5.13, E1, E38)
-- A12 C5 → `ItemKind::DeviceLibrary`, `library::DeviceLibrary { family, path }`; `CircuitExtra::ElementWithoutModel` (item), `CircuitExtra::ModelWithoutLibrary` (design-level); naming of parameterless models: IR-CIRCUIT §4a, pending
+- A12 C5 → `ItemKind::DeviceLibrary`, `library::DeviceLibrary { family, path }`; `CircuitExtra::ElementWithoutModel` (item), `CircuitExtra::ModelWithoutLibrary` (design-level); parameterless builtin models: `ModelFamily::{SourceV, SourceI, Vcvs, Vccs, Ccvs, Cccs, Mutual}`, an optional `Model` master on the source and linear controlled kinds (IR-CIRCUIT §4a)
 
 ## Gaps and proposals
 

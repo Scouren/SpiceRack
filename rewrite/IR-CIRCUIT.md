@@ -100,13 +100,20 @@ whose family has no reachable library of that family); `CircuitExtra::ElementWit
 model, run n2). Neutral passes add and remove libraries and models; readers and writers stay
 inverse.
 
-**Parameterless models of kinds with no family today** (independent and controlled sources,
-couplings). Proposed by the circuit owner to the VACASK agent, pending its agreement: new
-`ModelFamily` members `VSource ISource Vcvs Vccs Cccs Ccvs Mutual` with no parameters by
-definition; `ElemKind::master_kind` of `VSource ISource Port Vcvs Vccs Cccs Ccvs` becomes an
-optional `Model` (as `Coupling` has); a pass that removes `ElementWithoutModel` adds one model
-per family in the scope that first needs it, named by the family's IR-text word made unique.
-Not yet in the code; this paragraph is replaced by the agreed rule.
+**Parameterless models of kinds with no family today** (agreed with the VACASK agent,
+2026-11-12; VACASK fails "Master 'vsource' not found." without a model line, run n2). One
+`ModelFamily` member per builtin: `SourceV SourceI Vcvs Vccs Ccvs Cccs Mutual`, each "the
+simulator's built-in device for that element kind, with no parameters". `ElemKind::master_kind`
+of `VSource ISource Vcvs Vccs Cccs Ccvs` is an optional `Model` (as `Coupling`'s; `Port` keeps
+none: VACASK spells a port as a vsource and a resistor). `check` (`FieldDomain`): a resolved
+master of a builtin family serves only its kind; a source or linear controlled source names
+only its builtin (a coupling may also name a core, and a coupling bound to `Mutual` does not set
+`CouplingCore`); a builtin model has no parameters and no polarity. A builtin family needs no
+`DeviceLibrary`, so it never sets `ModelWithoutLibrary` (assumed from DIALECT-VACASK: the
+builtins are not loaded; to be confirmed by the VACASK agent). The two conversions are the
+VACASK slice's neutral passes: `explicit_family_models` adds one such model per scope and
+family for the elements that lack one (the pass chooses the name), `drop_builtin_models`
+removes them and sets `Element.model` to `NONE`.
 
 ## 5. What to deliver
 

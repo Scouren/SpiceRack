@@ -481,8 +481,14 @@ mod tests {
     fn element_refuses_a_master_on_a_kind_without_one() {
         pushed(|b, top| {
             let one = n(b, 1);
-            let h = b.head("v1", &["a", "0"], Some("vmod"), &[], ExprId::NONE);
-            b.source(top, ElemKind::VSource, h, source(one), Span::NONE);
+            let h = b.head("b1", &["a", "0"], Some("bmod"), &[], ExprId::NONE);
+            b.behav(
+                top,
+                ElemKind::Behav,
+                h,
+                behav(one, OutKind::Voltage),
+                Span::NONE,
+            );
         });
     }
 

@@ -11,6 +11,7 @@
 //! `pub(crate) fn reads_circuit`, `pub(crate) fn dc_at_zero`, `pub(crate) fn library_features`,
 //! `pub(crate) fn mult_class`
 
+use crate::circuit_check::{bound_family, builtin_kind};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_text::get_row;
 use crate::controlled::{
@@ -56,7 +57,9 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
                 if c.inductors.len() > 2 {
                     add(X::CouplingMany);
                 }
-                if e.model.name != NameId::NONE {
+                // a coupling bound to the builtin mutual inductance is no core (A12 C5)
+                let mutual = bound_family(design, e.model) == Some(ModelFamily::Mutual);
+                if e.model.name != NameId::NONE && !mutual {
                     add(X::CouplingCore);
                 }
             }
@@ -230,7 +233,8 @@ pub(crate) fn dc_at_zero(kind: WaveKind) -> X {
 }
 
 /// Adds `ModelWithoutLibrary` when a reachable model's family has no reachable
-/// `DeviceLibrary` of that family (A12 C5). One pass over the reachable items.
+/// `DeviceLibrary` of that family (A12 C5); a builtin family needs none. One pass over the
+/// reachable items.
 pub(crate) fn library_features(design: &Design, set: &mut FeatureSet) {
     let reachable = design.reachable();
     let mut has_library = [false; ModelFamily::COUNT];
@@ -240,8 +244,10 @@ pub(crate) fn library_features(design: &Design, set: &mut FeatureSet) {
         }
     }
     let missing = reachable.iter().any(|&(item, _)| {
-        item.kind == ItemKind::Model
-            && !has_library[design.row::<Model>(item.index).family as usize]
+        item.kind == ItemKind::Model && {
+            let family = design.row::<Model>(item.index).family;
+            builtin_kind(family).is_none() && !has_library[family as usize]
+        }
     });
     if missing {
         *set = set.with(Feature::Circuit(X::ModelWithoutLibrary));

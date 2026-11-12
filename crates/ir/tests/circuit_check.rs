@@ -224,10 +224,10 @@ mod tests {
                 let s = b.detail(semi());
                 push(b, top, ElemKind::Diode, &["a", "0"], None, s);
             }),
-            ("source naming a model", |b, top| {
+            ("behavioural source naming a model", |b, top| {
                 let one = n(b, 1);
-                let v = b.detail(source(one));
-                push(b, top, ElemKind::VSource, &["a", "0"], Some("vm"), v);
+                let v = b.detail(behav(one, spicerack_ir::controlled::OutKind::Voltage));
+                push(b, top, ElemKind::Behav, &["a", "0"], Some("bm"), v);
             }),
             ("unresolved master bound", |b, top| {
                 b.subckt(top, "sub", &[], &[], Span::NONE);

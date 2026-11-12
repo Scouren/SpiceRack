@@ -18,7 +18,7 @@
 
 use crate::build::Builder;
 use crate::build_circuit::ElemHead;
-use crate::circuit_check::has_polarity;
+use crate::circuit_check::{builtin_kind, has_polarity};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
@@ -27,12 +27,15 @@ use crate::controlled::{
 use crate::element::{DetailKind, ElemKind, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::{Gen, Reads};
-use crate::id::{ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
+use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, NameList, Ref, ScopeId};
+use crate::item::DefKind;
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, IcMode};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::span::Span;
 
+#[path = "circuit_gen_head.rs"]
+mod head;
 #[path = "circuit_gen_rows.rs"]
 mod rows;
 #[path = "circuit_gen_waves.rs"]
@@ -43,8 +46,18 @@ pub(crate) use rows::generate_library;
 const N: ExprId = ExprId::NONE;
 const NONE_REF: Ref = Ref {
     name: NameId::NONE,
-    def: crate::id::DefId::NONE,
+    def: DefId::NONE,
 };
+
+/// The builtin families and the kinds they serve (AMEND-A12 C5).
+const BUILTINS: [(ModelFamily, ElemKind); 6] = [
+    (ModelFamily::SourceV, ElemKind::VSource),
+    (ModelFamily::SourceI, ElemKind::ISource),
+    (ModelFamily::Vcvs, ElemKind::Vcvs),
+    (ModelFamily::Vccs, ElemKind::Vccs),
+    (ModelFamily::Ccvs, ElemKind::Ccvs),
+    (ModelFamily::Cccs, ElemKind::Cccs),
+];
 
 /// The generator's state for one row.
 struct R<'r, 'b> {
@@ -141,7 +154,12 @@ pub(crate) fn generate_model(
     };
     let mut pairs: Vec<(String, ExprId)> = Vec::new();
     // values first, then keys: the order `Words::params` creates them in
-    let values: Vec<ExprId> = (0..r.g.below(3)).map(|_| r.ex()).collect();
+    let count = if builtin_kind(family).is_some() {
+        0
+    } else {
+        r.g.below(3)
+    };
+    let values: Vec<ExprId> = (0..count).map(|_| r.ex()).collect();
     for value in values {
         let key = r.g.fresh_name(r.b);
         pairs.push((r.b.design().str(key).to_owned(), value));
@@ -158,12 +176,12 @@ pub(crate) fn generate_model(
         NameId::NONE
     };
     let ako = if r.maybe(X::ModelAko) {
-        r.reference(crate::item::DefKind::Model)
+        r.reference(DefKind::Model)
     } else {
         NONE_REF
     };
     let module = if family == ModelFamily::Module {
-        r.reference(crate::item::DefKind::Module)
+        r.reference(DefKind::Module)
     } else {
         NONE_REF
     };
@@ -214,7 +232,9 @@ impl R<'_, '_> {
             && (self.has(X::ElementWithoutModel)
                 || kind == ElemKind::Unresolved
                 || match kind.master_kind() {
-                    Some(_) if kind == ElemKind::Coupling => self.has(X::CouplingCore),
+                    Some(_) if kind == ElemKind::Coupling => {
+                        self.has(X::CouplingCore) || self.has_visible(ModelFamily::Mutual)
+                    }
                     Some(_) => true,
                     None => false,
                 })
@@ -261,66 +281,6 @@ impl R<'_, '_> {
             .collect();
         assert!(!allowed.is_empty(), "no allowed member");
         allowed[self.g.below(allowed.len() as u32) as usize]
-    }
-
-    fn terminals(&mut self, kind: ElemKind, two: bool) -> NameList {
-        let (lo, hi) = kind.terminals();
-        let count = match kind {
-            ElemKind::Laplace | ElemKind::FreqTable | ElemKind::VSwitch => {
-                if two {
-                    2
-                } else {
-                    4
-                }
-            }
-            ElemKind::Diode => 2 + u32::from(self.maybe(X::DiodeThermal)),
-            ElemKind::CoupledLines => 4 + 2 * self.g.below(3),
-            _ => lo as u32 + self.g.below((hi - lo).min(3) as u32 + 1),
-        };
-        let ids: Vec<NameId> = (0..count)
-            .map(|_| {
-                if self.g.chance(4) {
-                    NameId::GROUND
-                } else {
-                    self.g.fresh_name(self.b)
-                }
-            })
-            .collect();
-        if ids.is_empty() {
-            List::EMPTY
-        } else {
-            self.b.name_ids(&ids)
-        }
-    }
-
-    /// An existing definition of `kind` visible here, or a fresh unresolved name.
-    fn reference(&mut self, kind: crate::item::DefKind) -> Ref {
-        let def = self.g.pick_def(self.b.design(), self.scope, kind);
-        if def == crate::id::DefId::NONE {
-            Ref::unresolved(self.g.fresh_name(self.b))
-        } else {
-            Ref {
-                name: self.b.design().def(def).name,
-                def,
-            }
-        }
-    }
-
-    fn master(&mut self, kind: ElemKind) -> Ref {
-        let optional = match kind {
-            ElemKind::Coupling => {
-                self.has(X::CouplingCore) && (!self.has(X::ElementWithoutModel) || self.g.chance(2))
-            }
-            ElemKind::Resistor | ElemKind::Capacitor | ElemKind::Inductor => {
-                !self.has(X::ElementWithoutModel) || self.g.chance(4)
-            }
-            _ => false,
-        };
-        match kind.master_kind() {
-            _ if kind == ElemKind::Unresolved => Ref::unresolved(self.g.fresh_name(self.b)),
-            Some(dk) if kind.needs_model() || optional => self.reference(dk),
-            _ => NONE_REF,
-        }
     }
 
     /// Pushes `kind`'s detail row (its side and wave rows first, at their field positions).
