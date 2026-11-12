@@ -22,7 +22,8 @@
 //! (ngspice's option spellings, which `write_run` spells back); for the control area, which reads
 //! a script command (`tran 1n 1u uic`) as the card without its dot:
 //! `pub(super) use words::split as split_words` (`fn(&str) -> Vec<String>`),
-//! `pub(super) use analysis::read as read_analysis` (`fn(&mut Lower, Stmt, name: &str,
+//! `pub(super) use analysis::Card`, `pub(super) use analysis::read as read_analysis`
+//! (`fn(&mut Lower, Stmt, name: &str,
 //! words: &[String]) -> Result<Card, Fail>`), `pub(super) use rows::push as push_analysis`
 //! (`fn(&mut Lower, Stmt, &Card)`)
 
@@ -31,6 +32,11 @@ mod rows;
 mod state;
 mod words;
 
+#[allow(
+    unused_imports,
+    reason = "the control area holds a validated Card between its passes"
+)]
+pub(super) use analysis::Card;
 pub(super) use analysis::read as read_analysis;
 pub(super) use rows::push as push_analysis;
 pub(super) use state::KEYS;
