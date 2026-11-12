@@ -1,0 +1,4 @@
+an alter whose names and assignments are interleaved
+control
+  alter instance("r1", r=2k "r2")
+endc

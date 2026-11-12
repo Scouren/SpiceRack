@@ -1,0 +1,8 @@
+# Oracle: run dup (settle/run/dup_name.sim: VACASK stops with "Analysis 'op1' redefinition."):
+# the second analysis of one name is refused (P2320), the first kept. Shrunk mutant of
+# dialect_mutants seeds 4..28 (a line duplicated), which panicked in the builder.
+# codes: P2320 S0004
+file "dup_name.sim" deck
+  title "two analyses of one name"
+  analysis op name=op1
+  opaque vacask invalid "analysis op1 op"

@@ -17,10 +17,16 @@
 //! `nix develop .#testing`. Known failures are named in `KNOWN` (compared as a list: an
 //! unexpected pass fails until its line goes).
 //!
-//! Contents: tests only.
+//! Contents: tests only (`settle`, the settle decks' facts; `save_plans`, the seeded save
+//! property).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[path = "dialect_vacask_run/save_plans.rs"]
+mod save_plans;
+#[path = "dialect_vacask_run/settle.rs"]
+mod settle;
 
 use spicerack::dialect::{self, Policy, Sources};
 use spicerack::ir;
@@ -36,10 +42,16 @@ const SETTLE: &str = "tests/fixtures/dialect/vacask/settle/run";
 
 /// Reader fixtures that fail for a cause outside this area, each with its cause; strict both
 /// ways.
-const KNOWN: &[(&str, &str)] = &[];
+const KNOWN: &[(&str, &str)] = &[(
+    "alter_shape",
+    "fold.rs:267 (vacask-plan's) reads the key of a string field after an assignment: a NONE index",
+)];
 
 /// Settle decks the round trip cannot run yet, each with its cause; strict both ways.
-const KNOWN_TRIP: &[(&str, &str)] = &[];
+const KNOWN_TRIP: &[(&str, &str)] = &[(
+    "alter_shape",
+    "fold.rs:267 (vacask-plan's) reads the key of a string field after an assignment: a NONE index",
+)];
 
 /// One VACASK run: what it printed after its banner, its raw files (each without its clock
 /// line, sorted by name) and the directory it ran in.
@@ -260,7 +272,10 @@ fn every_reader_fixture_reads_to_its_ir() {
         };
         let text = std::fs::read_to_string(&deck).unwrap();
         let file = deck.file_name().unwrap().to_string_lossy().into_owned();
-        let (got, diags) = read(&file, &text, "vacask");
+        let Ok((got, diags)) = std::panic::catch_unwind(|| read(&file, &text, "vacask")) else {
+            failed.push((name, "the reader panicked".to_string()));
+            continue;
+        };
         let mut why = String::new();
         if canonical(&got) != canonical(&want) {
             why += &format!("--- got\n{}--- want\n{}", canonical(&got), canonical(&want));
@@ -297,8 +312,7 @@ fn every_fixtures_ir_text_parses_cleanly() {
             failed.push((stem(&path), format!("{refused:?}")));
         }
     }
-    // The marked fixtures state syntax the run owner has not written yet (KNOWN).
-    assert_known(&failed, KNOWN);
+    assert_known(&failed, &[]);
 }
 
 #[test]
@@ -306,7 +320,11 @@ fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
     let mut failed = Vec::new();
     for deck in files(READ, "sim") {
         let file = deck.file_name().unwrap().to_string_lossy().into_owned();
-        let (mut once, _) = read(&file, &std::fs::read_to_string(&deck).unwrap(), "vacask");
+        let text = std::fs::read_to_string(&deck).unwrap();
+        let Ok((mut once, _)) = std::panic::catch_unwind(|| read(&file, &text, "vacask")) else {
+            failed.push((stem(&deck), "the reader panicked".to_string()));
+            continue;
+        };
         let before = canonical(&once);
         let text = write_entry(&mut once);
         let (twice, _) = read(&file, &text, "vacask");
@@ -317,7 +335,7 @@ fn every_reader_fixture_is_a_fixpoint_of_write_and_read() {
             ));
         }
     }
-    assert!(failed.is_empty(), "{failed:#?}");
+    assert_known(&failed, KNOWN);
 }
 
 #[test]
@@ -327,7 +345,11 @@ fn every_reader_fixture_uses_only_vacasks_features() {
     let mut failed = Vec::new();
     for deck in files(READ, "sim") {
         let file = deck.file_name().unwrap().to_string_lossy().into_owned();
-        let (design, _) = read(&file, &std::fs::read_to_string(&deck).unwrap(), "vacask");
+        let text = std::fs::read_to_string(&deck).unwrap();
+        let Ok((design, _)) = std::panic::catch_unwind(|| read(&file, &text, "vacask")) else {
+            failed.push((stem(&deck), "the reader panicked".to_string()));
+            continue;
+        };
         let lacked: Vec<ir::Feature> = ir::features_used(&design)
             .iter()
             .filter(|f| !features.contains(*f))
@@ -336,7 +358,7 @@ fn every_reader_fixture_uses_only_vacasks_features() {
             failed.push((stem(&deck), format!("{lacked:?}")));
         }
     }
-    assert!(failed.is_empty(), "{failed:#?}");
+    assert_known(&failed, KNOWN);
 }
 
 // ---- writer fixtures ----
@@ -355,228 +377,6 @@ fn every_writer_fixture_writes_its_text() {
     assert!(failed.is_empty(), "{failed:#?}");
 }
 
-// ---- settle decks: VACASK's own facts ----
-
-#[test]
-fn ic_next_an_analysis_list_holds_for_that_analysis_only() {
-    // Run e1: `ic={"b", 1}` with icmode="uic" starts t1 at 1 V; t2 starts at 0.
-    let r = settle("ic_next.sim");
-    assert!(
-        close(value(&raw(&r, "t1.raw"), "b", 0), 1.0, 1e-12),
-        "{}",
-        r.out
-    );
-    assert!(
-        close(value(&raw(&r, "t2.raw"), "b", 0), 0.0, 1e-12),
-        "{}",
-        r.out
-    );
-}
-
-#[test]
-fn save_scope_v_governs_op_and_tran_not_ac() {
-    // Run e5: `default` saves every node and every branch current (an inductor's too);
-    // `save v(b)` limits op and tran to b, the ac keeps its default; `full` adds nothing here.
-    let r = settle("save_scope.sim");
-    let all = ["a", "b", "c", "l1:flow(br)", "v1:flow(br)"];
-    assert_eq!(vectors(&raw(&r, "opd.raw")), all);
-    assert_eq!(vectors(&raw(&r, "opv.raw")), ["b"]);
-    assert_eq!(vectors(&raw(&r, "trv.raw")), ["time", "b"]);
-    let ac = vectors(&raw(&r, "acv.raw"));
-    assert_eq!(ac[0], "frequency");
-    assert_eq!(&ac[1..], all);
-    assert_eq!(vectors(&raw(&r, "opf.raw")), all);
-}
-
-#[test]
-fn maxstep0_a_zero_ceiling_is_none() {
-    // Run e7: `maxstep=0` writes the same raw file as no maxstep (the span/50 cap of tr1), and
-    // `start=0` the same as no start.
-    let r = settle("maxstep0.sim");
-    let get = |n: &str| r.raws.iter().find(|(k, _)| k == n).expect(n).1.clone();
-    assert_eq!(get("tq.raw"), get("tw.raw"));
-    // VD cmd-analysis-tran: `start` defaults to 0, so a literal 0 is none given (R47).
-    assert_eq!(get("tq.raw"), get("tz.raw"));
-}
-
-#[test]
-fn two_blocks_one_control_block_per_file() {
-    let r = settle("two_blocks.sim");
-    assert!(
-        r.out.contains("Only one control block is allowed."),
-        "{}",
-        r.out
-    );
-}
-
-#[test]
-fn dup_name_a_second_analysis_of_one_name_is_refused() {
-    let r = settle("dup_name.sim");
-    assert!(r.out.contains("Analysis 'op1' redefinition."), "{}", r.out);
-}
-
-#[test]
-fn unknown_option_is_refused() {
-    let r = settle("unknown_option.sim");
-    assert!(r.out.contains("Parameter 'foo' not found."), "{}", r.out);
-}
-
-#[test]
-fn sweep_bound_a_sweep_binds_the_next_analysis() {
-    let r = settle("sweep_bound.sim");
-    assert!(r.out.contains("expecting sweep or analysis"), "{}", r.out);
-}
-
-#[test]
-fn options_mid_an_option_holds_from_where_it_stands() {
-    // `options temp=127` between op1 and op2: r1 = 1k (1 + 1m (127 - 27)) = 1.1k from op2 on.
-    let r = settle("options_mid.sim");
-    let i = |n: &str| value(&raw(&r, n), "v1:flow(br)", 0).abs();
-    assert!(close(i("op1.raw"), 1e-3, 1e-9), "{}", r.out);
-    assert!(close(i("op2.raw"), 1.0 / 1100.0, 1e-9), "{}", r.out);
-    assert!(close(i("op3.raw"), 1.0 / 1100.0, 1e-9), "{}", r.out);
-}
-
-#[test]
-fn plan_an_alter_persists() {
-    // Run e2: after `alter instance("r2") r=3k` every later op sees the 1k/3k divider.
-    let r = settle("plan.sim");
-    let b = |n: &str| value(&raw(&r, n), "b", 0);
-    assert!(close(b("op1.raw"), 0.5, 1e-9), "{}", r.out);
-    assert!(close(b("op2.raw"), 0.75, 1e-9), "{}", r.out);
-    assert!(close(b("op3.raw"), 0.75, 1e-9), "{}", r.out);
-}
-
-#[test]
-fn ac_points_a_lin_count_is_intervals() {
-    // VD cmd-analysis-ac: `mode="lin" points=2` is 3 frequencies; dec 10..1k at 2 per decade
-    // is 5.
-    let r = settle("ac_points.sim");
-    assert_eq!(raw(&r, "a1.raw").re(0).len(), 3, "{}", r.out);
-    assert_eq!(raw(&r, "a2.raw").re(0).len(), 5, "{}", r.out);
-}
-
-#[test]
-fn save_from_here_saves_accumulate_from_where_they_stand() {
-    // Run sv1: `save v(b)`, op0, op1, `save v(a)`, op2: op1 holds b alone, op2 b and a.
-    let r = settle("save_from_here.sim");
-    assert_eq!(vectors(&raw(&r, "op0.raw")), ["b"]);
-    assert_eq!(vectors(&raw(&r, "op1.raw")), ["b"]);
-    assert_eq!(vectors(&raw(&r, "op2.raw")), ["b", "a"]);
-}
-
-#[test]
-fn save_clear_drops_every_save_before_it() {
-    // Run sv2: after `clear saves` op2 holds the default set; a later `save v(b)` starts anew.
-    let r = settle("save_clear.sim");
-    assert_eq!(vectors(&raw(&r, "op1.raw")), ["a"]);
-    assert_eq!(vectors(&raw(&r, "op2.raw")), ["a", "b", "v1:flow(br)"]);
-    assert_eq!(vectors(&raw(&r, "op3.raw")), ["b"]);
-}
-
-// ---- generated save plans ----
-
-#[test]
-fn generated_save_plans_read_back_to_their_meaning() {
-    // Oracle: law L5 (`read(write(x)) ≅ x`, `eq_meaning`) on designs this test builds from a
-    // seed, holding only the save shapes VACASK spells (R55: the neutral generator cannot know
-    // them, so `Item(Save)` is unreached by the laws and this property covers it): the
-    // op/dc/tran set with `v`, `i`, `p` probes in every combination and order (a hierarchical
-    // one among them), the wider set with `default` and no `p()`, several saves before and
-    // between analyses, each holding from where it stands, a reset of the saves between them
-    // (runs sv1, sv2). Every design must be admitted; floors keep it from passing on nothing.
-    let (mut designs, mut saves, mut resets) = (0, 0, 0);
-    for seed in 0..256u64 {
-        let text = save_plan(seed);
-        let Some((design, _)) = read_ir(&text) else {
-            panic!("seed {seed}: the plan does not read:\n{text}");
-        };
-        let mut legal = design.clone();
-        let written = write_entry(&mut legal);
-        let (back, _) = read("g.sim", &written, "vacask");
-        assert!(
-            back.eq_meaning(&design),
-            "seed {seed}:\n{text}written as\n{written}read back as\n{}",
-            canonical(&back)
-        );
-        designs += 1;
-        saves += text.matches("\n  save ").count();
-        resets += text.matches("\n  reset saves").count();
-    }
-    assert!(
-        designs >= 256 && saves >= 512 && resets >= 64,
-        "{designs} designs, {saves} saves, {resets} resets"
-    );
-}
-
-/// A deck in IR text from `seed`: up to eight items, each a save of a shape VACASK spells or
-/// a named analysis, at least two saves.
-fn save_plan(seed: u64) -> String {
-    let mut r = seed
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407);
-    let mut next = |n: u64| {
-        r = r
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        (r >> 33) % n
-    };
-    const PROBES: [&str; 5] = [
-        "(v (a))",
-        "(v (x1 n))",
-        "(i (v1))",
-        "(param (r1) (i))",
-        "(param (x1 m1) (gm))",
-    ];
-    const ANALYSES: [&str; 3] = [
-        "analysis op name=op{k}",
-        "analysis tran name=tr{k} stop=1m cap=span_over50",
-        "analysis ac name=ac{k} (list values=[1k])",
-    ];
-    let mut out = String::from("file \"g.sim\" deck\n  title \"g\"\n");
-    let items = 2 + next(7);
-    let mut made = 0;
-    for k in 0..items {
-        let save = made < 2 && items - k <= 2 - made || next(2) == 0;
-        if !save {
-            let a = ANALYSES[next(3) as usize].replace("{k}", &k.to_string());
-            out.push_str(&format!("  {a}\n"));
-            continue;
-        }
-        made += 1;
-        // Probes in a random order: every combination of the five, at least one.
-        let mut order: Vec<usize> = (0..PROBES.len()).collect();
-        for i in (1..order.len()).rev() {
-            order.swap(i, next(i as u64 + 1) as usize);
-        }
-        let default = next(3) == 0;
-        let mut probes: Vec<&str> = order
-            .iter()
-            .filter(|&&i| next(2) == 0 && !(default && PROBES[i].starts_with("(param")))
-            .map(|&i| PROBES[i])
-            .collect();
-        if default {
-            let at = next(probes.len() as u64 + 1) as usize;
-            probes.insert(at, "(all_v) (all_branch_i)");
-        } else if probes.is_empty() {
-            probes.push(PROBES[next(PROBES.len() as u64) as usize]);
-        }
-        let set = match default {
-            true => "(op dc ac tran dc_inc)",
-            false => "(op dc tran)",
-        };
-        out.push_str(&format!(
-            "  save analysis={set} from_here {}\n",
-            probes.join(" ")
-        ));
-        // A reset of the saves between them (VACASK's `clear saves`, run sv2).
-        if next(4) == 0 {
-            out.push_str("  reset saves\n");
-        }
-    }
-    out
-}
-
 // ---- the simulator round trip ----
 
 #[test]
@@ -584,7 +384,12 @@ fn every_settle_deck_runs_the_same_after_read_and_write() {
     let mut failed = Vec::new();
     for deck in files(SETTLE, "sim") {
         let text = std::fs::read_to_string(&deck).unwrap();
-        let (mut design, diags) = read("deck.sim", &text, "vacask");
+        let Ok((mut design, diags)) =
+            std::panic::catch_unwind(|| read("deck.sim", &text, "vacask"))
+        else {
+            failed.push((stem(&deck), "the reader panicked".to_string()));
+            continue;
+        };
         let a = vacask(&text);
         if diags.rows().iter().any(|d| dialect::refuses(d.code)) {
             // A deck the reader refuses is one VACASK rejects.
