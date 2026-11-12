@@ -112,7 +112,7 @@ pub enum CircuitExtra {
     AmPreZero,
     /// An AM whose modulation time is shifted by the carrier phase (`AmModTime::CarrierPhase`, sp).
     AmModCarrierPhase,
-    /// An AM whose `mod_offset` is not the literal 1 (A31): VACASK's AM is
+    /// An AM whose `mod_offset` is not the real literal 1 (an Int `1i` sets it too; A31): VACASK's AM is
     /// `sinedc + ampl·sin(carrier)·(1 + modindex·sin(mod))`, ngspice's takes any offset.
     AmModOffset,
     /// A PWL delay (`Pwl::delay`, E7).

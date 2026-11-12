@@ -187,11 +187,16 @@ impl R<'_, '_> {
                 };
                 let given_zero = self.zero_rule();
                 let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
-                // A31: without `AmModOffset` the modulating offset is the literal 1
+                // A31: without `AmModOffset` the modulating offset is the real literal 1
                 let mod_offset = if self.maybe(X::AmModOffset) {
                     self.ex()
                 } else {
-                    self.b.literal(crate::literal::Literal::from_f64(1.0))
+                    self.b.literal(crate::literal::Literal {
+                        mantissa: 1,
+                        frac: 0,
+                        exp10: 0,
+                        form: crate::literal::NumForm::Plain,
+                    })
                 };
                 let [
                     mod_index,

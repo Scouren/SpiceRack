@@ -473,10 +473,13 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
         WaveKind::Am => {
             if let Some(a) = get_row::<Am>(design, w.index) {
                 add(pre(a.pre, X::AmPreOffset, X::AmPreHold, X::AmPreZero));
-                // A31: VACASK's AM has the modulating offset 1 only
+                // A31: VACASK's AM has the modulating offset 1 only, as the real literal (an Int
+                // 1 reads back real there)
                 let one = a.mod_offset == ExprId::NONE
                     || matches!(design.expr(a.mod_offset),
-                        crate::expr::Expr::Num(k) if design.literal_value(design.num(k)) == 1.0);
+                        crate::expr::Expr::Num(k)
+                            if design.num(k).form != crate::literal::NumForm::Int
+                                && design.literal_value(design.num(k)) == 1.0);
                 if !one {
                     add(X::AmModOffset);
                 }
