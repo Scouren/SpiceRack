@@ -40,6 +40,9 @@
 //!
 //! Contents: none (tests only).
 
+#[path = "common/memcap.rs"]
+mod memcap;
+
 #[path = "common/cmp.rs"]
 mod cmp;
 #[allow(dead_code)]

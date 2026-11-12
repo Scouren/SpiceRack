@@ -294,7 +294,8 @@ mod tests {
         let mut design = ir::Design::new();
         let mut diags = ir::Diags::new();
         let text = format!("file \"t.sp\" deck\n  title \"t\"\n  param k = 1\n  {line}\n");
-        ir::parse(&text, &mut design.builder(), &mut diags);
+        // unchecked: `dc=($time * 2)` is X0012 for `check` too, which `text::parse` now runs
+        ir::parse_unchecked(&text, &mut design.builder(), &mut diags);
         assert!(diags.is_empty(), "{line}: {diags:?}");
         let item = *design
             .items(design.file(design.entry()).top)

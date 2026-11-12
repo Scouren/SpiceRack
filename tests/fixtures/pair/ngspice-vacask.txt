@@ -9,13 +9,12 @@
 # that refusal no deck is written, so these are unobservable today and come back with the
 # naming rules: F1 (R64: the VACASK writer's panic on a `.dc` over a source: dc_sweep, diode,
 # mosfet), F2 (the VACASK writer drops a transient's print_step: every tran deck), and A38 on
-# unresolved_param (the strict read should refuse it at step 1; the IR door landed in 70df1a14,
-# the spine's refusal has not).
+# unresolved_param (now refused at step 1 by the strict read, S0104: ir-next 9016cbf2).
 ac_phase 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
 ac_rc 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
 case_names 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
 controlled 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-coupled_l 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+coupled_l 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); an analysis with no name (VACASK requires one)
 dc_sweep 2 refused:U0001:Run(AnalysisUnnamed)+Run(DcAxisUnnamed) ruling=A35 # Run(DcAxisUnnamed) too: the .dc axis has no name (A35); F1 behind it
 diode 2 refused:U0001:Run(AnalysisUnnamed)+Run(DcAxisUnnamed) ruling=A35 # as dc_sweep
 diode_op 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
@@ -24,15 +23,15 @@ mosfet_op 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no 
 op_divider 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
 param_div 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
 param_funcs 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-pulse_zero_edges 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-sine_full 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
+pulse_zero_edges 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); an analysis with no name (VACASK requires one)
+sine_full 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); an analysis with no name (VACASK requires one)
 subckt_param 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
 temp_card 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
 temp_diode 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-tran_exp 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # ExpTd2FromZero no longer refused: exp_td2_relative registered (17c42343)
-tran_pwl 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-tran_rc_pulse 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-tran_rl_isrc 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-tran_sine 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # an analysis with no name (VACASK requires one)
-unresolved_param 2 refused:U0001:Run(AnalysisUnnamed) ruling=A35 # A38 owed at step 1 (see the header)
-tran_uic 2 refused:U0001:Circuit(IcUicOnly)+Run(AnalysisUnnamed) pass=device_ic_to_nodeset # Circuit(IcUicOnly): a capacitor's ic= under uic; and A35
+tran_exp 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); ExpTd2FromZero no longer refused: exp_td2_relative registered (17c42343)
+tran_pwl 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); an analysis with no name (VACASK requires one)
+tran_rc_pulse 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); an analysis with no name (VACASK requires one)
+tran_rl_isrc 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); an analysis with no name (VACASK requires one)
+tran_sine 2 refused:U0001:Run(AnalysisUnnamed)+Run(TranPrintStep) ruling=A35 # Run(TranPrintStep): a given print step, VACASK has none (R67/A41, the drop rule owed by passes); an analysis with no name (VACASK requires one)
+unresolved_param 1 refused:S0104 ruling=A38 # the strict read refuses the unbound `nosuch` (R63), as ngspice does ("Undefined parameter")
+tran_uic 2 refused:U0001:Circuit(IcUicOnly)+Run(AnalysisUnnamed)+Run(TranPrintStep) pass=device_ic_to_nodeset # and Run(TranPrintStep) (R67/A41); Circuit(IcUicOnly): a capacitor's ic= under uic; and A35

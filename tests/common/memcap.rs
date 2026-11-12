@@ -7,7 +7,8 @@
 //! loop that never ends on a mutant, a table that grows per token) once grew `dialect_mutants`
 //! to 22 GB and took the machine and twenty agents with it. Under the cap the allocation that
 //! crosses it fails, and Rust aborts that binary with `memory allocation of N bytes failed`.
-//! The limit is inherited by the simulators a test starts, which need far less.
+//! The limit is inherited by the simulators a test starts (ngspice, VACASK), which need far
+//! less.
 //!
 //! Linux only (`RLIMIT_AS`, `.init_array`); elsewhere the module is empty.
 //!
@@ -18,8 +19,9 @@
 #![allow(dead_code)]
 
 /// The cap, 6 GiB of address space: above what any law binary reserves (each runs in well under
-/// 1 GiB resident, four test threads), and under half the build queue's 12-14 GB scope, so a
-/// runaway binary dies here before the scope kills the whole command.
+/// 1 GiB resident, four test threads; a whole fast gate peaks at 2.5 GB), and under the build
+/// queue's scope (two slots of 10 GB each), so a runaway binary dies here before its scope
+/// kills the whole command. The simulators the pair test starts inherit it, and need far less.
 pub const CAP_BYTES: u64 = 6 << 30;
 
 /// The constructor the loader runs before `main`.

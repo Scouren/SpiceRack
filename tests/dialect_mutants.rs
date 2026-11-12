@@ -31,20 +31,12 @@ const MUTANTS: u64 = 32;
 const SHRINK_STEPS: usize = 400;
 
 /// The rows that fail today: (law, row, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[
-    (
-        "l1-mutants",
-        "ir",
-        "the reader lets a mismatched instance through: A36 (X0022; worked.ir seed 9, \
-         `subckt div (in gnd)` with `element instance x1 (a b 0) model=div`)",
-    ),
-    (
-        "l1-mutants",
-        "ngspice",
-        "the reader lets a mismatched instance through: A36 (X0022; default_which.sp seed 24, \
+const KNOWN: &[(&str, &str, &str)] = &[(
+    "l1-mutants",
+    "ngspice",
+    "the reader lets a mismatched instance through: A36 (X0022; default_which.sp seed 24, \
          elements/instance.sp seed 20: `.subckt sub a` with `X1 n1 n2 sub`)",
-    ),
-];
+)];
 
 /// splitmix64.
 struct Rng(u64);
