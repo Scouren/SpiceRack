@@ -5,8 +5,15 @@ Status (2026-11-12): go given. Phase 1 of §8.3 is done: the IR crate's definiti
 `rewrite/` are tracked): 43 files, 9.3k lines, every type and signature, bodies `todo!()`; 23 item
 kinds, 37 element kinds, 9 waveforms, 70 model families, 24 analysis kinds, 40 functions, 496
 features; 531 inventory rows mapped to a field, variant or feature and 51 named gaps
-(`rewrite/COVERAGE-circuit.md`, `COVERAGE-run.md`). Phase 2 is running: the crate's tests and
-bodies (`rewrite/IR-IMPL.md`) and slice S2 (`rewrite/SPINE.md`). `main` is untouched and nothing
+(`rewrite/COVERAGE-circuit.md`, `COVERAGE-run.md`). Phase 2 is done but for its last milestone: every row of the
+IR crate has a body (kernel, circuit and run owners merged at `cf98e0d4`: 150 tests, the text
+round trip and the feature properties on 2,000 generated designs per owner) and slice S2 (the
+spine, `legalize`, the facade with nothing routed, laws L1–L8 on the `ir` row; golden
+`IDENTICAL`) is on `ir-spine`; the kernel's M5 (properties over every feature, throughput)
+and amendments A12/A13 are in progress. Phase 3 has begun: the ngspice scaffold (S3.0, branch
+`dialect-ngspice`) and the VACASK plan (`rewrite/DIALECT-VACASK.md`, branch `dialect-vacask`),
+both checked against the real simulators, which overturned several inventory rows and the
+IR in places (rulings R12–R23, `rewrite/AMEND-A12.md`). `main` is untouched and nothing
 is pushed. Written against `main` (f7fbf3b, 0.2.0) and the integration head
 `p7-integrate` (1059821, 596 commits ahead of `main`, never pushed). Method: the house `rewrite-clean` (old code kept alive as the oracle, one slice at
 a time, four gated phases per slice) and `codebase-clean-code` (data, owners, spines, seams,
