@@ -18,6 +18,8 @@
 //! `func`, `global`, `card` (each `(lw: &mut Lower<'_, '_>, st: Stmt)`);
 //! `pub(super) fn def_name`, `func_parts` (the declare step's readers)
 
+use std::collections::HashSet;
+
 use super::codes;
 use super::cst::{self, joined};
 use super::declare::Class;
@@ -28,6 +30,7 @@ use super::read_outputs;
 use super::read_run;
 use super::tables::Eval;
 use super::value::{Wrap, unwrap};
+use crate::dialect::Reference;
 use crate::ir;
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::token::Tokens;
@@ -78,6 +81,10 @@ pub(super) fn include(lw: &mut Lower<'_, '_>, st: Stmt) {
     }
     let section = (want == 2).then(|| lw.names.fold(&lw.text(Node(fields[1]))));
     let path = lw.include_path(st, &path);
+    if includes_back(lw, &path) {
+        // ngspice-45 crashes on an include cycle (settle inc_cycle.sp: exit 139)
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::INCLUDE_CYCLE);
+    }
     let span = lw.span(st.node);
     lw.b.include(st.scope, &path, section.as_deref(), span);
 }
@@ -440,6 +447,31 @@ fn eval(class: Class) -> Eval {
     } else {
         Eval::Numparam
     }
+}
+
+/// Whether the file at `target` reads, itself or through its includes, the file `lw` lowers:
+/// an include cycle. A worklist over the sources' files with a visited set.
+fn includes_back(lw: &Lower<'_, '_>, target: &str) -> bool {
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut todo = vec![target.to_string()];
+    // Bounded: each path is taken once, and only paths of the sources are followed.
+    while let Some(path) = todo.pop() {
+        if path == lw.path {
+            return true;
+        }
+        if !seen.insert(path.clone()) {
+            continue;
+        }
+        let Some((_, text)) = lw.src.files().iter().find(|(p, _)| *p == path) else {
+            continue;
+        };
+        for r in super::read::references(text) {
+            if let Reference::File(_) = r {
+                todo.push(r.resolve(&path));
+            }
+        }
+    }
+    false
 }
 
 /// Whether the statement stands in an `.if` branch.

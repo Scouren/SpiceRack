@@ -213,19 +213,12 @@ pub(super) fn missing_targets(design: &ir::Design, diags: &mut ir::Diags) {
             design.str(e.name).to_ascii_lowercase()
         })
         .collect();
-    // a model of that name in any file of the design (ngspice inlines every include first)
-    let models: std::collections::HashSet<String> = design
-        .definitions()
-        .iter()
-        .filter(|d| d.kind == ir::DefKind::Model)
-        .map(|d| design.str(d.name).to_ascii_lowercase())
-        .collect();
     // ponytail: an element of that name anywhere; the target's instance path is not followed
     let held = |t: &ir::Target| match t.kind {
         // `altermod` takes a model or an instance of it (corpus vdmos/…-quasisat.sp: `mn1`)
         ir::TargetKind::ModelParam => {
             let name = design.str(t.a.name).to_ascii_lowercase();
-            !t.a.def.is_none() || models.contains(&name) || names.contains(&name)
+            !t.a.def.is_none() || names.contains(&name)
         }
         ir::TargetKind::ElementValue | ir::TargetKind::SourceDc | ir::TargetKind::DeviceParam => {
             names.contains(&design.str(t.a.name).to_ascii_lowercase())
