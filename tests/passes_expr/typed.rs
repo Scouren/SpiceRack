@@ -6,6 +6,7 @@
 use spicerack::ir;
 use spicerack::passes;
 
+use super::bindings::Point;
 use super::compare::{ANY, code, keeps_boundary_values, keeps_every_root_value, notes};
 
 // ---- private ----
@@ -135,4 +136,160 @@ fn int_literal_to_plain_keeps_every_value_and_leaves_what_a_tag_reads() {
     let points = keeps_boundary_values("int_literal_to_plain", text, ANY);
     eprintln!("int_literal_to_plain: {points} boundary points");
     assert_eq!(notes("int_literal_to_plain", "read"), [code(118); 6]);
+}
+
+/// The census's `r=1.0/7` (VACASK corpus `demo/natures/ddt.sim:22`): legalized for ngspice,
+/// the typed division goes first and then the integer literal, in one legalize. The rule read
+/// the dead row of the division it replaced (rows are appended, the old ones stay) as a reader.
+#[test]
+fn a_division_gone_leaves_its_integer_literal_free_in_the_same_legalize() {
+    let text = "file \"p.sp\" deck\n  title \"t\"\n  element resistor r1 (a 0) value=(1.0 /: 7i)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    passes::legalize(
+        &mut design,
+        &spicerack::dialect::ngspice::FEATURES,
+        &mut diags,
+    );
+    let left = ir::features_used(&design).minus(spicerack::dialect::ngspice::FEATURES);
+    assert!(
+        left.is_empty(),
+        "left: {:?} {:?}",
+        left.iter().collect::<Vec<_>>(),
+        diags.rows()
+    );
+    let mut out = String::new();
+    ir::dump(&design, design.entry(), &mut out);
+    assert!(out.contains("value=(1.0 / 7)"), "{out}");
+}
+
+/// The census's integer quotient (VACASK corpus `test/test_hb3.sim:8`, `rth=(3000-25)/60`, 49
+/// on VACASK): legalized for ngspice it is `trunc((3000 - 25) / 60)` with plain literals, 49 by
+/// the reference evaluator, and ngspice writes `trunc` as numparam's `int` (ngspice-45:
+/// `int((3000-25)/60)` gives 49 and `int(-2.5)` -2, `trunc(…)` is "Formula() error"); run:
+/// the written deck's resistor of `rth` ohms passes 1/49 A at 1 V.
+#[test]
+fn an_integer_quotient_reaches_ngspice_as_its_truncation() {
+    let text = "file \"p.sp\" deck\n  title \"t\"\n  param rth = (3000i - 25i) /: 60i\n  element vsource v1 (a 0) dc=1\n  element resistor r1 (a 0) value=rth\n  analysis op\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    let ngspice = spicerack::dialect::ngspice::FEATURES;
+    passes::legalize(&mut design, &ngspice, &mut diags);
+    let left: Vec<ir::Feature> = ir::features_used(&design).minus(ngspice).iter().collect();
+    assert!(left.is_empty(), "left: {left:?}");
+    let mut out = String::new();
+    ir::dump(&design, design.entry(), &mut out);
+    assert!(out.contains("param rth = trunc((3000 - 25) / 60)"), "{out}");
+    let row = spicerack::dialect::by_name("ngspice").expect("the ngspice row");
+    let deck = spicerack::dialect::write(&design, design.entry(), row, &mut diags);
+    let deck = deck.replace(".end", ".control\nop\nprint i(v1)\n.endc\n.end");
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let path = dir.path().join("deck.cir");
+    std::fs::write(&path, &deck).expect("the deck");
+    let run = std::process::Command::new("ngspice")
+        .arg("-b")
+        .arg(&path)
+        .output()
+        .expect("ngspice runs (nix develop .#testing provides it; unsupported fails)");
+    let printed = String::from_utf8_lossy(&run.stdout).into_owned();
+    let line = printed
+        .lines()
+        .find(|l| l.contains("i(v1) = "))
+        .unwrap_or_else(|| panic!("{deck}\n{printed}"));
+    let amps: f64 = line
+        .split('=')
+        .nth(1)
+        .expect("a value")
+        .trim()
+        .parse()
+        .expect("a number");
+    // `print` shows six significant digits: the tolerance is its rounding
+    assert!((amps * 49.0 + 1.0).abs() < 1e-5, "{amps}: {deck}");
+}
+
+/// An unbound read has no known tag (the file that defines it may make it an Int): every rule
+/// that reads the tag table must be right for both. `sqr(x?)` with `x` bound to an Int whose
+/// square leaves the Int range (2⁵² + 1 in the boundary set) is the red case the IR round's
+/// generator found for `sqr_to_mul` (seed 144: `-sqr(g54)`).
+#[test]
+fn the_typed_rules_are_right_for_both_tags_of_an_unbound_read() {
+    let rules: [(&str, &str); 8] = [
+        ("sqr_to_mul", "sqr(x?)"),
+        ("toreal_to_mul", "to_real(x?) * 3"),
+        ("toint_to_trunc", "to_int(x? * 1.5)"),
+        ("sgnzeropos_to_ternary", "sgn_zero_pos(x?) * 3"),
+        ("ramp_to_ternary", "ramp(x?) * 3"),
+        ("div_to_div_typed", "x? / y?"),
+        ("div_typed_to_div", "x? /: 2.5"),
+        ("int_literal_to_plain", "x? * 3i"),
+    ];
+    for (name, body) in rules {
+        let text = format!("file \"p.sp\" deck\n  param r = {body}\n");
+        let points = keeps_boundary_values(name, &text, ANY);
+        eprintln!("{name} on {body}: {points} boundary points");
+    }
+}
+
+/// The tag table reads only live calls for a formal's tag (rows are appended, a rewritten call
+/// stays in the table): after `int_literal_to_plain` writes `@f(7i)` as `@f(7)`, the formal is
+/// Real, so `sqr_to_mul` writes `x * x`; the dead `@f(7i)` made it either, `1 * x * x`.
+#[test]
+fn a_dead_call_row_does_not_widen_a_formals_tag() {
+    let text = "file \"p.sp\" deck\n  func f(x) = sqr(x)\n  param q = @f(7i)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    for name in ["int_literal_to_plain", "sqr_to_mul"] {
+        let pass = passes::all().find(|p| p.name == name).expect("registered");
+        (pass.run)(&mut design, &mut diags);
+    }
+    let mut out = String::new();
+    ir::dump(&design, design.entry(), &mut out);
+    assert!(out.contains("func f(x) = x * x"), "{out}");
+}
+
+/// The environment of a rule that decides by the tag table must bind a resolved read the way
+/// the table reads it: by its definition. `sqr(p)` with `p = 0.5` (Real) is written `p * p`,
+/// right for every value `p` takes; bound by name to a large Int instead (`follow` off, as
+/// the generated comparison did for `sqr_to_mul`: round9's ir-next seed 131, a subckt formal
+/// whose default is Real), the product leaves the Int range where `sqr` is Real. So the
+/// comparison follows definitions for those rules (the RULES test's `FOLLOW`).
+#[test]
+fn a_tag_deciding_rule_is_compared_with_reads_bound_by_their_definitions() {
+    let text = "file \"p.sp\" deck\n  param p = 0.5\n  param r = sqr(p)\n";
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    ir::parse(text, &mut design.builder(), &mut diags);
+    let old = design.row::<ir::item::Param>(1).value;
+    let pass = passes::all()
+        .find(|p| p.name == "sqr_to_mul")
+        .expect("registered");
+    (pass.run)(&mut design, &mut diags);
+    let new = design.row::<ir::item::Param>(1).value;
+    assert_ne!(old, new, "the rule wrote p * p");
+    let at = |trial: u64, follow: bool| Point {
+        design: &design,
+        trial,
+        follow,
+        depth: std::cell::Cell::new(0),
+    };
+    let differs = |follow: bool| {
+        (0..4096u64).any(|t| {
+            let (a, b) = (
+                ir::eval_typed(&design, old, &at(t, follow)),
+                ir::eval_typed(&design, new, &at(t, follow)),
+            );
+            a.map(|v| v.number.to_bits()) != b.map(|v| v.number.to_bits())
+        })
+    };
+    assert!(
+        differs(false),
+        "bound by name, some trial's Int squares out of range"
+    );
+    assert!(!differs(true), "bound by the definition, the two agree");
 }

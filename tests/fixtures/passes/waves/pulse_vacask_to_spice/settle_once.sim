@@ -1,0 +1,11 @@
+pulse with no period: one pulse
+// settle: VACASK 36be560, v(a): 0.5 at 1.5n, 1 at 2.5n, 0.5 at 3.5n, 0 at 4.5n, 50n and the stop 100n (one pulse)
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource type="pulse" val0=0 val1=1 delay=1n rise=1n fall=1n width=1n
+r1 (a 0) res r=1k
+control
+  options rawfile="ascii"
+  analysis tr tran stop=100n step=0.1n maxstep=0.1n
+endc

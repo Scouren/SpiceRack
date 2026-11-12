@@ -25,7 +25,7 @@
 //! Contents: `pub fn int_literal_to_plain(&mut ir::Design, &mut ir::Diags)`
 
 use super::INT_TAG_READ;
-use super::nodes::{kids, note_left};
+use super::nodes::{kids, live, note_left};
 use super::reach::tag_reach;
 use crate::ir;
 
@@ -62,10 +62,11 @@ pub fn int_literal_to_plain(design: &mut ir::Design, diags: &mut ir::Diags) {
 // ---- private ----
 
 /// Per expression row: whether its tag may reach an operand of a node that reads a tag.
+/// The live readers only: a rewritten row stays in the table (rows are appended), and a typed
+/// division another rule replaced reads nothing any more.
 fn tag_read(design: &ir::Design) -> Vec<bool> {
     let mut seeds = Vec::new();
-    for i in 0..design.expr_count() {
-        let e = ir::ExprId(i as u32);
+    for e in live(design) {
         if reads_tag(design.expr(e)) {
             kids(design, e, &mut seeds);
         }

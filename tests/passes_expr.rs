@@ -34,6 +34,9 @@ use compare::{
 /// rewrites (operands `x` and `y`), and the node it removes.
 type Rule = (&'static str, &'static [&'static str], fn(ir::Expr) -> bool);
 
+/// The rules of [`RULES`] that decide by the tag table.
+const FOLLOW: &[&str] = &["sqr_to_mul", "ramp_to_ternary"];
+
 const RULES: &[Rule] = &[
     (
         "pow_to_powabs",
@@ -224,7 +227,9 @@ fn the_powers_roundings_and_ternaries_keep_every_value() {
                 let tags: &[u8] = if name == "sqr_to_mul" { &[0, 2] } else { ANY };
                 points += keeps_boundary_values(row, &text, tags);
             }
-            let generated = keeps_generated_values(row, hit, false);
+            // a rule that decides by the tag table is compared with every resolved read bound
+            // by its definition, as the table reads it (typed.rs, the seed-131 case)
+            let generated = keeps_generated_values(row, hit, FOLLOW.contains(&name));
             eprintln!("{row}: {points} boundary points, {generated} generated roots");
             // generated pwl points are rarely increasing literals: its own test draws them
             assert!(
