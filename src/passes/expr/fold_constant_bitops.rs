@@ -23,8 +23,7 @@
 //! `pub fn fold_constant_bitnot_dyn` (each `fn(&mut ir::Design, &mut ir::Diags)`)
 
 use super::BITOP_NOT_CONSTANT;
-use super::context::rewrite_in;
-use super::nodes::{binary_form, literal, note_left, plain, reads_tags};
+use super::nodes::{binary_form, form, literal, note_left, plain, reads_tags};
 use crate::ir;
 
 /// The operator a row folds.
@@ -101,7 +100,7 @@ pub fn fold_constant_bitnot_dyn(design: &mut ir::Design, diags: &mut ir::Diags) 
 
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, op: Op, dynamic: bool) {
     if !reads_tags(design) {
-        rewrite_in(design, dynamic, &mut |b, e| {
+        ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
             let d = b.design();
             let value = match (d.expr(e), op) {
                 (ir::Expr::Binary(o, x, y), Op::Binary(want)) if o == want => {

@@ -14,8 +14,7 @@
 //! `pub fn sgnzeropos_to_ternary_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::TAG_READ;
-use super::context::rewrite_in;
-use super::nodes::{func_form, note_left, plain, reads_tags};
+use super::nodes::{form, func_form, note_left, plain, reads_tags};
 use super::tags::{REAL, Tags};
 use crate::ir;
 
@@ -34,7 +33,7 @@ pub fn sgnzeropos_to_ternary_dyn(design: &mut ir::Design, diags: &mut ir::Diags)
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let untyped = !reads_tags(design);
     let mut tags = Tags::new(design);
-    rewrite_in(design, dynamic, &mut |b, e| {
+    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         tags.of(b.design(), e);
         let ir::Expr::Call(ir::Func::SgnZeroPos, args) = b.design().expr(e) else {
             return None;

@@ -22,20 +22,20 @@
 //!
 //! A function or operator is two features, `Func(f)` and `FuncDyn(f)` by the root it stands in
 //! (`ir::features_used`), so each rule is two rows, `<rule>` and `<rule>_dyn`, one file:
-//! `context.rs` applies a rule to one context's roots and leaves the other's.
+//! `ir::rewrite_exprs_in` applies a rule to one form's roots and leaves the other's (A26).
 //!
-//! Contents: `pub mod atan2_to_atan`, `pub mod div_to_div_typed`, `pub mod div_typed_to_div`, `pub mod draws_always_to_sampling`, `pub mod draws_per_reference_to_call_site`, `pub mod fold_constant_bitops`, `pub mod hypot_to_sqrt`, `pub mod pow_to_powabs`, `pub mod powabs_to_pow`, `pub mod pwl_to_ternary`, `pub mod ramp_to_ternary`, `pub mod round_half_away_to_floor`, `pub mod round_half_even_to_away`, `pub mod sampling_draws_to_nominal`, `pub mod sgn_to_ternary`, `pub mod sgnzeropos_to_ternary`, `pub mod step_half_to_ternary`, `pub mod step_to_ternary`, `pub mod substitute_tran_leaves`, `pub mod tnom_to_env`, `pub mod toint_to_trunc`, `pub mod toreal_to_mul`, `pub(super) const PASSES: &[Pass]`,
+//! Contents: `pub mod atan2_to_atan`, `pub mod div_to_div_typed`, `pub mod div_typed_to_div`, `pub mod draws_always_to_sampling`, `pub mod draws_per_reference_to_call_site`, `pub mod fold_constant_bitops`, `pub mod hypot_to_sqrt`, `pub mod long_literal_to_shortest`, `pub mod pow_to_powabs`, `pub mod powabs_to_pow`, `pub mod pwl_to_ternary`, `pub mod ramp_to_ternary`, `pub mod round_half_away_to_floor`, `pub mod round_half_even_to_away`, `pub mod sampling_draws_to_nominal`, `pub mod sgn_to_ternary`, `pub mod sgnzeropos_to_ternary`, `pub mod step_half_to_ternary`, `pub mod step_to_ternary`, `pub mod substitute_tran_leaves`, `pub mod tnom_to_env`, `pub mod toint_to_trunc`, `pub mod toreal_to_mul`, `pub(super) const PASSES: &[Pass]`,
 //! `pub(super) const CODES: &[(ir::Code, ir::Info)]` and the codes (`codes.rs`)
 
 pub mod atan2_to_atan;
 mod codes;
-mod context;
 pub mod div_to_div_typed;
 pub mod div_typed_to_div;
 pub mod draws_always_to_sampling;
 pub mod draws_per_reference_to_call_site;
 pub mod fold_constant_bitops;
 pub mod hypot_to_sqrt;
+pub mod long_literal_to_shortest;
 mod nodes;
 pub mod pow_to_powabs;
 pub mod powabs_to_pow;
@@ -498,6 +498,13 @@ pub(super) const PASSES: &[Pass] = &[
         ]),
         notes: &[DRAW_SAMPLES],
         run: sampling_draws_to_nominal::sampling_draws_to_nominal,
+    },
+    Pass {
+        name: "long_literal_to_shortest",
+        removes: ir::Feature::Extra(ir::Extra::LongLiteral),
+        requires: set(&[ir::Feature::Expr(ir::ExprTag::Num)]),
+        notes: &[],
+        run: long_literal_to_shortest::long_literal_to_shortest,
     },
 ];
 

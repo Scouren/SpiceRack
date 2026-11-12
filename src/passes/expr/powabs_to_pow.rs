@@ -15,19 +15,18 @@
 //! Contents: `pub fn powabs_to_pow(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn powabs_to_pow_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::context::rewrite_in;
 use crate::ir;
 
 /// Rewrites `pow_abs(x, y)` as `pow(abs(x), y)` in every root that does not read the circuit.
 pub fn powabs_to_pow(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    rewrite_in(design, false, &mut rule);
+    ir::rewrite_exprs_in(design, ir::Form::Static, &mut rule);
 }
 
 /// Rewrites `pow_abs(x, y)` as `pow(abs(x), y)` in every root of the dynamic form: one that
 /// reads the circuit or the temperature, or stands in a circuit field (a behavioural source, a
 /// function body).
 pub fn powabs_to_pow_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
-    rewrite_in(design, true, &mut rule);
+    ir::rewrite_exprs_in(design, ir::Form::Dynamic, &mut rule);
 }
 
 // ---- private ----

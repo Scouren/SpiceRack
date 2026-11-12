@@ -9,8 +9,7 @@
 //! `pub fn ramp_to_ternary_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::DRAW_TWICE;
-use super::context::rewrite_in;
-use super::nodes::{Draws, func_form, note_left, plain, reads_tags};
+use super::nodes::{Draws, form, func_form, note_left, plain, reads_tags};
 use super::tags::{REAL, Tags};
 use crate::ir;
 
@@ -30,7 +29,7 @@ fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let draws = Draws::new(design);
     let untyped = !reads_tags(design);
     let mut tags = Tags::new(design);
-    rewrite_in(design, dynamic, &mut |b, e| {
+    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         tags.of(b.design(), e);
         let ir::Expr::Call(ir::Func::Ramp, args) = b.design().expr(e) else {
             return None;

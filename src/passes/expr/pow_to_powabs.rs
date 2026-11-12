@@ -17,8 +17,7 @@
 //! `pub fn pow_to_powabs_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::POW_BASE;
-use super::context::rewrite_in;
-use super::nodes::{func_form, literal, note_left};
+use super::nodes::{form, func_form, literal, note_left};
 use crate::ir;
 
 /// Rewrites `Pow` in every root of the plain form.
@@ -34,7 +33,7 @@ pub fn pow_to_powabs_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
 // ---- private ----
 
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
-    rewrite_in(design, dynamic, &mut |b, e| {
+    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         let d = b.design();
         let ir::Expr::Call(ir::Func::Pow, args) = d.expr(e) else {
             return None;
@@ -56,7 +55,7 @@ fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
 /// Whether `x` is `>= +0` on every evaluation (never negative, never `-0`).
 fn never_negative(d: &ir::Design, x: ir::ExprId) -> bool {
     match d.expr(x) {
-        ir::Expr::Num(n) => d.num(n).mantissa >= 0,
+        ir::Expr::Num(n) => d.literal_value(d.num(n)).is_sign_positive(),
         ir::Expr::Call(f, _) => matches!(
             f,
             ir::Func::Abs | ir::Func::SqrtAbs | ir::Func::Exp | ir::Func::Sqr | ir::Func::PowAbs

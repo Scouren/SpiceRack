@@ -12,8 +12,7 @@
 //! `pub fn toint_to_trunc_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::TAG_READ;
-use super::context::rewrite_in;
-use super::nodes::{func_form, note_left, reads_tags};
+use super::nodes::{form, func_form, note_left, reads_tags};
 use crate::ir;
 
 /// Rewrites `ToInt` as `Trunc` in every root of the plain form.
@@ -30,7 +29,7 @@ pub fn toint_to_trunc_dyn(design: &mut ir::Design, diags: &mut ir::Diags) {
 
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     if !reads_tags(design) {
-        rewrite_in(design, dynamic, &mut |b, e| {
+        ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
             let ir::Expr::Call(ir::Func::ToInt, args) = b.design().expr(e) else {
                 return None;
             };

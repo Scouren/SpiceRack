@@ -16,7 +16,8 @@
 //! `pub(super) fn samples(&ir::Design) -> bool`,
 //! `pub(super) fn leaf_literal(&ir::Design, ir::ExprId) -> Option<ir::Literal>`,
 //! `pub(super) fn binary_form(ir::BinOp, bool) -> ir::Feature`, `pub(super) fn func_form(ir::Func, bool) -> ir::Feature`,
-//! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`
+//! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`,
+//! `pub(super) fn form(bool) -> ir::Form`
 
 use crate::ir;
 
@@ -286,10 +287,18 @@ pub(super) fn literal(design: &ir::Design, e: ir::ExprId) -> Option<f64> {
     let mut at = e;
     for _ in 0..=design.expr_count() {
         match design.expr(at) {
-            ir::Expr::Num(n) => return Some(sign * design.num(n).value()),
+            ir::Expr::Num(n) => return Some(sign * design.literal_value(design.num(n))),
             ir::Expr::Unary(ir::UnOp::Neg, a) => (sign, at) = (-sign, a),
             _ => return None,
         }
     }
     unreachable!("a chain of negations is shorter than the table")
+}
+
+/// The expression form a row of a rule pair rewrites: `Dynamic` for its `_dyn` row.
+pub(super) fn form(dynamic: bool) -> ir::Form {
+    match dynamic {
+        true => ir::Form::Dynamic,
+        false => ir::Form::Static,
+    }
 }

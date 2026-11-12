@@ -13,7 +13,7 @@
 //! Contents: `pub fn div_to_div_typed(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn div_to_div_typed_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::context::rewrite_in;
+use super::nodes::form;
 use super::nodes::plain;
 use super::tags::{REAL, Tags};
 use crate::ir;
@@ -32,7 +32,7 @@ pub fn div_to_div_typed_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
 
 fn run(design: &mut ir::Design, dynamic: bool) {
     let mut tags = Tags::new(design);
-    rewrite_in(design, dynamic, &mut |b, e| {
+    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         tags.of(b.design(), e);
         let ir::Expr::Binary(ir::BinOp::Div, x, y) = b.design().expr(e) else {
             return None;

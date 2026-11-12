@@ -16,8 +16,7 @@
 //! `pub fn round_half_even_to_away_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::DRAW_TWICE;
-use super::context::rewrite_in;
-use super::nodes::{Draws, func_form, note_left, plain};
+use super::nodes::{Draws, form, func_form, note_left, plain};
 use crate::ir;
 
 /// Rewrites `RoundHalfEven` in every root of the plain form.
@@ -34,7 +33,7 @@ pub fn round_half_even_to_away_dyn(design: &mut ir::Design, diags: &mut ir::Diag
 
 fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
     let draws = Draws::new(design);
-    rewrite_in(design, dynamic, &mut |b, e| {
+    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         let ir::Expr::Call(ir::Func::RoundHalfEven, args) = b.design().expr(e) else {
             return None;
         };

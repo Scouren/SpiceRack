@@ -8,7 +8,7 @@
 //! Contents: `pub fn step_to_ternary(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn step_to_ternary_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::context::rewrite_in;
+use super::nodes::form;
 use super::nodes::plain;
 use crate::ir;
 
@@ -25,7 +25,7 @@ pub fn step_to_ternary_dyn(design: &mut ir::Design, _diags: &mut ir::Diags) {
 // ---- private ----
 
 fn run(design: &mut ir::Design, dynamic: bool) {
-    rewrite_in(design, dynamic, &mut |b, e| {
+    ir::rewrite_exprs_in(design, form(dynamic), &mut |b, e| {
         let ir::Expr::Call(ir::Func::Step, args) = b.design().expr(e) else {
             return None;
         };
