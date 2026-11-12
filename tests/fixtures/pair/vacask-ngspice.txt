@@ -1,0 +1,17 @@
+# The vacask-ngspice cell's failing steps (`tests/test_pair.rs`): `<deck> <step 1..6> <class> <proof>`,
+# compared by (deck, step) both ways. A line goes the day its step passes.
+# Proofs: `pass=<name>` the pass rewrite/DIALECT-VACASK.md §6.2 plans for the feature refused (not
+# registered on the trunk); `finding=<id>` a pair finding sent to the lead:
+#   F3  ngspice lacks Extra(IntLiteral) and no pass removes it, none planned (§6.2 has no row): a
+#       VACASK integer literal (`dc=5`, an ac's `points=10`) refuses the deck. Owner: the expr
+#       group (a literal pass) or the ngspice FEATURES, by the lead's assignment.
+#   F4  ngspice lacks Circuit(GivenZeroAsGiven) and `given_zero_to_as_given` (ngspice -> VACASK)
+#       has no reverse row, none planned: every VACASK pulse or sine source the reader reads
+#       carries it and refuses the deck. Owner: the waves group.
+ac_rc 2 refused:U0001 finding=F3 # Extra(IntLiteral) at `points=10`
+int_literal 2 refused:U0001 finding=F3 # Extra(IntLiteral) at `dc=5`
+dc_sweep 2 refused:U0001 pass=dc_axes_to_loops # Run(DcAxisDeviceParam): `sweep instance="v1" parameter="dc"` reads as a device parameter
+diode 2 refused:U0001 pass=dc_axes_to_loops # as dc_sweep
+mosfet 2 refused:U0001 pass=dc_axes_to_loops # as dc_sweep
+tran_rc_pulse 2 refused:U0001 pass=pulse_vacask_to_spice # Circuit(PulseVacask); also Circuit(GivenZeroAsGiven) (F4), Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)
+tran_sine 2 refused:U0001 finding=F4 # Circuit(GivenZeroAsGiven); also Run(TranSimulatorStep), Run(TranInitialStep) (pass=tran_explicit_cap)

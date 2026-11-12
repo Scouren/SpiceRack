@@ -1,0 +1,22 @@
+# The ngspice-vacask cell's failing steps (`tests/test_pair.rs`): `<deck> <step 1..6> <class> <proof>`,
+# compared by (deck, step) both ways. A line goes the day its step passes.
+# Proofs: `ruling=<id>` a ruling or amendment that settles the cause and says when it goes;
+# `finding=<id>` a pair finding sent to the lead (the deck is its smallest form):
+#   F1  the VACASK writer panics on a `.dc` over a source's DC value (TargetKind::SourceDc):
+#       `unreachable!` at src/dialect/vacask/write_run/analyses.rs:171; the IR states that sweep
+#       as every writer's (crates/ir/src/plan.rs `target_extra`: no feature). Owner: VACASK writer.
+#   F2  the VACASK writer drops a transient's `print_step`: the legalized design holds
+#       `print_step=0.1n`, the text read back none. Owner: VACASK writer (or FEATURES, if VACASK
+#       has no print step, with a pass). Behind A35's invented name on the same line.
+ac_rc 3 differs ruling=A35 # analysis ac (no name) read back as `name=ac1` (the writer invents it, W2301)
+diode_op 3 differs ruling=A35 # analysis op read back as `name=op1`
+mosfet_op 3 differs ruling=A35 # analysis op read back as `name=op1`
+op_divider 3 differs ruling=A35 # analysis op read back as `name=op1`
+subckt_param 3 differs ruling=A35 # analysis op read back as `name=op1`
+tran_rc_pulse 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=0.1n`
+tran_sine 3 differs finding=F2 # also A35: read back `name=tran1`, and without `print_step=10n`
+dc_sweep 3 panic finding=F1 # the writer panics: FEATURES lacks a target of kind SourceDc
+diode 3 panic finding=F1 # as dc_sweep
+mosfet 3 panic finding=F1 # as dc_sweep
+unresolved_param 3 differs ruling=A35 # analysis op read back as `name=op1`
+unresolved_param 4 source-fails ruling=A38 # ngspice: "Undefined parameter [nosuch]"; under A38 the strict read refuses it at step 1, and these two lines become one
