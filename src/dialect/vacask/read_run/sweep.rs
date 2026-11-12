@@ -16,7 +16,7 @@ use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, check
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
-use crate::dialect::vacask::read_elements::Source;
+use crate::dialect::vacask::read_elements::Aimed;
 use crate::ir;
 use crate::syntax::ast::{NONE, Node, Tag};
 
@@ -43,6 +43,7 @@ pub(super) enum Aim {
     Device(Vec<String>, String, String),
     Param(String),
     Source(Vec<String>, String),
+    Value(Vec<String>, String),
     Model(String, String),
     Temp,
     Option(ir::OptionKey),
@@ -246,13 +247,15 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
                     false => Err(BAD),
                 };
             }
-            if !l.declared.has_instance(&path, &element) {
-                return Err(BAD);
-            }
-            match (p.as_str(), l.declared.source(&path, &element)) {
-                ("dc", Some(Source::Dc)) => Aim::Source(path, element),
-                ("dc", Some(Source::Wave)) => return Err(private(SWEEP_WAVE)),
-                _ => Aim::Device(path, element, p),
+            match l
+                .declared
+                .aim(&path, &element, &p, (l.cst.file, l.start(s)))
+            {
+                Aimed::Missing => return Err(BAD),
+                Aimed::SourceDc => Aim::Source(path, element),
+                Aimed::SourceWave => return Err(private(SWEEP_WAVE)),
+                Aimed::ElementValue => Aim::Value(path, element),
+                Aimed::Device => Aim::Device(path, element, p),
             }
         }
         (Some(_), _, _, None) => return Err(private(SWEEP_FORM)),
@@ -310,6 +313,10 @@ pub(super) fn target(l: &mut Lower<'_, '_, '_>, aim: &Aim) -> ir::Target {
         Aim::Source(path, element) => {
             let path: Vec<&str> = path.iter().map(String::as_str).collect();
             l.b.target(ir::TargetKind::SourceDc, &path, element, None)
+        }
+        Aim::Value(path, element) => {
+            let path: Vec<&str> = path.iter().map(String::as_str).collect();
+            l.b.target(ir::TargetKind::ElementValue, &path, element, None)
         }
         Aim::Model(model, param) => {
             let t =

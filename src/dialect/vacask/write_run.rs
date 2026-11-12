@@ -12,7 +12,7 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cmd-overview, cmd-sweep, cmd-analysis-*.
 //!
 //! Contents: `analysis`, `control_span`, `admit` (crate-private), and for the children
-//! `quote`, `name_of`, `fold_alters`, `body`
+//! `quote`, `name_of`, `value_word`, `fold_alters`, `body`
 
 mod analyses;
 mod plan;
@@ -53,7 +53,10 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
         ir::ItemKind::Alter => plan::alter(w, d.row(at.index)),
         ir::ItemKind::Option => plan::option(w, d.row(at.index)),
         ir::ItemKind::Env => plan::env(w, d.row(at.index)),
-        ir::ItemKind::Elaborate => plan::elaborate(w, d.row(at.index)),
+        ir::ItemKind::Elaborate => {
+            w.epoch = Some(at);
+            plan::elaborate(w, d.row(at.index));
+        }
         ir::ItemKind::Save => write_outputs::save(w, at),
         // `admits` refuses every other class (W2305).
         ir::ItemKind::Reset => {
@@ -150,16 +153,27 @@ pub(super) fn admit(
     if !names_spelled(design, at) {
         diags.push_at(NAME_SPELLING, design, at, 0);
     }
+    let epoch = epoch_before(design, at);
     for t in swept_targets(design, at) {
         match t.kind {
-            ir::TargetKind::SourceDc => match source_of(design, t) {
+            ir::TargetKind::SourceDc => match source_of(design, epoch, t) {
                 None => diags.push_at(SOURCE_SWEEP_NAME, design, at, 0),
                 Some(src) if src.dc_rule == DcRule::WaveAtZero && !src.wave.is_none() => {
                     diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
                 }
                 Some(_) => {}
             },
-            ir::TargetKind::DeviceParam if element_of(design, t).is_none() => {
+            ir::TargetKind::ElementValue
+                if !element_of(design, epoch, t).is_some_and(|e| {
+                    matches!(
+                        e.kind,
+                        ir::ElemKind::Resistor | ir::ElemKind::Capacitor | ir::ElemKind::Inductor
+                    )
+                }) =>
+            {
+                diags.push_at(TARGET_UNFOUND, design, at, 0);
+            }
+            ir::TargetKind::DeviceParam if element_of(design, epoch, t).is_none() => {
                 diags.push_at(TARGET_UNFOUND, design, at, 0);
             }
             ir::TargetKind::Param if !top_param(design, t) => {
@@ -171,6 +185,20 @@ pub(super) fn admit(
     let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
     if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
         diags.push_at(RESET_CLASS, design, at, 0);
+    }
+}
+
+/// The value parameter's name of the passive an element-value target names (`r`, `c`, `l`;
+/// R64b): `admits` refused one VACASK would not find (W2312).
+pub(super) fn value_word(
+    design: &ir::Design,
+    epoch: Option<ir::ItemRef>,
+    t: ir::Target,
+) -> &'static str {
+    match element_of(design, epoch, t).map(|e| e.kind) {
+        Some(ir::ElemKind::Capacitor) => "c",
+        Some(ir::ElemKind::Inductor) => "l",
+        _ => "r",
     }
 }
 
@@ -368,7 +396,11 @@ fn swept_targets(design: &ir::Design, at: ir::ItemRef) -> Vec<ir::Target> {
 /// instance's bound
 /// subcircuit, as VACASK's `instance="x1:v1"` finds it (the reader's
 /// `masters::Declared::has_instance`); `None` when a name on the way is no element.
-fn element_of(design: &ir::Design, t: ir::Target) -> Option<ir::Element> {
+fn element_of(
+    design: &ir::Design,
+    epoch: Option<ir::ItemRef>,
+    t: ir::Target,
+) -> Option<ir::Element> {
     let named = |scope: ir::ScopeId, name: ir::NameId| {
         design.items(scope).iter().copied().find(|i| {
             i.kind == ir::ItemKind::Element && design.row::<ir::Element>(i.index).name == name
@@ -376,15 +408,14 @@ fn element_of(design: &ir::Design, t: ir::Target) -> Option<ir::Element> {
     };
     // VACASK's include is textual: the top of every file is the one top level.
     let mut scopes: Vec<ir::ScopeId> = design.files().map(|f| design.file(f).top).collect();
-    // An elaborated subcircuit's instances stand at the top level too (VD cir-elaboration).
-    for (at, _) in design.reachable() {
-        if at.kind == ir::ItemKind::Elaborate {
-            let row: ir::Elaborate = design.row(at.index);
-            for r in design.refs(row.circuits) {
-                if !r.def.is_none() && design.def(r.def).kind == ir::DefKind::Subckt {
-                    let sub: ir::item::Subckt = design.row(design.def(r.def).item.index);
-                    scopes.push(sub.body);
-                }
+    // The epoch's elaborated subcircuits' instances stand at the top level too (VD
+    // cir-elaboration; R64b: the last `elaborate` before the statement).
+    if let Some(e) = epoch {
+        let row: ir::Elaborate = design.row(e.index);
+        for r in design.refs(row.circuits) {
+            if !r.def.is_none() && design.def(r.def).kind == ir::DefKind::Subckt {
+                let sub: ir::item::Subckt = design.row(design.def(r.def).item.index);
+                scopes.push(sub.body);
             }
         }
     }
@@ -405,9 +436,24 @@ fn element_of(design: &ir::Design, t: ir::Target) -> Option<ir::Element> {
     Some(design.row(at.index))
 }
 
+/// The `Elaborate` in effect at item `at`: the last one before it in listed order.
+fn epoch_before(design: &ir::Design, at: ir::ItemRef) -> Option<ir::ItemRef> {
+    let reached = design.reachable();
+    reached
+        .iter()
+        .take_while(|(i, _)| *i != at)
+        .filter(|(i, _)| i.kind == ir::ItemKind::Elaborate)
+        .map(|(i, _)| *i)
+        .last()
+}
+
 /// The independent source a source-DC target names (`element_of`), or `None`.
-fn source_of(design: &ir::Design, t: ir::Target) -> Option<ir::source::Source> {
-    let row = element_of(design, t)?;
+fn source_of(
+    design: &ir::Design,
+    epoch: Option<ir::ItemRef>,
+    t: ir::Target,
+) -> Option<ir::source::Source> {
+    let row = element_of(design, epoch, t)?;
     matches!(row.kind, ir::ElemKind::VSource | ir::ElemKind::ISource).then(|| design.source(&row))
 }
 

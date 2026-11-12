@@ -28,6 +28,8 @@ pub(super) struct Writer<'d, 'o> {
     pub(super) words: super::families::Words,
     /// The scope each reachable item is listed in, built once per call.
     pub(super) scopes: std::collections::HashMap<ir::ItemRef, ir::ScopeId>,
+    /// The last `Elaborate` written (R64b: its subcircuits' instances stand at the top).
+    pub(super) epoch: Option<ir::ItemRef>,
 }
 
 /// One step of the walk: an item, a branch head of an `If`, or a block's closing line.
@@ -86,6 +88,7 @@ pub(super) fn write(design: &ir::Design, file: ir::FileId, out: &mut String) {
         dir,
         words: super::families::Words::of(design),
         scopes: design.reachable().into_iter().collect(),
+        epoch: None,
     };
     if design.file(file).role == ir::Role::Deck {
         let title = design

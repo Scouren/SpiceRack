@@ -32,7 +32,7 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
             w.line();
             w.out.push_str("sweep ");
             name::spell(d.str(axis.name), Place::Other, w.out);
-            target(d, axis.target, w.out);
+            target(d, w.epoch, axis.target, w.out);
             range(d, axis.sweep, w.out);
             w.out.push('\n');
         }
@@ -132,7 +132,7 @@ pub(super) fn range(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
 /// ` instance="x1:r1" parameter="r"`, ` instance="x1:v1" parameter="dc"` (a source's DC value,
 /// R64), ` instance="__topinst__" parameter="p"` (a top-level parameter, R70),
 /// ` model="m" parameter="p"`, ` option="name"`.
-pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
+pub(super) fn target(d: &ir::Design, epoch: Option<ir::ItemRef>, t: ir::Target, out: &mut String) {
     let element = |out: &mut String| {
         let mut path = name_of(d, t.path);
         if !path.is_empty() {
@@ -157,6 +157,13 @@ pub(super) fn target(d: &ir::Design, t: ir::Target, out: &mut String) {
             out.push_str(" instance=");
             element(out);
             out.push_str(" parameter=\"dc\"");
+        }
+        // R64b: a passive's value is its `r`, `c` or `l`.
+        ir::TargetKind::ElementValue => {
+            out.push_str(" instance=");
+            element(out);
+            out.push_str(" parameter=");
+            quote(super::value_word(d, epoch, t), out);
         }
         ir::TargetKind::ModelParam => {
             out.push_str(" model=");
