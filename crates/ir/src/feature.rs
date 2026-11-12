@@ -112,6 +112,10 @@ pub enum Extra {
     /// A `Subckt` head default holds a `Param` read (A12 K2: VACASK lets an instance override
     /// only a formal whose default folds to a constant).
     FormalReadsParam,
+    /// A file of role `Deck` whose top scope holds no `Title` item (A12 K2 addendum: ngspice
+    /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
+    /// empty one are the same text there).
+    DeckWithoutTitle,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -240,7 +244,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; 11] = [
+    pub const ALL: [Extra; Extra::DeckWithoutTitle as usize + 1] = [
         Extra::NestedSubckt,
         Extra::LocalModel,
         Extra::LocalFunc,
@@ -252,6 +256,7 @@ impl Extra {
         Extra::IntLiteral,
         Extra::EnclosingRef,
         Extra::FormalReadsParam,
+        Extra::DeckWithoutTitle,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

@@ -154,7 +154,7 @@ fn features_of_a_hand_built_deck() {
 fn each_kernel_extra_has_a_row_and_a_neighbour() {
     type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
     // (extra, a design that sets it, its legal neighbour that does not)
-    let cases: [(Extra, Build, Build); 11] = [
+    let cases: [(Extra, Build, Build); Extra::COUNT] = [
         (
             Extra::NestedSubckt,
             |b, top| {
@@ -308,6 +308,16 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             |b, top| {
                 let one = b.num(1.0);
                 b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
+            },
+        ),
+        (
+            Extra::DeckWithoutTitle,
+            |b, top| {
+                b.comment(top, "no title", Span::NONE);
+            },
+            |b, top| {
+                b.title(top, "", Span::NONE);
+                b.comment(top, "titled", Span::NONE);
             },
         ),
     ];
@@ -492,4 +502,16 @@ fn used_with(f: impl FnOnce(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeI
     }
     spicerack_ir::link(&mut d, &mut Diags::new());
     features_used(&d)
+}
+
+#[test]
+fn a_library_without_a_title_is_no_deck_without_one() {
+    // the legal neighbour of DeckWithoutTitle's other side: only a `Deck` file needs a title
+    let mut d = Design::new();
+    {
+        let mut b = d.builder();
+        let (_, top) = b.file("lib.sp", Role::Library);
+        b.comment(top, "a library", Span::NONE);
+    }
+    assert!(!features_used(&d).contains(Feature::Extra(Extra::DeckWithoutTitle)));
 }
