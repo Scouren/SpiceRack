@@ -11,6 +11,7 @@
 //!
 //! Contents: `pub(super) enum Tok`, `pub(super) enum Op`, `pub(super) const PI: ir::Literal`,
 //! `pub(super) const E: ir::Literal`, `pub(super) struct Leaves`, `pub(super) fn leaves(&str) -> Leaves`,
+//! `pub(super) fn calls(&str) -> Vec<(String, usize)>`,
 //! `pub(super) fn lex(&str, Eval) -> Result<Vec<Tok>, Fail>`
 
 use super::expr_read::Fail;
@@ -158,6 +159,60 @@ pub(super) fn lex(text: &str, eval: Eval) -> Result<Vec<Tok>, Fail> {
         k += len;
     }
     Ok(toks)
+}
+
+/// Every `name(…)` in `text` outside quotes, with its argument count (top-level commas plus
+/// one; `name()` has none), in text order: for the arity check against the `.func`s in scope.
+pub(super) fn calls(text: &str) -> Vec<(String, usize)> {
+    let b = text.as_bytes();
+    let mut out = Vec::new();
+    let mut quote: Option<u8> = None;
+    let mut k = 0;
+    // Bounded: each byte is passed once by `k`; an argument scan moves `j` ahead of it.
+    while k < b.len() {
+        let c = b[k];
+        if let Some(q) = quote {
+            quote = (c != q).then_some(q);
+            k += 1;
+            continue;
+        }
+        if c == b'"' || c == b'\'' {
+            quote = Some(c);
+            k += 1;
+            continue;
+        }
+        let ident = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+        if !(c.is_ascii_alphabetic() || c == b'_') || (k > 0 && ident(b[k - 1])) {
+            k += 1;
+            continue;
+        }
+        let start = k;
+        while k < b.len() && ident(b[k]) {
+            k += 1;
+        }
+        let mut j = k;
+        while j < b.len() && b[j] == b' ' {
+            j += 1;
+        }
+        if j >= b.len() || b[j] != b'(' {
+            continue;
+        }
+        let (mut depth, mut commas, mut empty) = (0usize, 0usize, true);
+        for &d in &b[j + 1..] {
+            match d {
+                b'(' => depth += 1,
+                b')' if depth == 0 => break,
+                b')' => depth -= 1,
+                b',' if depth == 0 => commas += 1,
+                b' ' | b'\t' => continue,
+                _ => {}
+            }
+            empty = false;
+        }
+        let count = if empty && commas == 0 { 0 } else { commas + 1 };
+        out.push((text[start..k].to_string(), count));
+    }
+    out
 }
 
 // ---- private ----

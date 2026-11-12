@@ -530,6 +530,9 @@ fn dispatch(lw: &mut Lower<'_, '_>, st: Stmt) {
             );
         }
     }
+    if wrong_arity(lw, st) {
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::CALL_ARITY);
+    }
     match lw.ast.tag(st.node) {
         Tag::Title => read_structure::title(lw, st),
         Tag::End => read_structure::end(lw, st),
@@ -579,6 +582,22 @@ fn dispatch(lw: &mut Lower<'_, '_>, st: Stmt) {
         | Tag::List
         | Tag::Bad => lw.unread(st),
     }
+}
+
+/// Whether `st` calls a `.func` in scope with another argument count than its formals: ngspice
+/// stops ("parameter mismatch for function call", runs arity/a2, a0, ab). A block statement's
+/// head line only; a control block is its script's, no numparam call.
+fn wrong_arity(lw: &Lower<'_, '_>, st: Stmt) -> bool {
+    let text = match lw.ast.tag(st.node) {
+        Tag::Control | Tag::Title => return false,
+        Tag::Subckt | Tag::Section | Tag::If | Tag::Else => lw.rest(st.node),
+        _ => lw.raw(st.node),
+    };
+    super::expr_lex::calls(&text).iter().any(|(name, args)| {
+        lw.declared
+            .arity(st.container, name)
+            .is_some_and(|n| n != *args)
+    })
 }
 
 /// Whether an element card's letter is an independent source's (`V`, `I`): `read_sources`.

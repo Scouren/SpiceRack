@@ -1,0 +1,8 @@
+# codes: P1013 P1013
+file "func_arity.sp" deck
+  title "func_arity"
+  comment " oracle: ngspice-45 runs (scratchpad runs/arity: f(1, 2), f() and a B source f(1,2) on a one-formal .func stop ngspice: \"parameter mismatch for function call\")"
+  func f(x) = x * 2
+  opaque ngspice invalid ".param p={f(1, 2)}"
+  opaque ngspice invalid ".param q={f(3)} r={f()}"
+  param s = @g?(1, 2)
