@@ -147,6 +147,7 @@ pub(crate) const FAMILY_WORDS: [&str; ModelFamily::COUNT] = [
     "jfet_hspice2",
     "mesfet",
     "gaas",
+    "mesa",
     "hfet1",
     "hfet2",
     "igbt",

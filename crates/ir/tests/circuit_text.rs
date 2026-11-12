@@ -459,4 +459,26 @@ mod tests {
             b.passive(top, ElemKind::Capacitor, h, row, Span::NONE);
         });
     }
+
+    #[test]
+    fn bins_of_a_group_and_an_instance_of_the_group() {
+        let text = "file \"t.sp\" deck\n  model nch.1 bsim4 polarity=n bin_of=nch\n  \
+                    model nch.2 bsim4 polarity=n bin_of=nch\n  model mz mesa polarity=p\n  \
+                    element mosfet m1 (d g s b) model=nch\n";
+        same(text, |b, top| {
+            for bin in ["nch.1", "nch.2"] {
+                let name = b.name(bin);
+                let bin_of = b.name("nch");
+                let row = spicerack_ir::Model {
+                    bin_of,
+                    ..model(name, ModelFamily::Bsim4, Polarity::N)
+                };
+                b.model(top, row, Span::NONE);
+            }
+            let name = b.name("mz");
+            b.model(top, model(name, ModelFamily::Mesa, Polarity::P), Span::NONE);
+            let h = b.head("m1", &["d", "g", "s", "b"], Some("nch"), &[], ExprId::NONE);
+            b.semi(top, ElemKind::Mosfet, h, semi(), Span::NONE);
+        });
+    }
 }

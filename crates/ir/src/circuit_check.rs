@@ -224,6 +224,7 @@ pub(crate) fn has_polarity(f: ModelFamily) -> bool {
         | F::JfetHspice2
         | F::Mesfet
         | F::Gaas
+        | F::Mesa
         | F::Hfet1
         | F::Hfet2
         | F::Igbt => true,
