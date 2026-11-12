@@ -20,7 +20,7 @@ use crate::edit::Editor;
 use crate::expr::Expr;
 use crate::facts::RowFacts;
 use crate::feature::{ExprWalk, expr_roots};
-use crate::id::{DefId, NameId};
+use crate::id::{DefId, ExprId, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, Subckt};
 
 /// Binds every still-unresolved reference by `Design::lookup` from the scope of the item (or the
@@ -66,15 +66,31 @@ pub fn link(design: &mut Design, diags: &mut Diags) {
         }
         // expressions: a subcircuit's head defaults are looked up from its body (A10: a default
         // reads its sibling head parameters first); every other row's from its listing scope
-        let scope = if item.kind == ItemKind::Subckt {
-            design.row::<Subckt>(item.index).body
+        // A29 (R53): a default's read of its own formal is never the formal itself; it is what
+        // is visible from where the subcircuit is defined (the listing scope), or unbound
+        let listing = scope;
+        let (scope, roots): (ScopeId, Vec<(ExprId, NameId)>) = if item.kind == ItemKind::Subckt {
+            let row = design.row::<Subckt>(item.index);
+            let defaults = design
+                .params(row.params)
+                .iter()
+                .map(|&(n, e)| (e, n))
+                .collect();
+            (row.body, defaults)
         } else {
-            scope
+            let roots = expr_roots(design, &handles);
+            (
+                scope,
+                roots.into_iter().map(|e| (e, NameId::NONE)).collect(),
+            )
         };
         let mut binds = Vec::new();
-        for root in expr_roots(design, &handles) {
+        for (root, own) in roots {
             for &e in walk.tree(design, root) {
                 let def = match design.expr(e) {
+                    Expr::Param(r) if r.def.is_none() && r.name == own => {
+                        design.lookup(listing, DefKind::Param, r.name)
+                    }
                     Expr::Param(r) if r.def.is_none() => {
                         let found = design.lookup(scope, DefKind::Param, r.name);
                         if found.is_none() && item.kind == ItemKind::Measure {

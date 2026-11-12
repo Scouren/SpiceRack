@@ -50,7 +50,7 @@ pub(super) fn element(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
             ir::controlled::OutKind::Voltage => " v=",
             _ => " i=",
         });
-        write_expr(d, row.expr, w.out);
+        super::expr_write::write_behavioural(d, row.expr, w.out);
         w.out.push('\n');
         return;
     }

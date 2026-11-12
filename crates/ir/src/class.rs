@@ -16,6 +16,7 @@
 //! Contents: `pub enum ExprClass`, `pub fn expr_class(&Design, ExprId) -> ExprClass`; crate:
 //! `pub(crate) fn def_classes(&Design) -> &[ExprClass]`,
 //! `pub(crate) fn tree_class(&Design, ExprId, &[ExprClass]) -> ExprClass`,
+//! `pub(crate) fn cycle_defs(&Design) -> Vec<usize>`,
 //! `pub(crate) fn node_class(&Design, ExprId, &[ExprClass]) -> ExprClass`
 
 use crate::design::Design;
@@ -80,11 +81,22 @@ pub(crate) fn node_class(design: &Design, e: ExprId, table: &[ExprClass]) -> Exp
     leaf_class(design, e).max(read)
 }
 
+/// The definitions on a reference cycle (A28): those neither a deps-first nor a readers-first
+/// worklist can settle (a definition between two cycles counts too). O(definitions + reads).
+pub(crate) fn cycle_defs(design: &Design) -> Vec<usize> {
+    let (_, deps, readers) = graph(design);
+    let forward = kahn(&deps, &readers);
+    let backward = kahn(&readers, &deps);
+    (0..deps.len())
+        .filter(|&k| !forward[k] && !backward[k])
+        .collect()
+}
+
 // ---- private ----
 
-/// The class table: each definition's direct class from its own expressions, then the
-/// dependency-ordered maximum over what it reads; what the worklist cannot order is `Circuit`.
-fn compute(design: &Design) -> Vec<ExprClass> {
+/// Each definition's direct class, the definitions it reads (one entry per read), and its
+/// readers.
+fn graph(design: &Design) -> (Vec<ExprClass>, Vec<Vec<usize>>, Vec<Vec<usize>>) {
     let n = design.defs.len();
     let mut direct = vec![ExprClass::Constant; n];
     let mut deps: Vec<Vec<usize>> = vec![Vec::new(); n];
@@ -99,20 +111,42 @@ fn compute(design: &Design) -> Vec<ExprClass> {
             }
         }
     }
-    // Kahn: a definition is final once every definition it reads is
-    let mut waiting: Vec<usize> = deps.iter().map(Vec::len).collect();
     let mut readers: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (k, ds) in deps.iter().enumerate() {
         for &d in ds {
             readers[d].push(k);
         }
     }
-    let mut class = direct.clone();
+    (direct, deps, readers)
+}
+
+/// Which nodes a worklist settles when a node is ready once every node it waits on (`on`) is
+/// settled (`waiters` the reverse edges): Kahn's algorithm, bounded by the edges.
+fn kahn(on: &[Vec<usize>], waiters: &[Vec<usize>]) -> Vec<bool> {
+    let n = on.len();
+    let mut waiting: Vec<usize> = on.iter().map(Vec::len).collect();
     let mut done = vec![false; n];
     let mut ready: Vec<usize> = (0..n).filter(|&k| waiting[k] == 0).collect();
     while let Some(k) = ready.pop() {
         done[k] = true;
-        class[k] = deps[k].iter().fold(direct[k], |c, &d| c.max(class[d]));
+        for &u in &waiters[k] {
+            waiting[u] -= 1;
+            if waiting[u] == 0 {
+                ready.push(u);
+            }
+        }
+    }
+    done
+}
+
+/// The settled definitions in an order where each follows what it reads.
+fn order(deps: &[Vec<usize>], readers: &[Vec<usize>]) -> Vec<usize> {
+    let n = deps.len();
+    let mut waiting: Vec<usize> = deps.iter().map(Vec::len).collect();
+    let mut out = Vec::new();
+    let mut ready: Vec<usize> = (0..n).filter(|&k| waiting[k] == 0).collect();
+    while let Some(k) = ready.pop() {
+        out.push(k);
         for &u in &readers[k] {
             waiting[u] -= 1;
             if waiting[u] == 0 {
@@ -120,9 +154,30 @@ fn compute(design: &Design) -> Vec<ExprClass> {
             }
         }
     }
-    for k in 0..n {
-        if !done[k] {
-            class[k] = ExprClass::Circuit; // on or behind a reference cycle
+    out
+}
+
+/// The class table: each definition's direct class from its own expressions, then the
+/// dependency-ordered maximum over what it reads. A definition on or behind a reference cycle
+/// (which `check` reports as `DefinitionCycle`, A28) takes the most its direct class and the
+/// classes it reads give, propagated by a worklist (each class rises at most twice), so a cycle
+/// does not make every reader `Circuit`.
+fn compute(design: &Design) -> Vec<ExprClass> {
+    let (direct, deps, readers) = graph(design);
+    let n = direct.len();
+    let done = kahn(&deps, &readers);
+    let mut class = direct.clone();
+    // the settled ones in dependency order
+    for k in order(&deps, &readers) {
+        class[k] = deps[k].iter().fold(direct[k], |c, &d| c.max(class[d]));
+    }
+    // the rest: rise to the fixpoint
+    let mut work: Vec<usize> = (0..n).filter(|&k| !done[k]).collect();
+    while let Some(k) = work.pop() {
+        let next = deps[k].iter().fold(direct[k], |c, &d| c.max(class[d]));
+        if next > class[k] {
+            class[k] = next;
+            work.extend(readers[k].iter().copied().filter(|&u| !done[u]));
         }
     }
     class

@@ -1,2 +1,1 @@
 # Known failures of this directory: <fixture> <why>. A line goes the day its cause is fixed.
-behavioural a Behav sets ElementWithoutModel, though VACASK's b source takes no master (VD dev-builtin-behavioral), so legalize refuses the round trip (IR gap, reported)

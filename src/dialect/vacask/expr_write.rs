@@ -11,7 +11,7 @@
 //!
 //! Cites: VD expr-operators, expr-functions, expr-special; `rewrite/DIALECT-VACASK.md` §4.
 //!
-//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `admits` (crate-private)
+//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `write_behavioural`, `admits` (crate-private)
 
 use super::name::{self, Place};
 use super::number;
@@ -64,6 +64,50 @@ const PRIMARY: u8 = 14;
 
 /// Appends expression `e` of `design` as VACASK text.
 pub(super) fn write_expr(design: &ir::Design, e: ir::ExprId, out: &mut String) {
+    write(design, e, false, out);
+}
+
+/// Appends expression `e` of a behavioural source's own expression: as [`write_expr`], but
+/// `to_int` of a parameter read is `$intparam(p)` (VACASK's only integer read of a parameter
+/// there, behavioural-only: runs ip1, ip4; R56).
+pub(super) fn write_behavioural(design: &ir::Design, e: ir::ExprId, out: &mut String) {
+    write(design, e, true, out);
+}
+
+/// Appends a refusal, at its item, for each real conversion VACASK cannot spell ([`NO_REAL`])
+/// and each integer literal it would wrap ([`WIDE_INT`]).
+pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
+    let mut handles = Vec::new();
+    for (at, _) in design.reachable() {
+        handles.clear();
+        design.item_handles(at, &mut handles);
+        // Only a behavioural source's expression is VACASK's behavioural evaluator (R52); a
+        // passive's value is its parameter evaluator's, whatever the handle's kind.
+        let behavioural = at.kind == ir::ItemKind::Element
+            && design.row::<ir::Element>(at.index).kind == ir::ElemKind::Behav;
+        let refused = handles.iter().find_map(|&h| match h {
+            ir::Handle::Expr(e) => refusal(design, e, false),
+            ir::Handle::ExprDyn(e) => refusal(design, e, behavioural),
+            ir::Handle::Exprs(list) => design
+                .exprs(list)
+                .iter()
+                .find_map(|&e| refusal(design, e, false)),
+            ir::Handle::Params(list) => design
+                .params(list)
+                .iter()
+                .find_map(|&(_, e)| refusal(design, e, false)),
+            _ => None,
+        });
+        if let Some(code) = refused {
+            diags.push_at(code, design, at, 0);
+        }
+    }
+}
+
+// ---- private ----
+
+/// [`write_expr`] and, with `behavioural`, [`write_behavioural`].
+fn write(design: &ir::Design, e: ir::ExprId, behavioural: bool, out: &mut String) {
     let mut todo = vec![Task::Expr(e, false)];
     // Bounded: each expression row is pushed once per parent that reads it (a tree).
     while let Some(task) = todo.pop() {
@@ -97,6 +141,17 @@ pub(super) fn write_expr(design: &ir::Design, e: ir::ExprId, out: &mut String) {
             ir::Expr::I(element) => {
                 out.push_str("i(");
                 name::spell(design.str(element), Place::Other, out);
+                out.push(')');
+            }
+            ir::Expr::Call(ir::Func::ToInt, args)
+                if behavioural
+                    && matches!(design.expr(design.exprs(args)[0]), ir::Expr::Param(_)) =>
+            {
+                let ir::Expr::Param(r) = design.expr(design.exprs(args)[0]) else {
+                    unreachable!("matched above");
+                };
+                out.push_str("$intparam(");
+                name::spell(design.str(r.name), Place::Other, out);
                 out.push(')');
             }
             ir::Expr::Call(ir::Func::ToReal, args) => {
@@ -148,38 +203,6 @@ pub(super) fn write_expr(design: &ir::Design, e: ir::ExprId, out: &mut String) {
     }
 }
 
-/// Appends a refusal, at its item, for each real conversion VACASK cannot spell ([`NO_REAL`])
-/// and each integer literal it would wrap ([`WIDE_INT`]).
-pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
-    let mut handles = Vec::new();
-    for (at, _) in design.reachable() {
-        handles.clear();
-        design.item_handles(at, &mut handles);
-        // Only a behavioural source's expression is VACASK's behavioural evaluator (R52); a
-        // passive's value is its parameter evaluator's, whatever the handle's kind.
-        let behavioural = at.kind == ir::ItemKind::Element
-            && design.row::<ir::Element>(at.index).kind == ir::ElemKind::Behav;
-        let refused = handles.iter().find_map(|&h| match h {
-            ir::Handle::Expr(e) => refusal(design, e, false),
-            ir::Handle::ExprDyn(e) => refusal(design, e, behavioural),
-            ir::Handle::Exprs(list) => design
-                .exprs(list)
-                .iter()
-                .find_map(|&e| refusal(design, e, false)),
-            ir::Handle::Params(list) => design
-                .params(list)
-                .iter()
-                .find_map(|&(_, e)| refusal(design, e, false)),
-            _ => None,
-        });
-        if let Some(code) = refused {
-            diags.push_at(code, design, at, 0);
-        }
-    }
-}
-
-// ---- private ----
-
 /// What VACASK cannot spell in root `e`: an integer literal past 32 bits ([`WIDE_INT`]); a real
 /// conversion it lacks ([`NO_REAL`]): in a behavioural source's expression (`circuit`) a parameter read
 /// that is not the operand of a `to_real`, or a `to_real` of anything else; in any other field a
@@ -205,6 +228,12 @@ fn refusal(design: &ir::Design, e: ir::ExprId, circuit: bool) -> Option<ir::Code
                     return Some(NO_REAL);
                 }
                 todo.push((arg, true));
+            }
+            // `$intparam(p)` in a behavioural source (R56).
+            ir::Expr::Call(ir::Func::ToInt, args)
+                if circuit && matches!(design.expr(design.exprs(args)[0]), ir::Expr::Param(_)) =>
+            {
+                todo.push((design.exprs(args)[0], true));
             }
             ir::Expr::Unary(_, a) => todo.push((a, false)),
             ir::Expr::Binary(_, a, b) => todo.extend([(a, false), (b, false)]),
@@ -407,7 +436,7 @@ mod tests {
             )
         });
         let mut out = String::new();
-        write_expr(&design, e, &mut out);
+        write_behavioural(&design, e, &mut out);
         (out, real)
     }
 
@@ -425,7 +454,13 @@ mod tests {
                 "idt(v(a)) + ddt(v(a))",
                 false,
             ),
+            // A28: `idt(x, ic)` keeps its initial value; a literal-0 one is the absent one.
+            ("b1 (c 0) v=idt(v(a), 3)", "idt(v(a), 3)", false),
+            ("b1 (c 0) v=idt(v(a), 0.0)", "idt(v(a))", false),
             ("b1 (c 0) v=p/2", "p / 2", true),
+            // R56: `$realparam(p)` is `to_real(p)`, written back as the bare `p`.
+            ("b1 (c 0) v=$realparam(p)/2", "p / 2", true),
+            ("b1 (c 0) v=$intparam(p)/2", "$intparam(p) / 2", false),
         ];
         for (text, want, real) in cases {
             assert_eq!(
