@@ -416,3 +416,28 @@ fn elab_targets_kind_through_the_epochs_elaboration() {
         r.out
     );
 }
+
+#[test]
+fn topinst_names_nothing_a_save_or_an_analysis_can_read() {
+    // R70's grep: `__topinst__` as a save's instance, a noise input or an stb probe has no
+    // meaning: each fails its analysis (VACASK exits 0); the reader keeps reading the names
+    // as written (no run shows a meaning to read).
+    for (deck, message) in [
+        ("topinst_ts1.sim", "Node '__topinst__:flow(br)' not found."),
+        (
+            "topinst_ts2.sim",
+            "Output variable 'a' of instance '__topinst__' not found.",
+        ),
+        (
+            "topinst_tn1.sim",
+            "Instance '__topinst__' is not an independent source.",
+        ),
+        (
+            "topinst_tp1.sim",
+            "Instance '__topinst__' is not an independent source.",
+        ),
+    ] {
+        let r = settle(deck);
+        assert!(r.out.contains(message), "{deck}: {}", r.out);
+    }
+}

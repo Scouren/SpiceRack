@@ -2,9 +2,14 @@ targets that name nothing
 model vsource vsource
 parameters a=1.0
 v1 (in 0) vsource dc=10.0
+load "spice/resistor.osdi"
+model res sp_resistor
+r1 (in 0) res r=1k
 control
   alter instance("nosuch") r=2
   alter instance("__topinst__") zz=2.0
+  alter instance("r1") zz=2.0
+  alter instance("r1") dtemp=5
   sweep sn instance="nosuch" parameter="r" values=[1, 2]
     analysis d1 op
   sweep sz instance="__topinst__" parameter="zz" values=[1, 2]
