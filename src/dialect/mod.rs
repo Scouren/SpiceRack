@@ -42,7 +42,7 @@
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
 //! - `pub fn write(design: &ir::Design, file: ir::FileId, to: &DialectRow, diags: &mut ir::Diags) -> String`
 //! - `pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Policy) -> Result<Written, ir::Diags>`
-//! - `pub fn refuses(code: ir::Code) -> bool`
+//! - `pub fn info(code: ir::Code) -> Option<ir::Info>`, `pub fn refuses(code: ir::Code) -> bool`
 
 pub mod facade;
 pub mod irtext;
@@ -122,9 +122,20 @@ pub struct Written {
     pub notes: ir::Diags,
 }
 
-/// The refusal a strict read adds at each `Unread` item: `S9001`, `arg` 0. The spine's own
-/// code until the IR catalogue has one (a request in `rewrite/SPINE-NOTES.md`).
-pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 9001);
+/// The refusal a strict read adds at each `Unread` item: `S0101`, `arg` 0. The spine owns
+/// the policy, so it owns the code: its catalogue is `S0101..=S0199` ([`info`]).
+pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
+
+/// The spine's catalogue rows, in code order.
+const SPINE_CODES: &[(ir::Code, ir::Info)] = &[(
+    STRICT_UNREAD,
+    ir::Info {
+        title: "a statement the reader has no rule for, under a strict read",
+        cite: "REWRITE-PLAN.md §3.4 (strictness); D26 (`from_spice` is strict)",
+        explain: "The reader kept the statement as an `Opaque` of class `Unread` (its own note says which); a strict read refuses the deck instead of carrying text it did not read. Read leniently to keep it, or give the reader a rule.",
+        kind: ir::Kind::Refusal,
+    },
+)];
 
 /// The row named `name`, or `None`.
 pub fn by_name(name: &str) -> Option<&'static DialectRow> {
@@ -169,8 +180,8 @@ pub fn read(
 }
 
 /// `file` of `design` written by `to`. A design that uses only the target's features goes to
-/// the writer as it is; any other is cloned, legalized (`passes::legalize`) and checked legal
-/// first. An `Opaque` of another text family is refused here (a `U0001` row for
+/// the writer as it is; any other is cloned and legalized (`passes::legalize`, whose
+/// `ir::check_legal` reports what is left). An `Opaque` of another text family is refused here (a `U0001` row for
 /// `Feature::Item(Opaque)` at the item). On any refusal the writer is not called and the text
 /// is empty.
 ///
@@ -197,17 +208,7 @@ pub fn write(
     let mut legal = design.clone();
     passes::legalize(&mut legal, target, diags);
     if foreign == 0 && ir::features_used(&legal).minus(*target).is_empty() {
-        let at = diags.len();
-        ir::check_legal(&legal, target, diags);
-        debug_assert_eq!(
-            diags.len(),
-            at,
-            "write: legalize left a feature {} lacks",
-            to.name
-        );
-        if diags.len() == at {
-            writer.write(&legal, file, &mut out, diags);
-        }
+        writer.write(&legal, file, &mut out, diags);
     }
     out
 }
@@ -236,10 +237,20 @@ pub fn transpile(
     Ok(Written { text, notes: diags })
 }
 
-/// Whether `code` refuses a deck: [`STRICT_UNREAD`], an IR code whose row is a refusal, and
-/// any code no catalogue knows (a missing row fails loudly, never silently).
+/// The catalogue row of `code`: the spine's own, else the IR crate's; `None` for a code no
+/// catalogue holds (each dialect slice adds its table here when it lands).
+pub fn info(code: ir::Code) -> Option<ir::Info> {
+    let spine = SPINE_CODES
+        .iter()
+        .find(|(c, _)| *c == code)
+        .map(|(_, i)| *i);
+    spine.or_else(|| ir::diag::info(code))
+}
+
+/// Whether `code` refuses a deck: its row is a refusal, or no catalogue holds it (a missing
+/// row fails loudly, never silently).
 pub fn refuses(code: ir::Code) -> bool {
-    code == STRICT_UNREAD || ir::diag::info(code).is_none_or(|info| info.kind == ir::Kind::Refusal)
+    info(code).is_none_or(|info| info.kind == ir::Kind::Refusal)
 }
 
 // ---- private ----

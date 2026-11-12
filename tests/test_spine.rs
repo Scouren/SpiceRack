@@ -16,7 +16,7 @@
 
 use std::collections::HashMap;
 
-use spicerack::dialect::facade::{self, Pipeline, ROUTES, UNMAPPED};
+use spicerack::dialect::facade::{self, IR_NOTE, IR_REFUSAL, Pipeline, ROUTES};
 use spicerack::dialect::{
     self, BUILTIN, DialectRow, Policy, Reference, STRICT_UNREAD, Sources, Write, irtext::IrText,
 };
@@ -116,50 +116,57 @@ fn strict_refuses_an_unread_statement_and_lenient_keeps_it() {
 fn the_facade_writes_todays_message_lines_from_spans() {
     // Byte 9 of the text is `c` of line 2 ("ab cd"), column 4; byte 0 is line 1, column 1.
     let src = Sources::one("deck", "first\nab cd\n");
-    let at = |start| ir::Span {
-        file: ir::FileId(0),
+    let at = |file, start| ir::Span {
+        file: ir::FileId(file),
         start,
         len: 1,
     };
+    let strict = |span| ir::Diag {
+        code: STRICT_UNREAD,
+        span,
+        arg: 0,
+    };
     let rows = [
-        ir::Diag {
-            code: ir::Code::new(b'X', 3),
-            span: at(9),
-            arg: 0,
-        },
-        ir::Diag {
-            code: ir::Code::new(b'W', 1),
-            span: at(0),
-            arg: 0,
-        },
-        ir::Diag {
-            code: ir::Code::new(b'P', 2),
-            span: ir::Span::NONE,
-            arg: 0,
-        },
+        strict(at(0, 9)),
+        strict(ir::Span::NONE),
+        strict(at(0, 0)),
+        strict(at(7, 0)),
     ];
     let shown = facade::diags(&rows, &src, "t", "spectre");
     let codes: Vec<Code> = shown.diags.iter().map(|d| d.code).collect();
-    assert_eq!(codes, [Code::W0001, Code::R0042, Code::P0002]);
+    assert_eq!(codes, [Code::W0203; 4], "a refusal stays a refusal");
+    let title = dialect::info(STRICT_UNREAD).expect("the spine's row").title;
     let expected = format!(
-        "t:1:1: W0001 {}\nt:2:4: R0042 {}\nt:0:0: P0002 {}\n",
-        info(Code::W0001).title,
-        info(UNMAPPED).title,
-        info(Code::P0002).title
+        "t:1:1: W0203 S0101 {title}\nt:2:4: W0203 S0101 {title}\nt:0:0: W0203 S0101 {title}\nt:0:0: W0203 S0101 {title}\n"
     );
     assert_eq!(shown.messages, expected);
+    assert_eq!(
+        info(Code::W0203).kind,
+        spicerack::syntax::diag::Kind::Refusal
+    );
+    assert_eq!(info(Code::W0204).kind, spicerack::syntax::diag::Kind::Note);
 }
 
 #[test]
-fn a_new_code_with_no_row_is_its_namesake_or_unmapped() {
-    let d = |letter, number| ir::Diag {
-        code: ir::Code::new(letter, number),
+// marker: IR bodies (slice S1 implementation); remove when they land
+#[should_panic(expected = "not yet implemented")]
+fn a_new_code_with_no_row_is_shown_by_its_verdict() {
+    let d = |code| ir::Diag {
+        code,
         span: ir::Span::NONE,
         arg: 0,
     };
-    assert_eq!(facade::old_code(&d(b'R', 6), "ngspice"), Code::R0006);
-    assert_eq!(facade::old_code(&d(b'U', 1), "ngspice"), UNMAPPED);
-    assert_eq!(facade::old_code(&d(b'W', 9999), "ngspice"), UNMAPPED);
+    let unread = ir::diag::opaque_code(ir::OpaqueClass::Unread);
+    assert_eq!(facade::old_code(&d(unread), "ngspice"), IR_NOTE);
+    assert_eq!(
+        facade::old_code(&d(ir::diag::UNSUPPORTED), "ngspice"),
+        IR_REFUSAL
+    );
+    // A code no catalogue holds refuses, loudly.
+    assert_eq!(
+        facade::old_code(&d(ir::Code::new(b'W', 9999)), "ngspice"),
+        IR_REFUSAL
+    );
 }
 
 #[test]

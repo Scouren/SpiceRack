@@ -1,5 +1,5 @@
 //! The catalogue's W0201–W0300 rows: the rules a dialect definition
-//! declares. A block of `catalogue!`'s list (`mod.rs` chains every block,
+//! declares, and W0203–W0204, the IR pipeline's (`dialect::facade`). A block of `catalogue!`'s list (`mod.rs` chains every block,
 //! in code order).
 //!
 //! Cites: each row's `cite` names its own clause.
@@ -24,6 +24,19 @@ macro_rules! rows_w_def {
                 title: "noted by the target dialect's definition",
                 cite: "the target's definition (`syntax::def`, `DialectDef::code`)",
                 explain: "The target is a dialect a definition declared (a plugin), and that definition leaves this construct out with a note of its own; the message names the code and says what was left out. The deck is still written.",
+            }
+            // W0203–W0204: the IR pipeline's (`dialect::facade`), for a routed pair.
+            /// A refusal of the IR pipeline with no old code: the message carries the new code and its title.
+            W0203 Refusal {
+                title: "refused by the IR pipeline",
+                cite: "the new code's own row (`dialect::info`); `rewrite/SPINE.md` §5",
+                explain: "The pair is written by the IR pipeline (`dialect::facade::ROUTES`, or SPICERACK_PIPELINE=new), which refused the deck with a code of its own that has no code of the old catalogue; the message names that code and its title.",
+            }
+            /// A note of the IR pipeline with no old code: the message carries the new code and its title.
+            W0204 Note {
+                title: "noted by the IR pipeline",
+                cite: "the new code's own row (`dialect::info`); `rewrite/SPINE.md` §5",
+                explain: "The pair is written by the IR pipeline (`dialect::facade::ROUTES`, or SPICERACK_PIPELINE=new), which noted something with a code of its own that has no code of the old catalogue; the message names that code and its title. The deck is still written.",
             }
         }
     };
