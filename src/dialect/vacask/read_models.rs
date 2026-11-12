@@ -41,6 +41,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Family(ir::ModelFamily::Ccvs))
     .with(ir::Feature::Family(ir::ModelFamily::Cccs))
     .with(ir::Feature::Family(ir::ModelFamily::Mutual))
+    .with(ir::Feature::Family(ir::ModelFamily::TlineIdeal))
     .with(ir::Feature::Family(ir::ModelFamily::Module))
     .with(ir::Feature::Family(ir::ModelFamily::Resistor))
     .with(ir::Feature::Family(ir::ModelFamily::Capacitor))

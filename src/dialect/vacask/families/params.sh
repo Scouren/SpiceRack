@@ -51,4 +51,5 @@ bsimbulk bsimbulk106.osdi d_g_s_b bsimbulk106.va
 vbic13 vbic_1p3.osdi c_b_e vbic/*.va
 vbic13_4t vbic_1p3_4t.osdi c_b_e_s vbic/*.va
 vbic13_5t vbic_1p3_5t.osdi c_b_e_s_t vbic/*.va
+tline_ideal tline_ideal.osdi a_b_c_d tline_ideal.va
 LIST

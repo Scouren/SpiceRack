@@ -1,0 +1,4 @@
+tline model
+load "tline_ideal.osdi"
+model t tline_ideal
+model t2 tline_ideal z0=50
