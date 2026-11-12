@@ -18,7 +18,7 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes as constants (`pub(super) const MALFORMED`, `UNREAD_FORM`, `DROPPED`, `TC_BASE`,
-//! `FIRST_BRACE`, `PRIVATE_FORM`, `DUPLICATE_KEY`, `PORT_COUNT`), `pub(super) struct Item`, `pub(super) enum Kind`,
+//! `FIRST_BRACE`, `PRIVATE_FORM`, `DUPLICATE_KEY`, `PORT_COUNT`, `MODEL_ORDER`), `pub(super) struct Item`, `pub(super) enum Kind`,
 //! `pub(super) enum Val`, `pub(super) struct Card`, `Card::param(&mut self, &str, Val)`, `Item::as_value(&self) -> String`,
 //! `pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) fn val`, `b_tree`,
 //! `emit`, `head`, `push_done`, `number_word`, `literal`,
@@ -144,6 +144,10 @@ pub(super) const DUPLICATE_KEY: ir::Code = ir::Code::new(b'P', 1107);
 /// An X card whose node count is not the port count of the subcircuit it names (R61, A36):
 /// ngspice rejects the deck (settle `instance_ports_*.sp`): `InvalidInSource`.
 pub(super) const PORT_COUNT: ir::Code = ir::Code::new(b'P', 1108);
+/// An R, C or L card with a model whose value stands where ngspice-45 rejects it: before the
+/// model (a C's or L's, or an R's braced or quoted value), or an L's `l=` (settle
+/// `passive_model_order.sp`): `InvalidInSource`.
+pub(super) const MODEL_ORDER: ir::Code = ir::Code::new(b'P', 1109);
 
 /// An instance `temp=`/`dtemp=` on an element whose bound model's family has none on ngspice
 /// ("unknown parameter": runs fam, `instance_temp`): the deck is invalid in its source.
@@ -192,6 +196,12 @@ pub(super) const CODES: &[Row] = &[
         "a subcircuit instance whose node count is not its subcircuit's port count",
         "ngspice-45 frontend/subckt.c; settle instance_ports_short.sp, instance_ports_long.sp",
         "ngspice rejects the deck; kept as text (InvalidInSource).",
+    ),
+    row(
+        MODEL_ORDER,
+        "an R, C or L value where ngspice does not take it beside a model",
+        "ngspice-45 inp2r.c, inp2c.c, inp2l.c; settle passive_model_order.sp",
+        "before the model only an R's number is taken, and an L with a model takes no l=; ngspice stops on 'unknown parameter'; kept as text (InvalidInSource).",
     ),
     row(
         TEMP_FAMILY,

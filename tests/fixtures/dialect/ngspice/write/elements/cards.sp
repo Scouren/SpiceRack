@@ -1,5 +1,5 @@
 cards
-R1 a b 1k rmod tc1=1m temp=50 noisy=0 l=1u m=2
+R1 a b rmod 1k tc1=1m temp=50 noisy=0 l=1u m=2
 C1 a 0 1p ic=0.5
 R2 a b {v(a) * 1k}
 C2 a b q={1p * v(a)}
