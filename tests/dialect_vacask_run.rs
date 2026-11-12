@@ -36,13 +36,7 @@ const SETTLE: &str = "tests/fixtures/dialect/vacask/settle/run";
 
 /// Reader fixtures that fail for a cause outside this area, each with its cause; strict both
 /// ways.
-const KNOWN: &[(&str, &str)] = &[
-    (
-        "save",
-        "A22: Save states its set of analysis kinds (run owner)",
-    ),
-    ("sweep_op", "A22: DcAxis gains an optional name (run owner)"),
-];
+const KNOWN: &[(&str, &str)] = &[];
 
 /// Settle decks the round trip cannot run yet, each with its cause; strict both ways.
 const KNOWN_TRIP: &[(&str, &str)] = &[];
@@ -451,6 +445,24 @@ fn ac_points_a_lin_count_is_intervals() {
     let r = settle("ac_points.sim");
     assert_eq!(raw(&r, "a1.raw").re(0).len(), 3, "{}", r.out);
     assert_eq!(raw(&r, "a2.raw").re(0).len(), 5, "{}", r.out);
+}
+
+#[test]
+fn save_from_here_saves_accumulate_from_where_they_stand() {
+    // Run sv1: `save v(b)`, op0, op1, `save v(a)`, op2: op1 holds b alone, op2 b and a.
+    let r = settle("save_from_here.sim");
+    assert_eq!(vectors(&raw(&r, "op0.raw")), ["b"]);
+    assert_eq!(vectors(&raw(&r, "op1.raw")), ["b"]);
+    assert_eq!(vectors(&raw(&r, "op2.raw")), ["b", "a"]);
+}
+
+#[test]
+fn save_clear_drops_every_save_before_it() {
+    // Run sv2: after `clear saves` op2 holds the default set; a later `save v(b)` starts anew.
+    let r = settle("save_clear.sim");
+    assert_eq!(vectors(&raw(&r, "op1.raw")), ["a"]);
+    assert_eq!(vectors(&raw(&r, "op2.raw")), ["a", "b", "v1:flow(br)"]);
+    assert_eq!(vectors(&raw(&r, "op3.raw")), ["b"]);
 }
 
 // ---- the simulator round trip ----

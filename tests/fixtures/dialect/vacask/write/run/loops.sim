@@ -12,6 +12,6 @@ control
   endmc
   mc m2 samples=2 lh=0
     sweep s5 option="reltol" values=[1e-3]
-      analysis op2 op
+      analysis t3 tran stop=1m
   endmc
 endc

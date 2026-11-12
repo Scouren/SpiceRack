@@ -14,4 +14,4 @@ file "loops.ir" deck
     analysis op name=op1
   loop monte_carlo name=m2 runs=2i
     loop sweep name=s5 (option rel_tol) (list values=[1e-3])
-      analysis op name=op2
+      analysis tran name=t3 stop=1m cap=span_over50
