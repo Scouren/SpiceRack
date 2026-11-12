@@ -106,6 +106,9 @@ pub enum Form {
     /// The root stands in a field that may read the circuit, or it or what it reads is of class
     /// `Temp` or above.
     Dynamic,
+    /// A function body called from roots of both forms (A28, R51): it counts in both, and no
+    /// one-form pass rewrites it.
+    Both,
 }
 
 /// The kernel's features that are fields or placements, not kinds. The circuit and run owners'
@@ -653,6 +656,13 @@ pub fn root_form(design: &Design, root: ExprId, use_: ExprUse) -> Form {
         use_,
         crate::class::tree_class(design, root, def_classes(design)),
     )
+}
+
+/// The forms each function body counts in (A28, R51), by body expression: bit 1 static, bit 2
+/// dynamic; a body nothing calls has none and counts static. Cached on the design with the
+/// class table.
+pub(crate) fn body_forms(design: &Design) -> &crate::names::FxMap<ExprId, u8> {
+    todo!()
 }
 
 // ---- private ----

@@ -64,6 +64,8 @@ pub mod edit;
 pub mod eval;
 pub mod expr;
 pub mod feature;
+#[cfg(test)]
+mod form_tests;
 #[cfg(any(test, feature = "gen"))]
 mod gen_expr;
 #[cfg(any(test, feature = "gen"))]

@@ -134,6 +134,9 @@ pub struct Design {
     /// The dynamic class of each definition (`class::def_classes`), computed on demand and
     /// cleared by every `Builder` and `Editor` mutation. Not part of equality.
     pub(crate) classes: std::sync::OnceLock<Vec<ExprClass>>,
+    /// The forms each function body counts in (`feature::body_forms`, A28): bit 1 static, bit 2
+    /// dynamic, by body expression. Computed on demand and cleared with `classes`.
+    pub(crate) forms: std::sync::OnceLock<crate::names::FxMap<ExprId, u8>>,
     /// The first element of each whole name in each scope (`Builder::element_named`), built on
     /// demand, extended by every element push and cleared where `editor` hands out its door and
     /// by each Editor mutation that can move or rename an element. Not part of equality.
@@ -261,19 +264,20 @@ impl Design {
             circuit: CircuitDetails::default(),
             run: RunDetails::default(),
             classes: std::sync::OnceLock::new(),
+            forms: std::sync::OnceLock::new(),
             element_names: std::sync::OnceLock::new(),
         }
     }
 
     /// The append-only door for readers and builders.
     pub fn builder(&mut self) -> Builder<'_> {
-        self.classes.take();
+        self.derived_changed();
         Builder { design: self }
     }
 
     /// The door for passes: replace rows and item lists, append through a builder.
     pub fn editor(&mut self) -> Editor<'_> {
-        self.classes.take();
+        self.derived_changed();
         self.element_names.take();
         Editor { design: self }
     }
@@ -579,6 +583,13 @@ impl Design {
 }
 
 impl Design {
+    /// Forgets what is derived from the expressions and definitions (the class and form caches):
+    /// every door and every mutation that can change a class calls it.
+    pub(crate) fn derived_changed(&mut self) {
+        self.classes.take();
+        self.forms.take();
+    }
+
     /// A `Long` literal's significand. Asserts the form and the pool index.
     fn long_text(&self, l: Literal) -> &str {
         assert!(l.form == NumForm::Long, "a Long literal");
