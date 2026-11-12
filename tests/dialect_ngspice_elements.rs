@@ -32,10 +32,12 @@ const READ: &[&str] = &[
     "defaults_duplicates",
     "diode_bjt",
     "instance",
+    "instance_ports",
     "lines",
     "mosfet_jfet_mesfet",
     "mosfet_soi3",
     "osdi_codemodel",
+    "passive_model_order",
     "rcl_dynamic",
     "rcl_dynamic_quoted",
     "rcl_dynamic_refused",
@@ -46,7 +48,7 @@ const READ: &[&str] = &[
 ];
 
 /// The write fixtures, by name.
-const WRITE: &[&str] = &["cards"];
+const WRITE: &[&str] = &["cards", "model_value"];
 
 /// Known failures, by fixture name, with why: the design reads (or is written) but uses a feature
 /// ngspice's `FEATURES` lacks. Strict both ways (`known`): an unexpected pass fails until the
