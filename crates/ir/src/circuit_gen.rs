@@ -366,7 +366,7 @@ impl R<'_, '_> {
             }
             DetailKind::Coupling => {
                 let count = if self.maybe(X::CouplingMany) { 3 } else { 2 };
-                let inductors = self.fresh_names(count);
+                let inductors = self.element_names(count);
                 let k = self.dy();
                 self.b.detail(Coupling { inductors, k })
             }
@@ -377,7 +377,7 @@ impl R<'_, '_> {
             DetailKind::Controlled => {
                 let gain = self.ex();
                 let sense = if matches!(kind, ElemKind::Cccs | ElemKind::Ccvs) {
-                    self.g.fresh_name(self.b)
+                    self.element_name()
                 } else {
                     NameId::NONE
                 };
@@ -387,7 +387,11 @@ impl R<'_, '_> {
                 let dimension = 1 + self.g.below(2) as u8;
                 let control = ctl;
                 let per = if control == Quantity::Voltage { 2 } else { 1 };
-                let controls = self.fresh_names(per * u32::from(dimension));
+                let controls = if control == Quantity::Current {
+                    self.element_names(u32::from(dimension))
+                } else {
+                    self.fresh_names(per * u32::from(dimension))
+                };
                 let n = 1 + self.g.below(3);
                 let coeffs = self.exprs(n);
                 let output = out;
@@ -503,7 +507,7 @@ impl R<'_, '_> {
             }
             DetailKind::Switch => {
                 let sense = if kind == ElemKind::ISwitch {
-                    self.g.fresh_name(self.b)
+                    self.element_name()
                 } else {
                     NameId::NONE
                 };

@@ -4,14 +4,15 @@
 //!
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator); `rewrite/AMEND-A12.md` C5; `circuit_gen.rs`.
 //!
-//! Contents: `R::terminals`, `R::reference`, `R::master`, `R::has_visible` (`pub(super)`)
+//! Contents: `R::terminals`, `R::reference`, `R::master`, `R::has_visible`, `R::element_names`,
+//! `R::element_name` (`pub(super)`)
 
 use super::{BUILTINS, NONE_REF, R};
 use crate::circuit_check::{bound_family, builtin_fits, builtin_kind};
 use crate::circuit_extra::CircuitExtra as X;
 use crate::element::ElemKind;
 use crate::id::{DefId, List, NameId, NameList, Ref};
-use crate::item::DefKind;
+use crate::item::{DefKind, ItemKind};
 use crate::model::{Model, ModelFamily};
 
 impl R<'_, '_> {
@@ -153,5 +154,58 @@ impl R<'_, '_> {
                 && design.row::<Model>(d.item.index).family == family
                 && design.lookup(self.scope, DefKind::Model, d.name) == DefId(k as u32)
         })
+    }
+}
+
+impl R<'_, '_> {
+    /// `count` element names, each half the time an element already listed in this scope (A32:
+    /// real references for the rename properties) and otherwise fresh; distinct.
+    pub(super) fn element_names(&mut self, count: u32) -> NameList {
+        let mut ids: Vec<NameId> = Vec::with_capacity(count as usize);
+        for _ in 0..count {
+            let name = match self.existing_element() {
+                Some(n) if !ids.contains(&n) => n,
+                _ => self.g.fresh_name(self.b),
+            };
+            ids.push(name);
+        }
+        if ids.is_empty() {
+            List::EMPTY
+        } else {
+            self.b.name_ids(&ids)
+        }
+    }
+
+    /// Half the time, the name of an element listed in this scope: up to four draws of a random
+    /// item of the scope, O(1) whatever its size.
+    fn existing_element(&mut self) -> Option<NameId> {
+        if !self.g.chance(2) {
+            return None;
+        }
+        let items = self.b.design().items(self.scope);
+        if items.is_empty() {
+            return None;
+        }
+        // bounded: four draws
+        for _ in 0..4 {
+            let item = items[self.g.below(items.len() as u32) as usize];
+            if item.kind == ItemKind::Element {
+                return Some(
+                    self.b
+                        .design()
+                        .row::<crate::element::Element>(item.index)
+                        .name,
+                );
+            }
+        }
+        None
+    }
+
+    /// The name of an element of this scope half the time, else a fresh one.
+    pub(super) fn element_name(&mut self) -> NameId {
+        match self.existing_element() {
+            Some(n) => n,
+            None => self.g.fresh_name(self.b),
+        }
     }
 }
