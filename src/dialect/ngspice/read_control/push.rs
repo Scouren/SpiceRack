@@ -14,6 +14,7 @@ use super::{FORM, OWN};
 use crate::dialect::ngspice::expr_read::{self, Tree};
 use crate::dialect::ngspice::number::{self, Grammar};
 use crate::dialect::ngspice::read::{Lower, Stmt};
+use crate::dialect::ngspice::read_outputs;
 use crate::dialect::ngspice::read_run;
 use crate::dialect::ngspice::tables::Eval;
 use crate::ir;
@@ -31,6 +32,8 @@ pub(super) enum Ready {
     Env(Option<Value>, Option<Value>),
     /// A load.
     Load(String),
+    /// A `save` or `meas` command the outputs area reads: which, its words, its opaque text.
+    Output(bool, Vec<String>, String),
     /// An opaque: class, code, text.
     Opaque(ir::OpaqueClass, ir::Code, String),
     /// A loop: its variable, target, values and body.
@@ -55,6 +58,7 @@ pub(super) fn ready(lw: &mut Lower<'_, '_>, st: Stmt, ops: &[Op]) -> Vec<Ready> 
             | Op::State { cmd, .. }
             | Op::Load { cmd, .. }
             | Op::Save { cmd, .. }
+            | Op::Meas { cmd, .. }
             | Op::Opaque { cmd, .. }
             | Op::Pending { cmd, .. }
             | Op::Loop { cmd, .. } => cmd,
@@ -101,6 +105,20 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, scope: ir::ScopeId, items: 
             }
             Ready::Load(path) => {
                 lw.b.load(scope, ir::LoadKind::Osdi, path, span);
+            }
+            Ready::Output(save, words, text) => {
+                // the outputs area validates before it pushes; a refusal is this command's opaque
+                let inner = Stmt { scope, ..st };
+                let done = if *save {
+                    read_outputs::save_command(lw, inner, words)
+                } else {
+                    read_outputs::meas_command(lw, inner, words)
+                };
+                if let Err(no) = done {
+                    let f = read_outputs::fail(no);
+                    lw.b.opaque(scope, "ngspice", f.class, text, span);
+                    lw.diags.push(f.code, span, 0);
+                }
             }
             Ready::Opaque(class, code, text) => {
                 lw.b.opaque(scope, "ngspice", *class, text, span);
@@ -157,8 +175,10 @@ fn one(
         ),
         Op::State { keys, .. } => return state(keys),
         Op::Load { path, .. } => Ready::Load(path.clone()),
-        // ponytail: Unread until the outputs area's entry point for a script `save` lands
-        Op::Save { .. } => return Err((ir::OpaqueClass::Unread, FORM)),
+        Op::Save { rest, cmd } => Ready::Output(true, read_outputs::words(rest), cmd.opaque_text()),
+        Op::Meas { rest, cmd } => {
+            Ready::Output(false, read_outputs::words(rest), cmd.opaque_text())
+        }
         Op::Opaque { class, code, cmd } => Ready::Opaque(*class, *code, cmd.opaque_text()),
         Op::Pending { .. } => unreachable!("plan settles every pending alterparam"),
         Op::Loop {

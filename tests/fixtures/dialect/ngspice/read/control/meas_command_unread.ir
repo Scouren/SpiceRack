@@ -1,0 +1,7 @@
+# codes: P1408
+file "meas_command_unread.sp" deck
+  title "meas_command_unread"
+  comment " oracle: lead's Q5: a script meas with two analyses of its kind measures only the current plot: Unread at its place"
+  analysis tran stop=5u print_step=1u cap=ngspice_rule
+  analysis tran stop=10u print_step=1u cap=ngspice_rule
+  opaque ngspice unread ".control\nmeas tran mx max v(b)\n.endc"

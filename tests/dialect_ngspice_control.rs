@@ -40,6 +40,8 @@ const READ: &[&str] = &[
     "hash_line",
     "in_branch",
     "inert_commands",
+    "meas_command",
+    "meas_command_unread",
     "no_command",
     "option_commands",
     "osdi_late",
@@ -72,16 +74,7 @@ const WRITE: &[&str] = &[
 
 /// The fixtures that fail today, by name, with why. Strict both ways: a listed fixture that
 /// passes fails the test until its line goes.
-const PENDING: &[(&str, &str)] = &[
-    (
-        "hash_line",
-        "ng-scaffold: a `*#` line is read as a comment, not routed to the control area",
-    ),
-    (
-        "save_command",
-        "ng-outputs: the entry point for a script `save`",
-    ),
-];
+const PENDING: &[(&str, &str)] = &[];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in

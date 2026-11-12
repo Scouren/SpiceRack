@@ -68,6 +68,9 @@ pub(super) enum Op {
     Load { path: String, cmd: Cmd },
     /// `save …` in its exact case (before the first analysis, no `reset` in the script).
     Save { rest: String, cmd: Cmd },
+    /// `meas …` in its exact case (the script's one analysis of its kind ran before it, and
+    /// the deck has no card a `run` stands for: lead's Q5).
+    Meas { rest: String, cmd: Cmd },
     /// A command kept as its own opaque.
     Opaque {
         class: ir::OpaqueClass,
@@ -102,6 +105,13 @@ struct Interp {
     analysed: bool,
     /// Whether the script holds a `reset` anywhere (a `save` before it is undone by it).
     resets: bool,
+    /// The analysis words the whole script runs, a word twice if it runs more than once (a
+    /// loop body counts twice).
+    runs: Vec<String>,
+    /// The analysis words run so far.
+    seen: Vec<String>,
+    /// Whether the deck has a dot-card analysis.
+    cards: bool,
     /// Whether `quit` ended the script.
     quit: bool,
     /// Operations produced so far (the unroll bound).
@@ -125,6 +135,12 @@ pub(super) fn plan(blocks: &[Block], cards: bool) -> Result<Vec<Vec<Op>>, ir::Co
         resets: blocks
             .iter()
             .any(|b| b.nodes.as_ref().is_ok_and(|n| has_reset(n))),
+        runs: blocks
+            .iter()
+            .filter_map(|b| b.nodes.as_ref().ok())
+            .flat_map(|n| analysis_words(n, 1))
+            .collect(),
+        cards,
         ..Interp::default()
     };
     let mut out = Vec::with_capacity(blocks.len());
@@ -258,6 +274,7 @@ impl Interp {
             }
             _ if ANALYSES.contains(&w) => {
                 self.analysed = true;
+                self.seen.push(word.clone());
                 out.push(Op::Analysis {
                     name: word.clone(),
                     rest: subst(c.rest(), env)?,
@@ -326,7 +343,26 @@ impl Interp {
                 }
             }
             // ponytail: Unread until the outputs area's entry points for the exact case (Q5)
-            "meas" | "fourier" => out.push(opaque(ir::OpaqueClass::Unread, FORM)),
+            "meas" => {
+                let kind = c
+                    .rest()
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                let once = self.runs.iter().filter(|w| **w == kind).count() == 1;
+                if !self.cards && once && self.seen.contains(&kind) {
+                    out.push(Op::Meas {
+                        rest: subst(c.rest(), env)?,
+                        cmd: c.clone(),
+                    });
+                } else {
+                    out.push(opaque(ir::OpaqueClass::Unread, FORM));
+                }
+            }
+            // ponytail: `fourier` is the run area's `.four` on the current plot; Unread until a
+            // scripted deck can write `Four` back (ng-run refuses it there)
+            "fourier" => out.push(opaque(ir::OpaqueClass::Unread, FORM)),
             "osdi" => out.push(opaque(ir::OpaqueClass::InvalidInSource, NO_COMMAND)),
             _ => out.push(opaque(ir::OpaqueClass::InvalidInSource, NO_COMMAND)),
         }
@@ -454,6 +490,23 @@ fn reads_mark(op: &Op) -> bool {
         }
         other => format!("{other:?}").contains(MARK),
     }
+}
+
+/// The analysis words of `nodes`, each `times` times (a loop body twice: it may run more).
+fn analysis_words(nodes: &[Node], times: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    for n in nodes {
+        match n {
+            Node::Cmd(c) if ANALYSES.contains(&c.word().as_str()) => {
+                out.extend(std::iter::repeat_n(c.word(), times));
+            }
+            Node::Foreach { body, .. } | Node::Repeat { body, .. } => {
+                out.extend(analysis_words(body, times * 2));
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 /// Whether any statement of the script holds a `reset`.
