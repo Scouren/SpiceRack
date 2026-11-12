@@ -250,7 +250,7 @@ fn idt_takes_an_initial_value() {
         let mut diags = spicerack_ir::Diags::new();
         let text =
             format!("file \"t.sp\" deck\n  element behav b1 (a 0) expr=({e}) output=current\n");
-        spicerack_ir::parse(&text, &mut d.builder(), &mut diags);
+        spicerack_ir::parse_unchecked(&text, &mut d.builder(), &mut diags);
         let mut checked = spicerack_ir::Diags::new();
         spicerack_ir::check(&d, &mut checked);
         (

@@ -210,7 +210,7 @@ fn features(lines: &str) -> FeatureSet {
     let text = format!("file \"t.sp\" deck\n{lines}\n");
     let mut d = Design::new();
     let mut diags = Diags::new();
-    parse(&text, &mut d.builder(), &mut diags);
+    spicerack_ir::parse_unchecked(&text, &mut d.builder(), &mut diags);
     assert!(
         diags.is_empty(),
         "the deck reads with no diagnostic before any feature is looked at\n{text}: {:?}",

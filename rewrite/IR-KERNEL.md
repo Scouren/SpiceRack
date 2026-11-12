@@ -599,6 +599,14 @@ FeatureSet` is one scan.
   format is canonical (one spelling per design), lossless (`parse(dump(d))` rebuilds equal tables),
   line oriented, indented by scope, writable by hand. Put the grammar and one worked example in
   the file header.
+  (2026-11-12, R61/A36's finding on the trunk's mutation law: IR text is a dialect like the
+  others.) `parse` refuses a text that states an invalid design: a line read only in part
+  leaves no item, and after the link every item a `check` row names is one `TEXT_SYNTAX` row
+  and leaves its scope, the references to its definitions unbound, until `check` names none
+  (one `check` per read of a valid text). `parse_unchecked(&str, &mut Builder, &mut Diags)`
+  builds what the text states, valid or not: the door for `check`'s own fixtures. Law:
+  `tests/kernel_text_refuse.rs`, mutated dumps of generated designs read to designs `check`
+  accepts.
 - `gen.rs` (behind `cfg(any(test, feature = "gen"))`): `generate(seed, &FeatureSet, Size) ->
   Design`, always valid under `check` and legal for the set.
 - `diag.rs`: `Code { letter: u8, number: u16 }`, `Kind::{Note, Refusal}`, `Info { title, cite,

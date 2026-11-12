@@ -36,7 +36,7 @@
 //!   `Span`, `Table`, the kernel enums of `item` and `expr`, `Literal`, `NumForm`, `RowFacts`,
 //!   `Handle`, `ExprUse`, `Feature`, `FeatureSet`, `Extra`, `features_used`, `link`, `rewrite_exprs`, `check`,
 //!   `check_legal`, `Violation`, the diagnostic rows of `diag`, `eval`, `Bindings`, `Domain`,
-//!   `dump`, `parse`
+//!   `dump`, `parse`, `parse_unchecked`
 //! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
 //!   `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
 //! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `Reset`, `ResetSet`, `Restorable`, `Listed`, `listed`, `Setting`, `in_force`, `run_walks`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
@@ -187,7 +187,7 @@ pub use state_order::{Listed, Setting, in_force, listed, run_walks};
 pub use stats::{Statistics, Vary, VaryDist};
 pub use sweep::{SweepBounds, SweepEnd, SweepKind, SweepSpec};
 pub use table::Table;
-pub use text::{dump, parse};
+pub use text::{dump, parse, parse_unchecked};
 
 // `gen` is a reserved word in edition 2024; this line is last so check_style.py, which does
 // not read the raw identifier as a module, sees no import after it.
