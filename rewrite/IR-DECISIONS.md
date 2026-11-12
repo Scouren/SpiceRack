@@ -351,3 +351,22 @@ Run owner, Definition phase. Question → choice, why. `R<n>` ids are cited from
 - `run_exprs::Roots` holds the kernel's expression-list pool, the run pools and the pass's visitor. Its methods mirror the `*_handles` helpers one for one (`expr`, `exprs`, `sweep`, `probe`, `probes`, `event`, `dc_axes`, `varies`, `correlations`), so each row's `map_exprs` is one call per field, in `handles`' order. Pools are written in place. A probe's expression and an event's value are `Circuit`; every other root is `Constant`.
 - `DetailFacts::map_exprs(&mut self, &mut Roots)` is required, so every detail kind writes its own roots. `exprs_of::<D>` reads the detail row, visits it, and stores it back. Analysis, Loop and Measure dispatch through it; Alter, OptionRow, Env, NodeSet, Save, Print and Statistics write their own fields. Elaborate keeps the default because it holds no expression.
 - Oracle: the kernel's drift property (`kernel_rewrite`). It went red on a swapped event order (`count`/`delay`) before it was trusted green.
+
+## A18 applied (long literals)
+
+- The significands live in a dedicated pool (`Exprs::long`), not the text pool the proposal named: `eq_meaning` compares the text pool exactly, so long digits there would make two spellings of one decimal unequal. `eq_ignoring_spans` compares the long pool exactly; `eq_meaning` compares each literal pair by exact decimal value.
+- The design-level twins take a `Literal`, not a `NumId` (a writer holds the literal): `Design::literal_value(Literal)`, `Design::literal_eq(Literal, Literal)`, `Design::long_digits(Literal) -> Option<(&str, NumForm)>`; `text::write_num(&Design, Literal, &mut String)` beside `write_literal`.
+- A long `Mil` or `Int` literal is no `Long` (the written form is `Plain`, `Exponent` or `Scale`): an integer beyond 2^53 is a domain error anyway, and a long `mil` would need the decimal product by 25.4e-6 on strings. A reader that meets one keeps R37's interim rule.
+- `Words::number` (no caller) reads short literals only; the expression parser reads both through `text_parse::push_number`.
+- The owners' two generic literal reads moved to the design: `circuit_check`'s sign test (`literal_value`) and `run_words::is_one` (`literal_eq`).
+- `check`'s long-literal arm is `literal::long_violation` (check.rs passed 500 lines).
+
+## A26 applied (`Form`, `root_form`, `rewrite_exprs_in`)
+
+- `features_used` now reads each root's use from the row's handles (`feature::roots_with_use`, `map_exprs`'s order) instead of testing membership in the `ExprDyn` list. A root id listed under both kinds of handle counts in each field's own form, where before one `ExprDyn` listing made every listing dynamic.
+- `rewrite_exprs` and `rewrite_exprs_in` are one walk (`rewrite_where`). Each root's form is decided before the builder opens, while the class table is cached, and `map_exprs` stores back by position in the same order.
+
+## A25 item 1 applied (`Diag.item`)
+
+- `check`'s report takes the item instead of a span; non-item rows (expression rows, definitions' own faults at `Span::NONE`, the design-level features) pass `ItemRef::NONE`. The owners' row checks (`item_facts::field_domain`, the opaque check, `element::design_check`, `circuit_check`, `analysis_facts::report`) push at the item too; `Diags::push(code, span, arg)` stays for a reader's syntax rows and sets no item.
+

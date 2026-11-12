@@ -21,8 +21,8 @@ use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Func, UnOp};
 use crate::id::ExprId;
 use crate::text_expr::{binary_prec, func_text};
 use crate::text_lex::{
-    Mark, apply_mark, ident_or_quoted, lex_literal, lex_mark, lex_name, name_byte, number_end,
-    unquote,
+    Lexed, Mark, apply_mark, ident_or_quoted, lex_mark, lex_name, lex_number, name_byte,
+    number_end, unquote,
 };
 
 /// An entry of the operator stack.
@@ -116,7 +116,7 @@ pub(crate) fn parse_expr(
                 }
                 b'-' if p + 1 < end && s[p + 1].is_ascii_digit() => {
                     let q = number_end(s, p + 1, end);
-                    vals.push(b.literal(lex_literal(&text[p..q]).ok_or(p)?));
+                    vals.push(push_number(b, &text[p..q]).ok_or(p)?);
                     operand = false;
                     p = q;
                 }
@@ -131,7 +131,7 @@ pub(crate) fn parse_expr(
                 b'+' => p += 1, // unary plus is no node
                 b'0'..=b'9' => {
                     let q = number_end(s, p, end);
-                    vals.push(b.literal(lex_literal(&text[p..q]).ok_or(p)?));
+                    vals.push(push_number(b, &text[p..q]).ok_or(p)?);
                     operand = false;
                     p = q;
                 }
@@ -279,6 +279,14 @@ pub(crate) fn parse_expr(
 }
 
 // ---- private ----
+
+/// Pushes a number word as its literal, short or `Long` (A18); `None` when it is no number.
+fn push_number(b: &mut Builder<'_>, word: &str) -> Option<ExprId> {
+    Some(match lex_number(word)? {
+        Lexed::Short(l) => b.literal(l),
+        Lexed::Long(significand, exp10, form) => b.long_literal(significand, exp10, form),
+    })
+}
 
 /// Opens `word(`: a probe (read whole), a built-in function's argument list, or an error.
 /// Returns the position after what it consumed.
