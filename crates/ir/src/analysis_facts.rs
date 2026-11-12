@@ -124,7 +124,7 @@ pub(crate) fn detail_get<D: RunDetail>(design: &Design, index: u32) -> Option<D>
 
 /// Appends violation `v` of item `at` (`arg`: the item's row).
 pub(crate) fn report(design: &Design, at: ItemRef, v: Violation, out: &mut Diags) {
-    out.push(violation_code(v), design.span_of(at), at.index);
+    out.push_at(violation_code(v), design, at, at.index);
 }
 
 /// Whether an `Hb` or `Pss` analysis comes before position `pos` of `scope` in run order: in
