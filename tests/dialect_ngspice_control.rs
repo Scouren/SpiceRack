@@ -72,7 +72,16 @@ const WRITE: &[&str] = &[
 
 /// The fixtures that fail today, by name, with why. Strict both ways: a listed fixture that
 /// passes fails the test until its line goes.
-const PENDING: &[(&str, &str)] = &[];
+const PENDING: &[(&str, &str)] = &[
+    (
+        "hash_line",
+        "ng-scaffold: a `*#` line is read as a comment, not routed to the control area",
+    ),
+    (
+        "save_command",
+        "ng-outputs: the entry point for a script `save`",
+    ),
+];
 
 /// Decks whose vectors ngspice must reproduce after `write(read(deck))`. The element cards are
 /// other areas' (copied as text while they are stubs); the script is this area's, some of it in
@@ -212,7 +221,10 @@ fn row() -> &'static DialectRow {
 
 /// The fixture directory's `<sub>/control/<name>.<ext>`.
 fn text(sub: &str, name: &str, ext: &str) -> String {
-    let p = dir().join(sub).join("control").join(format!("{name}.{ext}"));
+    let p = dir()
+        .join(sub)
+        .join("control")
+        .join(format!("{name}.{ext}"));
     std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
 }
 
