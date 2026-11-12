@@ -38,6 +38,9 @@
 //! Cites: `rewrite/SPINE.md` §8a; REWRITE-PLAN §7.4; R49 (an ngspice deck means `ngspice -b
 //! -r`); AMEND-A12 A32 (the rename map is notes).
 //!
+//! Corpus cells (`--features corpus`, `test_pair/corpus.rs`): spice-bench through
+//! `ngspice-vacask`, the VACASK corpus through `vacask-ngspice`, leniently, with a census.
+//!
 //! Contents: none (tests only).
 
 #[path = "common/cmp.rs"]
@@ -59,16 +62,20 @@ mod vacask;
 mod files;
 #[path = "test_pair/plots.rs"]
 mod plots;
+#[path = "test_pair/run.rs"]
+mod run;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+#[cfg(feature = "corpus")]
+#[path = "test_pair/corpus.rs"]
+mod corpus;
+
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use spicerack::dialect::{self, DialectRow, Policy, Sources};
-use spicerack::ir;
-use spicerack::ir::ItemRow as _;
 
-use files::PairFile;
-use sim::{Ran, Sim};
+use run::{Deck, Done, Fail};
+use sim::Sim;
 
 /// One (source, target) pair: the dialect rows by name, the simulator each runs on, and the
 /// extension of each dialect's text.
@@ -81,25 +88,6 @@ struct Cell {
     from_ext: &'static str,
     to_ext: &'static str,
 }
-
-/// What the spine made of one deck: the legalized design, the written files (the entry
-/// first), the rename map (new name → source name, lower case) and the names of its devices
-/// (every element but a subcircuit instance, under both names, lower case).
-struct Spine {
-    legal: ir::Design,
-    files: Vec<(String, String)>,
-    renames: HashMap<String, String>,
-    devices: BTreeSet<String>,
-}
-
-/// A failed step: its class (what the expected list names) and what was seen.
-struct Fail {
-    class: String,
-    said: String,
-}
-
-/// A deck's written files, the entry first: (path, text).
-type Written = Vec<(String, String)>;
 
 /// The cells, `ngspice-vacask` and `vacask-ngspice` first (SPINE §8a).
 const CELLS: &[Cell] = &[
@@ -123,17 +111,48 @@ const CELLS: &[Cell] = &[
     },
 ];
 
-/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run`).
-const SECS: u64 = 60;
-
-/// The jobs step 6 converts the cell's decks on, against one.
-const JOBS: usize = 8;
-
-/// `name_with_letter`'s note at a renamed element, `arg` the old name (the pass's `RENAMED`,
-/// `src/passes/structure/name_with_letter.rs`; the passes are not public items).
-const RENAMED: ir::Code = ir::Code::new(b'U', 311);
-
 // ---- private ----
+
+#[cfg(feature = "corpus")]
+#[test]
+fn spice_bench_to_vacask() {
+    // The spice-bench decks the cross-sim cell keeps (`test_cross_sim/main.rs` SPICE_BENCH).
+    let spice_bench = corpus::Corpus {
+        var: "SPICE_BENCH",
+        keep: |p| !p.contains("/src") && !p.contains("/."),
+        source_list: "spice-bench",
+    };
+    let wrong = corpus::census(&CELLS[0], &spice_bench);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn vacask_corpus_to_ngspice() {
+    // The corpus's benchmarks carry each circuit for several simulators, each in its own
+    // folder (`benchmark/rc/{ngspice,xyce,gnucap,vacask}/runme.sim`): only VACASK's text is
+    // this cell's source.
+    let vacask = corpus::Corpus {
+        var: "VACASK_CORPUS",
+        keep: |p| {
+            let other = ["ngspice", "xyce", "gnucap"];
+            !p.split('/').any(|seg| other.iter().any(|o| seg.starts_with(o)))
+        },
+        source_list: "vacask",
+    };
+    let wrong = corpus::census(&CELLS[1], &vacask);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
 
 #[test]
 fn ngspice_to_vacask() {
@@ -173,46 +192,64 @@ fn a_cell_names_rows_with_the_sides_it_needs() {
 /// Every deck of `c` through the six steps, the failures compared with the cell's list.
 fn cell(c: &Cell) {
     let (from, to) = rows(c);
-    for s in [c.from_sim, c.to_sim] {
-        assert!(
-            s.on_path(),
-            "{}: {} not on PATH: run in `nix develop .#testing`",
-            c.name,
-            s.name()
-        );
-    }
-    let decks = decks(c);
+    let decks: Vec<Deck> = decks(c)
+        .into_iter()
+        .map(|path| {
+            let text = std::fs::read_to_string(&path).expect("a deck");
+            let file = path
+                .file_name()
+                .expect("a deck file")
+                .to_string_lossy()
+                .into_owned();
+            Deck {
+                name: stem(&path),
+                src: Sources::one(&file, &text),
+                path,
+                policy: Policy::Strict,
+                simulate: true,
+            }
+        })
+        .collect();
     assert!(!decks.is_empty(), "{}: a cell with no deck", c.name);
     let mut seen: BTreeMap<(String, u8), Fail> = BTreeMap::new();
-    let mut written: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+    let mut once = BTreeMap::new();
     for deck in &decks {
-        let name = stem(deck);
-        let text = std::fs::read_to_string(deck).expect("a deck");
-        let pair =
-            files::pair_file(deck).unwrap_or_else(|e| panic!("{}: {name}.pair: {e}", c.name));
-        let (fails, last) = steps(c, from, to, deck, &text, &pair, &mut written);
-        // A step with no input (no design, no text, no plots) did not run: `-`. Step 6 runs on
-        // every deck that was written.
-        let ran = |s: u8| s <= last || (s == 6 && written.contains_key(&name));
-        let line: Vec<String> = (1..=6u8)
-            .map(|s| match fails.get(&s) {
-                Some(f) => format!("{s}:{}", f.class),
-                None if ran(s) => format!("{s}:ok"),
-                None => format!("{s}:-"),
-            })
-            .collect();
-        eprintln!("{} {name}: {}", c.name, line.join(" "));
-        for (s, f) in fails {
-            seen.insert((name.clone(), s), f);
+        let pair = files::pair_file(&deck.path)
+            .unwrap_or_else(|e| panic!("{}: {}.pair: {e}", c.name, deck.name));
+        let done = run::steps(c, from, to, deck, &pair);
+        eprintln!(
+            "{} {}: {}",
+            c.name,
+            deck.name,
+            line(&done, done.written.is_some())
+        );
+        if let Some(w) = done.written {
+            once.insert(deck.name.clone(), w);
+        }
+        for (s, f) in done.fails {
+            seen.insert((deck.name.clone(), s), f);
         }
     }
-    for (name, why) in determinism(c, from, to, &decks, &written) {
-        let said = why.clone();
-        seen.insert((name, 6), fail("nondeterministic", said));
+    for (name, why) in run::determinism(from, to, &decks, &once) {
+        seen.insert((name, 6), run::fail("nondeterministic", why));
     }
-    let listed = files::listed(c.name);
+    let wrong = judge(c.name, &seen);
+    assert!(
+        wrong.is_empty(),
+        "{}: {} differ from tests/fixtures/pair/{}.txt:\n{}",
+        c.name,
+        wrong.len(),
+        c.name,
+        wrong.join("\n")
+    );
+}
+
+/// `seen` (each failing (deck, step)) against the list `tests/fixtures/pair/<list>.txt`, both
+/// ways: each unlisted failure, each listed step that fails in another class or passes.
+fn judge(list: &str, seen: &BTreeMap<(String, u8), Fail>) -> Vec<String> {
+    let listed = files::listed(list);
     let mut wrong = Vec::new();
-    for ((deck, step), f) in &seen {
+    for ((deck, step), f) in seen {
         match listed.get(&(deck.clone(), *step)) {
             Some(class) if *class == f.class => {}
             Some(class) => wrong.push(format!(
@@ -229,24 +266,39 @@ fn cell(c: &Cell) {
             ));
         }
     }
-    assert!(
-        wrong.is_empty(),
-        "{}: {} differ from tests/fixtures/pair/{}.txt:\n{}",
-        c.name,
-        wrong.len(),
-        c.name,
-        wrong.join("\n")
-    );
+    wrong
+}
+
+/// A deck's six steps on one line, `<step>:<class>`, `ok`, or `-` for a step with no input (no
+/// design, no text, no plots); step 6 ran when the deck was `written`.
+fn line(done: &Done, written: bool) -> String {
+    let ran = |s: u8| s <= done.last || (s == 6 && written);
+    let steps: Vec<String> = (1..=6u8)
+        .map(|s| match done.fails.get(&s) {
+            Some(f) => format!("{s}:{}", f.class),
+            None if ran(s) => format!("{s}:ok"),
+            None => format!("{s}:-"),
+        })
+        .collect();
+    steps.join(" ")
 }
 
 /// The two rows of `c`; panics unless the source has a reader and the target a writer and a
-/// reader (step 3 reads the written text back).
+/// reader (step 3 reads the written text back), and both simulators are on `PATH`.
 fn rows(c: &Cell) -> (&'static DialectRow, &'static DialectRow) {
     let row = |n: &str| dialect::by_name(n).unwrap_or_else(|| panic!("{}: no row {n}", c.name));
     let (from, to) = (row(c.from), row(c.to));
     assert!(from.read.is_some(), "{}: {} has no reader", c.name, c.from);
     assert!(to.write.is_some(), "{}: {} has no writer", c.name, c.to);
     assert!(to.read.is_some(), "{}: {} has no reader", c.name, c.to);
+    for s in [c.from_sim, c.to_sim] {
+        assert!(
+            s.on_path(),
+            "{}: {} not on PATH: run in `nix develop .#testing`",
+            c.name,
+            s.name()
+        );
+    }
     (from, to)
 }
 
@@ -262,283 +314,6 @@ fn decks(c: &Cell) -> Vec<PathBuf> {
         .collect();
     out.sort();
     out
-}
-
-/// Steps 1 to 5 of one deck: each failing step with its class, and the last step that ran.
-/// Puts the written files of a deck that reached step 3 in `written` (step 6's one job).
-fn steps(
-    c: &Cell,
-    from: &DialectRow,
-    to: &DialectRow,
-    deck: &Path,
-    text: &str,
-    pair: &PairFile,
-    written: &mut BTreeMap<String, Vec<(String, String)>>,
-) -> (BTreeMap<u8, Fail>, u8) {
-    let mut out = BTreeMap::new();
-    let spine = match spine(from, to, deck, text) {
-        Ok(s) => s,
-        Err((step, f)) => {
-            out.insert(step, f);
-            return (out, step);
-        }
-    };
-    written.insert(stem(deck), spine.files.clone());
-    if let Err(f) = read_back(to, &spine) {
-        out.insert(3, f);
-    }
-    let run = |sim: Sim, path: &Path, text: &str, files: &[(String, String)]| {
-        sim::run(sim, path, text, files, SECS)
-    };
-    let a = run(c.from_sim, deck, text, &[]);
-    let (entry, rest) = spine.files.split_first().expect("an entry file");
-    let b = run(c.to_sim, &deck.with_extension(c.to_ext), &entry.1, rest);
-    let (a, b) = match (a, b) {
-        (Ran::Plots(a), Ran::Plots(b)) => (
-            plots::only(a, pair.vectors.as_ref()),
-            plots::only(plots::renamed(b, &spine.renames), pair.vectors.as_ref()),
-        ),
-        (a, b) => {
-            out.insert(4, ran_fail(a, b));
-            return (out, 4);
-        }
-    };
-    let mut tol = cmp::Tol::of(&[text, &entry.1]);
-    for (k, v) in &pair.tightened {
-        tol.tighten(k, *v).expect("pair_file checked it");
-    }
-    if let Err(why) = cmp::compare(&a, &b, tol) {
-        out.insert(4, fail("mismatch", why));
-    }
-    if let Err(why) = plots::names(&a, &b, &spine.devices) {
-        out.insert(5, fail("missing-vector", why));
-    }
-    (out, 5)
-}
-
-/// Steps 1 and 2 and the writing: the legalized design and its files, or the step that
-/// refused with its codes. A statement the source reader keeps as `InvalidInSource` (its
-/// simulator rejects it) fails step 1, class `invalid-in-source`: the deck, not a pass, is at
-/// fault, though `legalize` would refuse it too. A panic is the step's failure, class `panic`: in the read step 1,
-/// in `legalize` step 2, in the writer step 3 (the target dialect).
-fn spine(from: &DialectRow, to: &DialectRow, deck: &Path, text: &str) -> Result<Spine, (u8, Fail)> {
-    let path = deck.file_name().expect("a deck file").to_string_lossy();
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    let src = Sources::one(&path, text);
-    guard(1, || {
-        dialect::read(&src, from, Policy::Strict, &mut design, &mut diags)
-    })?;
-    if let Some(f) = refusal(&diags, 0, text) {
-        return Err((1, f));
-    }
-    let table = ir::item::Opaque::table(&design);
-    let invalid = table
-        .rows()
-        .iter()
-        .filter(|o| o.class == ir::OpaqueClass::InvalidInSource);
-    if invalid.count() > 0 {
-        let notes: Vec<&ir::Diag> = diags.rows().iter().collect();
-        return Err((1, fail("invalid-in-source", describe(&notes, text))));
-    }
-    let read = diags.len();
-    guard(2, || dialect::legalize(&mut design, to, &mut diags))?;
-    if let Some(f) = refusal(&diags, read, text) {
-        return Err((2, f));
-    }
-    let renames: HashMap<String, String> = diags.rows()[read..]
-        .iter()
-        .filter(|d| d.code == RENAMED)
-        .map(|d| {
-            let e = design.row::<ir::Element>(d.item.index);
-            let new = design.str(e.name).to_ascii_lowercase();
-            (new, design.str(ir::NameId(d.arg)).to_ascii_lowercase())
-        })
-        .collect();
-    let files = guard(3, || laws::write_all(&design, to).files().to_vec())?;
-    let mut devices = BTreeSet::new();
-    for (item, _) in design.reachable() {
-        if item.kind != ir::ItemKind::Element {
-            continue;
-        }
-        let e = design.row::<ir::Element>(item.index);
-        if e.kind != ir::ElemKind::Instance {
-            let name = design.str(e.name).to_ascii_lowercase();
-            devices.extend(renames.get(&name).cloned());
-            devices.insert(name);
-        }
-    }
-    Ok(Spine {
-        legal: design,
-        files,
-        renames,
-        devices,
-    })
-}
-
-/// Step 3: the written files read back by `to`'s reader, leniently, mean the legalized design.
-fn read_back(to: &DialectRow, spine: &Spine) -> Result<(), Fail> {
-    let mut src = Sources::new();
-    for (path, text) in &spine.files {
-        src.add(path, text);
-    }
-    let mut back = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    dialect::read(&src, to, Policy::Lenient, &mut back, &mut diags);
-    if let Some(f) = refusal(&diags, 0, &spine.files[0].1) {
-        return Err(fail("refused-back", f.said));
-    }
-    if laws::same_meaning(&spine.legal, &back) {
-        return Ok(());
-    }
-    let ir_row = dialect::by_name("ir").expect("the ir row");
-    let normal =
-        |d: &ir::Design| laws::canonical(&laws::read_all(ir_row, &laws::write_all(d, ir_row)));
-    let (want, got) = (normal(&spine.legal), normal(&back));
-    // Every differing line, the first four: a known difference must not hide another.
-    let pairs = want.lines().zip(got.lines()).filter(|(w, g)| w != g);
-    let lines: Vec<String> = pairs
-        .take(4)
-        .map(|(w, g)| format!("legalized `{}`, read back `{}`", w.trim(), g.trim()))
-        .collect();
-    let said = match lines.is_empty() {
-        false => lines.join(" | "),
-        true => format!(
-            "{} lines legalized, {} read back",
-            want.lines().count(),
-            got.lines().count()
-        ),
-    };
-    Err(fail("differs", said))
-}
-
-/// `f`'s value, or step `step` failed with class `panic` and the panic's message.
-fn guard<T>(step: u8, f: impl FnOnce() -> T) -> Result<T, (u8, Fail)> {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).map_err(|e| {
-        let said = e
-            .downcast_ref::<String>()
-            .cloned()
-            .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
-            .unwrap_or_else(|| "a panic with no message".into());
-        (step, fail("panic", said))
-    })
-}
-
-/// The refusing rows of `diags` from `from` on, as a class `refused:<codes>` (and, for `U0001`,
-/// `:<features>`: the cause is the feature, so a row whose feature changes fails its line) and
-/// a message naming each with its title and source line; `None` when none refuses.
-fn refusal(diags: &ir::Diags, from: usize, text: &str) -> Option<Fail> {
-    let rows: Vec<&ir::Diag> = diags.rows()[from..]
-        .iter()
-        .filter(|d| dialect::refuses(d.code))
-        .collect();
-    if rows.is_empty() {
-        return None;
-    }
-    let codes: BTreeSet<String> = rows.iter().map(|d| d.code.to_string()).collect();
-    let features: BTreeSet<String> = rows
-        .iter()
-        .filter(|d| d.code == ir::diag::UNSUPPORTED)
-        .map(|d| format!("{:?}", ir::Feature::from_index(d.arg as u16)).replace(' ', ""))
-        .collect();
-    let mut class = format!(
-        "refused:{}",
-        codes.into_iter().collect::<Vec<_>>().join(",")
-    );
-    if !features.is_empty() {
-        class += ":";
-        class += &features.into_iter().collect::<Vec<_>>().join("+");
-    }
-    Some(fail(&class, describe(&rows, text)))
-}
-
-/// `rows`, each with its source line in `text`, its code, title and (for `U0001`) the feature.
-fn describe(rows: &[&ir::Diag], text: &str) -> String {
-    let said: Vec<String> = rows
-        .iter()
-        .map(|d| {
-            let title = dialect::info(d.code).map_or("(no catalogue row)", |i| i.title);
-            let line = 1 + text.as_bytes()[..(d.span.start as usize).min(text.len())]
-                .iter()
-                .filter(|&&b| b == b'\n')
-                .count();
-            let arg = match d.code == ir::diag::UNSUPPORTED {
-                true => format!(" {:?}", ir::Feature::from_index(d.arg as u16)),
-                false => String::new(),
-            };
-            format!("line {line}: {} {title}{arg}", d.code)
-        })
-        .collect();
-    said.join(" | ")
-}
-
-/// Step 4's verdict when a run gave no plots: whose run, and why.
-fn ran_fail(a: Ran, b: Ran) -> Fail {
-    match (a, b) {
-        (Ran::Timeout, _) | (_, Ran::Timeout) => fail("slow", "past the CPU budget".into()),
-        (Ran::Failed(why), _) => fail("source-fails", why),
-        (_, Ran::Failed(why)) => fail("target-fails", why),
-        (Ran::Plots(_), Ran::Plots(_)) => unreachable!("a run without plots"),
-    }
-}
-
-/// Step 6: every deck of `decks` that was written once (`written`, one job) converted again on
-/// [`JOBS`] threads at once; the decks whose bytes differ, with the first file that does.
-fn determinism(
-    c: &Cell,
-    from: &DialectRow,
-    to: &DialectRow,
-    decks: &[PathBuf],
-    written: &BTreeMap<String, Vec<(String, String)>>,
-) -> Vec<(String, String)> {
-    let again: Vec<(String, Option<Written>)> = std::thread::scope(|s| {
-        let jobs: Vec<_> = (0..JOBS)
-            .map(|j| {
-                s.spawn(move || {
-                    let mine = decks.iter().skip(j).step_by(JOBS);
-                    mine.map(|d| {
-                        let text = std::fs::read_to_string(d).expect("a deck");
-                        (stem(d), spine(from, to, d, &text).ok().map(|s| s.files))
-                    })
-                    .collect::<Vec<_>>()
-                })
-            })
-            .collect();
-        jobs.into_iter()
-            .flat_map(|j| j.join().expect("a job"))
-            .collect()
-    });
-    assert_eq!(
-        again.len(),
-        decks.len(),
-        "{}: every deck converted again",
-        c.name
-    );
-    let mut out = Vec::new();
-    for (name, files) in again {
-        let once = written.get(&name);
-        if once != files.as_ref() {
-            let file = once
-                .zip(files.as_ref())
-                .and_then(|(x, y)| {
-                    x.iter()
-                        .zip(y)
-                        .find(|(p, q)| p != q)
-                        .map(|(p, _)| p.0.clone())
-                })
-                .unwrap_or_else(|| "the file list".into());
-            out.push((name, format!("{file} differs between 1 and {JOBS} jobs")));
-        }
-    }
-    out
-}
-
-/// A failure of class `class`.
-fn fail(class: &str, said: String) -> Fail {
-    Fail {
-        class: class.to_string(),
-        said,
-    }
 }
 
 /// A path's file stem.
