@@ -21,7 +21,9 @@
 //! `FIRST_BRACE`, `PRIVATE_FORM`, `DUPLICATE_KEY`), `pub(super) struct Item`, `pub(super) enum Kind`,
 //! `pub(super) enum Val`, `pub(super) struct Card`, `Card::param(&mut self, &str, Val)`, `Item::as_value(&self) -> String`,
 //! `pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) fn val`, `b_tree`,
-//! `emit`, `head`, `push_done`, `number_word`, `literal`
+//! `emit`, `head`, `push_done`, `number_word`, `literal`,
+//! `pub(super) fn instance_temp(&ir::Design, &ir::Element) -> (bool, bool)`,
+//! `pub(super) fn bound(&ir::Design, &mut ir::Diags)`, `pub(super) const TEMP_FAMILY`
 
 mod controlled;
 mod lines;
@@ -137,6 +139,10 @@ pub(super) const PRIVATE_FORM: ir::Code = ir::Code::new(b'P', 1106);
 /// `tc1=0.01 tc1=0.02` is 0.02, `X1 … w=1 w=2` passes 2); the earlier ones are left out.
 pub(super) const DUPLICATE_KEY: ir::Code = ir::Code::new(b'P', 1107);
 
+/// An instance `temp=`/`dtemp=` on an element whose bound model's family has none on ngspice
+/// ("unknown parameter": runs fam, `instance_temp`): the deck is invalid in its source.
+pub(super) const TEMP_FAMILY: ir::Code = ir::Code::new(b'R', 1100);
+
 /// This area's codes.
 pub(super) const CODES: &[Row] = &[
     row(
@@ -174,6 +180,12 @@ pub(super) const CODES: &[Row] = &[
         "a parameter given twice on an element card",
         "ngspice-45 INPdevParse (each value set in turn); runs",
         "ngspice keeps the last value; the earlier ones are left out.",
+    ),
+    row(
+        TEMP_FAMILY,
+        "an instance temperature on a model family that has none",
+        "ngspice-45 device IFparm tables (bsim3/4, b3soi, b4soi, mes: no temp or dtemp; hicum2, soi3: no dtemp; hisimhv, mesa: no temp); runs",
+        "ngspice rejects the card (unknown parameter); the deck is invalid in its source.",
     ),
     row(
         PRIVATE_FORM,
@@ -396,6 +408,64 @@ pub(super) fn number_word(text: &str) -> Option<Scan> {
     (first.is_ascii_digit() || first == b'.')
         .then(|| number::card(t))
         .flatten()
+}
+
+/// Whether the family of `e`'s bound model takes an instance `temp` and `dtemp` on ngspice-45
+/// (the device's instance `IFparm` table; runs fam: `temp=40`/`dtemp=40` on an instance of each
+/// family, "unknown parameter" where it is false). `(true, true)` when the master is unbound or
+/// its family is not a semiconductor's of this table. The writer's `admits` and the reader's
+/// bound check read this one table.
+pub(super) fn instance_temp(design: &ir::Design, e: &ir::Element) -> (bool, bool) {
+    use ir::ModelFamily as F;
+    if e.model.def.is_none() {
+        return (true, true);
+    }
+    let item = design.def(e.model.def).item;
+    if item.kind != ItemKind::Model {
+        return (true, true);
+    }
+    let m: ir::Model = design.row(item.index);
+    match m.family {
+        // bsim1, bsim2, bsim3*, bsim4*, bsimsoi (b4soi.c), bsim3soi_*, mes: neither
+        F::Bsim1
+        | F::Bsim2
+        | F::Bsim3
+        | F::Bsim4
+        | F::B4Soi
+        | F::B3SoiFd
+        | F::B3SoiDd
+        | F::B3SoiPd
+        | F::Mesfet => (false, false),
+        // hicum2.c, soi3.c: temp only
+        F::Hicum2 | F::Soi3 => (true, false),
+        // hsmhv.c, hsmhv2.c, mesa.c: dtemp only
+        F::HisimHv | F::Mesa => (false, true),
+        // dio, bjt, vbic, mos1-9, hsm2, vdmos, jfet, jfet2, hfet1, hfet2: both
+        _ => (true, true),
+    }
+}
+
+/// The bind step's check of this area (called by `read.rs` after `bind_rows`): a coded row
+/// ([`TEMP_FAMILY`]) at every element whose instance temperature its bound family lacks.
+#[allow(
+    dead_code,
+    reason = "read.rs calls it after bind_rows once ng-scaffold adds the call"
+)]
+pub(super) fn bound(design: &ir::Design, diags: &mut ir::Diags) {
+    for (item, _) in design.reachable() {
+        if item.kind != ItemKind::Element {
+            continue;
+        }
+        let e: ir::Element = design.row(item.index);
+        if e.kind.detail() != ir::DetailKind::Semi {
+            continue;
+        }
+        let s = design.semi(&e);
+        let (temp, dtemp) = instance_temp(design, &e);
+        if !temp && !s.temp_abs.is_none() || !dtemp && !s.dtemp.is_none() {
+            diags.push(TEMP_FAMILY, design.span_of(item), 0);
+        }
+    }
 }
 
 /// A literal by its parts.

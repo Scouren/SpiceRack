@@ -4,11 +4,13 @@
 //! one (G, F, a current B, the semiconductors, R/C/L, X); an R/C/L whose value names the circuit
 //! or the temperature carries only what ngspice's B-source rewrite keeps; a static R/C/L only
 //! the keys its device takes; an instance parameter never one the reader reads as a typed
-//! field; a B-source field only what the B-source grammar spells.
+//! field; a B-source field only what the B-source grammar spells; an instance temperature only
+//! where its bound model's family has one (`read_elements::instance_temp`).
 //!
 //! Contents: `pub(super) fn spellable(&ir::Design, &ir::Element) -> bool`
 
 use super::super::expr_write;
+use super::super::read_elements;
 use super::super::tables::Eval;
 use super::cards::{names_run, passive_fields};
 use crate::ir::{self, ElemKind as K, Expr, ExprId};
@@ -117,12 +119,20 @@ pub(super) fn spellable(d: &ir::Design, e: &ir::Element) -> bool {
         }
         K::Diode | K::Bjt | K::Jfet => {
             let s = d.semi(e);
+            let (temp, dtemp) = read_elements::instance_temp(d, e);
+            if !temp && !none(s.temp_abs) || !dtemp && !none(s.dtemp) {
+                return false;
+            }
             s.initial != ir::semi::InitialState::On
                 && keys_ok(&["area", "ic", "m", "temp", "dtemp"])
         }
         K::Mosfet | K::Mesfet => {
             // a MOS takes no area (no ngspice MOS has the key: InvalidInSource on read)
             let s = d.semi(e);
+            let (temp, dtemp) = read_elements::instance_temp(d, e);
+            if !temp && !none(s.temp_abs) || !dtemp && !none(s.dtemp) {
+                return false;
+            }
             let area = e.kind == K::Mesfet || none(s.area);
             area && s.initial != ir::semi::InitialState::On
                 && keys_ok(&["area", "ic", "m", "temp", "dtemp"])

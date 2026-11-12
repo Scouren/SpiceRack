@@ -352,6 +352,39 @@ fn no_card_reaches_a_builder_assert_and_every_read_checks_clean() {
     }
 }
 
+#[test]
+fn an_instance_temperature_on_a_family_without_one_is_refused_by_the_writer() {
+    // Oracle: runs fam (ngspice-45): `temp=`/`dtemp=` on a BSIM4 instance is "unknown
+    // parameter"; on MOS1 it runs. The writer refuses the first (W1100), writes the second.
+    let ir = |family: &str| {
+        format!(
+            "file \"t.sp\" deck\n  title \"t\"\n  model m {family} polarity=n\n  element mosfet M1 (d g 0 0) model=m temp_abs=30\n"
+        )
+    };
+    for (family, refused) in [("bsim4", true), ("mos1", false), ("hicum2", false)] {
+        let mut design = parse_ir(&ir(family));
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row(), &mut diags);
+        let got = diags.rows().iter().any(|d| d.code.to_string() == "W1100");
+        assert_eq!(got, refused, "{family}: {diags:?}");
+    }
+}
+
+#[test]
+fn a_read_instance_temperature_on_a_family_without_one_is_flagged_known_failure() {
+    // Oracle: runs fam: `M1 d g 0 0 m4 temp=30` on a BSIM4 model is "unknown parameter", so the
+    // deck is invalid in its source; the read should say so once the model is bound (R1100).
+    // KNOWN FAILURE: needs a hook after read.rs's bind_rows (asked of ng-scaffold); this test
+    // fails when the code appears, so the marker goes with the fix.
+    let deck = "t\n.model m4 nmos level=14 version=4.8.3\nM1 d g 0 0 m4 temp=30\n";
+    let (_, diags) = read_deck("t.sp", deck);
+    let flagged = diags.rows().iter().any(|d| d.code.to_string() == "R1100");
+    assert!(
+        !flagged,
+        "R1100 is read: the known failure is fixed, turn this into the passing test"
+    );
+}
+
 /// The ngspice row.
 fn row() -> &'static DialectRow {
     dialect::by_name("ngspice").expect("the ngspice row")
