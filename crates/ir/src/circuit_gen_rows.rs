@@ -15,6 +15,7 @@ use crate::circuit_features::dc_at_zero;
 use crate::circuit_features::reads_circuit;
 use crate::controlled::{Behav, OutKind};
 use crate::element::{ElemKind, NO_ROW};
+use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::Gen;
 use crate::r#gen::Reads;
 use crate::id::{ItemRef, ScopeId};
@@ -27,9 +28,22 @@ use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::span::Span;
 use crate::wave::WaveRef;
 
-/// Pushes one random device library into `scope` (always possible).
-pub(crate) fn generate_library(g: &mut Gen, scope: ScopeId, b: &mut Builder<'_>) -> ItemRef {
-    let family = ModelFamily::ALL[g.below(ModelFamily::COUNT as u32) as usize];
+/// Pushes one random device library of a family `features` holds into `scope` (A25), or
+/// returns `ItemRef::NONE` when it holds none.
+pub(crate) fn generate_library(
+    g: &mut Gen,
+    scope: ScopeId,
+    b: &mut Builder<'_>,
+    features: &FeatureSet,
+) -> ItemRef {
+    let families: Vec<ModelFamily> = ModelFamily::ALL
+        .into_iter()
+        .filter(|&f| features.contains(Feature::Family(f)))
+        .collect();
+    if families.is_empty() {
+        return ItemRef::NONE;
+    }
+    let family = families[g.below(families.len() as u32) as usize];
     let path = if g.chance(2) {
         NameId::NONE
     } else {

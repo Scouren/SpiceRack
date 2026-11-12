@@ -16,7 +16,7 @@ use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
 use crate::facts::{Handle, RowFacts};
-use crate::feature::FeatureSet;
+use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
 use crate::id::{ItemRef, NameId, Ref, ScopeId};
@@ -60,8 +60,9 @@ impl RowFacts for DeviceLibrary {
         // no reference field
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // `Feature::Item(DeviceLibrary)` is the kernel's; the row states nothing else
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        // `Feature::Item(DeviceLibrary)` is the kernel's; the family is the row's (A25)
+        *set = set.with(Feature::Family(self.family));
     }
 
     fn check(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _out: &mut Diags) {
@@ -86,8 +87,8 @@ impl RowFacts for DeviceLibrary {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        _features: &FeatureSet,
+        features: &FeatureSet,
     ) -> ItemRef {
-        crate::circuit_gen::generate_library(g, scope, b)
+        crate::circuit_gen::generate_library(g, scope, b, features)
     }
 }

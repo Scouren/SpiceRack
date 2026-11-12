@@ -189,7 +189,8 @@ dialect's default file for the family, the one proven over the family's whole ty
 set; a path names another proven file, kept as written (R45). The path is spelling, never
 meaning: no `check` or feature reads it, and a pass that drops libraries drops the row whatever
 its path. IR text:
-`device_library <family> [path="<path>"]`. Features: `Item(DeviceLibrary)`;
+`device_library <family> [path="<path>"]`. Features: `Item(DeviceLibrary)`; `Family(family)`, as a
+model of it (A25);
 `CircuitExtra::ModelWithoutLibrary` (design-level, `element::design_features`: a reachable model
 whose family has no reachable library of that family; `Module`, `CodeModel` and `Other` are
 exempt beside the builtins, R44: their code comes from a `Load` or is unbound, never from a
