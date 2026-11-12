@@ -7,12 +7,12 @@
 //! Cites: `rewrite/AMEND-A12.md` A23; `rewrite/IR-KERNEL.md` C11 (explicit stacks).
 //!
 //! Contents: `pub fn rewrite_exprs(&mut Design, &mut dyn FnMut(&mut Builder<'_>, ExprId) ->
-//! Option<ExprId>) -> u32`
+//! Option<ExprId>) -> u32`, `pub fn rewrite_exprs_in(&mut Design, Form, …) -> u32`
 
 use crate::build::Builder;
 use crate::design::Design;
 use crate::facts::RowFacts;
-use crate::feature::{Form, expr_roots};
+use crate::feature::{Form, root_form, roots_with_use};
 use crate::id::{ExprId, ItemRef};
 
 /// Rewrites every expression root of every listed item by `rule` and returns how many roots
@@ -43,40 +43,7 @@ pub fn rewrite_exprs(
     design: &mut Design,
     rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
 ) -> u32 {
-    let items: Vec<ItemRef> = design.reachable().into_iter().map(|(i, _)| i).collect();
-    let n = design.expr_count();
-    // old id -> its rewrite (itself when unchanged); `NONE` until visited
-    let mut memo = vec![ExprId::NONE; n];
-    // the roots, as `handles` lists them (`map_exprs` visits the same: the drift property)
-    let mut roots = Vec::new();
-    let mut handles = Vec::new();
-    for &item in &items {
-        handles.clear();
-        for_kind!(item.kind, R => design.row::<R>(item.index).handles(design, &mut handles));
-        roots.extend(expr_roots(design, &handles));
-    }
-    {
-        let mut b = design.builder();
-        for root in roots {
-            rewrite_tree(&mut b, root, &mut memo, rule);
-        }
-    }
-    // store the changed roots back through each row's own walk
-    let mut changed = 0;
-    let mut editor = design.editor();
-    for item in items {
-        editor.map_exprs(item, &mut |root, _| {
-            if root.is_none() || root.index() >= n {
-                return;
-            }
-            let new = memo[root.index()];
-            if !new.is_none() && new != *root {
-                *root = new;
-                changed += 1;
-            }
-        });
-    }
-    changed
+    rewrite_where(design, None, rule)
 }
 
 /// As [`rewrite_exprs`], restricted to the roots of one `form` (A26: `root_form` of each root as
@@ -88,10 +55,66 @@ pub fn rewrite_exprs_in(
     form: Form,
     rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
 ) -> u32 {
-    todo!()
+    rewrite_where(design, Some(form), rule)
 }
 
 // ---- private ----
+
+/// The walk of `rewrite_exprs` (`only` `None`) and `rewrite_exprs_in`: roots read through
+/// `handles` with their use, each root's form decided before anything is appended, the chosen
+/// roots rewritten into a memo, and stored back through each row's `map_exprs` in the same order.
+fn rewrite_where(
+    design: &mut Design,
+    only: Option<Form>,
+    rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
+) -> u32 {
+    let items: Vec<ItemRef> = design.reachable().into_iter().map(|(i, _)| i).collect();
+    let n = design.expr_count();
+    // old id -> its rewrite (itself when unchanged); `NONE` until visited
+    let mut memo = vec![ExprId::NONE; n];
+    // per item, whether each root (in `map_exprs` order) is of the chosen form
+    let mut chosen: Vec<Vec<bool>> = Vec::with_capacity(items.len());
+    let mut roots = Vec::new();
+    let mut handles = Vec::new();
+    for &item in &items {
+        handles.clear();
+        for_kind!(item.kind, R => design.row::<R>(item.index).handles(design, &mut handles));
+        let mut flags = Vec::new();
+        for (root, use_) in roots_with_use(design, &handles) {
+            let pick = only.is_none_or(|f| root.is_none() || root_form(design, root, use_) == f);
+            flags.push(pick);
+            if pick {
+                roots.push(root);
+            }
+        }
+        chosen.push(flags);
+    }
+    {
+        let mut b = design.builder();
+        for root in roots {
+            rewrite_tree(&mut b, root, &mut memo, rule);
+        }
+    }
+    // store the chosen roots back through each row's own walk
+    let mut changed = 0;
+    let mut editor = design.editor();
+    for (item, flags) in items.into_iter().zip(&chosen) {
+        let mut k = 0;
+        editor.map_exprs(item, &mut |root, _| {
+            let pick = flags.get(k).copied().unwrap_or(false);
+            k += 1;
+            if !pick || root.is_none() || root.index() >= n {
+                return;
+            }
+            let new = memo[root.index()];
+            if !new.is_none() && new != *root {
+                *root = new;
+                changed += 1;
+            }
+        });
+    }
+    changed
+}
 
 /// Rewrites the tree under `root` into `memo`, post-order with an explicit stack. Only rows
 /// that existed before the pass (`memo`'s length) are visited; a child not below its parent (a

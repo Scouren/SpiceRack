@@ -387,6 +387,15 @@ false for it; every generic caller goes through the design (`literal_value`, `li
 `long_digits`, `text::write_num`). IR text spells the digits as written, then the power in its
 form. `Extra::LongLiteral` marks one; the generator makes them only when the set has it.
 
+**A26 (2026-11-12): the expression door takes a form.** `pub enum Form { Static, Dynamic }` and
+`root_form(design, root, use) -> Form`: `Dynamic` when the root's field may read the circuit
+(`ExprUse::Circuit`) or its tree is of class `Temp` or above; the one decision, which
+`features_used` makes through the same private rule. `rewrite_exprs_in(design, form, rule)` is
+`rewrite_exprs` restricted to the roots of one form (decided before the pass appends anything):
+a root of the other form keeps its id, and a subtree shared by roots of both forms is rewritten
+for the one and kept for the other. Property: with a wrapping rule of `-(-e)`, the other form's
+`Neg` feature is never added, its roots keep their ids, and every root keeps its value.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are
