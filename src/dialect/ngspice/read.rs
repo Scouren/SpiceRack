@@ -18,13 +18,15 @@
 //! later).
 //!
 //! Contents: `pub(super) struct Lower<'a, 'd>`, `pub(super) struct Stmt`,
-//! `pub(super) enum Def`, `pub(super) struct RowRef`, `pub(super) fn bind_rows`,
-//! `pub(super) fn bind_reads`,
+//! `pub(super) enum Def`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
 //! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
 //! class, subckt_formals, refer, pending, rescope, measure_reads, include_path}`; the CST reads are `cst.rs`
 
+use std::collections::HashSet;
+
+use super::bind::{RowRef, bind};
 use super::codes;
 use super::cst::{body, extent, joined, line, next, rest, unquote};
 use super::declare::{self, Class, Declared, Script, declare};
@@ -66,6 +68,8 @@ pub(super) struct Lower<'a, 'd> {
     measured: &'a mut Vec<(usize, usize)>,
     declared: &'a Declared,
     script: &'a Script,
+    /// `(scope, element name)` of every element card so far (folded).
+    elements: &'a mut HashSet<(ir::ScopeId, String)>,
     /// Bytes read before the file's own text (1 for a library file).
     shift: u32,
     frames: Vec<Frame<'a>>,
@@ -82,22 +86,6 @@ pub(super) struct Stmt {
     pub(super) scope: ir::ScopeId,
     /// The root, `.subckt`, `.lib` section or branch node it stands in.
     pub(super) container: Node,
-}
-
-/// A row's reference waiting for the bind step ([`Lower::refer`]): its item, its slot in
-/// `RowFacts::map_refs` order, the scope it is read from, the kind the slot expects, the name.
-#[derive(Clone, Copy, Debug)]
-pub(super) struct RowRef {
-    /// The pushed item.
-    pub(super) item: ir::ItemRef,
-    /// Its reference's slot.
-    pub(super) k: u32,
-    /// Where the name is read.
-    pub(super) scope: ir::ScopeId,
-    /// The definition kind the slot expects.
-    pub(super) kind: ir::DefKind,
-    /// The name, as pushed.
-    pub(super) name: ir::NameId,
 }
 
 /// What a name is defined as, for the declare step.
@@ -155,6 +143,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
     let mut pending = Vec::new();
     let mut rows = Vec::new();
     let mut measured = Vec::new();
+    let mut elements = HashSet::new();
     for (k, (path, _)) in src.files().iter().enumerate() {
         let (file, top) = out.file(path, roles[k]);
         let declared = declare(&asts[k], &toks[k]);
@@ -175,6 +164,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             measured: &mut measured,
             declared: &declared,
             script: &script,
+            elements: &mut elements,
             shift: u32::from(roles[k] == ir::Role::Library),
             frames: Vec::new(),
             framed: false,
@@ -213,50 +203,6 @@ pub(super) fn references(text: &str) -> Vec<Reference> {
         }
     }
     out
-}
-
-/// The bind step's row half: each queued reference bound to the `kind` definition of its name
-/// nearest its scope outward (`Design::lookup`), through `Builder::bind_ref`; left unresolved
-/// when there is none (R4).
-pub(super) fn bind_rows(b: &mut ir::Builder<'_>, rows: &[RowRef]) {
-    for r in rows {
-        let def = b.design().lookup(r.scope, r.kind, r.name);
-        if !def.is_none() {
-            b.bind_ref(r.item, r.k, def);
-        }
-    }
-}
-
-/// The bind step's read half: each pending parameter read and user call, still unresolved,
-/// bound to the definition ngspice reads from its scope, the nearest enclosing one
-/// (`Design::lookup`); a read inside a `measured` range (`Lower::measure_reads`) binds to a
-/// measure of its name first, then to a parameter.
-pub(super) fn bind_reads(
-    b: &mut ir::Builder<'_>,
-    pending: &[(ir::ExprId, ir::ScopeId)],
-    measured: &[(usize, usize)],
-) {
-    for (k, &(e, scope)) in pending.iter().enumerate() {
-        let (kind, r) = match b.design().expr(e) {
-            ir::Expr::Param(r) => (ir::DefKind::Param, r),
-            ir::Expr::UserCall(r, _) => (ir::DefKind::Func, r),
-            other => unreachable!("only reads and calls are pending: {other:?}"),
-        };
-        if !r.def.is_none() {
-            continue;
-        }
-        let in_measure = measured.iter().any(|&(a, z)| (a..z).contains(&k));
-        let mut def = ir::DefId::NONE;
-        if in_measure && kind == ir::DefKind::Param {
-            def = b.design().lookup(scope, ir::DefKind::Measure, r.name);
-        }
-        if def.is_none() {
-            def = b.design().lookup(scope, kind, r.name);
-        }
-        if !def.is_none() {
-            b.resolve(e, def);
-        }
-    }
 }
 
 impl<'a, 'd> Lower<'a, 'd> {
@@ -550,8 +496,19 @@ fn lower(lw: &mut Lower<'_, '_>, top: ir::ScopeId) {
     );
 }
 
-/// The one dispatch: a statement's tag → its area function.
+/// The one dispatch: a statement's tag → its area function. An element card whose name the
+/// scope has already is no element: ngspice bails out ("device already exists", run dup.cir).
 fn dispatch(lw: &mut Lower<'_, '_>, st: Stmt) {
+    if lw.ast.tag(st.node) == Tag::Instance {
+        let name = name::key(&lw.keyword(st.node));
+        if !lw.elements.insert((st.scope, name)) {
+            return lw.opaque(
+                st,
+                ir::OpaqueClass::InvalidInSource,
+                codes::DUPLICATE_ELEMENT,
+            );
+        }
+    }
     match lw.ast.tag(st.node) {
         Tag::Title => read_structure::title(lw, st),
         Tag::End => read_structure::end(lw, st),
@@ -649,16 +606,4 @@ fn comments(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, from: u32, to: u32) {
         }
         lw.b.comment(scope, text, span);
     }
-}
-
-/// The bind step: each queued row reference ([`bind_rows`]), then each pending parameter read
-/// and user call ([`bind_reads`]).
-fn bind(
-    b: &mut ir::Builder<'_>,
-    pending: &[(ir::ExprId, ir::ScopeId)],
-    measured: &[(usize, usize)],
-    rows: &[RowRef],
-) {
-    bind_rows(b, rows);
-    bind_reads(b, pending, measured);
 }

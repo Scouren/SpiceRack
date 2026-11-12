@@ -417,14 +417,14 @@ fn a_row_reference_queued_by_an_area_binds_to_a_definition_pushed_later() {
     let mut b = d.builder();
     let name = b.design().find_name("s");
     let top = b.design().file(b.design().entry()).top;
-    let rows = [super::read::RowRef {
+    let rows = [super::bind::RowRef {
         item,
         k: 0,
         scope: top,
         kind: ir::DefKind::Subckt,
         name,
     }];
-    super::read::bind_rows(&mut b, &rows);
+    super::bind::bind_rows(&mut b, &rows);
     let e: ir::Element = d.row(item.index);
     assert_eq!(d.def(e.model.def).item, sub);
 }
@@ -445,7 +445,7 @@ fn a_read_in_a_measure_binds_to_a_measure_before_a_parameter() {
     let inside = b.param_ref("x");
     let outside = b.param_ref("x");
     let pending = [(inside, top), (outside, top)];
-    super::read::bind_reads(&mut b, &pending, &[(0, 1)]);
+    super::bind::bind_reads(&mut b, &pending, &[(0, 1)]);
     let def = |e| match b.design().expr(e) {
         ir::Expr::Param(r) => r.def,
         other => panic!("{other:?}"),

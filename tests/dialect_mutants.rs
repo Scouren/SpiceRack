@@ -34,7 +34,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l1-mutants",
         "ngspice",
-        "elements: two B cards of one name push two elements (X0016); a J card with fewer than its \
+        "elements: a J card with fewer than its \
          nodes (`jfet_mes_hfet` read as a card, ` j1 njf beta=1e-4`) indexes past its words in \
          read_elements/semi.rs; run: `.options fourgridsize=400` with `.four` pushes a key of \
          another kind (X0015); reported to ng-elements and ng-run",
