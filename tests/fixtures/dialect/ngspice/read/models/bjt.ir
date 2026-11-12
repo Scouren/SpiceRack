@@ -1,9 +1,10 @@
 # codes:
 file "bjt.sp" deck
   title "bjt"
-  comment " oracle: inpdomod.c npn/pnp switch (levels 0-2 BJT, 4 and 9 VBIC, 8 hicum2), vbicsetup.c:360 (a silent vers is 1.2), hicum2setup.c:45 (silent version 2.4.0), run: level=2 gives the level-1 current"
+  comment " oracle: inpdomod.c npn/pnp switch (levels 0-2 BJT, 4 and 9 VBIC, 8 hicum2), vbicsetup.c:360 (a silent vers is 1.2), hicum2setup.c:45 (silent version 2.4.0; a version is never read again: 2.3 runs 2.4.0, run), run: level=2 gives the level-1 current"
   model q1 gummel_poon polarity=n params=(bf=100 is=1e-16)
   model q2 gummel_poon polarity=p params=(bf=50)
   model q3 vbic polarity=n params=(rbi=10) version="1.2"
   model q4 vbic polarity=p params=(is=1e-16) version="1.2"
   model q5 hicum2 polarity=n params=(c10=2e-30) version="2.4.0"
+  model q6 hicum2 polarity=n version="2.4.0"

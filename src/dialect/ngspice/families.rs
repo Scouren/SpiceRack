@@ -321,10 +321,11 @@ pub(super) fn binnable(family: F) -> bool {
 /// prefix (b4v5check.c:64-69); BSIM4 `4.8.1`/`4.81`, `4.8.2`/`4.82`, `4.8.3`/`4.83`, else 4.8.0
 /// (b4set.c:345-347, b4check.c:68-70); BSIM3v0, BSIM3v1, BSIM3 (3.3.0), BSIM4v6 (4.6.5), BSIM4v7
 /// (4.7.0) one each; HiSIM-HV and HiSIM2 reset any version to theirs (hsmhvset.c:76-81,
-/// hsmhv2set.c:136-150, hsm2set.c:132-138); HICUM2, B4SOI, B3SOI and VBIC keep the text but
-/// run one version: only that one is in the vocabulary (a numeric version compares as a number).
+/// hsmhv2set.c:136-150, hsm2set.c:132-138); HICUM2, B4SOI, B3SOI and VBIC keep the text and never
+/// read it again (no use outside their `*mpar.c`/`*mask.c`), so any version runs their one.
+/// Pinned by runs: `the_version_spellings_run_the_same_device` in
+/// `tests/dialect_ngspice_models.rs` (both spellings of each family, one operating point).
 pub(super) fn standard(family: F, device: &str, text: &str) -> Option<&'static str> {
-    let num = |want: f64| text.parse::<f64>().ok().filter(|v| *v == want);
     let pick = |rows: &[(&str, &str, &'static str)], other: Option<&'static str>| {
         rows.iter()
             .find(|(exact, prefix, _)| text == *exact || text.starts_with(prefix))
@@ -359,11 +360,13 @@ pub(super) fn standard(family: F, device: &str, text: &str) -> Option<&'static s
         "hisimhv1" => Some("1.24"),
         "hisimhv2" => Some("2.20"),
         "hisim2" => Some("280"),
+        // silently ignored: runs: HICUM2 2.3, B4SOI 4.3, B3SOI-PD 2.2, VBIC vers=1.3 give the
+        // currents of 2.4.0, 4.4, 2.0, 1.2
         _ => match family {
-            F::Hicum2 => (text == "2.4.0").then_some("2.4.0"),
-            F::B4Soi => num(4.4).map(|_| "4.4"),
-            F::B3SoiFd | F::B3SoiDd | F::B3SoiPd => num(2.0).map(|_| "2.0"),
-            F::Vbic => num(1.2).map(|_| "1.2"),
+            F::Hicum2 => Some("2.4.0"),
+            F::B4Soi => Some("4.4"),
+            F::B3SoiFd | F::B3SoiDd | F::B3SoiPd => Some("2.0"),
+            F::Vbic => Some("1.2"),
             _ => None,
         },
     }

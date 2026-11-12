@@ -158,12 +158,6 @@ pub(super) const CODES: &[Row] = &[
         "each value is set in turn; the last one is kept.",
     ),
     note(
-        VERSION,
-        "a model version outside the IR's vocabulary",
-        "ir-circuit circuit_tables::VERSIONS; ngspice-45 the devices' *set.c and *check.c",
-        "ngspice runs it as a version the model standard's list does not name (HICUM 2.3, B3SOI-PD 2.2): kept as text until the vocabulary has it (Unread).",
-    ),
-    note(
         DIODE_LEVEL,
         "a diode level ngspice runs as neither family",
         "ngspice-45 diotemp.c:210, diosetup.c:301",
@@ -193,8 +187,6 @@ const IGNORED: Code = Code::new(b'P', 1205);
 const POLARITY: Code = Code::new(b'P', 1206);
 /// A parameter given twice: ngspice sets the last value.
 const REPEATED: Code = Code::new(b'P', 1207);
-/// A version ngspice runs but the IR's vocabulary lacks (`circuit_tables::VERSIONS`): `Unread`.
-const VERSION: Code = Code::new(b'P', 1209);
 /// A diode level other than 1 and 3: ngspice runs it as neither family, `Private`.
 const DIODE_LEVEL: Code = Code::new(b'P', 1208);
 /// A model its scope defines already: ngspice keeps the first; this one is `Inert`.
@@ -290,8 +282,11 @@ fn read(lw: &mut Lower<'_, '_>, st: Stmt) -> Result<(), Refusal> {
     // the version ngspice runs, in the IR's vocabulary (a silent card's default is in it)
     let version = match (version, device) {
         (Some(v), Some(dev)) => {
-            let std = families::standard(family, dev, &v).ok_or((OpaqueClass::Unread, VERSION))?;
-            Some(std.to_string())
+            let std = families::standard(family, dev, &v);
+            Some(
+                std.expect("every version ngspice runs is a standard one")
+                    .to_string(),
+            )
         }
         (v, _) => v,
     };
