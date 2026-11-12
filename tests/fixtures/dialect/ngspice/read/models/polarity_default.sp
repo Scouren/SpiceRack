@@ -1,0 +1,8 @@
+polarity_default
+* oracle: inpgmod.c create_model (the type word is read as a parameter: psoi, phfet on MES, pmf on HFET1, pmos on SOI3 (its flags are nsoi psoi, soi3.c:177) are none, unrecognized, and the device runs its default n type), runs: psoi level=10 gives the nmos level=10 current -9.97549e-09, pmos level=60 the nsoi level=60 current -2.00010e-12 (six terminals, tb tof tob given)
+.model s1 psoi level=10
+.model s2 nsoi level=57
+.model h1 phfet level=1
+.model f5 pmf level=5
+.model s3 pmos level=60
+.model s4 psoi level=60

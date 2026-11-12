@@ -1,0 +1,7 @@
+# codes: R1201 R1201
+file "duplicate.sp" deck
+  title "duplicate"
+  comment " oracle: inpmkmod.c INPmakeMod (a model name already in the table is kept: the first card wins), run: is=1e-14 then is=1e-12 gives the is=1e-14 current"
+  model dd diode params=(is=1e-14)
+  opaque ngspice inert ".model dd d is=1e-12"
+  opaque ngspice inert ".model DD d is=1e-10"

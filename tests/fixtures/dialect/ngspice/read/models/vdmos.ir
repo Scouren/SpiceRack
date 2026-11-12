@@ -1,0 +1,8 @@
+# codes: P1205 P1205 P1205
+file "vdmos.sp" deck
+  title "vdmos"
+  comment " oracle: inpcom.c inp_vdmos_model (a type word starting vdmos; pchan anywhere or vdmosp is p; pchan, nchan, ron=, vds=, qg=, mfg= dropped), vdmos.c model table"
+  model v1 vdmos polarity=n params=(vto=2 kp=10)
+  model v2 vdmos polarity=p params=(vto=-2 kp=10)
+  model v3 vdmos polarity=p params=(vto=-2)
+  model v4 vdmos polarity=n params=(vto=2)

@@ -1,0 +1,8 @@
+# codes: P1205 P1205 P1207 P1205 P1205
+file "params_ignored.sp" deck
+  title "params_ignored"
+  comment " oracle: inpgmod.c create_model (a name no IFparm table of the device has is unrecognized parameter - ignored; level and m skipped unless model parameters; a repeated parameter is set again), runs: foo=3 and m=2 on nmos change nothing"
+  model m1 mos1 polarity=n params=(vto=0.5 kp=2e-4)
+  model d1 diode params=(m=0.4)
+  model r1 resistor params=(r=5)
+  model m2 mos1 polarity=n params=(l=1u)
