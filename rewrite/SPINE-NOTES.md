@@ -143,7 +143,8 @@ Each line: question → choice → why.
     `tests/fixtures/dialect/ir/read/{worked,kernel}.ir`. Its first run found three IR-text
     reader holes (KNOWN): `ir::parse` pushes an element row `check` refuses instead of a `P9001`
     for a second element of one name (X0016), a key of another kind (`dc=` on a resistor,
-    X0015) and a terminal count out of range (X0006).
+    X0015) and a terminal count out of range (X0006). All three refused (one `P9001`, nothing
+    pushed) since ir-circuit ed8baf22 (ir-rewrite bdcae2e3); the `ir` entry is gone.
 
 35. A25 (R48) in the laws → shrink to admitted in `tests/common/laws.rs` (included by
     `dialect_laws.rs` by path; a one-file folder fails check_style.py, `common/` is the house

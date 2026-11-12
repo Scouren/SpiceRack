@@ -54,8 +54,6 @@ const KNOWN: &[(&str, &str)] = &[];
 
 /// The simulator deck: every card form that carries a number and runs in an operating point.
 const SIM: &str = "elements
-.options tnom=50
-.temp 77
 V1 in 0 1
 R17 a q {1k+0*v(a)} tc1=0.01
 R18 q 0 1k
@@ -94,6 +92,8 @@ R1 p q 1k m=5
 R8 x 0 1k
 R9 a k {1k+v(a)}
 R10 k 0 1k
+.options tnom=50
+.temp 77
 .control
 op
 print v(a) v(b) v(e) v(g) v(f) v(h2) v(p) v(h) v(bi) v(t) v(d) v(x) v(k) v(q) v(vb)

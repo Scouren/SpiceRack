@@ -614,6 +614,22 @@ mod tests {
             // a module model without its module
             "file \"rc.sp\" deck\n  model m2 module\n",
         ];
+        // DuplicateElement: a second element of one whole name in one scope (the first stays)
+        let text = "file \"rc.sp\" deck\n  subckt div (in out gnd) r=1\n    element resistor r1 (in out) value=r\n    element resistor r1 (in out) value=r\n";
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        parse(text, &mut d.builder(), &mut diags);
+        let codes: Vec<_> = diags.rows().iter().map(|r| r.code).collect();
+        assert_eq!(codes, vec![spicerack_ir::diag::TEXT_SYNTAX], "{text}");
+        let elements = d
+            .reachable()
+            .into_iter()
+            .filter(|(i, _)| i.kind == spicerack_ir::ItemKind::Element)
+            .count();
+        assert_eq!(elements, 1, "{text}");
+        let mut checked = Diags::new();
+        spicerack_ir::check(&d, &mut checked);
+        assert!(checked.is_empty(), "{text}: {:?}", checked.rows());
         for text in cases {
             let mut d = Design::new();
             let mut diags = Diags::new();
