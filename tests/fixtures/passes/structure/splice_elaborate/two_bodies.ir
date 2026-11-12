@@ -1,0 +1,7 @@
+file "a.sp" deck
+  subckt sup ()
+    element vsource v1 (a 0) dc=1
+  subckt load ()
+    element resistor r1 (a 0) value=1k
+  elaborate (sup load)
+  analysis op

@@ -17,11 +17,13 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
+//! Contents: `pub mod constant_param_to_formal`, `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
 //! `pub mod drop_device_libraries`, `pub mod explicit_family_models`,
 //! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`,
+//! `pub mod splice_elaborate`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
+pub mod constant_param_to_formal;
 pub mod deck_title;
 pub mod device_libraries;
 pub mod drop_builtin_models;
@@ -29,6 +31,7 @@ pub mod drop_device_libraries;
 pub mod explicit_family_models;
 pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
+pub mod splice_elaborate;
 
 use super::Pass;
 use crate::ir;
@@ -84,6 +87,20 @@ pub(super) const PASSES: &[Pass] = &[
             hoist_nested_subckts::HOIST_DEFAULT,
         ],
         run: hoist_nested_subckts::hoist_nested_subckts_default,
+    },
+    Pass {
+        name: "constant_param_to_formal",
+        removes: ir::Feature::Extra(ir::Extra::SubcktConstantParam),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[constant_param_to_formal::PASSED_LOCAL],
+        run: constant_param_to_formal::constant_param_to_formal,
+    },
+    Pass {
+        name: "splice_elaborate",
+        removes: ir::Feature::Item(ir::ItemKind::Elaborate),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Item(ir::ItemKind::Param)),
+        notes: &[splice_elaborate::ELABORATE_KEPT],
+        run: splice_elaborate::splice_elaborate,
     },
     Pass {
         name: "formal_defaults_to_instances",
@@ -213,6 +230,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a formal whose non-constant default the pass replaced with 0",
             cite: "R13, R53; rewrite/AMEND-A12.md A29",
             explain: "Every instance now passes this formal's default as its actual. The target has no formal without a default, so the formal's own default became 0: the pass's value, which no instance reads.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        splice_elaborate::ELABORATE_KEPT,
+        ir::Info {
+            title: "an elaborate statement the target's one top circuit cannot hold",
+            cite: "rewrite/AMEND-A12.md R1; rewrite/DIALECT-VACASK.md §6 (VS V1, V2)",
+            explain: "The target's top circuit is its deck's top scope, so an elaborate statement is spliced in: the named subcircuits' bodies become the top. This one cannot be: it is not the only one, it follows an analysis, the top holds elements of its own, a named subcircuit is also instantiated or has a formal without a default, or two spliced bodies define one name. The statement is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        constant_param_to_formal::PASSED_LOCAL,
+        ir::Info {
+            title: "a subcircuit's local parameter an instance passes a value for",
+            cite: "rewrite/AMEND-A12.md A25; R48",
+            explain: "The target reads a constant parameter in a subcircuit's body as a formal an instance may override. An instance passes a value of this parameter's name, which the source ignores and the target would take, so the parameter is refused.",
             kind: ir::Kind::Note,
         },
     ),

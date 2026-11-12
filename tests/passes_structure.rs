@@ -42,6 +42,8 @@ const PENDING_PAIRS: &[&str] = &[
     "hoist_enclosing_refs_default",
     "formal_defaults_to_instances",
     "formal_defaults_to_instances_default",
+    "splice_elaborate",
+    "constant_param_to_formal",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;

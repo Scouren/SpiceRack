@@ -1,0 +1,9 @@
+file "a.sp" deck
+  subckt c1 ()
+    element resistor r1 (a 0) value=1k
+  subckt c2 ()
+    element resistor r1 (a 0) value=2k
+  elaborate (c1)
+  analysis op
+  elaborate (c2)
+  analysis op
