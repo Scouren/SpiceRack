@@ -1,10 +1,11 @@
-# codes: P1350 P1350 P1350 P1350 P1350 P1350 P1350
+# codes: P1350 P1350 P1350 P1350 P1350 P1350 P1350 P1350
 file "meas_unread.sp" deck
   title "meas_unread"
   comment " oracle: forms the IR cannot state: td= on a window (measure_minMaxAvg ignores it), td= off tran (only tran_check reads m_td), td= with from= (both skip: their maximum), to=0 on a crossing ('no limit', m_to != 0.0e0), from= on a dc crossing (swapped, defaulted to -1e99..1e99), a trigger's from= as an expression (copied to the other clause only when not 0), par() (inpcom.c makes a B source)"
   opaque ngspice unread ".meas tran a4 avg v(a) td=1u"
   opaque ngspice unread ".meas ac a5 when vdb(out)=-3 td=1"
   opaque ngspice unread ".meas tran a6 find par('v(a)*2') at=1u"
+  opaque ngspice unread ".meas tran a12 find v(b) when v(a)=par('0.9*v(b)')"
   opaque ngspice unread ".meas tran a7 when v(a)=0.5 td=1u from=2u"
   opaque ngspice unread ".meas tran a8 when v(a)=0.5 to=0"
   opaque ngspice unread ".meas dc a9 when v(a)=0.5 from=1"

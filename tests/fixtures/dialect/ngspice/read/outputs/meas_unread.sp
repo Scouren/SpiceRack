@@ -3,6 +3,7 @@ meas_unread
 .meas tran a4 avg v(a) td=1u
 .meas ac a5 when vdb(out)=-3 td=1
 .meas tran a6 find par('v(a)*2') at=1u
+.meas tran a12 find v(b) when v(a)=par('0.9*v(b)')
 .meas tran a7 when v(a)=0.5 td=1u from=2u
 .meas tran a8 when v(a)=0.5 to=0
 .meas dc a9 when v(a)=0.5 from=1

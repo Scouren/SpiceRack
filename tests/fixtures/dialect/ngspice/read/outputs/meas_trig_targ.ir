@@ -1,8 +1,9 @@
 # codes:
 file "meas_trig_targ.sp" deck
   title "meas_trig_targ"
-  comment " oracle: ngspice-45 com_measure2.c measure_parse_trigtarg, measure_parse_stdParams (val is 0 when not given, the last of rise/fall/cross wins, LAST); get_measure2 (a FROM of one clause is the other's when that one has none and it is not 0); runs: tr = 1.156372e-07, t3 equal with and without cross=2 and val=0, t4 = td=1u in both clauses = 4.566531e-07"
+  comment " oracle: ngspice-45 com_measure2.c measure_parse_trigtarg, measure_parse_stdParams (val is 0 when not given, the last of rise/fall/cross wins, LAST); get_measure2 (a FROM of one clause is the other's when that one has none and it is not 0); runs: tr = 1.156372e-07, t3 equal with and without cross=2 and val=0, t4 = td=1u in both clauses = 4.566531e-07, val=0.2*2 reads 0.2 (ft_numparse stops at the number: t1 = t3 = 1.156372e-07)"
   measure tr tran trig_targ (cross rise (v (a)) value=0.2 count=1) (cross rise (v (a)) value=0.8 count=1)
   measure t2 tran trig_targ (at value=1u) (cross fall last (v (b)) value=0.5 delay=2u)
   measure t3 tran trig_targ (cross rise (v (a)) value=0.1 count=3) (cross cross last (i (v1)) value=0)
   measure t4 tran trig_targ (cross rise (v (a)) value=0.2 count=1 delay=1u) (cross fall (v (b)) value=0.5 count=1 delay=1u)
+  measure t5 tran trig_targ (cross rise (v (a)) value=0.2 count=1) (cross rise (v (a)) value=0.8 count=1)

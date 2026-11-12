@@ -73,7 +73,10 @@ pub(in crate::dialect::ngspice) fn probe_word(word: &str, ctx: Ctx) -> Result<Ve
         .and_then(|w| w.split_once('('))
         .ok_or(No::Untyped)?;
     let args: Vec<&str> = inner.split(',').collect();
-    let plain = |a: &&str| !a.is_empty() && !a.contains(['(', ')', '\'', '{', '}', '=']);
+    if args.iter().any(|a| a.is_empty()) {
+        return Err(No::Invalid); // `v()`: no such vector
+    }
+    let plain = |a: &&str| !a.contains(['(', ')', '\'', '{', '}', '=']);
     if args.len() > 2 || !args.iter().all(plain) {
         return Err(No::Untyped);
     }
