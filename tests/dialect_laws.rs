@@ -1,18 +1,18 @@
 //! The laws every dialect passes (REWRITE-PLAN §4.2), run for every row of
-//! `dialect::BUILTIN` on the sides it has: L1 totality, L2 validity, L3 determinism (reader);
-//! L4 writer totality over what `legalize` accepted, L7 feature honesty, L8 isolation (writer);
-//! L5 round trip (both); L6 corpus fixpoint (both, `--features corpus` only). L9 belongs to each dialect's own simulator
-//! tests. In slice S2 the only row is `ir`.
+//! `dialect::BUILTIN` on the sides it has: L1 totality (any bytes, and the empty text), L2
+//! validity, L3 determinism (reader); L4 writer totality over what `legalize` accepted, L7
+//! feature honesty, L8 isolation (writer); L5 round trip (both); L6 corpus fixpoint (both,
+//! `--features corpus` only). L9 belongs to each dialect's own simulator tests.
 //!
-//! Each file a writer writes is its own text at its own path, read back as one `Sources`
-//! (entry first); a reader whose one text names its files (`Read::names_its_files`, the IR
-//! text) reads them concatenated.
+//! Each law runs per row and its failing rows are compared with [`KNOWN`], strictly both ways:
+//! an unexpected failure and an unexpected pass both fail. Every file a writer writes is its own
+//! text at its own path, read back as one `Sources` (entry first). A row that is not lossless
+//! generates no `Opaque` (an opaque's class is its reader's judgement of the text, which a
+//! generated text cannot carry).
 //!
 //! Oracles: generated designs (`ir::gen::generate(seed, row's features, size)`, valid and legal
 //! for the set by construction) and their canonical IR text (`ir::dump`, which has no spans:
-//! `≅`); fixed seeds, each printed in the failing assertion.
-//!
-//! Each law runs on the writer's whole feature set.
+//! `≅`); fixed seeds, each printed in the failing message.
 //!
 //! Contents: tests only.
 
@@ -31,42 +31,10 @@ const SIZE: Size = Size {
     files: 3,
 };
 
-/// The IR text read one file per text (`names_its_files` false): the harness's per-file path,
-/// exercised before a dialect with that shape lands.
-struct PerFile;
-
-static PER_FILE: DialectRow = DialectRow {
-    name: "ir-per-file",
-    text_family: dialect::ANY_FAMILY,
-    read: Some(&PerFile),
-    write: Some(&PerFile),
-};
-
-impl Read for PerFile {
-    fn references(&self, text: &str) -> Vec<dialect::Reference> {
-        dialect::irtext::IrText.references(text)
-    }
-
-    fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
-        dialect::irtext::IrText.read(src, out, diags);
-    }
-}
-
-impl Write for PerFile {
-    fn features(&self) -> &'static ir::FeatureSet {
-        &ir::FeatureSet::ALL
-    }
-
-    fn write(
-        &self,
-        design: &ir::Design,
-        file: ir::FileId,
-        out: &mut String,
-        diags: &mut ir::Diags,
-    ) {
-        dialect::irtext::IrText.write(design, file, out, diags);
-    }
-}
+/// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
+/// that fails a law it is not listed for fails, and so does a listed row that passes. Each
+/// dialect branch lists its own rows here; the `ir` row fails none.
+const KNOWN: &[(&str, &str, &str)] = &[];
 
 // ---- private ----
 
@@ -89,55 +57,57 @@ fn l1_l2_any_bytes_read_returns_and_checks_clean() {
 
 #[test]
 fn l1_an_empty_text_is_one_file_with_no_item() {
-    for (row, _) in readers() {
+    reader_laws("l1-empty", |row, _| {
         for text in ["", "\n"] {
             let (design, diags) = read_text(row, text);
             let files: Vec<ir::FileId> = design.files().collect();
-            assert_eq!(files.len(), 1, "{}: {text:?} is one file", row.name);
-            assert!(
-                design.reachable().is_empty(),
-                "{}: {text:?} holds no item",
-                row.name
-            );
-            assert!(
-                diags.is_empty(),
-                "{}: {text:?}: {:?}",
-                row.name,
-                diags.rows()
-            );
-            assert_eq!(design.str(design.file(files[0]).path), "law");
+            if files.len() != 1 || !design.reachable().is_empty() || !diags.is_empty() {
+                return Err(format!(
+                    "{text:?}: {} files, {} items, rows {:?}",
+                    files.len(),
+                    design.reachable().len(),
+                    diags.rows()
+                ));
+            }
+            if design.str(design.file(files[0]).path) != "law" {
+                return Err(format!("{text:?}: the file is not at its source path"));
+            }
         }
-    }
+        Ok(())
+    });
 }
 
 #[test]
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
-    for (row, writer) in writers() {
+    laws("l3", |row, writer| {
+        let mut admitted = 0;
         for seed in SEEDS.take(8) {
-            let src = written(&generate(seed, writer.features(), SIZE), row);
-            let bytes = |d: &ir::Design| written(d, row).files().to_vec();
-            let once = bytes(&read_src(row, &src));
-            let threads: Vec<Vec<(String, String)>> = std::thread::scope(|s| {
+            let Some(design) = admitted_design(seed, row, writer) else {
+                continue;
+            };
+            admitted += 1;
+            let files = write_all(&design, row);
+            let once = canonical(&read_all(row, &files));
+            let threads: Vec<String> = std::thread::scope(|s| {
                 let jobs: Vec<_> = (0..4)
-                    .map(|_| s.spawn(|| bytes(&read_src(row, &src))))
+                    .map(|_| s.spawn(|| canonical(&read_all(row, &files))))
                     .collect();
                 jobs.into_iter()
                     .map(|j| j.join().expect("a reader thread"))
                     .collect()
             });
-            assert!(
-                threads.iter().all(|t| *t == once),
-                "{} seed {seed}",
-                row.name
-            );
+            if !threads.iter().all(|t| *t == once) {
+                return Err(format!("seed {seed}: the threads differ"));
+            }
         }
-    }
+        some(admitted)
+    });
 }
 
 #[test]
 fn l4_write_is_total_over_a_design_legalize_accepted() {
-    for (row, writer) in writers() {
-        let claimed = *writer.features();
+    laws("l4", |row, writer| {
+        let claimed = generated(row, writer);
         let (mut skipped, mut seen) = (Vec::new(), ir::FeatureSet::EMPTY);
         for seed in SEEDS {
             let mut design = generate(seed, &claimed, SIZE);
@@ -156,68 +126,47 @@ fn l4_write_is_total_over_a_design_legalize_accepted() {
                 .iter()
                 .filter(|d| dialect::refuses(d.code))
                 .collect();
-            assert!(
-                refusals.is_empty(),
-                "{} seed {seed}: {refusals:?}",
-                row.name
-            );
+            if !refusals.is_empty() {
+                return Err(format!("seed {seed}: {refusals:?}"));
+            }
         }
         // The skip cannot make the law vacuous: every item kind the writer claims is admitted in
         // some generated design.
         for &kind in &ir::ItemKind::ALL {
             let f = ir::Feature::Item(kind);
-            assert!(
-                !claimed.contains(f) || seen.contains(f),
-                "{}: no admitted design holds {kind:?} (skipped seeds {skipped:?})",
-                row.name
-            );
+            if claimed.contains(f) && !seen.contains(f) {
+                return Err(format!(
+                    "no admitted design holds {kind:?} (skipped {skipped:?})"
+                ));
+            }
         }
-    }
+        Ok(())
+    });
 }
 
 #[test]
 fn l5_read_of_write_is_the_design() {
-    for (row, writer) in writers() {
+    laws("l5", |row, writer| {
         if row.read.is_none() {
-            continue;
+            return Ok(());
         }
+        let mut admitted = 0;
         for seed in SEEDS {
-            let design = generate(seed, writer.features(), SIZE);
-            let back = read_src(row, &written(&design, row));
-            assert_eq!(
-                canonical(&back),
-                canonical(&design),
-                "{} seed {seed}",
-                row.name
-            );
+            let Some(design) = admitted_design(seed, row, writer) else {
+                continue;
+            };
+            admitted += 1;
+            let back = read_all(row, &write_all(&design, row));
+            if canonical(&back) != canonical(&design) {
+                return Err(format!(
+                    "seed {seed}:\n{}\nread back as\n{}",
+                    canonical(&design),
+                    canonical(&back)
+                ));
+            }
         }
-    }
-}
-
-#[test]
-fn l5_per_file_sources_carry_each_file_at_its_own_path() {
-    for seed in SEEDS {
-        let design = generate(seed, &ir::FeatureSet::ALL, SIZE);
-        let src = written(&design, &PER_FILE);
-        assert_eq!(
-            src.files().len(),
-            design.files().count(),
-            "seed {seed}: one text per file"
-        );
-        let entry = design.str(design.file(design.entry()).path);
-        assert_eq!(src.entries()[0].0, entry, "seed {seed}: the entry first");
-        let back = read_src(&PER_FILE, &src);
-        // The entry comes first, so compare file by file under each path.
-        for f in design.files() {
-            let path = design.str(design.file(f).path);
-            let again = back.find_file(path);
-            assert_eq!(
-                one_file(&back, again),
-                one_file(&design, f),
-                "seed {seed}: {path}"
-            );
-        }
-    }
+        some(admitted)
+    });
 }
 
 #[cfg(feature = "corpus")]
@@ -235,7 +184,7 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
         );
         for (k, text) in texts.iter().enumerate() {
             let once = read_text(row, text).0;
-            let twice = read_src(row, &written(&once, row));
+            let twice = read_all(row, &write_all(&once, row));
             assert_eq!(
                 canonical(&twice),
                 canonical(&once),
@@ -249,14 +198,12 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
 #[test]
 fn l7_legalized_designs_use_only_the_writers_features() {
     let all = dialect::irtext::IrText.features();
-    for (row, writer) in writers() {
+    laws("l7", |_row, writer| {
         for f in all.minus(*writer.features()).iter() {
             let removed = spicerack::passes::PASSES.iter().any(|p| p.removes == f);
-            assert!(
-                removed,
-                "{} lacks {f:?}: no pass removes it, and no citation",
-                row.name
-            );
+            if !removed {
+                return Err(format!("lacks {f:?}: no pass removes it, and no citation"));
+            }
         }
         for seed in SEEDS {
             let mut design = generate(seed, all, SIZE);
@@ -273,21 +220,26 @@ fn l7_legalized_designs_use_only_the_writers_features() {
                 .iter()
                 .map(|f| u32::from(f.index()))
                 .collect();
-            assert_eq!(
-                left, refused,
-                "{} seed {seed}: what is left is what is refused",
-                row.name
-            );
+            if left != refused {
+                return Err(format!(
+                    "seed {seed}: what is left {left:?} is not what is refused {refused:?}"
+                ));
+            }
         }
-    }
+        Ok(())
+    });
 }
 
 #[test]
 fn l8_a_file_is_written_the_same_whatever_the_other_files() {
     let ir_row = dialect::by_name("ir").expect("the ir row");
-    for (row, writer) in writers() {
+    laws("l8", |row, writer| {
+        let mut admitted = 0;
         for seed in SEEDS {
-            let design = generate(seed, writer.features(), SIZE);
+            let Some(design) = admitted_design(seed, row, writer) else {
+                continue;
+            };
+            admitted += 1;
             let entry = design.entry();
             let path = design.str(design.file(entry).path).to_string();
             let mut alone = ir::Diags::new();
@@ -298,9 +250,107 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
             let permuted = read_text(ir_row, &files.concat()).0;
             let mut diags = ir::Diags::new();
             let again = dialect::write(&permuted, permuted.find_file(&path), row, &mut diags);
-            assert_eq!(again, first, "{} seed {seed}", row.name);
+            if again != first {
+                return Err(format!("seed {seed}: the file is written otherwise"));
+            }
+        }
+        some(admitted)
+    });
+}
+
+/// Runs `law` on every row with a writer and compares the rows it fails on with the known
+/// failures of that law ([`KNOWN`]), strictly: an unexpected failure and an unexpected pass both
+/// fail, each with its message.
+fn laws(name: &str, law: impl Fn(&DialectRow, &dyn Write) -> Result<(), String>) {
+    let mut failing = Vec::new();
+    let mut messages = Vec::new();
+    for (row, writer) in writers() {
+        if let Err(m) = law(row, writer) {
+            failing.push(row.name);
+            messages.push(format!("{}: {m}", row.name));
         }
     }
+    check_known(name, &failing, &messages);
+}
+
+/// [`laws`] over the rows with a reader.
+fn reader_laws(name: &str, law: impl Fn(&DialectRow, &dyn Read) -> Result<(), String>) {
+    let mut failing = Vec::new();
+    let mut messages = Vec::new();
+    for (row, reader) in readers() {
+        if let Err(m) = law(row, reader) {
+            failing.push(row.name);
+            messages.push(format!("{}: {m}", row.name));
+        }
+    }
+    check_known(name, &failing, &messages);
+}
+
+/// The rows that failed law `name` against its [`KNOWN`] rows, in `BUILTIN` order.
+fn check_known(name: &str, failing: &[&str], messages: &[String]) {
+    let known: Vec<&str> = KNOWN
+        .iter()
+        .filter(|(law, _, _)| *law == name)
+        .map(|(_, row, _)| *row)
+        .collect();
+    assert_eq!(
+        failing,
+        known,
+        "{name}: failing rows against KNOWN\n{}",
+        messages.join("\n")
+    );
+}
+
+/// `Ok` when at least one generated design was admitted (else the law ran on nothing).
+fn some(admitted: usize) -> Result<(), String> {
+    if admitted == 0 {
+        return Err("no generated design was admitted: the law ran on nothing".to_string());
+    }
+    Ok(())
+}
+
+/// The set a law generates over: the writer's features, without `Opaque`
+/// for a row that is not lossless (an opaque's class is its reader's judgement of the text,
+/// which a generated text cannot carry).
+fn generated(row: &DialectRow, writer: &dyn Write) -> ir::FeatureSet {
+    let set = *writer.features();
+    if row.text_family == dialect::ANY_FAMILY {
+        return set;
+    }
+    set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(ir::ItemKind::Opaque)))
+}
+
+/// Design `seed` over [`generated`], legalized for `row`; `None` when `legalize` refuses it.
+fn admitted_design(seed: u64, row: &DialectRow, writer: &dyn Write) -> Option<ir::Design> {
+    let mut design = generate(seed, &generated(row, writer), SIZE);
+    let mut diags = ir::Diags::new();
+    dialect::legalize(&mut design, row, &mut diags);
+    (!diags.rows().iter().any(|d| dialect::refuses(d.code))).then_some(design)
+}
+
+/// Every file of `design` written by `row` as one source set: each file its own text at the
+/// path the design gives it, the entry first (its role setting the form), then file order.
+fn write_all(design: &ir::Design, row: &DialectRow) -> Sources {
+    let mut diags = ir::Diags::new();
+    let entry = design.entry();
+    let mut src = Sources::new();
+    for f in std::iter::once(entry).chain(design.files().filter(|&f| f != entry)) {
+        let path = design.str(design.file(f).path).to_string();
+        src.add(&path, &dialect::write(design, f, row, &mut diags));
+    }
+    src.set_form(match design.file(entry).role {
+        ir::Role::Deck => ir::Role::Deck,
+        ir::Role::Library | ir::Role::VerilogA | ir::Role::Missing => ir::Role::Library,
+    });
+    src
+}
+
+/// `src` read back by `row`, leniently.
+fn read_all(row: &DialectRow, src: &Sources) -> ir::Design {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(src, row, Policy::Lenient, &mut design, &mut diags);
+    design
 }
 
 /// The rows with a reader.
@@ -337,46 +387,6 @@ fn read_text(row: &DialectRow, text: &str) -> (ir::Design, ir::Diags) {
         &mut diags,
     );
     (design, diags)
-}
-
-/// Every file of `design` written by `row`, as the sources one read takes back: each file its
-/// own text at the path the design gives it, the entry first (in its role); or, for a reader
-/// whose one text names its files (`Read::names_its_files`), the texts concatenated.
-fn written(design: &ir::Design, row: &DialectRow) -> Sources {
-    let mut diags = ir::Diags::new();
-    let entry = design.entry();
-    let order = std::iter::once(entry).chain(design.files().filter(|&f| f != entry));
-    let texts: Vec<(String, String)> = order
-        .map(|f| {
-            (
-                design.str(design.file(f).path).to_string(),
-                dialect::write(design, f, row, &mut diags),
-            )
-        })
-        .collect();
-    if row.read.is_some_and(|r| r.names_its_files()) {
-        return Sources::one(
-            "law",
-            &texts.iter().map(|(_, t)| t.as_str()).collect::<String>(),
-        );
-    }
-    let mut src = Sources::new();
-    for (path, text) in &texts {
-        src.add(path, text);
-    }
-    src.set_form(match design.file(entry).role {
-        ir::Role::Deck => ir::Role::Deck,
-        ir::Role::Library | ir::Role::VerilogA | ir::Role::Missing => ir::Role::Library,
-    });
-    src
-}
-
-/// `src` read by `row`, leniently.
-fn read_src(row: &DialectRow, src: &Sources) -> ir::Design {
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    dialect::read(src, row, Policy::Lenient, &mut design, &mut diags);
-    design
 }
 
 /// One file as IR text.
