@@ -35,6 +35,7 @@ use crate::run_words::{
 use crate::sweep::gen_sweep;
 use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 impl DetailFacts for Pz {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
@@ -53,7 +54,7 @@ impl DetailFacts for Pz {
         };
         domain_unless(input && set(self.out_p) && set(self.out_n))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         put_word(out, &word(self.input));
         put_word(out, &word(self.transfer));
         put_word(out, &word(self.find));
@@ -147,8 +148,8 @@ impl DetailFacts for Sp {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(sweep_valid(&self.sweep))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_sweep(design, &self.sweep, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_sweep(design, ctx, &self.sweep, out);
         put_names(out, design, "ports", self.ports);
         put_flag(out, self.noise, "noise");
     }
@@ -203,11 +204,11 @@ impl DetailFacts for Net {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output) && !self.source.is_none())
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
         put_name(out, design, "source", self.source);
-        put_expr(out, design, "rin", self.rin);
-        put_expr(out, design, "rout", self.rout);
+        put_expr(out, design, ctx, "rin", self.rin);
+        put_expr(out, design, ctx, "rout", self.rout);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -265,9 +266,9 @@ impl DetailFacts for Disto {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(sweep_valid(&self.sweep))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_sweep(design, &self.sweep, out);
-        put_expr(out, design, "f2_over_f1", self.f2_over_f1);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_sweep(design, ctx, &self.sweep, out);
+        put_expr(out, design, ctx, "f2_over_f1", self.f2_over_f1);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -309,8 +310,8 @@ impl DetailFacts for TimedOp {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(self.times.len > 0)
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        put_exprs(out, design, "times", self.times);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        put_exprs(out, design, ctx, "times", self.times);
     }
     fn parse(
         words: &mut Words<'_>,

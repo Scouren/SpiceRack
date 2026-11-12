@@ -53,6 +53,7 @@ use crate::run_words::{domain_unless, flag, put_expr, put_word, take_enum, take_
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// Dispatches a generic call over a measure kind's detail type. Exhaustive.
 macro_rules! by_measure {
@@ -74,9 +75,11 @@ impl RowFacts for Measure {
         by_measure!(self.kind, handles_of(design, self.detail, out));
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {}
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f); // no reference
+    }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         let x = match self.kind {
             MeasureKind::TrigTarg => RunExtra::MeasTrigTarg,
             MeasureKind::When => RunExtra::MeasWhen,
@@ -89,7 +92,7 @@ impl RowFacts for Measure {
         by_measure!(self.kind, features_of(design, self.detail, set));
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if let Some(v) = by_measure!(self.kind, fault_of(design, self.detail)) {
             report(design, at, v, out);
         }
@@ -98,11 +101,11 @@ impl RowFacts for Measure {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         crate::text_expr::write_name(design.str(self.name), out);
         put_word(out, &word(self.analysis));
         put_word(out, &word(self.kind));
-        by_measure!(self.kind, dump_of(design, self.detail, out));
+        by_measure!(self.kind, dump_of(design, ctx, self.detail, out));
     }
 
     fn parse(
@@ -193,9 +196,9 @@ impl DetailFacts for MeasureTrigTarg {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(point(&self.trig) && point(&self.targ))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_event(design, &self.trig, out);
-        dump_event(design, &self.targ, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_event(design, ctx, &self.trig, out);
+        dump_event(design, ctx, &self.targ, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -237,8 +240,8 @@ impl DetailFacts for MeasureWhen {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(point(&self.at))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_event(design, &self.at, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_event(design, ctx, &self.at, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -275,9 +278,9 @@ impl DetailFacts for MeasureFind {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(probe_valid(&self.find) && point(&self.at))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.find, out);
-        dump_event(design, &self.at, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.find, out);
+        dump_event(design, ctx, &self.at, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -321,9 +324,9 @@ impl DetailFacts for MeasureDeriv {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(probe_valid(&self.signal) && point(&self.at))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.signal, out);
-        dump_event(design, &self.at, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.signal, out);
+        dump_event(design, ctx, &self.at, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -369,11 +372,11 @@ impl DetailFacts for MeasureStat {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(probe_valid(&self.signal) && event_valid(&self.from) && event_valid(&self.to))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         put_word(out, &word(self.stat));
-        dump_probe(design, &self.signal, out);
-        dump_event(design, &self.from, out);
-        dump_event(design, &self.to, out);
+        dump_probe(design, ctx, &self.signal, out);
+        dump_event(design, ctx, &self.from, out);
+        dump_event(design, ctx, &self.to, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -421,8 +424,8 @@ impl DetailFacts for MeasureParam {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(!self.value.is_none())
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        put_expr(out, design, "value", self.value);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        put_expr(out, design, ctx, "value", self.value);
     }
     fn parse(
         words: &mut Words<'_>,

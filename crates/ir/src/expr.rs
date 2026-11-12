@@ -48,7 +48,8 @@
 //!   but `Expr`: `ALL`, `COUNT`
 //! - `pub struct Literal`, `Literal::ZERO`, `Literal::value(self) -> f64`,
 //!   `Literal::from_f64(f64) -> Literal`, `Literal::eq_value(self, Literal) -> bool`,
-//!   `Literal::is_valid(self) -> bool`, crate: `Literal::shape_ok(self) -> bool`
+//!   `Literal::is_valid(self) -> bool`, crate: `Literal::shape_ok(self) -> bool`,
+//!   `Literal::finite(self) -> bool`
 //! - `Func::arity(self) -> (u8, u8)`, `Func::reads_circuit(self) -> bool`,
 //!   `Dist::arity(self) -> (u8, u8)`, `Expr::tag(self) -> ExprTag`
 //! - `pub(crate) struct Exprs`, `pub(crate) struct UserCall`
@@ -713,7 +714,22 @@ impl Literal {
 
     /// Whether the literal meets every invariant on [`Literal`].
     pub fn is_valid(self) -> bool {
-        self.shape_ok() && self.value().is_finite()
+        self.shape_ok() && self.finite()
+    }
+
+    /// Whether the value is finite, from the digit count and the power where that decides it
+    /// (the largest double is about 1.8e308), and by `value()` only at the boundary.
+    pub(crate) fn finite(self) -> bool {
+        let (m, k) = self.exact();
+        if m == 0 {
+            return true;
+        }
+        let digits = m.unsigned_abs().ilog10() as i32 + 1;
+        match digits + k {
+            ..=308 => true,
+            310.. => false,
+            309 => self.value().is_finite(),
+        }
     }
 
     /// Whether the literal meets every invariant but finiteness (`check` reports the two

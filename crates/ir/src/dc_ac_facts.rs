@@ -55,6 +55,7 @@ use crate::run_words::{
 use crate::sweep::gen_sweep;
 use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// Whether `p` is a valid analysis output: a node voltage, a voltage between nodes or a branch
 /// current.
@@ -91,10 +92,10 @@ impl DetailFacts for Dc {
         domain_unless(ok)
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         for axis in design.dc_axes(self.axes) {
-            dump_target(design, &axis.target, out);
-            dump_sweep(design, &axis.sweep, out);
+            dump_target(design, ctx, &axis.target, out);
+            dump_sweep(design, ctx, &axis.sweep, out);
         }
         put_flag(out, self.restart, "restart");
     }
@@ -156,8 +157,8 @@ impl DetailFacts for Ac {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(sweep_valid(&self.sweep))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_sweep(design, &self.sweep, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_sweep(design, ctx, &self.sweep, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -214,11 +215,17 @@ impl DetailFacts for Noise {
             output_valid(&self.output) && !self.source.is_none() && sweep_valid(&self.sweep),
         )
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
         put_name(out, design, "source", self.source);
-        dump_sweep(design, &self.sweep, out);
-        put_expr(out, design, "points_per_summary", self.points_per_summary);
+        dump_sweep(design, ctx, &self.sweep, out);
+        put_expr(
+            out,
+            design,
+            ctx,
+            "points_per_summary",
+            self.points_per_summary,
+        );
         put_flag(out, self.ac_sweep, "ac_sweep");
         put_flag(out, self.input_ref == NoiseRef::SourceAc, "source_ac");
     }
@@ -294,8 +301,8 @@ impl DetailFacts for Tf {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output) && !self.source.is_none())
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
         put_name(out, design, "source", self.source);
     }
     fn parse(
@@ -335,8 +342,8 @@ impl DetailFacts for DcXf {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -371,8 +378,8 @@ impl DetailFacts for Sens {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -409,9 +416,9 @@ impl DetailFacts for Xf {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
-        dump_sweep(design, &self.sweep, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
+        dump_sweep(design, ctx, &self.sweep, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -452,9 +459,9 @@ impl DetailFacts for SensAc {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
-        dump_sweep(design, &self.sweep, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
+        dump_sweep(design, ctx, &self.sweep, out);
     }
     fn parse(
         words: &mut Words<'_>,

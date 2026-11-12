@@ -43,6 +43,7 @@ use crate::run_words::{
     take_word, word,
 };
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// What a measure computes; names its detail table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -325,17 +326,17 @@ pub(crate) fn point(e: &Event) -> bool {
 }
 
 /// Appends ` (kind …)`.
-pub(crate) fn dump_event(design: &Design, e: &Event, out: &mut String) {
+pub(crate) fn dump_event(design: &Design, ctx: &Ctx, e: &Event, out: &mut String) {
     out.push_str(" (");
     out.push_str(&word(e.kind));
     if e.kind == EventKind::Cross {
         put_word(out, &word(e.edge));
         put_flag(out, e.last, "last");
-        dump_probe(design, &e.signal, out);
+        dump_probe(design, ctx, &e.signal, out);
     }
-    put_expr(out, design, "value", e.value);
-    put_expr(out, design, "count", e.count);
-    put_expr(out, design, "delay", e.delay);
+    put_expr(out, design, ctx, "value", e.value);
+    put_expr(out, design, ctx, "count", e.count);
+    put_expr(out, design, ctx, "delay", e.delay);
     out.push(')');
 }
 

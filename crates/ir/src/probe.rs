@@ -43,6 +43,7 @@ use crate::run_words::{
     take_names, word,
 };
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// One output quantity. `a`, `b`, `terminal` and `expr` are read per [`ProbeKind`]; every field
 /// a kind does not read is empty, `u8::MAX` or `NONE` (checked).
@@ -291,7 +292,7 @@ pub(crate) fn probe_features(p: &Probe, set: &mut FeatureSet) {
 }
 
 /// Appends ` (kind …)`.
-pub(crate) fn dump_probe(design: &Design, p: &Probe, out: &mut String) {
+pub(crate) fn dump_probe(design: &Design, ctx: &Ctx, p: &Probe, out: &mut String) {
     out.push_str(" (");
     out.push_str(&word(p.kind));
     if p.part != AcPart::None {
@@ -302,7 +303,7 @@ pub(crate) fn dump_probe(design: &Design, p: &Probe, out: &mut String) {
     }
     put_names(out, design, "", p.a);
     put_names(out, design, "", p.b);
-    put_expr(out, design, "expr", p.expr);
+    put_expr(out, design, ctx, "expr", p.expr);
     out.push(')');
 }
 

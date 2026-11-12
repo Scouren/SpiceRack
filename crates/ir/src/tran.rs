@@ -47,6 +47,7 @@ use crate::run_words::{
     take_expr, take_exprs, take_key, take_word, word,
 };
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// A transient analysis's detail. Every field is named and none is inferred from another;
 /// `NONE` is "not given", never 0.
@@ -170,16 +171,16 @@ impl DetailFacts for Tran {
         domain_unless(!self.stop.is_none() && noise && self.segments.len.is_multiple_of(2))
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        put_expr(out, design, "stop", self.stop);
-        put_expr(out, design, "record_start", self.record_start);
-        put_expr(out, design, "print_step", self.print_step);
-        put_expr(out, design, "max_step", self.max_step);
-        put_expr(out, design, "initial_step", self.initial_step);
-        put_expr(out, design, "noise_fmax", self.noise_fmax);
-        put_expr(out, design, "noise_fmin", self.noise_fmin);
-        put_expr(out, design, "noise_seed", self.noise_seed);
-        put_exprs(out, design, "segments", self.segments);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        put_expr(out, design, ctx, "stop", self.stop);
+        put_expr(out, design, ctx, "record_start", self.record_start);
+        put_expr(out, design, ctx, "print_step", self.print_step);
+        put_expr(out, design, ctx, "max_step", self.max_step);
+        put_expr(out, design, ctx, "initial_step", self.initial_step);
+        put_expr(out, design, ctx, "noise_fmax", self.noise_fmax);
+        put_expr(out, design, ctx, "noise_fmin", self.noise_fmin);
+        put_expr(out, design, ctx, "noise_seed", self.noise_seed);
+        put_exprs(out, design, ctx, "segments", self.segments);
         put_word(out, &format!("cap={}", word(self.cap)));
         put_flag(out, self.uic, "uic");
         put_flag(out, self.startup, "startup");
@@ -314,13 +315,13 @@ impl DetailFacts for Four {
         domain_unless(given && !outputs.is_empty() && outputs.iter().all(probe_valid))
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        put_expr(out, design, "fundamental", self.fundamental);
-        put_expr(out, design, "harmonics", self.harmonics);
-        put_expr(out, design, "periods", self.periods);
-        put_expr(out, design, "grid", self.grid);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        put_expr(out, design, ctx, "fundamental", self.fundamental);
+        put_expr(out, design, ctx, "harmonics", self.harmonics);
+        put_expr(out, design, ctx, "periods", self.periods);
+        put_expr(out, design, ctx, "grid", self.grid);
         for p in design.probes(self.outputs) {
-            dump_probe(design, p, out);
+            dump_probe(design, ctx, p, out);
         }
     }
 

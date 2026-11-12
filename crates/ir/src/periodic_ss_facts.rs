@@ -34,6 +34,7 @@ use crate::run_words::{
 use crate::sweep::gen_sweep;
 use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 impl DetailFacts for Pac {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
@@ -51,9 +52,9 @@ impl DetailFacts for Pac {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(sweep_valid(&self.sweep) && axis_ok(self.axis, self.relharm))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_sweep(design, &self.sweep, out);
-        dump_side(design, self.sidebands, self.relharm, self.axis, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_sweep(design, ctx, &self.sweep, out);
+        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -109,11 +110,11 @@ impl DetailFacts for Pnoise {
         let ok = output_valid(&self.output) && !self.source.is_none();
         domain_unless(ok && sweep_valid(&self.sweep) && axis_ok(self.axis, self.relharm))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
         put_name(out, design, "source", self.source);
-        dump_sweep(design, &self.sweep, out);
-        dump_side(design, self.sidebands, self.relharm, self.axis, out);
+        dump_sweep(design, ctx, &self.sweep, out);
+        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -176,10 +177,10 @@ impl DetailFacts for Pxf {
         let ok = output_valid(&self.output) && sweep_valid(&self.sweep);
         domain_unless(ok && axis_ok(self.axis, self.relharm))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_probe(design, &self.output, out);
-        dump_sweep(design, &self.sweep, out);
-        dump_side(design, self.sidebands, self.relharm, self.axis, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_probe(design, ctx, &self.output, out);
+        dump_sweep(design, ctx, &self.sweep, out);
+        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -237,10 +238,10 @@ impl DetailFacts for Pstb {
         let ok = !self.probe.is_none() && sweep_valid(&self.sweep);
         domain_unless(ok && axis_ok(self.axis, self.relharm))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         put_name(out, design, "probe", self.probe);
-        dump_sweep(design, &self.sweep, out);
-        dump_side(design, self.sidebands, self.relharm, self.axis, out);
+        dump_sweep(design, ctx, &self.sweep, out);
+        dump_side(design, ctx, self.sidebands, self.relharm, self.axis, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -291,9 +292,9 @@ impl DetailFacts for Stb {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(!self.probe.is_none() && sweep_valid(&self.sweep))
     }
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         put_name(out, design, "probe", self.probe);
-        dump_sweep(design, &self.sweep, out);
+        dump_sweep(design, ctx, &self.sweep, out);
     }
     fn parse(
         words: &mut Words<'_>,
@@ -331,13 +332,14 @@ fn axis_ok(axis: FreqAxis, relharm: ExprId) -> bool {
 
 fn dump_side(
     design: &Design,
+    ctx: &Ctx,
     sidebands: ExprId,
     relharm: ExprId,
     axis: FreqAxis,
     out: &mut String,
 ) {
-    put_expr(out, design, "sidebands", sidebands);
-    put_expr(out, design, "relharm", relharm);
+    put_expr(out, design, ctx, "sidebands", sidebands);
+    put_expr(out, design, ctx, "relharm", relharm);
     put_flag(out, axis == FreqAxis::Relative, "relative");
 }
 

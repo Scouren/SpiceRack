@@ -26,7 +26,7 @@
 //! - `pub enum DetailKind` (`ALL`, `COUNT`)
 //! - `pub struct Element`, `pub const NO_ROW`
 //! - `pub struct CircuitDetails`; `DetailRow` (kernel, A6) for every row type it holds
-//! - `RowFacts` for `Element`
+//! - `RowFacts` for `Element`; crate: `pub(crate) fn design_features(&Design, &mut FeatureSet)`
 
 use crate::build::Builder;
 use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, TableSource};
@@ -563,26 +563,28 @@ impl RowFacts for Element {
         todo!()
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
         // A real body: A4's contract for this row. A `NONE` name is no reference; the
         // unresolved kind has no `master_kind`, so the linker never sees it.
-        if let Some(kind) = self.kind.master_kind()
-            && self.model.name != NameId::NONE
+        let mut row: Element = design.row(at.index);
+        if let Some(kind) = row.kind.master_kind()
+            && row.model.name != NameId::NONE
         {
-            f(&mut self.model, kind);
+            f(&mut row.model, kind);
         }
+        design.editor().set(at.index, row);
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         todo!()
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         todo!()
     }
 
     #[allow(clippy::ptr_arg)] // definition phase: the body will push to `out`
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &crate::text_expr::Ctx, out: &mut String) {
         todo!()
     }
 
@@ -604,4 +606,10 @@ impl RowFacts for Element {
     ) -> ItemRef {
         todo!()
     }
+}
+
+/// The circuit owner's features of the whole design, which no single row carries (A9). Called
+/// once by `features_used` and by `check_legal`. Empty until the circuit owner fills it.
+pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
+    let _ = (design, set);
 }

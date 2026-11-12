@@ -19,9 +19,11 @@
 //! `MonteCarlo`
 
 #[cfg(any(test, feature = "gen"))]
+use crate::analysis_facts::analysis_count;
+#[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::gen_of;
 use crate::analysis_facts::{
-    DetailFacts, analysis_count, dump_of, fault_of, features_of, handles_of, parse_of, report,
+    DetailFacts, detail_get, dump_of, fault_of, features_of, handles_of, parse_of, report,
 };
 use crate::build::Builder;
 use crate::check::Violation;
@@ -37,18 +39,18 @@ use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::{ExprId, List, NameId};
 use crate::id::{ItemRef, Ref, ScopeId};
-use crate::item::{DefKind, ItemKind, ScopeKind};
+use crate::item::{DefKind, ScopeKind};
 use crate::plan::{
     Alter, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, Sampler, SweepLoop, TableLoop,
-    TargetUse, Variations, dump_target, parse_target, target_features, target_handles,
+    TargetUse, Variations, dump_target, parse_target, target_features, target_handles, target_refs,
     target_valid,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::{gen_target, target_kinds};
 use crate::run_extra::RunExtra;
 use crate::run_words::{
-    get, loop_depth, put_expr, put_exprs, put_flag, put_name, put_word, reachable, take_enum,
-    take_expr, take_exprs, take_name, take_word, trim_lead, word,
+    get, loop_depth, put_expr, put_exprs, put_flag, put_name, put_word, take_enum, take_expr,
+    take_exprs, take_name, take_word, trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -56,6 +58,7 @@ use crate::span::Span;
 use crate::sweep::gen_sweep;
 use crate::sweep::{dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// Dispatches a generic call over a loop kind's detail type. Exhaustive.
 macro_rules! by_loop {
@@ -74,11 +77,32 @@ impl RowFacts for Loop {
         by_loop!(self.kind, handles_of(design, self.detail, out));
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // The loop's targets live in its detail row, out of this hook's reach (run report).
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // A sweep's target, or a table's columns in order; a Monte Carlo loop holds none.
+        let row: Loop = design.row(at.index);
+        match row.kind {
+            LoopKind::Sweep => {
+                if let Some(d) = <SweepLoop as crate::design::DetailRow>::rows_mut(design)
+                    .get_mut(row.detail as usize)
+                {
+                    target_refs(&mut d.target, f);
+                }
+            }
+            LoopKind::Table => {
+                let Some(t) = detail_get::<TableLoop>(design, row.detail) else {
+                    return;
+                };
+                let start = t.columns.start as usize;
+                let end = (start + t.columns.len as usize).min(design.run.targets.len());
+                for target in &mut design.run.targets[start.min(end)..end] {
+                    target_refs(target, f);
+                }
+            }
+            LoopKind::MonteCarlo => {}
+        }
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         let mut add = |x: RunExtra| *set = set.with(Feature::Run(x));
         match self.kind {
             LoopKind::Sweep => {}
@@ -92,13 +116,11 @@ impl RowFacts for Loop {
         if loop_depth(design, self.body) > 1 {
             add(RunExtra::LoopNested);
         }
-        if reachable(design, self.body, ItemKind::Analysis) < analysis_count(design) {
-            add(RunExtra::LoopScoped);
-        }
+        // `LoopScoped` is a fact of the whole design: `analysis::design_features`.
         by_loop!(self.kind, features_of(design, self.detail, set));
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if let Some(v) = by_loop!(self.kind, fault_of(design, self.detail)) {
             report(design, at, v, out);
         }
@@ -107,11 +129,11 @@ impl RowFacts for Loop {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         out.push_str(&word(self.kind));
         put_flag(out, self.after == LoopEnd::KeepLast, "keep_last");
         put_name(out, design, "name", self.name);
-        by_loop!(self.kind, dump_of(design, self.detail, out));
+        by_loop!(self.kind, dump_of(design, ctx, self.detail, out));
     }
 
     fn parse(
@@ -214,29 +236,29 @@ impl RowFacts for Alter {
         out.push(Handle::Expr(self.value));
     }
 
-    fn map_refs(&mut self, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        if let Some(kind) = self.target.kind.def_kind() {
-            f(&mut self.target.a, kind);
-        }
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let mut row: Alter = design.row(at.index);
+        target_refs(&mut row.target, f);
+        design.editor().set(at.index, row);
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         target_features(&self.target, TargetUse::Alter, set);
         if !self.value.is_none() && matches!(design.expr(self.value), Expr::Str(_)) {
             *set = set.with(Feature::Run(RunExtra::AlterString));
         }
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if !target_valid(&self.target) || self.value.is_none() {
             report(design, at, Violation::FieldDomain, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         let at = out.len();
-        dump_target(design, &self.target, out);
-        put_expr(out, design, "value", self.value);
+        dump_target(design, ctx, &self.target, out);
+        put_expr(out, design, ctx, "value", self.value);
         trim_lead(out, at);
     }
 
@@ -297,9 +319,9 @@ impl DetailFacts for SweepLoop {
         (!target_valid(&self.target) || !sweep_valid(&self.sweep)).then_some(Violation::FieldDomain)
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        dump_target(design, &self.target, out);
-        dump_sweep(design, &self.sweep, out);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        dump_target(design, ctx, &self.target, out);
+        dump_sweep(design, ctx, &self.sweep, out);
     }
 
     fn parse(
@@ -349,11 +371,11 @@ impl DetailFacts for TableLoop {
         (!rows_ok || !columns.iter().all(target_valid)).then_some(Violation::FieldDomain)
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         for t in design.targets(self.columns) {
-            dump_target(design, t, out);
+            dump_target(design, ctx, t, out);
         }
-        put_exprs(out, design, "values", self.values);
+        put_exprs(out, design, ctx, "values", self.values);
     }
 
     fn parse(
@@ -425,10 +447,10 @@ impl DetailFacts for MonteCarlo {
         self.runs.is_none().then_some(Violation::FieldDomain)
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
-        put_expr(out, design, "runs", self.runs);
-        put_expr(out, design, "seed", self.seed);
-        put_exprs(out, design, "samples", self.samples);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        put_expr(out, design, ctx, "runs", self.runs);
+        put_expr(out, design, ctx, "seed", self.seed);
+        put_exprs(out, design, ctx, "samples", self.samples);
         if self.variations != Variations::Process {
             put_word(out, &word(self.variations));
         }

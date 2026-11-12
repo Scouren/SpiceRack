@@ -31,9 +31,14 @@ use crate::id::NameId;
 use crate::id::{ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
+use crate::plan::target_refs;
+#[cfg(any(test, feature = "gen"))]
 use crate::run_extra::RunExtra;
-use crate::run_words::{put_name, reachable, take_enum, take_name, word};
+#[cfg(any(test, feature = "gen"))]
+use crate::run_words::reachable;
+use crate::run_words::{put_name, take_enum, take_name, word};
 use crate::text::Words;
+use crate::text_expr::Ctx;
 use crate::tran::{Four, Tran};
 
 /// What the run owner's generic code needs from a detail row (the `RowFacts` of a header kind
@@ -48,7 +53,7 @@ pub(crate) trait DetailFacts: RunDetail {
     /// pool list past its pool. `None` when valid.
     fn fault(&self, design: &Design) -> Option<Violation>;
     /// Appends the row's fields (each with its leading space).
-    fn dump(&self, design: &Design, out: &mut String);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String);
     /// Reads the row's fields; `None` after a report.
     fn parse(
         words: &mut Words<'_>,
@@ -141,6 +146,7 @@ pub(crate) fn base_before(design: &Design, scope: ScopeId, pos: usize) -> bool {
 }
 
 /// The analyses reachable from every file's top scope.
+#[cfg(any(test, feature = "gen"))]
 pub(crate) fn analysis_count(design: &Design) -> usize {
     design
         .files()
@@ -154,19 +160,28 @@ impl RowFacts for Analysis {
         by_detail!(self.kind, (), handles_of(design, self.detail, out));
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // An analysis header holds no reference; its detail rows' are out of reach (report).
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // Only a DC sweep's axes hold references (their targets), in axis order.
+        let row: Analysis = design.row(at.index);
+        if row.kind != AnalysisKind::Dc {
+            return;
+        }
+        let Some(dc) = detail_get::<Dc>(design, row.detail) else {
+            return;
+        };
+        let start = dc.axes.start as usize;
+        let end = (start + dc.axes.len as usize).min(design.run.dc_axes.len());
+        for axis in &mut design.run.dc_axes[start.min(end)..end] {
+            target_refs(&mut axis.target, f);
+        }
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
-        if analysis_count(design) > 1 {
-            *set = set.with(Feature::Run(RunExtra::SeveralAnalyses));
-        }
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
         let fault = if self.kind.has_detail() {
             by_detail!(self.kind, None, fault_of(design, self.detail))
         } else {
@@ -184,17 +199,17 @@ impl RowFacts for Analysis {
             self.kind,
             AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb
         ) {
-            let place = crate::run_words::locate(design, at);
-            if !place.is_some_and(|(s, k)| base_before(design, s, k)) {
+            let pos = design.items(scope).iter().position(|&i| i == at);
+            if !pos.is_some_and(|k| base_before(design, scope, k)) {
                 report(design, at, Violation::FieldDomain, out);
             }
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         out.push_str(&word(self.kind));
         put_name(out, design, "name", self.name);
-        by_detail!(self.kind, (), dump_of(design, self.detail, out));
+        by_detail!(self.kind, (), dump_of(design, ctx, self.detail, out));
     }
 
     fn parse(
@@ -288,9 +303,9 @@ pub(crate) fn fault_of<D: DetailFacts>(design: &Design, index: u32) -> Option<Vi
 }
 
 /// `DetailFacts::dump` of `D`'s row at `index` (a checked design has it).
-pub(crate) fn dump_of<D: DetailFacts>(design: &Design, index: u32, out: &mut String) {
+pub(crate) fn dump_of<D: DetailFacts>(design: &Design, ctx: &Ctx, index: u32, out: &mut String) {
     let d = detail_get::<D>(design, index).expect("dump of a checked design: the detail exists");
-    d.dump(design, out);
+    d.dump(design, ctx, out);
 }
 
 /// Reads a `D` row and appends it to its table; its index.

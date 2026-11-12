@@ -29,9 +29,9 @@
 //!   `Design::targets(&self, TargetList) -> &[Target]`
 //! - the run rows' target facts: `pub(crate) TargetKind::reads_b`,
 //!   `pub(crate) TargetKind::has_path`, `pub(crate) enum TargetUse`,
-//!   `pub(crate) fn target_handles`, `pub(crate) fn target_valid`,
+//!   `pub(crate) fn target_handles`, `pub(crate) fn target_refs`, `pub(crate) fn target_valid`,
 //!   `pub(crate) fn target_features`, `pub(crate) fn dump_target`, `pub(crate) fn parse_target`,
-//!   `pub(crate) fn gen_target`, `pub(crate) fn target_kinds`
+//!   `pub(crate) fn gen_target`, `pub(crate) fn target_kinds`, `pub(crate) fn gen_ref`
 //! - (`RowFacts` for `Loop` and `Alter`, and the loop details' facts: `plan_facts.rs`)
 //!
 //! IR text of a target: `(kind [option] [a] [b] [path=(…)])`: `(temp)`, `(param r)`,
@@ -55,6 +55,7 @@ use crate::run_words::{
 };
 use crate::sweep::SweepSpec;
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// A loop: its body runs once per value of a sweep, row of a table, or Monte Carlo sample.
 /// Opens a `ScopeKind::Loop` scope holding run items only (analyses, alters, loops, state and
@@ -341,6 +342,14 @@ impl Design {
     }
 }
 
+/// Calls `f` on the target's reference when its kind names a definition (`a`), else not at
+/// all: an element's name is no reference.
+pub(crate) fn target_refs(t: &mut Target, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+    if let Some(kind) = t.kind.def_kind() {
+        f(&mut t.a, kind);
+    }
+}
+
 /// Appends a target's handles: `a` as a reference when its kind names a definition, else as a
 /// name; `b`; `path`.
 pub(crate) fn target_handles(t: &Target, out: &mut Vec<Handle>) {
@@ -418,14 +427,17 @@ pub(crate) fn target_features(t: &Target, used: TargetUse, set: &mut FeatureSet)
 }
 
 /// Appends ` (kind …)`.
-pub(crate) fn dump_target(design: &Design, t: &Target, out: &mut String) {
+pub(crate) fn dump_target(design: &Design, ctx: &Ctx, t: &Target, out: &mut String) {
     out.push_str(" (");
     out.push_str(&word(t.kind));
     if t.kind == TargetKind::Option {
         put_word(out, &word(t.option));
     }
     if !t.a.name.is_none() {
-        put_ref(out, design, t.a);
+        match t.kind.def_kind() {
+            Some(kind) => put_ref(out, design, ctx, t.a, kind),
+            None => put_name(out, design, "", t.a.name),
+        }
     }
     put_name(out, design, "", t.b);
     put_names(out, design, "path", t.path);
@@ -496,7 +508,7 @@ pub(crate) fn gen_target(
             t.b = g.fresh_name(b);
         }
     } else if kind != TargetKind::Temp {
-        t.a = Ref::unresolved(g.fresh_name(b));
+        t.a = gen_ref(g, b, kind.def_kind());
         if kind.reads_b() {
             t.b = g.fresh_name(b);
         }
@@ -535,4 +547,23 @@ pub(crate) fn target_kinds(features: &FeatureSet, used: TargetUse) -> Vec<Target
             ok && (k != TargetKind::Option || any_key)
         })
         .collect()
+}
+
+/// A reference for a generated target or variation: a visible definition of `kind` when there
+/// is one (resolved, A9: the linker reaches every run reference), else a fresh unresolved name.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn gen_ref(g: &mut Gen, b: &mut Builder<'_>, kind: Option<DefKind>) -> Ref {
+    if let Some(kind) = kind
+        && g.chance(2)
+    {
+        let scope = g.scope;
+        let def = g.pick_def(b.design(), scope, kind);
+        if !def.is_none() {
+            return Ref {
+                name: b.design().def(def).name,
+                def,
+            };
+        }
+    }
+    Ref::unresolved(g.fresh_name(b))
 }

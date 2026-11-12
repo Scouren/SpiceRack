@@ -22,8 +22,8 @@
 //!   `pub(crate) fn close`
 //! - pools: `pub(crate) fn pool`, `pub(crate) fn get`
 //! - facts: `pub(crate) fn flag`, `pub(crate) fn has`, `pub(crate) fn domain_unless`,
-//!   `pub(crate) fn domain`, `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`,
-//!   `pub(crate) fn locate`, `pub(crate) fn locate_row`, `pub(crate) fn after_run_item`,
+//!   `pub(crate) fn reads_circuit`, `pub(crate) fn is_one`,
+//!   `pub(crate) fn after_run_item`,
 //!   `pub(crate) fn in_scope_kind`, `pub(crate) fn loop_depth`,
 //!   `pub(crate) fn reachable`
 
@@ -31,12 +31,14 @@ use std::fmt::Debug;
 
 use crate::build::Builder;
 use crate::check::Violation;
-use crate::design::{Design, ItemRow};
-use crate::diag::{Diags, violation_code};
+use crate::design::Design;
+use crate::diag::Diags;
 use crate::expr::{Expr, Literal, NumForm};
 use crate::feature::{Feature, FeatureSet};
-use crate::id::{ExprId, ExprList, ItemRef, List, NameId, NameList, POOL_MAX, Ref, ScopeId};
-use crate::item::{ItemKind, ScopeKind};
+#[cfg(any(test, feature = "gen"))]
+use crate::id::ItemRef;
+use crate::id::{ExprId, ExprList, List, NameId, NameList, POOL_MAX, Ref, ScopeId};
+use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::run_extra::RunExtra;
 use crate::text::Words;
 use crate::text_expr::{self, Ctx};
@@ -84,28 +86,22 @@ pub(crate) fn put_flag(out: &mut String, on: bool, w: &str) {
 }
 
 /// ` key=value`, unless `e` is `NONE`.
-pub(crate) fn put_expr(out: &mut String, design: &Design, key: &str, e: ExprId) {
+pub(crate) fn put_expr(out: &mut String, design: &Design, ctx: &Ctx, key: &str, e: ExprId) {
     if !e.is_none() {
         put_word(out, key);
         out.push('=');
-        put_value(out, design, e);
+        put_value(out, design, ctx, e);
     }
 }
 
 /// ` key=[e1, e2]`, unless the list is empty.
-pub(crate) fn put_exprs(out: &mut String, design: &Design, key: &str, list: ExprList) {
+pub(crate) fn put_exprs(out: &mut String, design: &Design, ctx: &Ctx, key: &str, list: ExprList) {
     if list.len == 0 {
         return;
     }
     put_word(out, key);
-    out.push_str("=[");
-    for (i, &e) in design.exprs(list).iter().enumerate() {
-        if i > 0 {
-            out.push_str(", ");
-        }
-        kernel_write_expr(design, e, out);
-    }
-    out.push(']');
+    out.push('=');
+    text_expr::write_exprs(design, list, ctx, out);
 }
 
 /// ` key=name` (` name` when `key` is empty), unless `n` is `NONE`.
@@ -118,7 +114,7 @@ pub(crate) fn put_name(out: &mut String, design: &Design, key: &str, n: NameId) 
         out.push_str(key);
         out.push('=');
     }
-    kernel_write_name(design, n, out);
+    text_expr::write_name(design.str(n), out);
 }
 
 /// ` key=(a b)` (` (a b)` when `key` is empty), unless the list is empty.
@@ -136,26 +132,26 @@ pub(crate) fn put_names(out: &mut String, design: &Design, key: &str, list: Name
         if i > 0 {
             out.push(' ');
         }
-        kernel_write_name(design, n, out);
+        text_expr::write_name(design.str(n), out);
     }
     out.push(')');
 }
 
 /// ` name`, ` name?` or ` name#k` for a reference (the kernel's spelling; a resolved reference
-/// is written bare: lossless unless an inner definition shadows it, see the run report).
-pub(crate) fn put_ref(out: &mut String, design: &Design, r: Ref) {
+/// is bare unless lookup from `ctx.scope` binds another definition: `name#k`, A9).
+pub(crate) fn put_ref(out: &mut String, design: &Design, ctx: &Ctx, r: Ref, kind: DefKind) {
     out.push(' ');
-    write_ref(out, design, r);
+    write_ref(out, design, ctx, r, kind);
 }
 
 /// A reference, as `put_ref` writes it, without the leading space.
-pub(crate) fn write_ref(out: &mut String, design: &Design, r: Ref) {
-    kernel_write_name(design, r.name, out);
+pub(crate) fn write_ref(out: &mut String, design: &Design, ctx: &Ctx, r: Ref, kind: DefKind) {
+    text_expr::write_ref(design, r, kind, ctx, out);
 }
 
 /// A field value: an atom as is, any other expression in parentheses.
-pub(crate) fn put_value(out: &mut String, design: &Design, e: ExprId) {
-    kernel_write_value(design, e, out);
+pub(crate) fn put_value(out: &mut String, design: &Design, ctx: &Ctx, e: ExprId) {
+    text_expr::write_value(design, e, ctx, out);
 }
 
 /// Consumes `w` when it is the next word.
@@ -315,15 +311,6 @@ pub(crate) fn domain_unless(ok: bool) -> Option<Violation> {
     (!ok).then_some(Violation::FieldDomain)
 }
 
-/// Appends the `FieldDomain` row of item `at`.
-pub(crate) fn domain(design: &Design, at: ItemRef, out: &mut Diags) {
-    out.push(
-        violation_code(Violation::FieldDomain),
-        design.span_of(at),
-        at.index,
-    );
-}
-
 /// Whether the tree at `e` holds a `V`, `I`, `Time` or `Freq` leaf or a `Ddt`/`Idt` call.
 /// Explicit stack (C11). `NONE` reads nothing.
 pub(crate) fn reads_circuit(design: &Design, e: ExprId) -> bool {
@@ -375,35 +362,9 @@ pub(crate) fn is_one(design: &Design, e: ExprId) -> bool {
     matches!(design.expr(e), Expr::Num(k) if design.num(k).eq_value(one))
 }
 
-/// The scope that lists `item` and its position there, found by one scan over every scope.
-/// O(items); for the few facts that depend on where an item stands (the run report).
-pub(crate) fn locate(design: &Design, item: ItemRef) -> Option<(ScopeId, usize)> {
-    for (s, items) in design.scope_items.iter().enumerate() {
-        if let Some(k) = items.iter().position(|&x| x == item) {
-            return Some((ScopeId(s as u32), k));
-        }
-    }
-    None
-}
-
-/// The scope and position of the first item whose row equals `row` (a row's facts get no
-/// item handle; equal rows have equal facts). O(items).
-pub(crate) fn locate_row<R: ItemRow + PartialEq>(
-    design: &Design,
-    row: &R,
-) -> Option<(ScopeId, usize)> {
-    let index = R::table(design).rows().iter().position(|r| r == row)?;
-    locate(
-        design,
-        ItemRef {
-            kind: R::KIND,
-            index: index as u32,
-        },
-    )
-}
-
 /// Whether position `pos` of `scope` comes after a run item (an analysis, loop or alter) of
 /// that scope, or `scope` is a loop body.
+#[cfg(any(test, feature = "gen"))]
 pub(crate) fn after_run_item(design: &Design, scope: ScopeId, pos: usize) -> bool {
     let items = design.items(scope);
     let run = |it: &ItemRef| {
@@ -475,16 +436,3 @@ pub(crate) fn reachable(design: &Design, scope: ScopeId, kind: ItemKind) -> usiz
 }
 
 // ---- private ----
-
-// The kernel's writers with a detached context, until A9 passes each row its `Ctx`.
-fn kernel_write_expr(design: &Design, e: ExprId, out: &mut String) {
-    text_expr::write_expr(design, e, &Ctx::detached(), out);
-}
-
-fn kernel_write_value(design: &Design, e: ExprId, out: &mut String) {
-    text_expr::write_value(design, e, &Ctx::detached(), out);
-}
-
-fn kernel_write_name(design: &Design, n: NameId, out: &mut String) {
-    text_expr::write_name(design.str(n), out);
-}

@@ -358,3 +358,47 @@ fn outputs_measures_and_statistics() {
         b.statistics(top, row, Span::NONE);
     });
 }
+
+#[test]
+fn references_in_detail_rows_and_pools_are_linked() {
+    // A9: the linker reaches a loop's target, a DC axis's target, a table's columns and a
+    // statistics block's variations and correlations, so each binds to the `param` it names.
+    let text = "file \"t.sp\" deck
+  param r = 1
+  param s = 2
+  loop sweep (param r) (list values=[1])
+    analysis dc (param s) (lin start=0 stop=1 step=1)
+  loop table (param r) (param s) values=[1, 2]
+  statistics process (r gauss spread=1) (s gauss spread=1) process_correlate (r s cc=0.5)
+";
+    let mut d = spicerack_ir::Design::new();
+    let mut diags = Diags::new();
+    parse(text, &mut d.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    let mut bound = 0;
+    let mut unbound = Vec::new();
+    for item in d
+        .items(d.file(FileId(0)).top)
+        .iter()
+        .chain(d.items(spicerack_ir::ScopeId(1)))
+    {
+        let mut refs = Vec::new();
+        let mut copy = d.clone();
+        copy.editor().map_refs(*item, &mut |r, _| refs.push(*r));
+        for r in refs {
+            if r.def.is_none() {
+                unbound.push(r)
+            } else {
+                bound += 1
+            }
+        }
+    }
+    assert!(unbound.is_empty(), "{unbound:?}");
+    assert_eq!(
+        bound, 8,
+        "sweep 1, dc axis 1, table columns 2, varies 2, correlation ends 2"
+    );
+    let mut out = String::new();
+    dump(&d, FileId(0), &mut out);
+    assert_eq!(out, text);
+}

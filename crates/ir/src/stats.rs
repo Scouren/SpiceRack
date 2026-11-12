@@ -21,8 +21,7 @@
 //! IR text: `statistics [process <vary> …] [mismatch <vary> …] [process_correlate <corr> …]
 //! [mismatch_correlate <corr> …] [truncate=v] [process_truncate=v] [mismatch_truncate=v]`, with
 //! `vary = (param gauss|unif|log_normal [percent] [mean=v] spread=v)` and `corr = (a b cc=v)`.
-//! The references in a block's pools are out of the linker's reach (`map_refs` sees only the
-//! header): they stay as parsed (the run report).
+//! The references in a block's pools are reached by `map_refs` (A9), so the linker binds them.
 
 use crate::analysis_facts::report;
 use crate::build::Builder;
@@ -35,6 +34,8 @@ use crate::feature::FeatureSet;
 use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, ItemRef, List, Ref, ScopeId};
 use crate::item::DefKind;
+#[cfg(any(test, feature = "gen"))]
+use crate::plan::gen_ref;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
@@ -45,6 +46,7 @@ use crate::run_words::{
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// A statistics block: the variations of a Monte Carlo loop, by scope. At the top or in a
 /// library section (a block inside a subcircuit or a branch is refused by its reader, W0018).
@@ -158,11 +160,27 @@ impl RowFacts for Statistics {
         }
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // The block's references live in its pools, out of this hook's reach (run report).
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        // Every vary's parameter (process, then mismatch), then every correlation's two ends.
+        let row: Statistics = design.row(at.index);
+        for list in [row.process, row.mismatch] {
+            let start = list.start as usize;
+            let end = (start + list.len as usize).min(design.run.varies.len());
+            for v in &mut design.run.varies[start.min(end)..end] {
+                f(&mut v.param, DefKind::Param);
+            }
+        }
+        for list in [row.process_correlations, row.mismatch_correlations] {
+            let start = list.start as usize;
+            let end = (start + list.len as usize).min(design.run.correlations.len());
+            for c in &mut design.run.correlations[start.min(end)..end] {
+                f(&mut c.a, DefKind::Param);
+                f(&mut c.b, DefKind::Param);
+            }
+        }
     }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         flag(set, self.mismatch.len > 0, RunExtra::StatsMismatch);
         let correlated = self.process_correlations.len + self.mismatch_correlations.len > 0;
         flag(set, correlated, RunExtra::StatsCorrelation);
@@ -179,7 +197,7 @@ impl RowFacts for Statistics {
         }
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let varies = [self.process, self.mismatch].map(|l| get(&design.run.varies, l));
         let corrs = [self.process_correlations, self.mismatch_correlations]
             .map(|l| get(&design.run.correlations, l));
@@ -202,18 +220,18 @@ impl RowFacts for Statistics {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         let at = out.len();
         for (key, list) in [("process", self.process), ("mismatch", self.mismatch)] {
             if list.len > 0 {
                 put_word(out, key);
                 for v in design.varies(list) {
                     out.push_str(" (");
-                    write_ref(out, design, v.param);
+                    write_ref(out, design, ctx, v.param, DefKind::Param);
                     put_word(out, &word(v.dist));
                     put_flag(out, v.percent, "percent");
-                    put_expr(out, design, "mean", v.mean);
-                    put_expr(out, design, "spread", v.spread);
+                    put_expr(out, design, ctx, "mean", v.mean);
+                    put_expr(out, design, ctx, "spread", v.spread);
                     out.push(')');
                 }
             }
@@ -227,16 +245,22 @@ impl RowFacts for Statistics {
                 put_word(out, key);
                 for c in design.correlations(list) {
                     out.push_str(" (");
-                    write_ref(out, design, c.a);
-                    put_ref(out, design, c.b);
-                    put_expr(out, design, "cc", c.cc);
+                    write_ref(out, design, ctx, c.a, DefKind::Param);
+                    put_ref(out, design, ctx, c.b, DefKind::Param);
+                    put_expr(out, design, ctx, "cc", c.cc);
                     out.push(')');
                 }
             }
         }
-        put_expr(out, design, "truncate", self.truncate);
-        put_expr(out, design, "process_truncate", self.process_truncate);
-        put_expr(out, design, "mismatch_truncate", self.mismatch_truncate);
+        put_expr(out, design, ctx, "truncate", self.truncate);
+        put_expr(out, design, ctx, "process_truncate", self.process_truncate);
+        put_expr(
+            out,
+            design,
+            ctx,
+            "mismatch_truncate",
+            self.mismatch_truncate,
+        );
         trim_lead(out, at);
     }
 
@@ -294,7 +318,7 @@ impl RowFacts for Statistics {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let vary = |g: &mut Gen, b: &mut Builder<'_>| {
-            let param = Ref::unresolved(g.fresh_name(b));
+            let param = gen_ref(g, b, Some(DefKind::Param));
             let mut dists = vec![VaryDist::Gauss, VaryDist::Unif];
             if has(features, RunExtra::VaryLogNormal) {
                 dists.push(VaryDist::LogNormal);
@@ -321,16 +345,19 @@ impl RowFacts for Statistics {
         } else {
             Vec::new()
         };
-        let c: Vec<Correlation> =
-            if p.len() == 2 && has(features, RunExtra::StatsCorrelation) && g.chance(2) {
-                vec![Correlation {
-                    a: p[0].param,
-                    b: p[1].param,
-                    cc: g.expr(b, features, Reads::Constant),
-                }]
-            } else {
-                Vec::new()
-            };
+        let c: Vec<Correlation> = if p.len() == 2
+            && p[0].param.name != p[1].param.name
+            && has(features, RunExtra::StatsCorrelation)
+            && g.chance(2)
+        {
+            vec![Correlation {
+                a: p[0].param,
+                b: p[1].param,
+                cc: g.expr(b, features, Reads::Constant),
+            }]
+        } else {
+            Vec::new()
+        };
         let truncate = if has(features, RunExtra::StatsTruncate) && g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {

@@ -492,14 +492,16 @@ impl Builder<'_> {
     }
 
     /// Binds every unresolved `Param` read of a formal argument in `body` to the function `def`.
-    /// Explicit stack (C11); a shared subtree is visited once per path, bounded by the rows.
+    /// Explicit stack (C11); each row of the body is visited once.
     fn bind_formals(&mut self, body: ExprId, args: NameList, def: DefId) {
         let formals: Vec<NameId> = self.design.names(args).to_vec();
         let mut stack = vec![body];
         let mut kids = Vec::new();
-        let mut seen = vec![false; body.index() + 1];
+        // the rows of this body only: a set, not a vector sized by the design (O(body), not
+        // O(expressions so far), per function)
+        let mut seen = std::collections::HashSet::new();
         while let Some(e) = stack.pop() {
-            if std::mem::replace(&mut seen[e.index()], true) {
+            if !seen.insert(e) {
                 continue;
             }
             let i = e.index();

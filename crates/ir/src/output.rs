@@ -46,6 +46,7 @@ use crate::run_words::{
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// Quantities to keep in the results: a member of the deck's save set.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -111,25 +112,27 @@ impl RowFacts for Save {
         list_handles(design, self.probes, out);
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {}
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f); // no reference
+    }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         flag(set, !self.every_analysis, RunExtra::SavePerAnalysis);
         list_features(design, self.probes, set);
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if let Some(v) = list_fault(design, self.probes) {
             report(design, at, v, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         let at = out.len();
         if !self.every_analysis {
             put_word(out, &format!("analysis={}", word(self.analysis)));
         }
-        dump_list(design, self.probes, out);
+        dump_list(design, ctx, self.probes, out);
         trim_lead(out, at);
     }
 
@@ -194,23 +197,25 @@ impl RowFacts for Print {
         list_handles(design, self.probes, out);
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {}
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f); // no reference
+    }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         flag(set, self.view == PrintView::HbTime, RunExtra::PrintHbTime);
         list_features(design, self.probes, set);
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if let Some(v) = list_fault(design, self.probes) {
             report(design, at, v, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         out.push_str(&word(self.analysis));
         put_flag(out, self.view == PrintView::HbTime, "hb_time");
-        dump_list(design, self.probes, out);
+        dump_list(design, ctx, self.probes, out);
     }
 
     fn parse(
@@ -293,9 +298,9 @@ fn list_fault(design: &Design, list: ProbeList) -> Option<Violation> {
     (probes.is_empty() || !probes.iter().all(probe_valid)).then_some(Violation::FieldDomain)
 }
 
-fn dump_list(design: &Design, list: ProbeList, out: &mut String) {
+fn dump_list(design: &Design, ctx: &Ctx, list: ProbeList, out: &mut String) {
     for p in design.probes(list) {
-        dump_probe(design, p, out);
+        dump_probe(design, ctx, p, out);
     }
 }
 

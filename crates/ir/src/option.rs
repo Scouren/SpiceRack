@@ -45,14 +45,17 @@ use crate::item::{DefKind, ScopeKind};
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
+use crate::run_words::after_run_item;
+#[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
-    after_run_item, flag, in_scope_kind, locate_row, put_expr, put_flag, put_name, put_names,
-    put_word, take_enum, take_expr, take_names, take_word, trim_lead, word,
+    flag, in_scope_kind, put_expr, put_flag, put_name, put_names, put_word, take_enum, take_expr,
+    take_names, take_word, trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// One simulator option. Applies to every run item after it (an option set between analyses
 /// is a state change: VACASK `options` in `control`, ngspice `option` in a script); a reader of
@@ -159,15 +162,16 @@ impl RowFacts for OptionRow {
         ]);
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {}
-
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
-        *set = set.with(Feature::Option(self.key));
-        let mid = locate_row(design, self).is_some_and(|(s, k)| after_run_item(design, s, k));
-        flag(set, mid, RunExtra::OptionMidRun);
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f); // no reference
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        *set = set.with(Feature::Option(self.key));
+        // `OptionMidRun` is a fact of the whole design: `analysis::design_features`.
+    }
+
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let named = !self.private.is_none() && !self.dialect.is_none();
         let ok = if self.key == OptionKey::Private {
             named
@@ -181,11 +185,11 @@ impl RowFacts for OptionRow {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         out.push_str(&word(self.key));
         put_name(out, design, "", self.private);
         put_name(out, design, "", self.dialect);
-        put_expr(out, design, "value", self.value);
+        put_expr(out, design, ctx, "value", self.value);
     }
 
     fn parse(
@@ -273,20 +277,22 @@ impl RowFacts for Env {
         out.extend([Handle::Expr(self.temp), Handle::Expr(self.tnom)]);
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {}
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f); // no reference
+    }
 
-    fn features(&self, _design: &Design, _set: &mut FeatureSet) {}
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {}
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         if self.temp.is_none() || self.tnom.is_none() {
             report(design, at, Violation::FieldDomain, out);
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         let at = out.len();
-        put_expr(out, design, "temp", self.temp);
-        put_expr(out, design, "tnom", self.tnom);
+        put_expr(out, design, ctx, "temp", self.temp);
+        put_expr(out, design, ctx, "tnom", self.tnom);
         trim_lead(out, at);
     }
 
@@ -326,9 +332,11 @@ impl RowFacts for NodeSet {
         ]);
     }
 
-    fn map_refs(&mut self, _f: &mut dyn FnMut(&mut Ref, DefKind)) {}
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f); // no reference
+    }
 
-    fn features(&self, design: &Design, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
         let held = self.kind != NodeSetKind::Nodeset;
         flag(
             set,
@@ -348,12 +356,11 @@ impl RowFacts for NodeSet {
             RunExtra::NodeSetHierarchical,
         );
         flag(set, self.kind == NodeSetKind::Device, RunExtra::IcDevice);
-        let subckt = locate_row(design, self)
-            .is_some_and(|(s, _)| in_scope_kind(design, s, ScopeKind::Subckt));
+        let subckt = in_scope_kind(design, scope, ScopeKind::Subckt);
         flag(set, subckt, RunExtra::NodeSetInSubckt);
     }
 
-    fn check(&self, design: &Design, at: ItemRef, out: &mut Diags) {
+    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let ok = !self.value.is_none()
             && (self.kind != NodeSetKind::Nodeset || self.applies == IcScope::EveryOp)
             && (self.node.len > 0 || self.kind == NodeSetKind::Nodeset)
@@ -363,13 +370,13 @@ impl RowFacts for NodeSet {
         }
     }
 
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         out.push_str(&word(self.kind));
         put_word(out, &word(self.applies));
         put_flag(out, self.next_only, "next_only");
         put_names(out, design, "node", self.node);
         put_names(out, design, "reference", self.reference);
-        put_expr(out, design, "value", self.value);
+        put_expr(out, design, ctx, "value", self.value);
     }
 
     fn parse(

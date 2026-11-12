@@ -19,3 +19,8 @@ gen = []
 
 # Its own workspace until slice S2 wires it into the root crate.
 [workspace]
+
+# The throughput measurement of rewrite/IR-PERF.md: it builds designs with the generator.
+[[example]]
+name = "throughput"
+required-features = ["gen"]

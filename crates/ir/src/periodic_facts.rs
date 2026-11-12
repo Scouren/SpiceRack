@@ -40,6 +40,7 @@ use crate::run_words::{
     take_exprs, take_key, take_name, take_word, word,
 };
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 impl DetailFacts for Hb {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
@@ -62,10 +63,10 @@ impl DetailFacts for Hb {
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(self.tones.len > 0 && self.tones.len == self.harmonics.len)
     }
-    fn dump(&self, design: &Design, out: &mut String) {
-        put_exprs(out, design, "tones", self.tones);
-        put_exprs(out, design, "harmonics", self.harmonics);
-        put_expr(out, design, "intermod", self.intermod);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        put_exprs(out, design, ctx, "tones", self.tones);
+        put_exprs(out, design, ctx, "harmonics", self.harmonics);
+        put_expr(out, design, ctx, "intermod", self.intermod);
         put_word(out, &format!("truncate={}", word(self.truncate)));
     }
     fn parse(
@@ -159,13 +160,13 @@ impl DetailFacts for Pss {
         };
         domain_unless(mode && !self.fundamental.is_none() && !self.tstab.is_none())
     }
-    fn dump(&self, design: &Design, out: &mut String) {
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
         put_word(out, &word(self.mode));
         put_flag(out, self.uic, "uic");
-        put_expr(out, design, "fundamental", self.fundamental);
-        put_expr(out, design, "tstab", self.tstab);
-        put_expr(out, design, "harmonics", self.harmonics);
-        put_expr(out, design, "points", self.points);
+        put_expr(out, design, ctx, "fundamental", self.fundamental);
+        put_expr(out, design, ctx, "tstab", self.tstab);
+        put_expr(out, design, ctx, "harmonics", self.harmonics);
+        put_expr(out, design, ctx, "points", self.points);
         put_name(out, design, "osc_p", self.osc_p);
         put_name(out, design, "osc_n", self.osc_n);
     }

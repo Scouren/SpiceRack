@@ -42,6 +42,7 @@ use crate::run_words::{
     close, open, put_expr, put_exprs, put_flag, take_enum, take_expr, take_exprs, take_word, word,
 };
 use crate::text::Words;
+use crate::text_expr::Ctx;
 
 /// A set of swept values with one reading (IR-RUN §1). Which fields are read is fixed by `kind`
 /// and `bounds`; every unread value field is `NONE` and `values` is empty unless `kind` is
@@ -260,16 +261,16 @@ pub(crate) fn sweep_features(s: &SweepSpec, set: &mut FeatureSet) {
 }
 
 /// Appends ` (kind …)`.
-pub(crate) fn dump_sweep(design: &Design, s: &SweepSpec, out: &mut String) {
+pub(crate) fn dump_sweep(design: &Design, ctx: &Ctx, s: &SweepSpec, out: &mut String) {
     out.push_str(" (");
     out.push_str(&word(s.kind));
     put_flag(out, s.end == SweepEnd::OnStop, "on_stop");
     put_flag(out, s.bounds == SweepBounds::CenterSpan, "center_span");
-    put_expr(out, design, "start", s.start);
-    put_expr(out, design, "stop", s.stop);
-    put_expr(out, design, "step", s.step);
-    put_expr(out, design, "points", s.points);
-    put_exprs(out, design, "values", s.values);
+    put_expr(out, design, ctx, "start", s.start);
+    put_expr(out, design, ctx, "stop", s.stop);
+    put_expr(out, design, ctx, "step", s.step);
+    put_expr(out, design, ctx, "points", s.points);
+    put_exprs(out, design, ctx, "values", s.values);
     out.push(')');
 }
 

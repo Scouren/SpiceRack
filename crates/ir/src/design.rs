@@ -44,8 +44,6 @@
 //!   `Design::eq_meaning(&self, &Design) -> bool`, `Design::children(&self, ExprId, &mut Vec<ExprId>)`
 //!   (crate)
 
-use std::collections::HashMap;
-
 use crate::analysis::{Analysis, RunDetails};
 use crate::build::Builder;
 use crate::edit::Editor;
@@ -63,7 +61,7 @@ use crate::item::{
     Section, Subckt, Title,
 };
 use crate::model::Model;
-use crate::names::{Names, Texts};
+use crate::names::{FxMap, Names, Texts};
 use crate::option::{Env, NodeSet, OptionRow};
 use crate::output::{Measure, Print, Save};
 use crate::plan::{Alter, Loop};
@@ -84,7 +82,7 @@ pub struct Design {
     pub(crate) scope_items: Vec<Vec<ItemRef>>,
     pub(crate) defs: Vec<Def>,
     /// `(scope, kind, name)` → definition: lookup only, never iterated.
-    pub(crate) def_index: HashMap<(ScopeId, DefKind, NameId), DefId>,
+    pub(crate) def_index: FxMap<(ScopeId, DefKind, NameId), DefId>,
     pub(crate) exprs: Exprs,
     pub(crate) name_pool: Vec<NameId>,
     pub(crate) expr_pool: Vec<ExprId>,
@@ -204,7 +202,7 @@ impl Design {
             scopes: Vec::new(),
             scope_items: Vec::new(),
             defs: Vec::new(),
-            def_index: HashMap::new(),
+            def_index: FxMap::default(),
             exprs: Exprs::default(),
             name_pool: Vec::new(),
             expr_pool: Vec::new(),

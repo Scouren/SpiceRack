@@ -66,14 +66,13 @@ impl<'d> Editor<'d> {
         rows[index as usize] = row;
     }
 
-    /// Calls `f` on each `Ref` of `item`'s row with the kind its field expects, and stores the
-    /// row back (one exhaustive dispatch over `ItemKind` to `RowFacts::map_refs`). For the
-    /// linker and for passes that renumber definitions. Asserts `item` is in range.
+    /// Calls `f` on every `Ref` `item` owns (header, detail rows, pools) with the kind its field
+    /// expects (one exhaustive dispatch over `ItemKind` to `RowFacts::map_refs`, which stores
+    /// them back). For the linker and for passes that renumber definitions. Asserts `item` is in
+    /// range.
     pub fn map_refs(&mut self, item: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        for_kind!(item.kind, R => {
-            let mut row: R = self.design.row(item.index);
-            row.map_refs(f);
-            R::table_mut(self.design).set(item.index, row);
-        })
+        let rows = for_kind!(item.kind, R => R::table(self.design).len());
+        assert!((item.index as usize) < rows, "an item in range");
+        for_kind!(item.kind, R => R::map_refs(self.design, item, f))
     }
 }
