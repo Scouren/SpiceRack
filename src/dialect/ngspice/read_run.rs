@@ -22,6 +22,7 @@
 //! (ngspice's option spellings, which `write_run` spells back)
 
 mod analysis;
+mod rows;
 mod state;
 mod words;
 
@@ -48,6 +49,14 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Analysis(AnalysisKind::Disto),
     Feature::Analysis(AnalysisKind::Sp),
     Feature::Analysis(AnalysisKind::Four),
+    Feature::Analysis(AnalysisKind::Pss),
+    Feature::Run(RunExtra::PssAutonomous),
+    Feature::Run(RunExtra::PssUic),
+    Feature::Run(RunExtra::PssScIter),
+    Feature::Run(RunExtra::PssSteadyCoeff),
+    Feature::Run(RunExtra::FourHarmonicsOption),
+    Feature::Option(OptionKey::NFreqs),
+    Feature::Option(OptionKey::FourGridSize),
     Feature::Run(RunExtra::SeveralAnalyses),
     Feature::Run(RunExtra::TranRecordStart),
     Feature::Run(RunExtra::TranMaxStep),
@@ -141,7 +150,7 @@ pub(super) const CODES: &[Row] = &[
         NO_FIELD,
         "a run card form the IR has no field for",
         "rewrite/IR-RUN.md §2",
-        "kept as text (Unread) until the IR has the field (.pss sc_iter and steady_coeff, a .sens filter, a .four under nfreqs).",
+        "kept as text (Unread): a .sens filter, a .four whose count a script sets, a .pss with fewer arguments, a .dc of more than two axes.",
     ),
     note(
         TEMP_27,
@@ -182,8 +191,8 @@ const RUN_INVALID: ir::Code = ir::Code::new(b'P', 1300);
 const NO_SUCH_CARD: ir::Code = ir::Code::new(b'P', 1301);
 /// An `.ac` whose numbers ngspice replaces with defaults (`np < 1`, `fstop < fstart`): `Unread`.
 const RUN_DEFAULTS: ir::Code = ir::Code::new(b'P', 1302);
-/// A run card form the IR has no field for (`.pss`'s `sc_iter`, a `.sens` filter, a `.four`
-/// whose harmonic count is the deck's `nfreqs`): `Unread`.
+/// A run card form the IR has no field for (a `.sens` filter, a `.four`
+/// whose count a script's `nfreqs` gives): `Unread`.
 const NO_FIELD: ir::Code = ir::Code::new(b'P', 1303);
 /// A `.temp` ngspice cannot read (a list, a scale suffix): it runs 27 °C, the `Env`'s literal.
 const TEMP_27: ir::Code = ir::Code::new(b'P', 1304);
@@ -206,7 +215,7 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
         | "four" | "fourier" => {
             let w = words::split(&lw.rest(st.node));
             match analysis::read(lw, st, name, &w) {
-                Ok(c) => analysis::push(lw, st, &c),
+                Ok(c) => rows::push(lw, st, &c),
                 Err(f) => lw.opaque(st, f.class, f.code),
             }
         }

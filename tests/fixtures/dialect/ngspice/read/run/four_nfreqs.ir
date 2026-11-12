@@ -1,6 +1,7 @@
-# codes: P1307 P1303
+# codes:
 file "four_nfreqs.sp" deck
   title "four_nfreqs"
-  comment " oracle: ngspice-45 fourier.c:69 (the harmonic count is the deck's nfreqs option: copying it repeats an operand, R13 b)"
-  opaque ngspice private ".options nfreqs=5"
-  opaque ngspice unread ".four 1k v(out)"
+  comment " oracle: ngspice-45 fourier.c:69 (the count is nfreqs: DC and the harmonics), A16 (no count in the row, the typed option); runs four1.cir (10 rows), four2.cir (nfreqs=3: 3 rows)"
+  option n_freqs value=5 whole_run
+  option four_grid_size value=400 whole_run
+  analysis four fundamental=1k periods=1 (v (out))

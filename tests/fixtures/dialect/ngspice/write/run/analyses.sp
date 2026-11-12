@@ -7,4 +7,5 @@ analyses
 .pz in 0 out 0 cur zer
 .disto dec 5 1k 10k 0.9
 .sp lin 2 1 10 1
+.pss 1k 1m b 64 10 50 1e-3 uic
 .end

@@ -1,0 +1,5 @@
+# codes: P1303
+file "pss_short.sp" deck
+  title "pss_short"
+  comment " oracle: ngspice-45 inp2dot.c dot_pss (every argument is read from the line, given or not: a short card's reading is not established)"
+  opaque ngspice unread ".pss 1k 1m b"

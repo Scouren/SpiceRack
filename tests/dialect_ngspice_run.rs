@@ -9,7 +9,7 @@
 //!   by hand.
 //! - Every read fixture is a fixpoint of read → write → read (law L6 on these decks).
 //! - The simulator round trip: each deck of [`DECKS`] and its `write(read(deck))` run on
-//!   ngspice-45 give the same raw file, byte for byte but the date line (the oracle is ngspice on
+//!   ngspice-45 give the same raw file, byte for byte but the date lines (the oracle is ngspice on
 //!   the original deck; R1: the writer spells the reader's digits, so the doubles are the same).
 //!   ngspice comes from `nix develop .#testing`; a missing simulator fails.
 //!
@@ -34,6 +34,7 @@ const READ: &[&str] = &[
     "disto",
     "four",
     "four_nfreqs",
+    "four_script",
     "ic",
     "ic_subckt",
     "nodeset",
@@ -43,6 +44,7 @@ const READ: &[&str] = &[
     "options",
     "options_form",
     "pss",
+    "pss_short",
     "pz",
     "run_in_subckt",
     "sens",
@@ -66,6 +68,7 @@ const WRITE: &[&str] = &["analyses", "analyses_outputs", "state"];
 /// Strict both ways: a listed fixture that passes fails the test until its line goes.
 const PENDING: &[(&str, &str)] = &[
     ("four", "read_outputs::probe is a stub (S3.3b)"),
+    ("four_nfreqs", "read_outputs::probe is a stub (S3.3b)"),
     ("noise", "read_outputs::probe is a stub (S3.3b)"),
     ("sens", "read_outputs::probe is a stub (S3.3b)"),
     ("tf", "read_outputs::probe is a stub (S3.3b)"),
@@ -79,6 +82,10 @@ const DECKS: &[(&str, &str)] = &[
     (
         "rc_tran",
         "rc tran\nV1 a 0 pulse(0 1 0 1u 1u 5u 10u)\nR1 a b 1k\nC1 b 0 1n\n.TRAN 0.1U 20U 1U 0.2U\n.Tran 1u 30u UIC\n.IC V(b)=0.5\n.OPTIONS RELTOL=1e-4 method=gear\n.end\n",
+    ),
+    (
+        "rc_pss",
+        "rc pss\nV1 a 0 dc 0 sin(0 1 1k)\nR1 a b 1k\nC1 b 0 1u\n.PSS 1k 1m b 64 10 50 1e-3\n.end\n",
     ),
     (
         "rc_small_signal",
@@ -262,7 +269,7 @@ fn parse_ir(name: &str, text: &str) -> ir::Design {
     design
 }
 
-/// The raw file ngspice-45 writes for `deck` (`ngspice -b -r`), without its `Date:` line.
+/// The raw file ngspice-45 writes for `deck` (`ngspice -b -r`), without its `Date:` lines.
 /// Asserts the run exits 0 and writes one.
 fn raw(dir: &std::path::Path, stem: &str, deck: &str) -> Vec<u8> {
     let cir = dir.join(format!("{stem}.cir"));
@@ -282,18 +289,22 @@ fn raw(dir: &std::path::Path, stem: &str, deck: &str) -> Vec<u8> {
         String::from_utf8_lossy(&run.stderr)
     );
     let bytes = std::fs::read(&out).unwrap_or_else(|e| panic!("{stem}: no raw file: {e}"));
+    // each plot's header has a `Date:` line (the second plot's sits after the first's binary
+    // data); a run that crosses a second differs there and only there
     let mut kept = Vec::with_capacity(bytes.len());
-    let mut lines = bytes.split_inclusive(|&b| b == b'\n');
-    for line in lines.by_ref() {
-        if !line.starts_with(b"Date:") {
-            kept.extend_from_slice(line);
+    let mut at = 0;
+    // Bounded: each step moves `at` forward.
+    while at < bytes.len() {
+        let line_start = at == 0 || bytes[at - 1] == b'\n';
+        if line_start && bytes[at..].starts_with(b"Date:") {
+            at += bytes[at..]
+                .iter()
+                .position(|&b| b == b'\n')
+                .map_or(bytes.len() - at, |k| k + 1);
+            continue;
         }
-        if line.starts_with(b"Binary:") {
-            break;
-        }
-    }
-    for line in lines {
-        kept.extend_from_slice(line);
+        kept.push(bytes[at]);
+        at += 1;
     }
     kept
 }

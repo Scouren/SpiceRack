@@ -1,6 +1,6 @@
 //! One analysis from its words (the card's dot and tag already dropped, so a `.control` command
-//! line reads through the same rules): [`read`] validates the whole analysis into a [`Card`],
-//! [`push`] appends it. ngspice-45's analyses (`inp2dot.c` `INP2dot`, `analysis.c:36-58`, this
+//! line reads through the same rules): [`read`] validates the whole analysis into a [`Card`];
+//! `rows::push` appends it. ngspice-45's analyses (`inp2dot.c` `INP2dot`, `analysis.c:36-58`, this
 //! build has PSS and RFSPICE, not HB or SENSE2): `op`, `dc`, `ac`, `tran`, `noise`, `tf`,
 //! `sens`, `pz`, `disto`, `sp`, `pss`, and `four`/`fourier`, which the frontend runs on the
 //! transient (`fourier.c`).
@@ -8,10 +8,11 @@
 //! Cites: ngspice-45 `inp2dot.c` `dot_*` (each argument's position and word), `traninit.c:29-34`
 //! (no `tmax`, or a zero one: the ceiling `min(tstep, span/50)`, `StepCap::NgspiceRule`),
 //! `dctrcurv.c:89-149` (a sweep's name: a resistor, a V or I source, or `temp`), `fourier.c:69`
-//! (`nfreqs` 10: DC and 9 harmonics), `pzsetp.c:78-87`; runs in `rewrite/DIALECT-NGSPICE.md` §3.
+//! (`nfreqs` 10 counts DC and 9 harmonics: runs four1.cir, four2.cir), `dot_pss` (every
+//! argument read, the oscillator node against ground), `pzsetp.c:78-87`; runs in `rewrite/DIALECT-NGSPICE.md` §3.
 //!
 //! Contents: `pub(super) enum Card`, `pub(super) enum Swept`, `pub(super) struct Sweep`, `pub(super) fn read(&mut Lower, Stmt, &str, &[String]) ->
-//! Result<Card, Fail>`, `pub(super) fn push(&mut Lower, Stmt, &Card)`
+//! Result<Card, Fail>`
 
 use super::super::expr_read::Fail;
 use super::super::read::{Lower, Stmt};
@@ -19,9 +20,7 @@ use super::super::read_outputs;
 use super::words::{self, Val, invalid};
 use super::{NO_FIELD, RUN_DEFAULTS};
 use crate::ir;
-use crate::ir::dc_ac::{Ac, Dc, DcAxis, Disto, Noise, NoiseRef, Pz, PzFind, PzInput, PzTransfer};
-use crate::ir::dc_ac::{Sens, SensAc, Sp, Tf};
-use crate::ir::tran::{Four, StepCap, Tran};
+use crate::ir::dc_ac::{PzFind, PzTransfer};
 
 /// An analysis read and validated, nothing appended yet.
 #[derive(Clone, Debug)]
@@ -61,10 +60,22 @@ pub(super) enum Card {
     Disto { sweep: Sweep, f2: Option<Val> },
     /// `sp sweep [donoise]`.
     Sp { sweep: Sweep, noise: bool },
-    /// `four freq out …`.
+    /// `four freq out …`; the count is ngspice's default unless the deck sets `nfreqs`.
     Four {
         fundamental: Val,
         outs: Vec<ir::Probe>,
+        default_count: bool,
+    },
+    /// `pss fguess stabtime oscnode points harmonics sc_iter steady_coeff [uic]`.
+    Pss {
+        fundamental: Val,
+        tstab: Val,
+        osc: String,
+        points: Val,
+        harmonics: Val,
+        sc_iter: Val,
+        steady_coeff: Val,
+        uic: bool,
     },
 }
 
@@ -82,10 +93,10 @@ pub(super) enum Swept {
 /// `DEC|OCT|LIN np fstart fstop`.
 #[derive(Clone, Debug)]
 pub(super) struct Sweep {
-    kind: ir::SweepKind,
-    points: Val,
-    start: Val,
-    stop: Val,
+    pub(super) kind: ir::SweepKind,
+    pub(super) points: Val,
+    pub(super) start: Val,
+    pub(super) stop: Val,
 }
 
 /// The analysis `name` with its words, validated whole. `Err` names the code and class of the
@@ -192,15 +203,22 @@ pub(super) fn read(
             Card::Sp { sweep, noise }
         }
         "four" | "fourier" if w.len() >= 2 => {
-            // the harmonic count is the deck's `nfreqs` (fourier.c:69): an option's value
-            // copied into this row would repeat an operand (R13 b)
-            // ponytail: a text scan of this file's non-comment lines; an `nfreqs` set in
-            // another file of the deck is not seen (a deck-wide option table would see it)
-            let sets = lw.toks.source().lines().any(|l| {
+            // `fourier.c:69`: the count is `nfreqs` (DC and the harmonics). An `.options
+            // nfreqs=` makes the count the option's (`harmonics` none, A16); one a script sets
+            // has no item to name.
+            // ponytail: a text scan of this file's non-comment lines; an `nfreqs` in another
+            // file of the deck is not seen (a deck-wide option table would see it)
+            let (mut by_option, mut by_script) = (false, false);
+            for l in lw.toks.source().lines() {
                 let l = l.trim_start().to_ascii_lowercase();
-                !l.starts_with('*') && (l.contains("nfreqs") || l.contains("fourgridsize"))
-            });
-            if sets {
+                let named = l.contains("nfreqs") || l.contains("fourgridsize");
+                if named && l.starts_with(".opt") {
+                    by_option = true;
+                } else if named && !l.starts_with('*') {
+                    by_script = true;
+                }
+            }
+            if by_script {
                 return Err(no_field());
             }
             let fundamental = val(lw, 0)?;
@@ -208,165 +226,34 @@ pub(super) fn read(
                 .iter()
                 .map(|o| read_outputs::probe(lw, st, o, ir::AnalysisKind::Four))
                 .collect::<Result<Vec<_>, _>>()?;
-            Card::Four { fundamental, outs }
+            Card::Four {
+                fundamental,
+                outs,
+                default_count: !by_option,
+            }
         }
-        // sc_iter and steady_coeff have no `Pss` field yet
+        // `.pss fguess stabtime oscnode points harmonics sc_iter steady_coeff [uic]`
+        "pss" if w.len() == 7 || w.len() == 8 => {
+            let uic = w.len() == 8;
+            if uic && !w[7].eq_ignore_ascii_case("uic") {
+                return Err(invalid());
+            }
+            let v = |lw: &Lower<'_, '_>, k: usize| words::value(lw, st, &w[k]);
+            Card::Pss {
+                fundamental: v(lw, 0)?,
+                tstab: v(lw, 1)?,
+                osc: lw.names.node(&w[2]),
+                points: v(lw, 3)?,
+                harmonics: v(lw, 4)?,
+                sc_iter: v(lw, 5)?,
+                steady_coeff: v(lw, 6)?,
+                uic,
+            }
+        }
+        // fewer arguments: `dot_pss` reads every one from the line regardless
         "pss" => return Err(no_field()),
         _ => return Err(invalid()),
     })
-}
-
-/// Appends `card` as one `Analysis` in `st.scope`.
-pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
-    let span = lw.span(st.node);
-    let scope = st.scope;
-    let none = ir::ExprId::NONE;
-    match card {
-        Card::Op => {
-            lw.b.op(scope, None, span);
-        }
-        Card::Dc(axes) => {
-            let mut rows = Vec::new();
-            for (swept, [a, b, c]) in axes {
-                let target = match swept {
-                    Swept::Source(n) => lw.b.target(ir::TargetKind::SourceDc, &[], n, None),
-                    Swept::Resistor(n) => lw.b.target(ir::TargetKind::ElementValue, &[], n, None),
-                    Swept::Temp => ir::Target::TEMP,
-                };
-                let (a, b, c) = (
-                    words::emit(lw, st, a),
-                    words::emit(lw, st, b),
-                    words::emit(lw, st, c),
-                );
-                rows.push(DcAxis {
-                    target,
-                    sweep: ir::SweepSpec::lin_step(a, b, c),
-                });
-            }
-            let axes = lw.b.dc_axes(&rows);
-            lw.b.analysis(
-                scope,
-                None,
-                Dc {
-                    axes,
-                    restart: false,
-                },
-                span,
-            );
-        }
-        Card::Ac(s) => {
-            let sweep = emit_sweep(lw, st, s);
-            lw.b.analysis(scope, None, Ac { sweep }, span);
-        }
-        Card::Tran {
-            step,
-            stop,
-            start,
-            max,
-            uic,
-        } => {
-            // in the IR text's field order, so a read and a parse intern alike
-            let stop = words::emit(lw, st, stop);
-            let record_start = start.as_ref().map_or(none, |v| words::emit(lw, st, v));
-            let print_step = words::emit(lw, st, step);
-            let max_step = max.as_ref().map_or(none, |v| words::emit(lw, st, v));
-            let row = Tran {
-                stop,
-                record_start,
-                print_step,
-                max_step,
-                initial_step: none,
-                noise_fmax: none,
-                noise_fmin: none,
-                noise_seed: none,
-                segments: ir::List::EMPTY,
-                cap: StepCap::NgspiceRule,
-                uic: *uic,
-                startup: false,
-            };
-            lw.b.analysis(scope, None, row, span);
-        }
-        Card::Noise {
-            out,
-            source,
-            sweep,
-            summary,
-        } => {
-            let output = *out;
-            let source = lw.b.name(source);
-            let sweep = emit_sweep(lw, st, sweep);
-            let points_per_summary = summary.as_ref().map_or(none, |v| words::emit(lw, st, v));
-            let row = Noise {
-                output,
-                source,
-                sweep,
-                points_per_summary,
-                ac_sweep: false,
-                input_ref: NoiseRef::Unit,
-            };
-            lw.b.analysis(scope, None, row, span);
-        }
-        Card::Tf { out, source } => {
-            let output = *out;
-            let source = lw.b.name(source);
-            lw.b.analysis(scope, None, Tf { output, source }, span);
-        }
-        Card::Sens { out, ac: None } => {
-            let output = *out;
-            lw.b.analysis(scope, None, Sens { output }, span);
-        }
-        Card::Sens { out, ac: Some(s) } => {
-            let output = *out;
-            let sweep = emit_sweep(lw, st, s);
-            lw.b.analysis(scope, None, SensAc { output, sweep }, span);
-        }
-        Card::Pz {
-            nodes,
-            transfer,
-            find,
-        } => {
-            let [in_p, in_n, out_p, out_n] = nodes.clone().map(|n| lw.b.name(&n));
-            let row = Pz {
-                input: PzInput::Nodes,
-                transfer: *transfer,
-                find: *find,
-                in_p,
-                in_n,
-                out_p,
-                out_n,
-                source: ir::NameId::NONE,
-            };
-            lw.b.analysis(scope, None, row, span);
-        }
-        Card::Disto { sweep, f2 } => {
-            let sweep = emit_sweep(lw, st, sweep);
-            let f2_over_f1 = f2.as_ref().map_or(none, |v| words::emit(lw, st, v));
-            lw.b.analysis(scope, None, Disto { sweep, f2_over_f1 }, span);
-        }
-        Card::Sp { sweep, noise } => {
-            let sweep = emit_sweep(lw, st, sweep);
-            let row = Sp {
-                sweep,
-                ports: ir::List::EMPTY,
-                noise: *noise,
-            };
-            lw.b.analysis(scope, None, row, span);
-        }
-        Card::Four { fundamental, outs } => {
-            let fundamental = words::emit(lw, st, fundamental);
-            let harmonics = lw.b.literal(plain(9));
-            let periods = lw.b.literal(plain(1));
-            let outputs = lw.b.probes(outs);
-            let row = Four {
-                fundamental,
-                harmonics,
-                periods,
-                grid: none,
-                outputs,
-            };
-            lw.b.analysis(scope, None, row, span);
-        }
-    }
 }
 
 // ---- private ----
@@ -461,31 +348,6 @@ fn defaults(s: &Sweep) -> bool {
     let below = start.is_some_and(|a| a < 0.0);
     let reversed = start.zip(lit(&s.stop)).is_some_and(|(a, b)| b < a);
     np || below || reversed
-}
-
-/// Appends a sweep: `points` per decade or octave, or `points` values in all for `lin`.
-fn emit_sweep(lw: &mut Lower<'_, '_>, st: Stmt, s: &Sweep) -> ir::SweepSpec {
-    let start = words::emit(lw, st, &s.start);
-    let stop = words::emit(lw, st, &s.stop);
-    let points = words::emit(lw, st, &s.points);
-    match s.kind {
-        ir::SweepKind::Dec => ir::SweepSpec::dec(start, stop, points),
-        ir::SweepKind::Oct => ir::SweepSpec::oct(start, stop, points),
-        ir::SweepKind::Lin => ir::SweepSpec::lin_points(start, stop, points),
-        ir::SweepKind::Log | ir::SweepKind::List => {
-            unreachable!("sweep reads dec, oct or lin only")
-        }
-    }
-}
-
-/// A whole number as a plain literal (a default the reader fills).
-const fn plain(n: i64) -> ir::Literal {
-    ir::Literal {
-        mantissa: n,
-        frac: 0,
-        exp10: 0,
-        form: ir::NumForm::Plain,
-    }
 }
 
 /// `P1303`, `Unread`: a form the IR has no field for.

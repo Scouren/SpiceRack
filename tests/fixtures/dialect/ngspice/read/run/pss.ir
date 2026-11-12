@@ -1,5 +1,6 @@
-# codes: P1303
+# codes:
 file "pss.sp" deck
   title "pss"
-  comment " oracle: ngspice-45 inp2dot.c dot_pss (sc_iter and steady_coeff have no Pss field)"
-  opaque ngspice unread ".pss 1k 1m b 64 10 50 1e-3"
+  comment " oracle: ngspice-45 inp2dot.c dot_pss (fguess stabtime oscnode points harmonics sc_iter steady_coeff [uic], the node against ground), A16; run pss.cir"
+  analysis pss autonomous fundamental=1k tstab=1m harmonics=10 points=64 osc_p=b osc_n=0 sc_iter=50 steady_coeff=1e-3
+  analysis pss autonomous uic fundamental=10meg tstab=5u harmonics=5 points=128 osc_p=out osc_n=0 sc_iter=20 steady_coeff=1e-4

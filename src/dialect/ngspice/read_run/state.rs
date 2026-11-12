@@ -64,14 +64,27 @@ pub(in super::super) const KEYS: &[(&str, OptionKey)] = &[
     ("norefvalue", OptionKey::NoRefValue),
     ("keepopinfo", OptionKey::KeepOpInfo),
     ("noinit", OptionKey::NoInit),
+    ("nfreqs", OptionKey::NFreqs),
+    ("fourgridsize", OptionKey::FourGridSize),
 ];
 
-/// ngspice's options that tune its solver and name no accuracy target (R19: `Hint`):
-/// `cktsopt.c`'s stepping, bypass, limiting and XSPICE convergence aids.
+/// ngspice's options that tune its solver and name no accuracy target (R19: `Hint`), from
+/// `cktsopt.c`'s table: the stepping factor, device bypass, SPICE2 limiting, Newton node
+/// damping and its limits, the skipped operating point before a linear AC, nodeset copying, the
+/// KLU memory growth, and XSPICE's analog/event alternation and code-model convergence aids.
+/// Every other key it has (`xmu`, `minbreak`, `epsmin`, `ramptime`, `defm`, `badmos3`,
+/// `trytocompact`, the SPICE2 output keys) names an accuracy target, changes the equations or is
+/// not established: `Private`.
 const HINTS: &[&str] = &[
     "gminfactor",
     "bypass",
     "oldlimit",
+    "nodedamping",
+    "absdv",
+    "reldv",
+    "noopac",
+    "copynodesets",
+    "klu_memgrow_factor",
     "noopalter",
     "maxopalter",
     "maxevtiter",

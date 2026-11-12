@@ -1,5 +1,5 @@
 //! Run items → ngspice dot cards: `Analysis` → `.op .dc .ac .tran .noise .tf .sens .pz .disto
-//! .sp .four`, each in its positional form; `Option`, `Env`, `NodeSet` → `.options`, `.temp`,
+//! .sp .pss .four`, each in its positional form; `Option`, `Env`, `NodeSet` → `.options`, `.temp`,
 //! `.ic`, `.nodeset` (with AMEND-A12 A14). Items are written in IR order (R25: no writer
 //! reorders run items); ngspice has no statistics block.
 //!
@@ -22,6 +22,7 @@ use super::read_run;
 use super::write::Out;
 use super::write_outputs;
 use crate::ir::dc_ac::{Ac, Dc, Disto, Noise, Pz, PzFind, PzTransfer, Sens, SensAc, Sp, Tf};
+use crate::ir::periodic::{Pss, PssMode};
 use crate::ir::tran::{Four, StepCap, Tran};
 use crate::ir::{self, AnalysisKind};
 
@@ -48,12 +49,6 @@ pub(super) const CODES: &[Row] = &[
         "ngspice-45 inp.c, inppas3.c, INPdoOpts (dot state cards hold for the whole deck); rewrite/RULINGS.md R24",
         "an ngspice .options, .temp, .ic or .nodeset holds for every analysis wherever it stands; refused.",
     ),
-    refusal(
-        ANALYSIS_NAME,
-        "a named analysis",
-        "ngspice-45 inp2dot.c (no card has a name)",
-        "an ngspice analysis card has no name; refused.",
-    ),
 ];
 
 /// A Fourier analysis whose harmonic count is not ngspice's default (DC and 9 harmonics): its
@@ -67,11 +62,9 @@ const CARD_FORM: ir::Code = ir::Code::new(b'W', 1301);
 /// A state item that holds from its place on (`FromHere`): every ngspice dot state card holds
 /// for the whole run (R24); a `.control` script spells it (S3.4).
 const FROM_HERE: ir::Code = ir::Code::new(b'W', 1303);
-/// A named analysis: an ngspice card has no name.
-const ANALYSIS_NAME: ir::Code = ir::Code::new(b'W', 1302);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21): a card form (`W1300–W1303`) or a value that reads the run (`W1005`: numparam evaluates
+/// (R21): a card form (`W1300`, `W1301`, `W1303`) or a value that reads the run (`W1005`: numparam evaluates
 /// a card's `{…}` once).
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let span = design.span_of(item);
@@ -107,9 +100,6 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         return check_values(design, &values, &mut refuse);
     }
     let a: ir::Analysis = design.row(item.index);
-    if !a.name.is_none() {
-        refuse(ANALYSIS_NAME);
-    }
     let mut form_ok = true;
     let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
         values.extend([s.start, s.stop, s.points]);
@@ -160,11 +150,21 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         }
         AnalysisKind::Four => {
             let f: Four = design.detail(a.detail);
-            let nine = matches!(design.expr(f.harmonics), ir::Expr::Num(n) if design.num(n).value() == 9.0);
+            // a given count is ngspice's default; none is the deck's `nfreqs` (A16)
+            let nine = f.harmonics.is_none()
+                || matches!(design.expr(f.harmonics), ir::Expr::Num(n) if design.num(n).value() == 9.0);
             if !nine {
                 refuse(FOUR_HARMONICS);
             }
             values.push(f.fundamental);
+        }
+        AnalysisKind::Pss => {
+            let p: Pss = design.detail(a.detail);
+            form_ok &= p.mode == PssMode::Autonomous && p.osc_n == ir::NameId::GROUND;
+            let given = [p.harmonics, p.points, p.sc_iter, p.steady_coeff];
+            form_ok &= given.iter().all(|e| !e.is_none());
+            values.extend([p.fundamental, p.tstab]);
+            values.extend(given);
         }
         _ => {}
     }
@@ -180,7 +180,7 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
     let a: ir::Analysis = d.row(item.index);
     assert!(
         a.name.is_none(),
-        "ngspice write: a named analysis (admits refuses it)"
+        "ngspice write: FEATURES lacks AnalysisNamed"
     );
     let mut t = String::new();
     match a.kind {
@@ -277,6 +277,20 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
                 t.push_str(" 1");
             }
         }
+        AnalysisKind::Pss => {
+            let p: Pss = d.detail(a.detail);
+            t.push_str(".pss");
+            value(d, p.fundamental, &mut t);
+            value(d, p.tstab, &mut t);
+            t.push(' ');
+            t.push_str(d.str(p.osc_p));
+            for e in [p.points, p.harmonics, p.sc_iter, p.steady_coeff] {
+                value(d, e, &mut t);
+            }
+            if p.uic {
+                t.push_str(" uic");
+            }
+        }
         AnalysisKind::Four => {
             let f: Four = d.detail(a.detail);
             t.push_str(".four");
@@ -289,7 +303,6 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
         | AnalysisKind::Xf
         | AnalysisKind::Net
         | AnalysisKind::Hb
-        | AnalysisKind::Pss
         | AnalysisKind::Pac
         | AnalysisKind::Pnoise
         | AnalysisKind::Pxf

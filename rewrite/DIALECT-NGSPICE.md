@@ -82,6 +82,16 @@ Rules the reader must get right, each with a fixture (the list is `INV-semantics
 | `.temp` list | ngspice runs 27 °C and says so (4.02); so does a value `strtod` does not read whole (`.temp 0.1k`: run temp4.cir, `inp.c:1173-1182`) | `Env` 27 with a note |
 | `.control` | `alterparam` needs `reset`; a dot-card analysis runs after the script and at each `run` (13.01) | run items in run order; display commands `Inert` |
 
+### Options by class (R19, A16; `read_run/state.rs`)
+
+From `cktsopt.c:246-330` and the frontend's option variables, key by key:
+
+| Class | Keys |
+|---|---|
+| typed (`OptionKey`) | `reltol abstol vntol chgtol trtol pivtol pivrel maxord method=trap, method=gear, itl1 itl2 itl4 gminsteps srcsteps itl6 noopiter gmin rshunt gshunt cshunt rseries scale defl defw defad defas klu sparse seed autostop interp acct noacct list nomod nopage node opts warn maxwarns norefvalue keepopinfo noinit nfreqs fourgridsize`; `temp`, `tnom` are `Env` |
+| `Hint` (tunes the solver, names no accuracy target) | `gminfactor bypass oldlimit nodedamping absdv reldv noopac copynodesets klu_memgrow_factor noopalter maxopalter maxevtiter convlimit convstep convabsstep autopartial` |
+| `Private` (names an accuracy target, changes the equations, or not established) | every other key: `xmu minbreak epsmin ramptime defm badmos3 trytocompact indverbosity`, the SPICE2 keys (`numdgt cptime limtim limpts lvlcod lvltim`), the frontend's (`ngbehavior savecurrents` …), a flag given a value, a `method=` other than trap or gear |
+
 A construct with no row in the IR is an `Opaque`, classed honestly: `Unread` is work to do,
 `Private` is ngspice's alone (XSPICE code models beyond the typed ones, `external` sources),
 `Inert` moves no number, `InvalidInSource` is what ngspice itself rejects, `Script` is
