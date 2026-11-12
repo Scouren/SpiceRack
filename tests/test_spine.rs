@@ -15,10 +15,12 @@
 //! Contents: tests only.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use spicerack::dialect::facade::{self, IR_NOTE, IR_REFUSAL, Pipeline, ROUTES};
 use spicerack::dialect::{
-    self, BUILTIN, DialectRow, Policy, Reference, STRICT_UNREAD, Sources, Write, irtext::IrText,
+    self, BUILTIN, DialectRow, INERT_DROPPED, Policy, Reference, STRICT_UNREAD, Sources, Write,
+    irtext::IrText,
 };
 use spicerack::ir;
 use spicerack::syntax::diag::{Code, info};
@@ -47,6 +49,35 @@ static NO_SUBCKT: DialectRow = DialectRow {
     write: Some(&NoSubckt),
 };
 
+/// A Spectre-family writer that counts its calls and spells everything.
+struct Counting(AtomicUsize);
+
+static SPECTRE_STUB: Counting = Counting(AtomicUsize::new(0));
+static NGSPICE_STUB: Counting = Counting(AtomicUsize::new(0));
+
+static SPECTRE_ROW: DialectRow = DialectRow {
+    name: "spectre-stub",
+    text_family: "spectre",
+    read: None,
+    write: Some(&SPECTRE_STUB),
+};
+
+static NGSPICE_ROW: DialectRow = DialectRow {
+    name: "ngspice-stub",
+    text_family: "ngspice",
+    read: None,
+    write: Some(&NGSPICE_STUB),
+};
+
+/// Two files: an inert ngspice statement in the deck, a private one in the library.
+const TWO_FILES: &str = "\
+file \"a.sp\" deck
+  opaque ngspice inert \".width out=80\"
+  title \"a\"
+file \"b.lib\" library
+  opaque ngspice private \".csparam x=1\"
+";
+
 impl Write for NoSubckt {
     fn features(&self) -> &'static ir::FeatureSet {
         static SET: std::sync::OnceLock<ir::FeatureSet> = std::sync::OnceLock::new();
@@ -57,6 +88,17 @@ impl Write for NoSubckt {
     }
 
     fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, _: &mut ir::Diags) {
+        ir::dump(design, file, out);
+    }
+}
+
+impl Write for Counting {
+    fn features(&self) -> &'static ir::FeatureSet {
+        IrText.features()
+    }
+
+    fn write(&self, design: &ir::Design, file: ir::FileId, out: &mut String, _: &mut ir::Diags) {
+        self.0.fetch_add(1, Ordering::Relaxed);
         ir::dump(design, file, out);
     }
 }
@@ -110,6 +152,65 @@ fn strict_refuses_an_unread_statement_and_lenient_keeps_it() {
     assert!(codes.contains(&STRICT_UNREAD), "{codes:?}");
     let lenient = dialect::transpile(&src, ir_row(), ir_row(), Policy::Lenient);
     assert_eq!(lenient.expect("lenient keeps it").text, text);
+}
+
+#[test]
+// marker: IR bodies (slice S1 implementation); remove when they land
+#[should_panic(expected = "not yet implemented")]
+fn legalize_drops_a_foreign_inert_and_refuses_a_foreign_private_once() {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(
+        &Sources::one("two.ir", TWO_FILES),
+        ir_row(),
+        Policy::Lenient,
+        &mut design,
+        &mut diags,
+    );
+    let read_rows = diags.len();
+    dialect::legalize(&mut design, &SPECTRE_ROW, &mut diags);
+    let opaque = u32::from(ir::Feature::Item(ir::ItemKind::Opaque).index());
+    let rows: Vec<(ir::Code, u32)> = diags.rows()[read_rows..]
+        .iter()
+        .map(|d| (d.code, d.arg))
+        .collect();
+    assert_eq!(rows, [(INERT_DROPPED, 0), (ir::diag::UNSUPPORTED, opaque)]);
+    let deck = design.find_file("a.sp");
+    let left = design.items(design.file(deck).top);
+    assert_eq!(
+        left.iter().map(|i| i.kind).collect::<Vec<_>>(),
+        [ir::ItemKind::Title]
+    );
+}
+
+#[test]
+// marker: IR bodies (slice S1 implementation); remove when they land
+#[should_panic(expected = "not yet implemented")]
+fn after_one_clean_legalize_each_file_is_written_once() {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    dialect::read(
+        &Sources::one("two.ir", TWO_FILES),
+        ir_row(),
+        Policy::Lenient,
+        &mut design,
+        &mut diags,
+    );
+    let read_rows = diags.len();
+    dialect::legalize(&mut design, &NGSPICE_ROW, &mut diags);
+    let added = &diags.rows()[read_rows..];
+    assert!(added.is_empty(), "the ngspice family keeps both: {added:?}");
+    let texts: Vec<String> = design
+        .files()
+        .map(|f| dialect::write(&design, f, &NGSPICE_ROW, &mut diags))
+        .collect();
+    assert_eq!(texts.concat(), TWO_FILES);
+    assert_eq!(NGSPICE_STUB.0.load(Ordering::Relaxed), 2);
+    assert_eq!(
+        SPECTRE_STUB.0.load(Ordering::Relaxed),
+        0,
+        "a refused design is never written"
+    );
 }
 
 #[test]

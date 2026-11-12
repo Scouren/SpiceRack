@@ -286,8 +286,7 @@ fn convert_new(
             let mut diags = ir::Diags::new();
             dialect::read(&src, reader, Policy::Lenient, &mut design, &mut diags);
             if let (Dump::Legal, Some(w)) = (dump, w) {
-                let target = w.write.expect("a writer row").features();
-                spicerack::passes::legalize(&mut design, target, &mut diags);
+                dialect::legalize(&mut design, w, &mut diags);
             }
             let name = w.map_or(irtext::SUFFIX, |w| w.name);
             let shown = facade::diags(diags.rows(), &src, stem, name);
