@@ -122,6 +122,104 @@ print v(d) v(t)
 .end
 ";
 
+/// One card of every element form the reader types (A19's class check).
+const BASES: &[&str] = &[
+    "R1 a b 1k",
+    "R2 a b {v(a)*1k}",
+    "C1 a b 1p",
+    "C2 a b q={1p*v(a)}",
+    "L1 a b 1u",
+    "K1 L1 L2 0.5",
+    "E1 a b c d 2",
+    "G1 a b c d 2",
+    "F1 a b vx 2",
+    "H1 a b vx 2",
+    "E2 a b poly(1) c d 0 1",
+    "E3 a b table {v(c)} = (0,0) (1,1)",
+    "E4 a b vol={v(c)}",
+    "G4 a b cur={v(c)}",
+    "B1 a b V=v(c)",
+    "B2 a b I=v(c)",
+    "D1 a k dmod",
+    "Q1 c b e qmod",
+    "M1 d g s b nmod",
+    "J1 d g s jmod",
+    "Z1 d g s zmod",
+    "S1 a b c d smod",
+    "W1 a b vx wmod",
+    "T1 a b c d z0=50 td=1n",
+    "O1 a b c d omod",
+    "U1 a b c umod",
+    "Y1 a b c d ymod",
+    "P1 a b 0 c d 0 pmod",
+    "X1 a b sub",
+    "N1 a b nmod",
+    "A1 a b amod",
+];
+
+/// Every typed field's IR name (the detail rows' fields, `m`, `mult`, `temp`: A19's
+/// `typed_key`), and every key the reader maps to a typed field.
+const KEYS: &[&str] = &[
+    "value",
+    "ic",
+    "tc1",
+    "tc2",
+    "tce",
+    "temp_abs",
+    "dtemp",
+    "ac",
+    "scale",
+    "parasitics",
+    "ic_mode",
+    "noisy",
+    "tc_base",
+    "tc_law",
+    "inductors",
+    "k",
+    "gain",
+    "sense",
+    "controls",
+    "coeffs",
+    "dimension",
+    "output",
+    "control",
+    "input",
+    "points",
+    "delta",
+    "law",
+    "expr",
+    "rpar",
+    "area",
+    "initial",
+    "z0",
+    "td",
+    "freq",
+    "nl",
+    "length",
+    "vel",
+    "lumps",
+    "m",
+    "mult",
+    "temp",
+    "r",
+    "resistance",
+    "c",
+    "cap",
+    "capacitance",
+    "l",
+    "inductance",
+    "tc",
+    "noise",
+    "coefficient",
+    "zo",
+    "f",
+    "len",
+    "n",
+    "nt",
+    "w",
+    "bv_max",
+];
+
 // ---- private ----
 
 #[test]
@@ -234,6 +332,24 @@ fn a_six_terminal_soi3_card_runs_on_ngspice_after_the_round_trip() {
         ngspice_op(SOI3, nets),
         "{written}"
     );
+}
+
+#[test]
+fn no_card_reaches_a_builder_assert_and_every_read_checks_clean() {
+    // Oracle: ir::check (A19: no parameter bears a typed field's name; every builder
+    // invariant). Each element form with each typed key added once and twice reads without a
+    // panic, and the design it reads to has no violation.
+    for base in BASES {
+        for key in KEYS {
+            for card in [format!("{base} {key}=1"), format!("{base} {key}=1 {key}=2")] {
+                let deck = format!("t\n{card}\n");
+                let (design, _) = read_deck("t.sp", &deck);
+                let mut diags = ir::Diags::new();
+                ir::check(&design, &mut diags);
+                assert!(diags.is_empty(), "{card}: {diags:?}");
+            }
+        }
+    }
 }
 
 /// The ngspice row.

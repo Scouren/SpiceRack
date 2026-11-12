@@ -121,17 +121,11 @@ pub(super) fn spellable(d: &ir::Design, e: &ir::Element) -> bool {
                 && keys_ok(&["area", "ic", "m", "temp", "dtemp"])
         }
         K::Mosfet | K::Mesfet => {
+            // a MOS takes no area (no ngspice MOS has the key: InvalidInSource on read)
             let s = d.semi(e);
             let area = e.kind == K::Mesfet || none(s.area);
-            let typed = if e.kind == K::Mosfet {
-                &["ic", "m"][..]
-            } else {
-                &["ic", "m", "area"][..]
-            };
-            area && none(s.temp_abs)
-                && none(s.dtemp)
-                && s.initial != ir::semi::InitialState::On
-                && keys_ok(typed)
+            area && s.initial != ir::semi::InitialState::On
+                && keys_ok(&["area", "ic", "m", "temp", "dtemp"])
         }
         K::VSwitch | K::ISwitch => no_params,
         K::LosslessLine | K::LossyLine | K::RcLine | K::SingleLossyLine | K::CoupledLines => {
