@@ -36,7 +36,8 @@ Applies::{FromHere, WholeRun}`. `FromHere` (the default) holds for the run items
 `WholeRun` holds for every run item of its deck wherever it stands, and among `WholeRun` items
 that set the same thing the last in listed order holds (an `Include` read as the items of the
 file it names, in place). An `Env` sets what it names: `temp` and `tnom` are each optional, not
-both absent. A run item is its deck's wherever it stands (R26): an analysis, option or `Env`
+both absent. Each mode has its feature (`StateFromHere`, `StateWholeRun`), wherever the item
+stands. A run item is its deck's wherever it stands (R26): an analysis, option or `Env`
 inside a subcircuit or section body is marked `RunExtra::RunItemNested`; a `NodeSet` there keeps
 its own meaning (`NodeSetInSubckt`: nodes local to each instance).
 

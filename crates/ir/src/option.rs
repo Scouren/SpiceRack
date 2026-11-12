@@ -77,10 +77,12 @@ pub struct OptionRow {
     pub holds: Applies,
 }
 
-/// The circuit temperature and the nominal temperature, °C. An `Env` sets what it names (A14):
-/// either may be `NONE`, not both (checked). A reader fills its simulator's defaults into the
-/// deck's first `Env` (HSPICE 25/25, the others 27/27), so every run sees both; a change
-/// between runs is an `Alter` of `Target::TEMP` or a `FromHere` `Env`.
+/// The circuit temperature and the nominal temperature, °C. An `Env` sets what it names (A14,
+/// R24): either may be `NONE`, not both (checked), and each source card is its own item (a
+/// `.temp` card is an `Env` naming `temp`). What a run sees where no `Env` names one is the
+/// simulator's default (HSPICE 25/25, the others 27/27); a reader that must state it adds its
+/// own `Env` for it. A change between runs is an `Alter` of `Target::TEMP` or a `FromHere`
+/// `Env`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Env {
     /// The circuit temperature, or `NONE` when this item does not set it. May be an expression
@@ -198,6 +200,7 @@ impl RowFacts for OptionRow {
     }
 
     fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+        holds_feature(self.holds, set);
         *set = set.with(Feature::Option(self.key));
         flag(set, nested(design, scope), RunExtra::RunItemNested);
         // `OptionMidRun` and `WholeRunMidRun` are facts of the listed order: `state_order_features`.
@@ -317,6 +320,7 @@ impl RowFacts for Env {
     }
 
     fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+        holds_feature(self.holds, set);
         flag(set, nested(design, scope), RunExtra::RunItemNested);
     }
 
@@ -389,6 +393,7 @@ impl RowFacts for NodeSet {
     }
 
     fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+        holds_feature(self.holds, set);
         let held = self.kind != NodeSetKind::Nodeset;
         flag(
             set,
@@ -588,8 +593,21 @@ fn gen_holds(
         (Applies::WholeRun, RunExtra::WholeRunMidRun),
     ]
     .into_iter()
-    .filter(|&(_, x)| !after || has(features, x))
+    .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode_feature(m)))
     .map(|(m, _)| m)
     .collect();
     (!modes.is_empty()).then(|| modes[g.below(modes.len() as u32) as usize])
+}
+
+/// Adds the feature of a state item's mode (`StateFromHere`, `StateWholeRun`).
+fn holds_feature(holds: Applies, set: &mut FeatureSet) {
+    flag(set, true, mode_feature(holds));
+}
+
+/// The feature of each `Applies` member.
+const fn mode_feature(holds: Applies) -> RunExtra {
+    match holds {
+        Applies::FromHere => RunExtra::StateFromHere,
+        Applies::WholeRun => RunExtra::StateWholeRun,
+    }
 }
