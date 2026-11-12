@@ -38,8 +38,10 @@ that set the same thing the last in listed order holds (an `Include` read as the
 file it names, in place). An `Env` sets what it names: `temp` and `tnom` are each optional, not
 both absent. Each mode has its feature (`StateFromHere`, `StateWholeRun`), wherever the item
 stands. A run item is its deck's wherever it stands (R26): an analysis, option or `Env`
-inside a subcircuit or section body is marked `RunExtra::RunItemNested`; a `NodeSet` there keeps
-its own meaning (`NodeSetInSubckt`: nodes local to each instance).
+inside a subcircuit or section body is `Feature::Placed(Subckt | Section, kind)` (A15 K1, kernel;
+it replaced `RunExtra::RunItemNested`); a `NodeSet` in a subcircuit keeps its own meaning (nodes
+local to each instance) and is `Placed(Subckt, NodeSet)` (was `NodeSetInSubckt`); a loop in a
+loop is `Placed(Loop, Loop)` (was `LoopNested`).
 
 A `Loop` of kind `Sweep` whose body is exactly one `Op` uses `RunExtra::LoopOverOp` (A12 R2,
 RULINGS R20): it is not a `Dc` (one result over the grid, each point continued from the last,

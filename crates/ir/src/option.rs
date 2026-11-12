@@ -43,18 +43,17 @@ use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, ItemRef, NameId, NameList, Ref, ScopeId};
-use crate::item::{DefKind, ScopeKind};
+use crate::item::DefKind;
 use crate::option_key::OptionKey;
 use crate::run_extra::RunExtra;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
-    flag, in_scope_kind, put_expr, put_flag, put_name, put_names, put_word, take_enum, take_expr,
-    take_names, take_word, trim_lead, word,
+    flag, put_expr, put_flag, put_name, put_names, put_word, take_enum, take_expr, take_names,
+    take_word, trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
-use crate::state_order::nested;
 use crate::text::Words;
 use crate::text_expr::Ctx;
 
@@ -199,10 +198,9 @@ impl RowFacts for OptionRow {
         let _ = (design, at, f); // no reference
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         holds_feature(self.holds, set);
         *set = set.with(Feature::Option(self.key));
-        flag(set, nested(design, scope), RunExtra::RunItemNested);
         // `OptionMidRun` and `WholeRunMidRun` are facts of the listed order: `state_order_features`.
     }
 
@@ -319,9 +317,9 @@ impl RowFacts for Env {
         let _ = (design, at, f); // no reference
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         holds_feature(self.holds, set);
-        flag(set, nested(design, scope), RunExtra::RunItemNested);
+        // placement is the kernel's `Placed` (A15 K1)
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -392,7 +390,7 @@ impl RowFacts for NodeSet {
         let _ = (design, at, f); // no reference
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         holds_feature(self.holds, set);
         let held = self.kind != NodeSetKind::Nodeset;
         flag(
@@ -413,8 +411,6 @@ impl RowFacts for NodeSet {
             RunExtra::NodeSetHierarchical,
         );
         flag(set, self.kind == NodeSetKind::Device, RunExtra::IcDevice);
-        let subckt = in_scope_kind(design, scope, ScopeKind::Subckt);
-        flag(set, subckt, RunExtra::NodeSetInSubckt);
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -476,11 +472,6 @@ impl RowFacts for NodeSet {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
-        if !has(features, RunExtra::NodeSetInSubckt)
-            && in_scope_kind(b.design(), scope, ScopeKind::Subckt)
-        {
-            return ItemRef::NONE;
-        }
         let Some(holds) = gen_holds(g, b, scope, features, RunExtra::NodeSetMidRun) else {
             return ItemRef::NONE;
         };
@@ -539,6 +530,7 @@ pub(crate) fn gen_nfreqs(
 ) -> bool {
     let allowed = features.contains(Feature::Item(crate::item::ItemKind::Option))
         && features.contains(Feature::Option(OptionKey::NFreqs))
+        && crate::r#gen::placeable(b.design(), scope, crate::item::ItemKind::Option, features)
         && g.items_left > 1;
     let Some(holds) = allowed
         .then(|| gen_holds(g, b, scope, features, RunExtra::OptionMidRun))
@@ -572,21 +564,16 @@ fn take_holds(words: &mut Words<'_>) -> Applies {
 
 /// The mode of a state item generated into `scope`, or `None` when the set allows neither: once
 /// any run item exists (conservatively: anywhere, since items are generated in listed order),
-/// `FromHere` needs `mid` and `WholeRun` needs `WholeRunMidRun`; a nested item needs
-/// `RunItemNested` (options and envs only: the caller's kind).
+/// `FromHere` needs `mid` and `WholeRun` needs `WholeRunMidRun` (placement is `fill`'s, A15 K1).
 #[cfg(any(test, feature = "gen"))]
 fn gen_holds(
     g: &mut Gen,
     b: &Builder<'_>,
-    scope: ScopeId,
+    _scope: ScopeId,
     features: &FeatureSet,
     mid: RunExtra,
 ) -> Option<Applies> {
     let d = b.design();
-    if mid != RunExtra::NodeSetMidRun && nested(d, scope) && !has(features, RunExtra::RunItemNested)
-    {
-        return None;
-    }
     let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
     let modes: Vec<Applies> = [
         (Applies::FromHere, mid),

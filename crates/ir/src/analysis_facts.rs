@@ -175,11 +175,8 @@ impl RowFacts for Analysis {
         }
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
-        if crate::state_order::nested(design, scope) {
-            *set = set.with(Feature::Run(RunExtra::RunItemNested));
-        }
         if !self.name.is_none() {
             *set = set.with(Feature::Run(RunExtra::AnalysisNamed));
         }
@@ -245,11 +242,6 @@ impl RowFacts for Analysis {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
         let design = b.design();
-        if crate::state_order::nested(design, scope)
-            && !features.contains(Feature::Run(RunExtra::RunItemNested))
-        {
-            return ItemRef::NONE;
-        }
         let several = features.contains(Feature::Run(RunExtra::SeveralAnalyses));
         // Generation appends, so the table's rows are the design's analyses (no dead rows).
         if !design.analyses.is_empty() && !several {

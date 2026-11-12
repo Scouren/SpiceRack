@@ -11,8 +11,8 @@
 use spicerack_ir::diag::{self, TEXT_SYNTAX, UNSUPPORTED};
 use spicerack_ir::{
     AnalysisKind, BinOp, CircuitExtra, Code, Design, Diags, Dist, DrawPer, DrawWhen, ElemKind,
-    ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, LoadKind, OpaqueClass,
-    OptionKey, Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
+    ExprId, ExprTag, Extra, Feature, FeatureSet, Func, ItemKind, Kind, OpaqueClass, OptionKey,
+    Role, RunExtra, Span, UnOp, Violation, WaveKind, check_legal, features_used,
 };
 
 // ---- private ----
@@ -86,7 +86,7 @@ fn the_bitset_is_a_set() {
         .with(Feature::Func(Func::Exp));
     let b = FeatureSet::EMPTY
         .with(Feature::Func(Func::Exp))
-        .with(Feature::Extra(Extra::LocalFunc));
+        .with(Feature::Extra(Extra::IntLiteral));
     assert!(a.contains(Feature::Item(ItemKind::Param)));
     assert!(!a.contains(Feature::Item(ItemKind::Title)));
     assert!(FeatureSet::EMPTY.is_empty() && !a.is_empty());
@@ -99,7 +99,7 @@ fn the_bitset_is_a_set() {
         vec![
             Feature::Item(ItemKind::Param),
             Feature::Func(Func::Exp),
-            Feature::Extra(Extra::LocalFunc)
+            Feature::Extra(Extra::IntLiteral)
         ]
     );
     let all = (0..Feature::COUNT).fold(FeatureSet::EMPTY, |s, i| s.with(Feature::from_index(i)));
@@ -160,63 +160,6 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
     type Build = fn(&mut spicerack_ir::Builder<'_>, spicerack_ir::ScopeId);
     // (extra, a design that sets it, its legal neighbour that does not)
     let cases: [(Extra, Build, Build); Extra::COUNT] = [
-        (
-            Extra::NestedSubckt,
-            |b, top| {
-                let (_, body) = b.subckt(top, "outer", &[], &[], Span::NONE);
-                b.subckt(body, "inner", &[], &[], Span::NONE);
-            },
-            |b, top| {
-                b.subckt(top, "outer", &[], &[], Span::NONE);
-                b.subckt(top, "inner", &[], &[], Span::NONE);
-            },
-        ),
-        (
-            Extra::LocalModel,
-            |_, _| {}, // a Model is the circuit owner's row: its pair is in the owner's tests
-            |_, _| {},
-        ),
-        (
-            Extra::LocalFunc,
-            |b, top| {
-                let (_, body) = b.subckt(top, "s", &[], &[], Span::NONE);
-                let one = b.num(1.0);
-                b.func(body, "f", &[], one, Span::NONE);
-            },
-            |b, top| {
-                b.subckt(top, "s", &[], &[], Span::NONE);
-                let one = b.num(1.0);
-                b.func(top, "f", &[], one, Span::NONE);
-            },
-        ),
-        (
-            Extra::ParamInBranch,
-            |b, top| {
-                let c = b.num(1.0);
-                let (_, branches) = b.if_(top, &[c], Span::NONE);
-                let body = b.design().branches(branches)[0].body;
-                b.param(body, "k", c, Span::NONE);
-            },
-            |b, top| {
-                let c = b.num(1.0);
-                b.if_(top, &[c], Span::NONE);
-                b.param(top, "k", c, Span::NONE);
-            },
-        ),
-        (
-            Extra::LoadInBranch,
-            |b, top| {
-                let c = b.num(1.0);
-                let (_, branches) = b.if_(top, &[c], Span::NONE);
-                let body = b.design().branches(branches)[0].body;
-                b.load(body, LoadKind::Osdi, "m.osdi", Span::NONE);
-            },
-            |b, top| {
-                let c = b.num(1.0);
-                b.if_(top, &[c], Span::NONE);
-                b.load(top, LoadKind::Osdi, "m.osdi", Span::NONE);
-            },
-        ),
         (
             Extra::IncludeSection,
             |b, top| {
@@ -303,7 +246,7 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             },
         ),
         (
-            Extra::FormalReadsParam,
+            Extra::FormalNotConstant,
             |b, top| {
                 let one = b.num(1.0);
                 b.param(top, "w0", one, Span::NONE);
@@ -352,9 +295,6 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
         ),
     ];
     for (extra, sets, neighbour) in cases {
-        if extra == Extra::LocalModel {
-            continue;
-        }
         let f = Feature::Extra(extra);
         assert!(used(sets).contains(f), "{extra:?} is set");
         assert!(
@@ -495,4 +435,21 @@ fn placement_is_enclosure_at_any_depth() {
             placed(S::Loop, ItemKind::Loop)
         ]
     );
+}
+
+#[test]
+fn a_temperature_default_is_not_a_constant() {
+    // A15 widening of A12 K2: a head default of class Temp (VACASK run: `$temp` cannot be
+    // overridden either) sets FormalNotConstant, as a parameter read does; a literal does not
+    let f = Feature::Extra(Extra::FormalNotConstant);
+    let temp = used(|b, top| {
+        let t = b.temp();
+        b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
+    });
+    assert!(temp.contains(f), "w = $temp");
+    let tnom = used(|b, top| {
+        let t = b.tnom();
+        b.subckt(top, "s", &[], &[("w", t)], Span::NONE);
+    });
+    assert!(!tnom.contains(f), "w = $tnom is a constant of the run");
 }
