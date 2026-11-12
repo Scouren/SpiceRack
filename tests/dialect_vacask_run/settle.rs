@@ -187,3 +187,30 @@ fn names_mc_quoted_an_mc_name_is_an_identifier() {
         r.out
     );
 }
+
+#[test]
+fn sweep_source_a_sweep_of_a_sources_dc_is_ngspices_dc_while_its_type_is_dc() {
+    // R64. The same circuit on ngspice-45 (`.dc v1 0 5 1`, `.dc i1 0 3m 1m`, a `.dc` of `v2`
+    // in `x1`, `.dc v3 2 4 2` on `v3 e 0 pulse(0 1 0 1u 1u 1u)`) printed v(b) = 0 0.5 1 1.5 2
+    // 2.5, v(c) = 0 2 4 6, v(d) = 2 4, v(e) = 2 4. VACASK matches on the three dc sources
+    // (positive rows) and leaves the pulse source at its wave's value, e = 0 0 (the negative
+    // row: VACASK reads `dc` only while the type is dc; P2314, W2307).
+    let r = settle("sweep_source.sim");
+    let rows: [(&str, &str, &[f64]); 4] = [
+        ("dv.raw", "b", &[0.0, 0.5, 1.0, 1.5, 2.0, 2.5]),
+        ("di.raw", "c", &[0.0, 2.0, 6.0]),
+        ("dx.raw", "d", &[2.0, 4.0]),
+        ("dp.raw", "e", &[0.0, 0.0]),
+    ];
+    for (file, node, want) in rows {
+        let plot = raw(&r, file);
+        for (k, &x) in want.iter().enumerate() {
+            assert!(
+                close(value(&plot, node, k), x, 1e-12),
+                "{file} {node}[{k}]: {}",
+                r.out
+            );
+        }
+    }
+    assert_eq!(value(&raw(&r, "dp.raw"), "vp", 1), 4.0, "{}", r.out);
+}

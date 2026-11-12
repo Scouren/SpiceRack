@@ -1,0 +1,7 @@
+a dc sweep of a waveform source
+model vsource vsource
+v3 (e 0) vsource type="pulse" val0=0 val1=1 rise=1u width=1u
+control
+  sweep vp instance="v3" parameter="dc" values=[2, 4]
+    analysis dp op
+endc

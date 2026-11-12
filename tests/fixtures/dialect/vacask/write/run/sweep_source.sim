@@ -1,0 +1,18 @@
+written source sweeps
+model vsource vsource
+model isource isource
+subckt s (p n)
+  v2 (p n) vsource dc=1
+ends
+v1 (a 0) vsource dc=1
+i1 (a 0) isource dc=1m
+x1 (b 0) s
+control
+  sweep vg instance="v1" parameter="dc" from=0 to=5 step=0.1
+  sweep ig instance="i1" parameter="dc" values=[0, 1m]
+    analysis dc1 op
+  sweep vs instance="x1:v2" parameter="dc" values=[1, 2]
+    analysis dc2 op
+  sweep vl instance="v1" parameter="dc" values=[1, 2]
+    analysis t1 tran stop=1m
+endc

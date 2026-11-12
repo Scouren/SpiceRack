@@ -366,6 +366,7 @@ VACASK (a candidate feature), or VACASK's own limit.
 | W2106 | S4.1 | a behavioural source with `tc1`, `tc2`, `temp`, `dtemp` or `rpar` (ngspice's B has them) | feature |
 | W2108 | S4.1 | an element whose kind is not the one its model's family gives | feature |
 | W2304 | S4.3 | an option row of a key only another simulator has | feature |
+| W2307 | S4.3 | a sweep of the DC value of a source whose DC is its wave at zero (VACASK reads `dc` only while the type is dc: settle run/sweep_source, e = 0 0 where ngspice-45's `.dc` gives 2 4) | feature (R64: a pass giving the source its wave's value at zero as a given DC, written as R42's fold, would convert it) |
 | W2305 | S4.3 | a reset of a class other than the saves | feature |
 | W2002 | S4.0 | a device library whose path is no file of its family | VACASK's own |
 | W2004 | S4.0 | a load whose extension does not state its kind (R48 d) | VACASK's own |

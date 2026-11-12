@@ -3,17 +3,19 @@
 //! small-signal analyses (`from`/`to` with `step`, or `mode="lin|dec|oct"` with `points`, or
 //! `values=[…]`). A lin `points` counts intervals (VD cmd-sweep, cmd-analysis-ac), so the IR's
 //! count is one more; targets `instance=`/`parameter=` (a device parameter, hierarchical names
-//! split at `:`), `model=`/`parameter=` (bound to the top level's model), `option="temp"` (the
+//! split at `:`; `parameter="dc"` of an independent source of type dc is its DC value, R64, and
+//! of a waveform source, whose `dc` VACASK ignores, Private: settle run/sweep_source), `model=`/`parameter=` (bound to the top level's model), `option="temp"` (the
 //! temperature), `option=` a typed key or VACASK's own option by name. The principal parameter,
 //! `continuation=0`, values by a variable's name and a sweep of a variable are Private (R43).
 //!
 //! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`,
 //! `vector`, `range`, `sweep`, `value`, `spec`, `target` (crate-private)
 
-use super::{REJECTED, SWEEP_FORM, VARIABLE, assign, bare_name, string};
+use super::{REJECTED, SWEEP_FORM, SWEEP_WAVE, VARIABLE, assign, bare_name, string};
 use crate::dialect::vacask::expr_read::{self, Context};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
+use crate::dialect::vacask::read_elements::Source;
 use crate::ir;
 use crate::syntax::ast::{NONE, Node, Tag};
 
@@ -38,6 +40,7 @@ pub(super) struct Spec {
 /// A sweep target, as names.
 pub(super) enum Aim {
     Device(Vec<String>, String, String),
+    Source(Vec<String>, String),
     Model(String, String),
     Temp,
     Option(ir::OptionKey),
@@ -211,7 +214,11 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
         (Some(i), _, _, Some(p)) => {
             let mut path: Vec<String> = i.split(':').map(str::to_string).collect();
             let element = path.pop().expect("split gives one part");
-            Aim::Device(path, element, p)
+            match (p.as_str(), l.declared.source(&path, &element)) {
+                ("dc", Some(Source::Dc)) => Aim::Source(path, element),
+                ("dc", Some(Source::Wave)) => return Err(private(SWEEP_WAVE)),
+                _ => Aim::Device(path, element, p),
+            }
         }
         (Some(_), _, _, None) => return Err(private(SWEEP_FORM)),
         (_, Some(m), _, Some(p)) => Aim::Model(m, p),
@@ -260,6 +267,10 @@ pub(super) fn target(l: &mut Lower<'_, '_, '_>, aim: &Aim) -> ir::Target {
         Aim::Device(path, element, param) => {
             let path: Vec<&str> = path.iter().map(String::as_str).collect();
             l.b.target(ir::TargetKind::DeviceParam, &path, element, Some(param))
+        }
+        Aim::Source(path, element) => {
+            let path: Vec<&str> = path.iter().map(String::as_str).collect();
+            l.b.target(ir::TargetKind::SourceDc, &path, element, None)
         }
         Aim::Model(model, param) => {
             let t =

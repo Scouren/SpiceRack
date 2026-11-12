@@ -17,7 +17,9 @@
 mod analyses;
 mod plan;
 
-use super::read_run::{NAME_SPELLING, OPTION_ROW_PRIVATE, RESET_CLASS, identifier};
+use super::read_run::{
+    NAME_SPELLING, OPTION_ROW_PRIVATE, RESET_CLASS, SOURCE_SWEEP_WAVE, identifier,
+};
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
 use crate::ir;
@@ -108,7 +110,7 @@ pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usi
 
 /// Appends a refusal for each row of this area VACASK cannot spell for a reason no feature
 /// states (R21): an option row of a private key (W2304; VACASK's own options are Hint or
-/// Private opaques).
+/// Private opaques); a sweep of a waveform source's DC value (W2307, VACASK's own limit).
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     for (at, _) in design.reachable() {
         if at.kind == ir::ItemKind::Option
@@ -118,6 +120,12 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
         }
         if !names_spelled(design, at) {
             diags.push_at(NAME_SPELLING, design, at, 0);
+        }
+        if swept_targets(design, at)
+            .iter()
+            .any(|&t| sweeps_a_wave(design, t))
+        {
+            diags.push_at(SOURCE_SWEEP_WAVE, design, at, 0);
         }
         let saves = ir::ResetSet::of(&[ir::Restorable::Saves]);
         if at.kind == ir::ItemKind::Reset && design.row::<ir::Reset>(at.index).restores != saves {
@@ -203,6 +211,67 @@ pub(super) fn body(w: &mut Writer<'_, '_>, scope: ir::ScopeId) {
 }
 
 // ---- private ----
+
+/// The targets a DC analysis's axes or a sweep loop sweep; none for any other item.
+fn swept_targets(design: &ir::Design, at: ir::ItemRef) -> Vec<ir::Target> {
+    match at.kind {
+        ir::ItemKind::Analysis => {
+            let row: ir::Analysis = design.row(at.index);
+            if row.kind != ir::AnalysisKind::Dc {
+                return Vec::new();
+            }
+            let dc: ir::dc_ac::Dc = design.detail(row.detail);
+            design.dc_axes(dc.axes).iter().map(|a| a.target).collect()
+        }
+        ir::ItemKind::Loop => {
+            let row: ir::Loop = design.row(at.index);
+            match row.kind {
+                ir::LoopKind::Sweep => {
+                    vec![design.detail::<ir::plan::SweepLoop>(row.detail).target]
+                }
+                _ => Vec::new(),
+            }
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Whether `t` sweeps the DC value of a source whose DC is its wave's (`WaveAtZero`): VACASK
+/// ignores `dc` on a waveform source, so the sweep would move nothing (settle run/sweep_source,
+/// W2307). The element is found from the entry file's top through each instance's bound
+/// subcircuit; one not found so is not refused.
+fn sweeps_a_wave(design: &ir::Design, t: ir::Target) -> bool {
+    if t.kind != ir::TargetKind::SourceDc {
+        return false;
+    }
+    let named = |scope: ir::ScopeId, name: ir::NameId| {
+        design.items(scope).iter().copied().find(|i| {
+            i.kind == ir::ItemKind::Element && design.row::<ir::Element>(i.index).name == name
+        })
+    };
+    let mut scope = design.file(design.entry()).top;
+    // Bounded by the path's length.
+    for &inst in design.names(t.path) {
+        let Some(at) = named(scope, inst) else {
+            return false;
+        };
+        let model = design.row::<ir::Element>(at.index).model.def;
+        if model.is_none() || design.def(model).kind != ir::DefKind::Subckt {
+            return false;
+        }
+        scope = design
+            .row::<ir::item::Subckt>(design.def(model).item.index)
+            .body;
+    }
+    let Some(at) = named(scope, t.a.name) else {
+        return false;
+    };
+    let row: ir::Element = design.row(at.index);
+    matches!(row.kind, ir::ElemKind::VSource | ir::ElemKind::ISource) && {
+        let src = design.source(&row);
+        src.dc_rule == ir::source::DcRule::WaveAtZero && !src.wave.is_none()
+    }
+}
 
 /// Whether `at` is a run item.
 fn run_item(at: ir::ItemRef) -> bool {
