@@ -152,8 +152,15 @@ mod tests {
     fn a_behavioural_source_reads_typed_parameters_without_the_feature() {
         let set = circuit_set()
             .minus(FeatureSet::EMPTY.with(Feature::Circuit(CircuitExtra::BehavUntypedParam)));
+        // the floor is on the reads, not the seeds: the stream shifts whenever a generator
+        // changes, so the walk runs until it has seen `WANT` typed reads, within `SEEDS`
+        const WANT: usize = 10;
+        const SEEDS: u64 = 6000;
         let mut typed = 0;
-        for seed in 0..600u64 {
+        for seed in 0..SEEDS {
+            if typed >= WANT {
+                break;
+            }
             let d = generate(seed, &set, SIZE);
             assert!(
                 !features_used(&d).contains(Feature::Circuit(CircuitExtra::BehavUntypedParam)),
@@ -170,8 +177,8 @@ mod tests {
                 .count();
         }
         assert!(
-            typed > 10,
-            "{typed} behavioural sources read a typed parameter"
+            typed >= WANT,
+            "{typed} behavioural sources read a typed parameter in {SEEDS} seeds"
         );
     }
 
