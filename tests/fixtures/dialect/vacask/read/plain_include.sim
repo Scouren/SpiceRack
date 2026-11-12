@@ -1,0 +1,2 @@
+a library included whole
+include "plain_include--lib.lib"

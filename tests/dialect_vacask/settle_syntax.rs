@@ -74,3 +74,13 @@ fn str_escapes_a_string_reads_backslash_escapes_and_holds_no_line_break() {
     let r = run("vacask", "str_escapes.sim");
     assert!(says(&r, "[q\"q] [b\\b] [n\nn] [t\tt] [xqx]"));
 }
+
+#[test]
+fn plain_include_a_library_included_whole_is_read_as_the_deck() {
+    // 6b's follow-up: `include "lib3.lib"` without `section=` reads the whole file, its
+    // `section` lines included, which VACASK rejects ("Syntax error, unexpected section
+    // directive. You probably included a library file."): outside-section text is Inert only
+    // under a section include.
+    let r = run("vacask", "plain_include.sim");
+    assert!(says(&r, "Syntax error, unexpected section directive."));
+}

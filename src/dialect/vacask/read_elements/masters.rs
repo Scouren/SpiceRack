@@ -9,12 +9,12 @@
 //! own).
 //!
 //! And each instance's master and `type` word, so a `sweep` can tell an independent source's DC
-//! value from a device parameter (R64: `Declared::source`, `Declared::has_instance`).
+//! value from a device parameter (R64: `Declared::source`, `Declared::has_instance`, `Declared::by_section`).
 //!
-//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`, `Declared::has_instance`
+//! Contents: `Declared`, `Master`, `Found`, `Source`, `declare`, `find`, `Declared::source`, `Declared::has_instance`, `Declared::by_section`
 //! (crate-private to the dialect)
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::super::read::{self, Cst, Lower};
 use crate::ir;
@@ -36,6 +36,10 @@ pub(in crate::dialect::vacask) struct Declared {
     /// join the top level (VD cir-elaboration; corpus demo/bsim3-ptm/amp.sim sweeps `vin` of
     /// the elaborated `namp`).
     elaborated: Vec<String>,
+    /// The file names (the path's last part) some `include "…" section=…` names: such a file is
+    /// read by section, so its text outside every section is skipped (settle
+    /// star_outside_section); a file included whole reads it all (settle plain_include).
+    section_included: HashSet<String>,
 }
 
 /// What an instance of a `vsource` or `isource` model is, for a sweep of its `dc` (R64).
@@ -144,6 +148,17 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
                     out.defs.entry(key).or_insert(master);
                     todo.extend(ast.body(n).iter().map(|&b| (b, own)));
                 }
+                Tag::Include => {
+                    let fields = ast.fields(n);
+                    let by_section = fields.iter().any(|&f| {
+                        ast.tag(Node(f)) == Tag::Assign
+                            && read::field_name(cst, ast.lhs(Node(f))) == "section"
+                    });
+                    if let (Some(&path), true) = (fields.first(), by_section) {
+                        let path = read::field_name(cst, path);
+                        out.section_included.insert(file_name(&path).to_string());
+                    }
+                }
                 Tag::Control => {
                     for &b in ast.body(n) {
                         let b = Node(b);
@@ -246,6 +261,12 @@ impl Declared {
         })
     }
 
+    /// Whether some include names the file at `path` with `section=` (matched by its last part:
+    /// ponytail: two libraries of one name in two directories count as one).
+    pub(in crate::dialect::vacask) fn by_section(&self, path: &str) -> bool {
+        self.section_included.contains(file_name(path))
+    }
+
     /// The master `name` seen from `at`: the holder's own, then the top's.
     fn master(&self, at: Holder, name: &str) -> Option<&Master> {
         [at, Holder::Top]
@@ -274,4 +295,9 @@ fn holder(l: &Lower<'_, '_, '_>) -> Holder {
         }
     }
     Holder::Top
+}
+
+/// The last part of `path` (after the last `/`).
+fn file_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
 }
