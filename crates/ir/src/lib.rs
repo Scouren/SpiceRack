@@ -170,7 +170,7 @@ pub use id::{
     Ref, ScopeId, TextId,
 };
 pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
-pub use link::link;
+pub use link::{UnboundRead, link, unbound_reads};
 pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
 pub use option::{Applies, Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 pub use option_key::{OptionClass, OptionKey};
