@@ -1,0 +1,10 @@
+recursive subcircuit: s instantiates itself
+.subckt s a
+r1 a 0 1k
+x1 a s
+.ends
+v1 n 0 1
+x0 n s
+.op
+.print op v(n)
+.end

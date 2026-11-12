@@ -303,6 +303,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "an analysis argument or sweep range that reads the temperature or the circuit",
             "an analysis's own arguments and a sweep's range are evaluated before the run: ngspice reads the card once with no temperature, VACASK rejects `$temp` there when the analysis runs; neither means it (R68).",
         ),
+        Violation::InstanceCycle => (
+            "a subcircuit that instantiates itself",
+            "an instance's subcircuit reaches the subcircuit holding the instance, directly or through others, so the hierarchy has no finite elaboration; ngspice and VACASK refuse it.",
+        ),
         Violation::StringOrListField => (
             "a typed field that holds a string or a list",
             "a row's own expression field is a number, except the fields its row names as strings (a model's version, an alter's value, a private option's value); a list is a value only of a parameter, a formal's default or a parameter list.",

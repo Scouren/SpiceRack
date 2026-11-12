@@ -333,7 +333,10 @@ impl R<'_, '_> {
         let def = self
             .g
             .pick_def(self.b.design(), self.scope, DefKind::Subckt);
-        (!def.is_none()).then(|| Ref {
+        // never an instance that closes a cycle of subcircuits (`Violation::InstanceCycle`)
+        let cycle =
+            !def.is_none() && crate::hierarchy::closes_cycle(self.b.design(), self.scope, def);
+        (!def.is_none() && !cycle).then(|| Ref {
             name: self.b.design().def(def).name,
             def,
         })

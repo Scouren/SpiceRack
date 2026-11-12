@@ -1,0 +1,11 @@
+vacask (nix develop .#testing), each deck's error lines:
+self.sim:
+Hierarchical recursion detected.
+    x1 (a) s
+    ^
+7:3
+cycle.sim:
+Hierarchical recursion detected.
+    x1 (a) p
+    ^
+11:3

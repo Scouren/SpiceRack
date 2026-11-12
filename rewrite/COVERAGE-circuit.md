@@ -129,7 +129,7 @@ conversion); "pass" means a conversion outside this crate. The gaps and proposal
 - D109 → xy reader leaves `Element.mult` `NONE`; `Extra::MultVSource`, `MultISource`
 - D110 → reader syntax
 - D111 → `ElemKind::Port` with a wave
-- D112 → `Passive.{tc1, tc2, temp_abs, dtemp, tce}`; `AGE`/`D` → `Element.params`, refusal elsewhere (no field: gap G11)
+- D112 → `Passive.{tc1, tc2, temp_abs, dtemp, tce}`, `tce` a resistor's only (R74: Xyce 7.10 refuses `TCE` on C and L, "Unrecognized parameter TCE for device C1", against the inventory row); `AGE`/`D` → `Element.params`, refusal elsewhere (no field: gap G11)
 - D113 → `Semi.area`
 - D114 → `CouplingCore` + `ModelFamily::CoreJilesAtherton`
 - D115 → `Coupling.k` expression of `Time`

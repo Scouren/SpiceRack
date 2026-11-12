@@ -120,11 +120,11 @@ impl RowFacts for Loop {
             LoopEnd::KeepLast => RunExtra::LoopKeepLast,
         });
         // `LoopScoped` is a fact of the whole design: `analysis::design_features`.
-        let body = design.items(self.body);
         let over_op = self.kind == LoopKind::Sweep
-            && body.len() == 1
-            && body[0].kind == ItemKind::Analysis
-            && Analysis::table(design).get(body[0].index).kind == AnalysisKind::Op;
+            && only_run(design, self.body).is_some_and(|i| {
+                i.kind == ItemKind::Analysis
+                    && Analysis::table(design).get(i.index).kind == AnalysisKind::Op
+            });
         if over_op {
             add(RunExtra::LoopOverOp);
         }
@@ -518,20 +518,28 @@ impl RowFacts for Elaborate {
 
 // ---- private ----
 
-/// Whether `body` holds, comments aside, exactly one analysis or one sweep loop (VACASK's
+/// Whether `body` holds, among its run items, exactly one analysis or one sweep loop (VACASK's
 /// one analysis per sweep, A22).
 fn one_run(design: &Design, body: ScopeId) -> bool {
-    let mut runs = design
-        .items(body)
-        .iter()
-        .filter(|i| i.kind != ItemKind::Comment);
-    let one = match (runs.next(), runs.next()) {
-        (Some(only), None) => Some(*only),
-        _ => None,
-    };
-    one.is_some_and(|i| {
+    only_run(design, body).is_some_and(|i| {
         i.kind == ItemKind::Analysis
             || (i.kind == ItemKind::Loop
                 && Loop::table(design).get(i.index).kind == LoopKind::Sweep)
     })
+}
+
+/// The one item of `body` that may run, when there is exactly one: run items and opaques (an
+/// opaque may be a run statement) count; comments and the circuit's and definitions' items
+/// (a function, a parameter, a subcircuit) run nothing, their place in a loop is their
+/// `Placed(Loop, _)` feature (the lead's finding on `drop_unused_funcs`, pass_laws p3 seed 47).
+fn only_run(design: &Design, body: ScopeId) -> Option<ItemRef> {
+    use crate::state_order::{Listed, listed};
+    let mut runs = design
+        .items(body)
+        .iter()
+        .filter(|i| listed(i.kind) == Listed::Run || i.kind == ItemKind::Opaque);
+    match (runs.next(), runs.next()) {
+        (Some(&only), None) => Some(only),
+        _ => None,
+    }
 }
