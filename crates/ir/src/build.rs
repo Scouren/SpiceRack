@@ -215,6 +215,13 @@ impl<'d> Builder<'d> {
         item
     }
 
+    /// The element of whole name `name` listed in `scope`, the first in list order; `None` when
+    /// none is (R23: a reader refuses a duplicate before pushing it). Amortized O(1): an index
+    /// built once from the design and kept by every push.
+    pub fn element_named(&mut self, scope: ScopeId, name: NameId) -> Option<ItemRef> {
+        todo!()
+    }
+
     /// Appends an item that opens a scope: creates the body scope (`body` kind, parent `scope`,
     /// owner the new item), passes its id to `row` to build the row, and pushes it.
     pub fn push_scoped<R: ItemRow>(
