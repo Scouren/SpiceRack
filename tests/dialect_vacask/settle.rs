@@ -434,3 +434,11 @@ fn lr1_a_long_literal_is_rounded_correctly() {
         );
     }
 }
+
+#[test]
+fn dp1_a_subcircuit_port_named_twice_is_rejected() {
+    assert!(says(
+        &run("vacask", "dp1.sim"),
+        "Terminal '1' is not unique."
+    ));
+}

@@ -29,6 +29,12 @@ use crate::dialect::Reference;
 use crate::ir;
 use crate::syntax::ast::{Name, Node, Tag};
 
+mod if_chain;
+mod load;
+
+pub(super) use if_chain::if_chain;
+pub(super) use load::load;
+
 /// What this area's rows use.
 pub(super) const FEATURES: ir::FeatureSet = families(PLACEMENTS)
     .with(ir::Feature::Item(ir::ItemKind::Title))
@@ -107,9 +113,9 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     (
         REDEFINED,
         ir::Info {
-            title: "a parameter defined twice in one scope",
-            cite: "DIALECT-VACASK Appendix A run n3 (\"Parameter redefinition.\"); INV-semantics 3.01",
-            explain: "VACASK refuses a second definition of a parameter in one scope; the first is kept and the deck is refused.",
+            title: "a name defined twice in one scope",
+            cite: "DIALECT-VACASK Appendix A runs n3 (\"Parameter redefinition.\"), dp1 (\"Terminal '1' is not unique.\"); INV-semantics 3.01",
+            explain: "VACASK refuses a second definition of a parameter or a subcircuit in one scope, and a subcircuit port named twice; the first parameter is kept, a subcircuit so written is kept as text, and the deck is refused.",
             kind: ir::Kind::Refusal,
         },
     ),
@@ -220,7 +226,11 @@ pub(super) fn subckt(l: &mut Lower<'_, '_, '_>, n: Node) {
     };
     let name = read::field_name(l.cst, name);
     let ports: Vec<String> = ports.iter().map(|&p| read::field_name(l.cst, p)).collect();
-    if defined_here(l, ir::DefKind::Subckt, &name) {
+    let mut sorted = ports.clone();
+    sorted.sort_unstable();
+    // A port named twice: "Terminal '1' is not unique." (run dp1).
+    let repeated = sorted.windows(2).any(|w| w[0] == w[1]);
+    if repeated || defined_here(l, ir::DefKind::Subckt, &name) {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(REDEFINED));
     }
     let body = ast.body(n).to_vec();
@@ -264,56 +274,6 @@ pub(super) fn subckt(l: &mut Lower<'_, '_, '_>, n: Node) {
     let until = closer_start(l, n);
     let (_, scope) = l.b.subckt(l.scope, &name, &ports, &formals, span);
     l.body(scope, &body, until);
-}
-
-/// `@if c` … `@elseif c` … `@else` … `@end`: one `If` with a branch per condition.
-pub(super) fn if_chain(l: &mut Lower<'_, '_, '_>, n: Node) {
-    let ast = &l.cst.ast;
-    let mut chain = vec![n];
-    // Bounded by the node count: each step moves to a later branch.
-    for _ in 0..ast.len() {
-        match ast.next(*chain.last().expect("non-empty")) {
-            Some(next) => chain.push(next),
-            None => break,
-        }
-    }
-    for &branch in &chain {
-        if ast.tag(branch) != Tag::If {
-            continue;
-        }
-        let Some(&cond) = ast.fields(branch).first() else {
-            return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(codes::PRIVATE));
-        };
-        if let Err(r) = expr_read::check_expr(l, cond, Context::Param) {
-            return read::opaque(l, n, r.class, Some(r.code));
-        }
-    }
-    let mut conds = Vec::with_capacity(chain.len());
-    for &branch in &chain {
-        conds.push(match l.cst.ast.tag(branch) {
-            Tag::If => {
-                let cond = l.cst.ast.fields(branch)[0];
-                expr_read::expr(l, cond, Context::Param).expect("checked")
-            }
-            _ => ir::ExprId::NONE,
-        });
-    }
-    let span = l.span(n);
-    let (_, branches) = l.b.if_(l.scope, &conds, span);
-    let scopes: Vec<ir::ScopeId> =
-        l.b.design()
-            .branches(branches)
-            .iter()
-            .map(|b| b.body)
-            .collect();
-    for (k, &branch) in chain.iter().enumerate() {
-        let until = match chain.get(k + 1) {
-            Some(&next) => Some(l.start(next)),
-            None => closer_start(l, branch),
-        };
-        let body = l.cst.ast.body(branch).to_vec();
-        l.body(scopes[k], &body, until);
-    }
 }
 
 /// `parameters a=e b=e …` outside a subcircuit's head: one `Param` per entry, in order.
@@ -373,56 +333,6 @@ pub(super) fn ground(l: &mut Lower<'_, '_, '_>, n: Node) {
     }
 }
 
-/// `load "path" [map=…]`.
-pub(super) fn load(l: &mut Lower<'_, '_, '_>, n: Node) {
-    if !top_level(l) {
-        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(TOP_ONLY));
-    }
-    let fields = l.cst.ast.fields(n).to_vec();
-    let Some(&path) = fields.first() else {
-        return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(codes::PRIVATE));
-    };
-    if l.cst.ast.tag(Node(path)) != Tag::Str {
-        return read::opaque(l, n, ir::OpaqueClass::Private, Some(codes::PRIVATE));
-    }
-    // `map=["m", "m", …]` loads only the modules named, under their own names: the load's
-    // modules. Any other `map=` (a rename, a wildcard) has no IR spelling.
-    let modules = match fields.get(1..) {
-        Some([]) | None => Some(Vec::new()),
-        Some([only]) => identity_map(l, *only),
-        Some(_) => None,
-    };
-    let Some(modules) = modules else {
-        return read::opaque(l, n, ir::OpaqueClass::Private, Some(codes::PRIVATE));
-    };
-    let path = read::field_name(l.cst, path);
-    let span = l.span(n);
-    if let (Some(family), true) = (tables::library(&path), modules.is_empty()) {
-        let default = tables::default_file(family).is_some_and(|d| d == path);
-        let path = if default {
-            ir::NameId::NONE
-        } else {
-            l.b.name(&path)
-        };
-        let row = ir::DeviceLibrary { path, family };
-        l.b.device_library(l.scope, row, span);
-        return;
-    }
-    let kind = match path.ends_with(".va") {
-        true => ir::LoadKind::VerilogA,
-        false => ir::LoadKind::Osdi,
-    };
-    let item = l.b.load(l.scope, kind, &path, span);
-    for module in modules {
-        let id = l.b.name(&module);
-        if defined_here(l, ir::DefKind::Module, &module) {
-            l.diags.push(REDEFINED, span, 0);
-            continue;
-        }
-        l.b.define(ir::DefKind::Module, id, l.scope, item);
-    }
-}
-
 /// `embed "file" <<<MARK … >>>MARK`.
 pub(super) fn embed(l: &mut Lower<'_, '_, '_>, n: Node) {
     if !top_level(l) {
@@ -464,39 +374,6 @@ fn assign(l: &Lower<'_, '_, '_>, f: u32) -> Option<(String, u32)> {
     let ast = &l.cst.ast;
     let n = Node(f);
     (ast.tag(n) == Tag::Assign).then(|| (read::field_name(l.cst, ast.lhs(n)), ast.rhs(n)))
-}
-
-/// The modules of a `map=[…]` field whose pairs each map a module to itself, in order; `None`
-/// for any other field.
-fn identity_map(l: &Lower<'_, '_, '_>, field: u32) -> Option<Vec<String>> {
-    let (key, value) = assign(l, field)?;
-    let ast = &l.cst.ast;
-    let v = Node(value);
-    if key != "map" || ast.tag(v) != Tag::Vector {
-        return None;
-    }
-    let at = ast.rhs(v);
-    let items: Vec<u32> = (0..ast.extra(at + 1))
-        .map(|k| ast.extra(at + 2 + k))
-        .collect();
-    if items.is_empty() || !items.len().is_multiple_of(2) {
-        return None;
-    }
-    let mut out = Vec::new();
-    for pair in items.chunks(2) {
-        if pair.iter().any(|&x| ast.tag(Node(x)) != Tag::Str) {
-            return None;
-        }
-        let (from, to) = (
-            read::field_name(l.cst, pair[0]),
-            read::field_name(l.cst, pair[1]),
-        );
-        if from != to || from.contains('*') {
-            return None;
-        }
-        out.push(from);
-    }
-    Some(out)
 }
 
 /// Whether the value at `node` folds to a constant at parse time: no name in it but a builtin

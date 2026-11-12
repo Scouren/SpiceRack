@@ -316,7 +316,11 @@ fn walk(cst: &Cst<'_>, n: Node, out: &mut Folds, seen: &mut HashSet<String>) {
         if ast.tag(m) != Tag::Analysis {
             continue;
         }
-        let kind = word_kind(&read::field_name(cst, ast.header(m).master));
+        // An analysis with no kind word (VACASK rejects it) is no side of the alternation.
+        let master = ast.header(m).master;
+        let kind = (master != crate::syntax::ast::NONE)
+            .then(|| word_kind(&read::field_name(cst, master)))
+            .flatten();
         for t in tracks.values_mut() {
             step(t, kind);
         }

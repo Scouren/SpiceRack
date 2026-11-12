@@ -48,13 +48,6 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "62 of 64 seeds differ under eq_meaning, which compares table ids: each design read back is equal to the generated one once both go through the IR text (the ir row reading its own write); the order the vacask reader pushes rows in is not the generator's",
     ),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
-    ("l3", "vacask", "no generated design admitted: as l4"),
-    ("l8", "vacask", "no generated design admitted: as l4"),
-    (
-        "l4",
-        "vacask",
-        "Gen draws parameter names and library paths no shipped module has: admits refuses W2002, W2004 and S4.1's W2102, W2103 on nearly every seed (the R21 name-pool gap, S4-AREAS)",
-    ),
 ];
 
 /// The most seeds the shrink self-test searches for its case.
@@ -65,7 +58,16 @@ const REACH_SEEDS: std::ops::Range<u64> = 0..512;
 
 /// The kinds a row claims and no admitted generated design reaches: (row, feature as `Debug`
 /// prints it). Strict both ways (`reach_every_kind_the_row_claims`).
-const KNOWN_REACH: &[(&str, &str)] = &[];
+const KNOWN_REACH: &[(&str, &str)] = &[
+    // vacask: legalize refuses Circuit(ElementWithoutModel) on a behavioural source, a kind
+    // that names no model (ir-circuit's fix, the lead's note on R52).
+    ("vacask", "Elem(Behav)"),
+    // vacask: every generated model of these families (8 over 512 seeds) holds `to_real` in a
+    // parameter expression of class Temp, which W2006 refuses (gap c, deferred: R52).
+    ("vacask", "Family(Diode)"),
+    ("vacask", "Family(Bsim3)"),
+    ("vacask", "Family(Bsim4)"),
+];
 
 /// A writer that spells every feature, refuses every item but elements in `admits`, and panics
 /// on a capacitor (the shrink self-test's planted bug).
