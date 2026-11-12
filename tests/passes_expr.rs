@@ -461,3 +461,16 @@ fn ulps(a: f64, b: f64) -> u64 {
     };
     key(a).abs_diff(key(b))
 }
+
+#[test]
+fn long_literal_to_shortest_keeps_every_value() {
+    // oracle: eval_typed of the long literal (its correctly rounded value) against the
+    // shortest decimal written in its place, under the boundary set
+    let text = "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = 0.12345678901234567890123 * x + 1.00000000000000000000001e-3 / y\n";
+    let points = keeps_boundary_values("long_literal_to_shortest", text, ANY);
+    eprintln!("long_literal_to_shortest: {points} boundary points");
+    assert_eq!(
+        notes("long_literal_to_shortest", "plain"),
+        [code(111), code(111)]
+    );
+}
