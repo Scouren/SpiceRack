@@ -48,10 +48,8 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-// definition phase: bodies are todo!(); remove when they land
-#![allow(unused_variables, dead_code)]
 
-// first: its `todo_facts!` macro is textually scoped to the modules declared after it
+// first: its `for_kind!` macro is textually scoped to the modules declared after it
 #[macro_use]
 pub mod facts;
 
@@ -97,6 +95,8 @@ mod circuit_parse;
 mod circuit_text;
 pub mod controlled;
 pub mod element;
+pub mod letter;
+pub mod library;
 pub mod line;
 pub mod model;
 pub mod passive;
@@ -107,6 +107,8 @@ pub mod wave;
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, NO_ROW};
+pub use letter::spice_letter;
+pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};
 pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 

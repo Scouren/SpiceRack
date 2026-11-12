@@ -14,7 +14,8 @@
 //! `rewrite/INV-semantics.md` 5.01–5.12, 5.18, 5.22, 5.25, 5.33.
 //!
 //! Contents:
-//! - `pub enum WaveKind`, `pub enum PreDelay`, `pub enum SffmLaw`, `pub enum PwlRepeat`,
+//! - `pub enum WaveKind`, `pub enum PreDelay`, `pub enum PulseLaw`, `pub enum TdFrom`,
+//!   `pub enum SffmLaw`, `pub enum PwlRepeat`,
 //!   `pub enum PwlJoin`, `pub enum AmModTime`, `pub enum TrRandomKind`; on each: `ALL`, `COUNT`
 //! - `pub struct WaveRef`, `WaveRef::NONE`, `WaveRef::is_none(self) -> bool`
 //! - `pub struct Pulse`, `pub struct Sin`, `pub struct Exp`, `pub struct Pwl`,
@@ -65,6 +66,28 @@ pub enum PreDelay {
     Zero,
 }
 
+/// Which pulse law (AMEND-A12 C1; DIALECT-VACASK runs p1, p2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum PulseLaw {
+    /// SPICE's trapezoidal pulse train (ng, hs, xy, lt, sp).
+    Spice,
+    /// VACASK's: `rise > 0` is required; `fall <= 0` is no falling edge (the value holds `v2`
+    /// to the end of the period and is `v1` again at the start of the next); `period <= 0` is
+    /// one pulse.
+    Vacask,
+}
+
+/// Where an exponential's second delay counts from (AMEND-A12 C2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum TdFrom {
+    /// From t = 0 (SPICE).
+    Zero,
+    /// From `td1` (va).
+    Td1,
+}
+
 /// Which SFFM formula (INV-semantics 5.01, 5.02).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -72,8 +95,8 @@ pub enum SffmLaw {
     /// SPICE3: offset + amplitude·sin(2π·fc·t + mdi·sin(2π·fs·t)) from t = 0, unclamped,
     /// with the phases and delay as [`Sffm`] states them (hs, xy, lt, sp, va).
     Spice3,
-    /// ngspice: the same formula with the index limited to fc/fs, and 0 for t ≤ delay
-    /// including the operating point.
+    /// ngspice: the same formula with the index limited to fc/fs and ngspice's defaults
+    /// (what the source is before the delay is `Sffm::pre`, `Zero` on ngspice; AMEND-A12 C3).
     Ngspice,
 }
 
@@ -142,7 +165,8 @@ pub struct WaveRef {
     pub index: u32,
 }
 
-/// `PULSE(v1 v2 delay rise fall width period [cycles])`. Before `delay` the value is `v1`.
+/// `PULSE(v1 v2 delay rise fall width period [cycles])` under `law`. Before `delay` the value
+/// is `v1`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Pulse {
     /// Initial value. Never `NONE`.
@@ -163,6 +187,8 @@ pub struct Pulse {
     /// Number of pulses, after which the value holds `v1` (ng NP, lt Ncycles, 5.04). `NONE`:
     /// unlimited; ngspice's 0 is `NONE`; Xyce ignores a count, so its reader writes `NONE`.
     pub cycles: ExprId,
+    /// Which pulse law (AMEND-A12 C1).
+    pub law: PulseLaw,
 }
 
 /// `SIN(offset amplitude freq delay damping phase [cycles])`: for t ≥ delay,
@@ -193,7 +219,7 @@ pub struct Sin {
 }
 
 /// `EXP(v1 v2 td1 tau1 td2 tau2)`: v1 before td1; rising towards v2 with tau1 from td1;
-/// falling back with tau2 from td2. Every field is required (never `NONE`); ngspice's zero
+/// falling back with tau2 from td2 (counted as `td2_from` says). Every field is required (never `NONE`); ngspice's zero
 /// defaults are `TStep`-based expressions written by its reader (5.05).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Exp {
@@ -205,11 +231,13 @@ pub struct Exp {
     pub td1: ExprId,
     /// Rise time constant (s).
     pub tau1: ExprId,
-    /// Fall delay (s), absolute from t = 0 (va counts it from `td1`: its reader adds, its
-    /// writer subtracts; 5.08).
+    /// Fall delay (s), counted from where `td2_from` says (5.08; AMEND-A12 C2 withdrew "its
+    /// reader adds": the sum would hold the delay in two fields).
     pub td2: ExprId,
     /// Fall time constant (s).
     pub tau2: ExprId,
+    /// Where `td2` counts from.
+    pub td2_from: TdFrom,
 }
 
 /// `PWL(t1 v1 t2 v2 …)`: absolute (time, value) points, linear between them, the last value
@@ -261,6 +289,8 @@ pub struct Sffm {
     pub phase_m_deg: ExprId,
     /// Which formula.
     pub law: SffmLaw,
+    /// What the source is before `delay` (AMEND-A12 C3; va holds its value at `delay`, ng is 0).
+    pub pre: PreDelay,
 }
 
 /// Amplitude modulation, the general formula every dialect's AM restricts (5.03): for
@@ -390,9 +420,9 @@ pub enum Wave {
 
 const _: () = assert!(size_of::<WaveKind>() == 1);
 const _: () = assert!(size_of::<WaveRef>() == 8);
-const _: () = assert!(size_of::<Pulse>() == 32);
+const _: () = assert!(size_of::<Pulse>() == 36);
 const _: () = assert!(size_of::<Sin>() == 40);
-const _: () = assert!(size_of::<Exp>() == 24);
+const _: () = assert!(size_of::<Exp>() == 28);
 const _: () = assert!(size_of::<Pwl>() == 32);
 const _: () = assert!(size_of::<Sffm>() == 36);
 const _: () = assert!(size_of::<Am>() == 40);
@@ -442,6 +472,20 @@ impl WaveKind {
 impl PreDelay {
     /// Every member, in declaration order.
     pub const ALL: [PreDelay; 3] = [PreDelay::Offset, PreDelay::HoldDelayValue, PreDelay::Zero];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+impl PulseLaw {
+    /// Every member, in declaration order.
+    pub const ALL: [PulseLaw; 2] = [PulseLaw::Spice, PulseLaw::Vacask];
+    /// Member count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+impl TdFrom {
+    /// Every member, in declaration order.
+    pub const ALL: [TdFrom; 2] = [TdFrom::Zero, TdFrom::Td1];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
 }

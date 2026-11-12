@@ -25,10 +25,10 @@ use crate::line::Line;
 use crate::model::Polarity;
 use crate::passive::{Coupling, IcMode, Parasitics, Passive};
 use crate::semi::{InitialState, Semi, Switch};
-use crate::source::{Distof, PortSpec, Source};
+use crate::source::{DcRule, Distof, PortSpec, Source};
 use crate::wave::{
-    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw, Sin,
-    TrNoise, TrRandom, TrRandomKind, WaveRef,
+    Am, AmModTime, Exp, Pattern, PreDelay, Pulse, PulseLaw, Pwl, PwlJoin, PwlRepeat, Sffm, SffmLaw,
+    Sin, TdFrom, TrNoise, TrRandom, TrRandomKind, WaveRef,
 };
 
 /// One field of a row, borrowed mutably, by the kind of value it holds.
@@ -144,6 +144,9 @@ choices! {
     AmModTime: ["delay", "carrier_phase"];
     TrRandomKind: ["uniform", "gauss", "exponential", "poisson"];
     Polarity: ["none", "n", "p"];
+    PulseLaw: ["spice", "vacask"];
+    TdFrom: ["zero", "td1"];
+    DcRule: ["given", "wave_at_zero"];
 }
 
 fields! {
@@ -158,7 +161,7 @@ fields! {
         dc: Expr = N, ac_mag: Expr = N, ac_phase_deg: Expr = N, tc1: Expr = N, tc2: Expr = N,
         pac_mag: Expr = N, pac_phase_deg: Expr = N, wave: Wave = WaveRef::NONE,
         noise_psd: Exprs = EL, parasitics: Side[Parasitics] = NO_ROW, port: Side[Port] = NO_ROW,
-        distof: Side[Distof] = NO_ROW,
+        distof: Side[Distof] = NO_ROW, dc_rule: Choice = DcRule::Given,
     }
     PortSpec { index: Expr = N, z0: Expr = N, noise_temp: Expr = N, power: Expr = N, freq: Expr = N }
     Distof { f1_mag: Expr = N, f1_phase_deg: Expr = N, f2_mag: Expr = N, f2_phase_deg: Expr = N }
@@ -195,14 +198,17 @@ fields! {
     }
     Pulse {
         v1: Expr = N, v2: Expr = N, delay: Expr = N, rise: Expr = N, fall: Expr = N,
-        width: Expr = N, period: Expr = N, cycles: Expr = N,
+        width: Expr = N, period: Expr = N, cycles: Expr = N, law: Choice = PulseLaw::Spice,
     }
     Sin {
         offset: Expr = N, amplitude: Expr = N, freq: Expr = N, delay: Expr = N,
         damping: Expr = N, phase_deg: Expr = N, cycles: Expr = N, amplitude2: Expr = N,
         freq2: Expr = N, pre: Choice = PreDelay::Offset,
     }
-    Exp { v1: Expr = N, v2: Expr = N, td1: Expr = N, tau1: Expr = N, td2: Expr = N, tau2: Expr = N }
+    Exp {
+        v1: Expr = N, v2: Expr = N, td1: Expr = N, tau1: Expr = N, td2: Expr = N, tau2: Expr = N,
+        td2_from: Choice = TdFrom::Zero,
+    }
     Pwl {
         points: Exprs = EL, delay: Expr = N, repeat_at: Expr = N, repeat_count: Expr = N,
         join_width: Expr = N, file: Name = NN, repeat: Choice = PwlRepeat::Never,
@@ -211,7 +217,7 @@ fields! {
     Sffm {
         offset: Expr = N, amplitude: Expr = N, carrier_freq: Expr = N, mod_index: Expr = N,
         signal_freq: Expr = N, delay: Expr = N, phase_c_deg: Expr = N, phase_m_deg: Expr = N,
-        law: Choice = SffmLaw::Spice3,
+        law: Choice = SffmLaw::Spice3, pre: Choice = PreDelay::Offset,
     }
     Am {
         offset: Expr = N, amplitude: Expr = N, mod_offset: Expr = N, mod_index: Expr = N,

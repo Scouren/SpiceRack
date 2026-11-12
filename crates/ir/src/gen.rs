@@ -377,6 +377,7 @@ fn candidates(
             | ItemKind::Include
             | ItemKind::Global
             | ItemKind::Opaque
+            | ItemKind::DeviceLibrary
             | ItemKind::Statistics
             | ItemKind::Element
             | ItemKind::Analysis

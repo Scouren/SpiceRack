@@ -145,6 +145,7 @@ mod tests {
             }
         }
         assert!(seen.contains(Feature::Item(ItemKind::Model)));
+        assert!(seen.contains(Feature::Item(ItemKind::DeviceLibrary)));
         assert_eq!(missing, Vec::<String>::new());
     }
 }

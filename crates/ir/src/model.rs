@@ -186,6 +186,23 @@ pub enum ModelFamily {
     HspiceW,
     /// Jiles-Atherton magnetic core (xy `core`; D11, D114, 7.18).
     CoreJilesAtherton,
+    // ---- builtins (AMEND-A12 C5) ----
+    /// The simulator's built-in independent voltage source, no parameters (va `vsource`; run
+    /// n2: VACASK instantiates every device through a model). Only a `VSource` names it.
+    SourceV,
+    /// The built-in independent current source, no parameters (va `isource`). Only an
+    /// `ISource` names it.
+    SourceI,
+    /// The built-in VCVS, no parameters (va `vcvs`). Only a `Vcvs` names it.
+    Vcvs,
+    /// The built-in VCCS, no parameters (va `vccs`). Only a `Vccs` names it.
+    Vccs,
+    /// The built-in CCVS, no parameters (va `ccvs`). Only a `Ccvs` names it.
+    Ccvs,
+    /// The built-in CCCS, no parameters (va `cccs`). Only a `Cccs` names it.
+    Cccs,
+    /// The built-in mutual inductance, no parameters (va `mutual`). Only a `Coupling` names it.
+    Mutual,
     // ---- modules ----
     /// XSPICE code model; `Model::word` is the code model's name (`s_xfer`, `d_cosim`; D37,
     /// F20).
@@ -246,7 +263,7 @@ const _: () = assert!(size_of::<Model>() == 44);
 
 impl ModelFamily {
     /// Every member, in declaration order.
-    pub const ALL: [ModelFamily; 70] = [
+    pub const ALL: [ModelFamily; 77] = [
         ModelFamily::Resistor,
         ModelFamily::ResistorMultiplier,
         ModelFamily::Capacitor,
@@ -314,6 +331,13 @@ impl ModelFamily {
         ModelFamily::Urc,
         ModelFamily::HspiceW,
         ModelFamily::CoreJilesAtherton,
+        ModelFamily::SourceV,
+        ModelFamily::SourceI,
+        ModelFamily::Vcvs,
+        ModelFamily::Vccs,
+        ModelFamily::Ccvs,
+        ModelFamily::Cccs,
+        ModelFamily::Mutual,
         ModelFamily::CodeModel,
         ModelFamily::Module,
         ModelFamily::Other,

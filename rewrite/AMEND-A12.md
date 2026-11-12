@@ -29,6 +29,7 @@ reader can decide it statically for a library.
   | comparisons, `And`, `Or`, `Not`, the bit operators and shifts | Int |
   | `Ternary` | the chosen branch's |
   | `ToInt` | Int |
+  | `SgnZeroPos` (addendum: VACASK `sgn`, runs e1, f4; −1 below zero, +1 otherwise) | its operand's |
   | everything else (`Div`, `DivTyped` of a real, every other `Func`, every leaf, `Draw`) | Real |
 
 - `BinOp::DivTyped(a, b)`: both Int → the quotient truncated toward zero, Int (`b == 0` a domain
@@ -240,3 +241,21 @@ its `admits` refused every generated design for forms no feature states); `ng-el
 - **R3. Open, not typed now (R29).** What a deck saves when it names nothing: today the IR is
   silent and the target's default applies. Decided with the run side (S12); `output.rs`'s
   sentence that the reader expands the default is withdrawn until then.
+
+## A15, additions from the ngspice models area (R32, R33)
+
+- **Kernel K5 (with the circuit owner).** `Feature::Family(ModelFamily)`: a `Model` of that
+  family, as `Elem`, `Wave` and `Analysis` are feature classes. "This simulator has no such
+  model" is then a feature a target lacks, not an `admits` refusal. (A version of a family a
+  target lacks stays the dialect's own check.)
+- **Circuit C3.** `ModelFamily::Mesa`: ngspice's MESA device (`nmf`/`pmf`/`nhfet`/`phfet`,
+  levels 2 to 4, `inpdomod.c`; the level is a parameter of the device).
+- **Circuit C4. A bin group has a definition.** Pushing a `Model` with `bin_of = X` also
+  defines `X` (`DefKind::Model`) in that scope, bound to the first such bin, when `X` is not
+  yet defined there. An instance that names the group (`nch`, where only `nch.1`, `nch.2`, …
+  exist) binds to that definition; the simulator picks the bin by geometry. The IR-text parser
+  does the same, so the round trip holds.
+- **No kernel change, a rule stated (R33).** A definition made in an `If` branch is visible
+  inside that branch only. A reference from outside the branch to a name defined only in
+  branches stays named and unbound (`def` `NONE`): it is bound when the design is elaborated.
+  `Placed(Branch, kind)` is the feature.
