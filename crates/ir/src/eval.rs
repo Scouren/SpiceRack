@@ -217,7 +217,7 @@ impl Machine<'_> {
             Expr::Num(n) => {
                 let l = d.num(n);
                 self.values.push(Value {
-                    number: l.value(),
+                    number: d.literal_value(l),
                     int: l.form == NumForm::Int,
                 });
             }
