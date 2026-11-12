@@ -903,6 +903,15 @@ mod tests {
             let w = b.wave(r);
             with_wave(b, t, w)
         }),
+        (X::AmModOffset, |b, t, on| {
+            // A31: an offset of 2; its neighbour the literal 1 (VACASK's only offset)
+            let mut r = am(b, AmModTime::Delay, PreDelay::Zero);
+            if on {
+                r.mod_offset = n(b, 2);
+            }
+            let w = b.wave(r);
+            with_wave(b, t, w)
+        }),
         (X::PwlDelay, |b, t, on| {
             let r = pwl(b);
             let delay = opt(b, on);

@@ -112,6 +112,9 @@ pub enum CircuitExtra {
     AmPreZero,
     /// An AM whose modulation time is shifted by the carrier phase (`AmModTime::CarrierPhase`, sp).
     AmModCarrierPhase,
+    /// An AM whose `mod_offset` is not the literal 1 (A31): VACASK's AM is
+    /// `sinedc + ampl·sin(carrier)·(1 + modindex·sin(mod))`, ngspice's takes any offset.
+    AmModOffset,
     /// A PWL delay (`Pwl::delay`, E7).
     PwlDelay,
     /// A PWL replaying from a time (`PwlRepeat::From`, 5.11).
@@ -261,7 +264,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 107] = [
+    pub const ALL: [CircuitExtra; 108] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -307,6 +310,7 @@ impl CircuitExtra {
         CircuitExtra::AmPreHold,
         CircuitExtra::AmPreZero,
         CircuitExtra::AmModCarrierPhase,
+        CircuitExtra::AmModOffset,
         CircuitExtra::PwlDelay,
         CircuitExtra::PwlRepeatFrom,
         CircuitExtra::PwlRepeatPeriod,
