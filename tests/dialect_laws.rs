@@ -231,7 +231,7 @@ fn l7_legalized_designs_use_only_the_writers_features() {
     let all = dialect::irtext::IrText.features();
     laws("l7", |_row, writer| {
         for f in all.minus(*writer.features()).iter() {
-            let removed = spicerack::passes::PASSES.iter().any(|p| p.removes == f);
+            let removed = spicerack::passes::all().any(|p| p.removes == f);
             if !removed {
                 return Err(format!("lacks {f:?}: no pass removes it, and no citation"));
             }

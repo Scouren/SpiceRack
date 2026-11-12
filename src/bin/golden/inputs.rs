@@ -188,9 +188,10 @@ const FIXTURES: [(&str, Dialect); 7] = [
 ];
 
 /// Directories under `tests/` whose files are not golden inputs: the new pipeline's
-/// per-dialect fixtures (`tests/fixtures/dialect/<name>/`), which that dialect's own tests read
+/// per-dialect and per-pass fixtures (`tests/fixtures/dialect/<name>/`,
+/// `tests/fixtures/passes/<group>/<pass>/`), which their own tests read
 /// and the old pipeline never did; the gate's input set is what it was at the baseline.
-const FIXTURES_EXCLUDED: [&str; 1] = ["fixtures/dialect"];
+const FIXTURES_EXCLUDED: [&str; 2] = ["fixtures/dialect", "fixtures/passes"];
 
 impl Input {
     /// Its kit and its file in it: the PDK kit it shares, or its own,
@@ -504,6 +505,7 @@ mod tests {
         let at = |p: &str| super::fixture(tests, &tests.join(p));
         assert_eq!(at("fixtures/dialect/ngspice/read/a.sp"), None);
         assert_eq!(at("fixtures/dialect/vacask/b.sim"), None);
+        assert_eq!(at("fixtures/passes/waves/pulse/a.sp"), None);
         assert_eq!(
             at("fixtures/dialectx/a.sp"),
             Some(spicerack::syntax::Dialect::Ngspice)

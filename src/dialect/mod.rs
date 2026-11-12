@@ -341,14 +341,15 @@ pub fn transpile(
     Ok(Written { text, notes: diags })
 }
 
-/// The catalogue row of `code`: the spine's own, else the IR crate's, else a dialect's
-/// (`ngspice::info`); `None` for a code no catalogue holds.
+/// The catalogue row of `code`: the spine's own, the passes' (`passes::info`), else the IR
+/// crate's, else a dialect's (`ngspice::info`); `None` for a code no catalogue holds.
 pub fn info(code: ir::Code) -> Option<ir::Info> {
     let spine = SPINE_CODES
         .iter()
         .find(|(c, _)| *c == code)
         .map(|(_, i)| *i);
     spine
+        .or_else(|| passes::info(code))
         .or_else(|| ir::diag::info(code))
         .or_else(|| ngspice::info(code))
 }
