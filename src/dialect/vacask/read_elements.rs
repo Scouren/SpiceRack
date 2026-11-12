@@ -36,7 +36,7 @@
 mod behavioural;
 mod masters;
 
-pub(super) use masters::Declared;
+pub(super) use masters::{Declared, Found, Master, find};
 
 use super::expr_read::{self, Context, Refusal};
 use super::families::{self, Name};
@@ -46,7 +46,6 @@ use super::read_structure::ENCLOSING;
 use super::write_models;
 use crate::ir;
 use crate::syntax::ast::{Node, Tag};
-use masters::{Found, Master};
 
 /// What this area's rows use.
 pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
@@ -231,7 +230,7 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
     let Some(master) = h.master else {
         return behavioural::source(l, n, &name, &nodes, &entries);
     };
-    match masters::find(l, l.declared, &master) {
+    match find(l, l.declared, &master) {
         Found::Enclosing => read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(ENCLOSING)),
         Found::Nowhere => unresolved(l, n, &name, &nodes, &master, &entries),
         Found::Here(Master::Subckt { ports, params }) => {
