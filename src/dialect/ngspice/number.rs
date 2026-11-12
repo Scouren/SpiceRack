@@ -90,6 +90,7 @@ pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan> {
 /// A card value's whole token read as `INPevaluate` reads it with `gobble` set: an optional
 /// sign, the number, and the rest of the token ignored (`1k5` is 1000, `10v` is 10). `None` when
 /// the token does not start with a number after its sign.
+#[allow(dead_code, reason = "S3.1's card values call it")]
 pub(super) fn card(token: &str) -> Option<Scan> {
     let (negative, rest) = match token.as_bytes().first() {
         Some(b'-') => (true, &token[1..]),

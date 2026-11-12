@@ -55,7 +55,7 @@ pub(super) fn key(name: &str) -> String {
 /// The letter ngspice reads `kind` from (manual §3.1), or `None` where the letter depends on the
 /// detail row (the controlled-source families: `E`/`G`/`F`/`H`/`B` by the output and law) or
 /// ngspice has no such element. The S3.1 writer owns the detail-dependent choice.
-#[cfg_attr(not(test), expect(dead_code, reason = "S3.1's writers call it"))]
+#[allow(dead_code, reason = "S3.1's writers call it")]
 pub(super) const fn letter(kind: ir::ElemKind) -> Option<u8> {
     use ir::ElemKind as K;
     Some(match kind {

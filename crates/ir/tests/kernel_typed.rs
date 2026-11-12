@@ -2,8 +2,9 @@
 //! on every value, `DivTyped` and `ToInt`, the `IntLiteral` feature, and their IR-text spelling.
 //!
 //! Oracles: the tag table of AMEND-A12 K1 at hand-worked points; VACASK's printed values for runs
-//! i1, t3 and f2 (DIALECT-VACASK Appendix A) as spec examples, where the run decides `Sgn`
-//! (Int-valued: `sgn(-3)/2` printed 0); the inverse for the text spelling.
+//! i1, t3, f2 and f4 (DIALECT-VACASK Appendix A) as spec examples, VACASK's `sgn` being
+//! `SgnZeroPos` (−1 below zero, +1 otherwise, its operand's type); the IR's `Sgn` is Real, as
+//! ruled (`sgn(3i) /: 2i` is 0.5); the inverse for the text spelling.
 //!
 //! Contents: none (tests only).
 
@@ -196,12 +197,24 @@ fn every_row_of_the_tag_table() {
     );
     assert!(!call(Func::Abs, &[three()]).int, "every other Func is Real");
     assert!(!call(Func::Floor, &[three()]).int);
-    assert_eq!(
-        call(Func::Sgn, &[int(-3)]),
-        i(-1.0),
-        "Sgn: Int of an Int (run f2)"
-    );
+    // the IR's Sgn (−1, 0, 1) is Real whatever its operand (ruled): VACASK's `sgn` is
+    // SgnZeroPos, a reader's sugar never spells it as Sgn
+    assert_eq!(call(Func::Sgn, &[int(-3)]), r(-1.0), "Sgn: Real of an Int");
     assert_eq!(call(Func::Sgn, &[real(-30, 1)]), r(-1.0));
+    assert_eq!(call(Func::Sgn, &[int(0)]), r(0.0));
+    assert_eq!(
+        call(Func::SgnZeroPos, &[int(-3)]),
+        i(-1.0),
+        "SgnZeroPos: its operand's"
+    );
+    assert_eq!(call(Func::SgnZeroPos, &[real(30, 1)]), r(1.0));
+    // run e1: −0.0 is not below zero (a literal has no sign of zero, so it is `Neg(0)`)
+    let neg_zero = ev(|bl| {
+        let z = bl.literal(Literal::ZERO);
+        let n = bl.unary(UnOp::Neg, z);
+        bl.call(Func::SgnZeroPos, &[n])
+    });
+    assert_eq!(neg_zero, r(1.0), "sgn of -0.0 is 1");
     let ternary = |c: Literal, a: Literal, b: Literal| {
         ev(|bl| {
             let (c, a, b) = (bl.literal(c), bl.literal(a), bl.literal(b));
@@ -264,12 +277,17 @@ fn vacask_runs_i1_t3_f2() {
   param f2c = abs(3i) /: 2i
   param f2d = min(3i, 5i) /: 2i
   param f2e = min(3.0, 5i) /: 2i
-  param f2f = sgn(-3i) /: 2i
+  param f2f = sgn_zero_pos(-3i) /: 2i
   param f2g = (1i ? 3i : 4.0) /: 2i
   param f2h = -3i /: 2i
   param f2i = pow(3i, 1i) /: 2i
   param f2j = 3i * 1i /: 2i
   param f2k = (3i > 2i) /: 2i
+  param f4a = sgn_zero_pos(3.0) /: 2i
+  param f4b = sgn_zero_pos(-3.0) /: 2i
+  param f4c = sgn_zero_pos(0) /: 2i
+  param f4d = sgn_zero_pos(3i) /: 2i
+  param f4f = sgn(3i) /: 2i
 ";
     let mut d = Design::new();
     let mut diags = Diags::new();
@@ -297,6 +315,11 @@ fn vacask_runs_i1_t3_f2() {
         ("f2i", 1.5),
         ("f2j", 1.0),
         ("f2k", 0.0),
+        ("f4a", 0.5),
+        ("f4b", -0.5),
+        ("f4c", 0.5),
+        ("f4d", 0.0),
+        ("f4f", 0.5),
     ];
     let top = d.file(d.entry()).top;
     for (name, value) in want {
