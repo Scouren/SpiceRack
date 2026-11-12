@@ -26,6 +26,7 @@
 //! Contents: `pub(super) const FEATURES`, `pub(super) const CODES`, `pub(super) const UNTYPED`,
 //! `INVALID`, `INERT`, `DC_WINDOW`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
 //! `pub(super) fn probe(lw, st, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`,
+//! `pub(super) fn script_save(lw, st, &[String], ir::Applies) -> Result<(), No>`,
 //! `pub(super) fn save_command`, `pub(super) fn meas_command` (each `(lw, st, &[String]) -> Result<(), No>`),
 //! `pub(super) fn fail(No) -> Fail`, `pub(super) fn words(&str) -> Vec<String>`, `pub(super) fn unwrap(&str) -> &str`; the probe
 //! words (`Ctx`, `Want`, `probe_word`) are `read_outputs/probe.rs`, the measures
@@ -50,6 +51,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Item(ItemKind::Save),
     Feature::Run(RunExtra::SaveWholeRun),
     Feature::Run(RunExtra::SaveFromHere),
+    Feature::Run(RunExtra::SaveMidRun),
     Feature::Item(ItemKind::Print),
     Feature::Item(ItemKind::Measure),
     Feature::Run(RunExtra::ProbeVdiff),
@@ -215,16 +217,26 @@ pub(super) fn probe(
     Ok(build(lw, &wants.remove(0)))
 }
 
-/// A script's `save word …` before its first analysis (the control area calls it then):
-/// `com_save` reads each word by `copynode`, as `.save` reads it by `gettoks`, except a
-/// `v(a,b)`, which `copynode` reads as one name `a,b` (not typed). Pushes one `Save` that holds
-/// from where it stands (`Applies::FromHere`, A27), or none.
-#[allow(dead_code, reason = "the control area calls it (S3.4)")]
-pub(super) fn save_command(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
+/// A script's `save word …`, holding as the control area, which knows the script's order,
+/// says: `WholeRun` before the first analysis with no reset after it (the deck's `.save`,
+/// ruling Q6), else `FromHere` (A27). `com_save` reads each word by `copynode`, as `.save` reads
+/// it by `gettoks`, except a `v(a,b)`, which `copynode` reads as one name `a,b` (not typed).
+/// Pushes one `Save`, or none.
+pub(super) fn script_save(
+    lw: &mut Lower<'_, '_>,
+    st: Stmt,
+    words: &[String],
+    holds: ir::Applies,
+) -> Result<(), No> {
     if words.iter().any(|w| w.contains('(') && w.contains(',')) {
         return Err(No::Untyped);
     }
-    save(lw, st, words, ir::Applies::FromHere)
+    save(lw, st, words, holds)
+}
+
+/// [`script_save`] holding `FromHere`, until the control area passes `holds` itself.
+pub(super) fn save_command(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String]) -> Result<(), No> {
+    script_save(lw, st, words, ir::Applies::FromHere)
 }
 
 /// A script's `meas kind name …` (the control area calls it when the script holds one analysis
