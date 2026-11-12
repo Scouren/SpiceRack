@@ -161,9 +161,20 @@ fn after(delay: f64) -> Vec<f64> {
 /// `TIME_ULPS·ulp(t)·slope` at instant t is the time's rounding, counted, not failed.
 fn compare(
     name: &str,
+    design: ir::Design,
+    tally: &mut Tally,
+    slope: Option<fn(&ir::Design, &ir::source::Source) -> Option<f64>>,
+) {
+    compare_until(name, design, tally, slope, f64::INFINITY);
+}
+
+/// [`compare`] at the instants up to `until` only (a rule exact up to the design's last stop).
+fn compare_until(
+    name: &str,
     mut design: ir::Design,
     tally: &mut Tally,
     slope: Option<fn(&ir::Design, &ir::source::Source) -> Option<f64>>,
+    until: f64,
 ) {
     let pass = passes::all().find(|p| p.name == name).expect("registered");
     let was = design.clone();
@@ -177,7 +188,12 @@ fn compare(
             continue;
         }
         tally.sources += 1;
-        let instants = times(&was, old).into_iter().map(At::Time);
+        // with a bound, the bound itself and an instant halfway to it are read too
+        let mut at = times(&was, old);
+        if until.is_finite() {
+            at.extend([until.next_down(), until, until * 0.5]);
+        }
+        let instants = at.into_iter().filter(|&t| t <= until).map(At::Time);
         for at in std::iter::once(At::OperatingPoint).chain(instants) {
             tally.points += 1;
             let a = source_value(&was, old, at, &Run);
