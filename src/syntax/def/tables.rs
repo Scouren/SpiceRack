@@ -166,8 +166,9 @@ impl DialectDef {
     /// `word` lowercased, a dot card's with its dot (`.stateye`), an
     /// element's whole (`yneuron`). A one-letter key matches every element
     /// line of that letter; the reader adds the construct's own shape check
-    /// (HSPICE's W line: a W model key), none for any other construct (`"a"`
-    /// matches every A line). A key held is replaced in place.
+    /// (HSPICE's W line: a W model key; a `PrivateText` `"k"`: a core model
+    /// after the coupling value), none otherwise (`"a"` matches every A
+    /// line). A key held is replaced in place.
     pub fn kept_word(mut self, word: &str, c: Construct) -> Self {
         let mut v = self.b.kept_words.to_vec();
         put(&mut v, leak(&word.to_ascii_lowercase()), c);

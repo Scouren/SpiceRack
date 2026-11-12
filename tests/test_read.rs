@@ -340,3 +340,47 @@ fn p4_065_xyce_private_devices() {
     let plain = format!("{rc}.op\n.end\n");
     assert!(write(&plain, xy, Dialect::Ngspice).contains(".op"));
 }
+
+// ZERO-LEDGER P4-066: a Xyce `K` line with a model name after the coupling
+// value couples its windings through a nonlinear magnetic core (RG 7.10
+// §2.3.6: `K<name> L<inductor name> [L<inductor name>*] <coupling value>
+// [model name]`, `.MODEL … CORE`). Oracle: the guide's clause, and runs
+// (research/impl/evidence/P4-066): Xyce 7.10 counts "K level 1 (Nonlinear
+// Mutual Inductor)", ngspice-45 stops with "unknown parameter (nlcore)";
+// the ngspice manual (§3.3.12) and the LTspice help (K) couple linearly
+// only. So each target refuses the line as Xyce's own (W0039), never as
+// text it could not read (W0001); Xyce gets it back as written. A plain
+// coupling is written, and a coupling given as an expression is never
+// called Xyce's own. Checks: 12 refusals, 2 lines, 2 neighbours.
+#[test]
+fn p4_066_xyce_k_core_model_is_private() {
+    let xy = Dialect::Xyce;
+    let cite = "Xyce RG 7.10 §2.3.6: a `K` line with a model name is a nonlinear magnetic core";
+    let rc = "* t\nV1 1 0 SIN(0 1 1k)\nR1 1 2 10\nL1 2 0 100\nL2 3 0 100\nR2 3 0 1k\n";
+    for line in ["K1 L1 L2 1.0 nlcore", "ktrans1 L1 L2 1 trans_core"] {
+        let deck = format!("{rc}{line}\n.end\n");
+        for to in [
+            Dialect::Ngspice,
+            Dialect::Espice,
+            Dialect::Hspice,
+            Dialect::Ltspice,
+            Dialect::Spectre,
+            Dialect::Vacask,
+        ] {
+            assert_eq!(refusals(&deck, xy, to), [Code::W0039], "{to:?}: {line}");
+        }
+        oracle::spec_example(cite, &deck, xy, xy, &[line]);
+    }
+    // The legal neighbour: a plain coupling is every simulator's.
+    let plain = format!("{rc}K1 L1 L2 0.5\n.end\n");
+    assert!(write(&plain, xy, Dialect::Ngspice).contains("K1 L1 L2 0.5"));
+    // A coupling given as an expression has no core model: whatever the
+    // target answers (P5-030 reads it), it is not Xyce's own statement.
+    let expr = format!("{rc}.param kc=0.5\nK1 L1 L2 {{kc}}\n.end\n");
+    let codes: Vec<Code> =
+        match spicerack::syntax::render::render_text(&expr, xy, "t", Dialect::Ngspice) {
+            Ok(_) => Vec::new(),
+            Err(e) => e.diags.iter().map(|d| d.code).collect(),
+        };
+    assert!(!codes.contains(&Code::W0039), "{codes:?}");
+}

@@ -285,9 +285,38 @@ impl Rd<'_> {
     fn kept_shape(&self, c: Construct, tok: u32) -> bool {
         match c {
             Construct::HspiceWLine => self.w_line(tok),
+            Construct::PrivateText => self.private_line(tok),
             // else: a construct with no shape of its own takes every line.
             _ => true,
         }
+    }
+
+    /// Whether the element line at `tok`, matched by a one-letter
+    /// `PrivateText` row, is its simulator's own device. A line of any
+    /// letter is, except `K`: every simulator couples inductors, so a `K`
+    /// line is private only through a core model, a model name after the
+    /// coupling value (Xyce RG 7.10 §2.3.6: `K<name> L<inductor name>
+    /// [L<inductor name>*] <coupling value> [model name]`).
+    fn private_line(&self, tok: u32) -> bool {
+        let line = self.span(tok, self.line_last(tok));
+        assert!(!line.is_empty(), "a kept line holds its first word");
+        if !line.starts_with(['k', 'K']) {
+            return true;
+        }
+        let mut words = line.split_whitespace().rev();
+        let (Some(model), Some(k)) = (words.next(), words.next()) else {
+            return false;
+        };
+        // The coupling value: a number, or an expression's closing
+        // delimiter.
+        let value = k.ends_with(['}', '\''])
+            || k.trim_start_matches(['+', '-'])
+                .starts_with(|c: char| c.is_ascii_digit() || c == '.');
+        let name = model.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+            && model
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "_-.".contains(c));
+        value && name
     }
 
     /// Whether the HSPICE text at `tok` is a W element's line: one of its

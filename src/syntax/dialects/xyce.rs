@@ -232,6 +232,13 @@ pub(super) fn xyce() -> DialectDef {
         .kept_word("yibis", Construct::PrivateText)
         .kept_word("yawl", Construct::PrivateText)
         .kept_word("yneuronpop", Construct::PrivateText)
+        // P4-066: a `K` line with a model name after its coupling value
+        // couples its windings through a nonlinear magnetic core (RG 7.10
+        // §2.3.6, `.MODEL … CORE`). ngspice (manual §3.3.12) and LTspice
+        // (help, K) couple linearly only, and HSPICE's Jiles-Atherton core
+        // is another formulation. The reader's shape check leaves a plain
+        // coupling out (`refused.rs::Rd::private_line`).
+        .kept_word("k", Construct::PrivateText)
         .kept_word(".sens", Construct::XyceSens)
         // The dot rules: `.LIN` (RG `.LIN`) is the S-parameter analysis over
         // the deck's `.AC` sweep.

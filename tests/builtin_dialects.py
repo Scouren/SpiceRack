@@ -605,6 +605,8 @@ def xyce(d):
         .kept_word("yibis", Construct.PrivateText)
         .kept_word("yawl", Construct.PrivateText)
         .kept_word("yneuronpop", Construct.PrivateText)
+        # P4-066: a `K` line with a core model (RG 7.10 §2.3.6); the reader checks the shape.
+        .kept_word("k", Construct.PrivateText)
         .kept_word(".sens", Construct.XyceSens)
         # The dot rules (RG `.LIN`, `.PREPROCESS`: P6-014).
         .dot_rule("lin", DotRule.SParams)
