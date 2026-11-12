@@ -16,8 +16,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use spicerack::dialect::facade::{self, IR_NOTE, IR_REFUSAL, Pipeline, ROUTES};
 use spicerack::dialect::{
-    self, BUILTIN, DialectRow, INERT_DROPPED, Policy, Reference, STRICT_UNREAD, Sources, Write,
-    irtext::IrText,
+    self, BUILTIN, DialectRow, HINT_DROPPED, INERT_DROPPED, Policy, Reference, STRICT_UNREAD,
+    Sources, Write, irtext::IrText,
 };
 use spicerack::ir;
 use spicerack::syntax::diag::{Code, info};
@@ -350,8 +350,6 @@ fn a_writer_that_admits_everything_writes_as_before() {
 }
 
 #[test]
-// marker: waits for `ir::parse` to set `span.file` (the lead's ruling on surprise 1); remove then
-#[should_panic(expected = "names its line")]
 fn a_routed_ir_text_diagnostic_names_its_line() {
     let text = "file \"d.sp\" deck\n  title \"t\"\n  bogus line\n";
     let refused = facade::render_text(text, "d", ir_row(), ir_row()).expect_err("P9001 refuses");
@@ -359,6 +357,55 @@ fn a_routed_ir_text_diagnostic_names_its_line() {
     assert!(
         line.starts_with("d:3:"),
         "a routed diagnostic names its line: {line}"
+    );
+}
+
+#[test]
+fn legalize_drops_a_foreign_hint_with_its_own_note_and_the_family_keeps_it() {
+    let text =
+        "file \"h.sp\" deck\n  title \"h\"\n  opaque ngspice hint \".options reltol=1e-4\"\n";
+    let read = |design: &mut ir::Design, diags: &mut ir::Diags| {
+        dialect::read(
+            &Sources::one("h.ir", text),
+            ir_row(),
+            Policy::Lenient,
+            design,
+            diags,
+        );
+    };
+    let (mut design, mut diags) = (ir::Design::new(), ir::Diags::new());
+    read(&mut design, &mut diags);
+    let at = diags.len();
+    dialect::legalize(&mut design, &SPECTRE_ROW, &mut diags);
+    let rows: Vec<(ir::Code, u32)> = diags.rows()[at..].iter().map(|d| (d.code, d.arg)).collect();
+    assert_eq!(rows, [(HINT_DROPPED, 0)]);
+    let kinds: Vec<ir::ItemKind> = design.reachable().iter().map(|(i, _)| i.kind).collect();
+    assert_eq!(kinds, [ir::ItemKind::Title], "the hint is gone");
+    let (mut design, mut diags) = (ir::Design::new(), ir::Diags::new());
+    read(&mut design, &mut diags);
+    let at = diags.len();
+    dialect::legalize(&mut design, &NGSPICE_ROW, &mut diags);
+    assert!(diags.rows()[at..].is_empty(), "its own family keeps it");
+    assert_eq!(design.reachable().len(), 2);
+    assert!(dialect::info(HINT_DROPPED).is_some_and(|i| i.kind == ir::Kind::Note));
+}
+
+#[test]
+// marker: waits for `Design::entry()` to be file 0 (the lead's ruling on surprise 6); remove then
+#[should_panic(expected = "writes the library")]
+fn a_kit_whose_entry_is_a_library_writes_the_library() {
+    let text = "file \"m.lib\" library\n  param vth = 0.4\nfile \"d.sp\" deck\n  title \"d\"\n";
+    let out = dialect::transpile(
+        &Sources::one("m.ir", text),
+        ir_row(),
+        ir_row(),
+        Policy::Lenient,
+    )
+    .unwrap_or_else(|d| panic!("refused: {:?}", d.rows()));
+    assert!(
+        out.text.starts_with("file \"m.lib\""),
+        "transpile writes the library: {}",
+        out.text
     );
 }
 
