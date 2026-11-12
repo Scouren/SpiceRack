@@ -41,6 +41,8 @@
 //!   `Design::scope(&self, ScopeId) -> Scope`, `Design::items(&self, ScopeId) -> &[ItemRef]`,
 //!   `Design::row<R: ItemRow>(&self, u32) -> R`, `Design::span_of(&self, ItemRef) -> Span`,
 //!   `Design::item_handles(&self, ItemRef, &mut Vec<Handle>)`,
+//!   `Design::literal_value(&self, Literal) -> f64`, `Design::literal_eq(&self, Literal, Literal) -> bool`,
+//!   `Design::long_digits(&self, Literal) -> Option<(&str, NumForm)>`,
 //!   `Design::item_refs(&self, ItemRef, &mut Vec<(Ref, DefKind)>)`,
 //!   `Design::str(&self, NameId) -> &str`, `Design::find_name(&self, &str) -> NameId`,
 //!   `Design::names(&self, NameList) -> &[NameId]`, `Design::exprs(&self, ExprList) -> &[ExprId]`,
@@ -414,19 +416,22 @@ impl Design {
     /// The correctly rounded double of any literal of this design, `Long` included (A18): the
     /// generic caller's `Literal::value`.
     pub fn literal_value(&self, l: Literal) -> f64 {
-        todo!()
+        match self.long_digits(l) {
+            Some(_) => crate::literal::long_value(self.long_text(l), l.exp10),
+            None => l.value(),
+        }
     }
 
     /// Whether two literals of this design state the same exact decimal number, `Long` included
     /// (A18): the generic caller's `Literal::eq_value`.
     pub fn literal_eq(&self, a: Literal, b: Literal) -> bool {
-        todo!()
+        literal_eq_across(self, a, self, b)
     }
 
     /// A `Long` literal's significand as written and the form its power was written in;
     /// `None` for a short literal. A writer spells the digits, then `exp10` in that form.
     pub fn long_digits(&self, l: Literal) -> Option<(&str, NumForm)> {
-        todo!()
+        (l.form == NumForm::Long).then(|| (self.long_text(l), NumForm::ALL[l.frac as usize]))
     }
 
     /// Expression row count; ids `0..expr_count()` are valid.
@@ -466,7 +471,7 @@ impl Design {
     /// (`1k` ≠ `1e3`, forms included), spans ignored. Exact by design (A15 K4). The `≅` of law
     /// L5 before its case rule.
     pub fn eq_ignoring_spans(&self, other: &Design) -> bool {
-        self.same(other, |a, b| a == b)
+        self.exprs.long == other.exprs.long && self.same(other, |_, a, _, b| a == b)
     }
 
     /// As [`Design::eq_ignoring_spans`], but two real literals are equal when their exact
@@ -474,7 +479,7 @@ impl Design {
     /// an `Int` literal equals only an `Int` of the same value (A15 K4, R28). For the
     /// differential harness (REWRITE-PLAN §7.3), which compares meanings across dialects.
     pub fn eq_meaning(&self, other: &Design) -> bool {
-        self.same(other, Literal::eq_value)
+        self.same(other, literal_eq_across)
     }
 }
 
@@ -535,10 +540,13 @@ impl Default for Design {
 
 impl Design {
     /// Every table equal, spans ignored, literals compared by `num_eq`.
-    fn same(&self, o: &Design, num_eq: fn(Literal, Literal) -> bool) -> bool {
+    fn same(&self, o: &Design, num_eq: fn(&Design, Literal, &Design, Literal) -> bool) -> bool {
         let (x, y) = (&self.exprs, &o.exprs);
-        let nums =
-            x.nums.len() == y.nums.len() && x.nums.iter().zip(&y.nums).all(|(a, b)| num_eq(*a, *b));
+        let nums = x.nums.len() == y.nums.len()
+            && x.nums
+                .iter()
+                .zip(&y.nums)
+                .all(|(a, b)| num_eq(self, *a, o, *b));
         let structure = self.names.bytes == o.names.bytes
             && self.names.ends == o.names.ends
             && self.texts == o.texts
@@ -562,6 +570,32 @@ impl Design {
             .iter()
             .all(|&kind| for_kind!(kind, R => R::table(self).rows() == R::table(o).rows()))
     }
+}
+
+impl Design {
+    /// A `Long` literal's significand. Asserts the form and the pool index.
+    fn long_text(&self, l: Literal) -> &str {
+        assert!(l.form == NumForm::Long, "a Long literal");
+        &self.exprs.long[l.mantissa as usize]
+    }
+}
+
+/// Whether `a` of `da` and `b` of `db` state the same exact decimal number: the short rule
+/// between short literals; digits and power after stripping zeros when either is `Long` (never
+/// the doubles: two distinct decimals may round to one); an `Int` equals only an `Int`.
+fn literal_eq_across(da: &Design, a: Literal, db: &Design, b: Literal) -> bool {
+    let long = |l: Literal| l.form == NumForm::Long;
+    if !long(a) && !long(b) {
+        return a.eq_value(b);
+    }
+    if a.form == NumForm::Int || b.form == NumForm::Int {
+        return false;
+    }
+    let normal = |d: &Design, l: Literal| match long(l) {
+        true => crate::literal::long_normal(d.long_text(l), l.exp10),
+        false => crate::literal::short_normal(l),
+    };
+    normal(da, a) == normal(db, b)
 }
 
 /// `pool[start..start + len]`, asserting the range lies in the pool.

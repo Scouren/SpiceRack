@@ -70,7 +70,7 @@ fn a_long_literal_keeps_its_digits_and_rounds_correctly() {
     // a sky130-style card value: 23 significant digits
     let digits = "0.12345678901234567890123";
     for (written, want) in [
-        (format!("{digits}"), format!("{digits}e0")),
+        (digits.to_string(), format!("{digits}e0")),
         (format!("{digits}e-3"), format!("{digits}e-3")),
         (format!("-{digits}u"), format!("-{digits}e-6")),
     ] {
@@ -99,7 +99,7 @@ fn long_equality_is_exact_decimal_equality() {
     };
     // the same decimal written with trailing zeros and another power: equal by meaning
     let (a, ea) = lit("0.12345678901234567890123");
-    let (b, eb) = lit("123.45678901234567890123000e-3");
+    let (b, _) = lit("123.45678901234567890123000e-3");
     assert!(a.literal_eq(num(&a, ea), num(&a, ea)));
     assert!(a.eq_meaning(&b), "one decimal, two spellings");
     assert!(!a.eq_ignoring_spans(&b), "but not the same digits");

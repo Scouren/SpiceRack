@@ -483,10 +483,12 @@ pub(crate) fn item_features(
                 .any(|&e| node_class(design, e, table) >= ExprClass::Temp);
         for &e in nodes {
             *set = set.with(Feature::Expr(design.expr(e).tag()));
-            if let Expr::Num(n) = design.expr(e)
-                && design.num(n).form == NumForm::Int
-            {
-                *set = set.with(Feature::Extra(Extra::IntLiteral));
+            if let Expr::Num(n) = design.expr(e) {
+                match design.num(n).form {
+                    NumForm::Int => *set = set.with(Feature::Extra(Extra::IntLiteral)),
+                    NumForm::Long => *set = set.with(Feature::Extra(Extra::LongLiteral)),
+                    NumForm::Plain | NumForm::Exponent | NumForm::Scale | NumForm::Mil => {}
+                }
             }
             let f = match design.expr(e) {
                 Expr::Call(func, _) if dynamic => Feature::FuncDyn(func),
