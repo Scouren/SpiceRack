@@ -313,6 +313,13 @@ pub(super) fn vacask() -> DialectDef {
         .spice_model_type("res")
         .spice_model_type("cap")
         .spice_model_type("ind")
+        // ngspice's HFET types (ngspice-45 `devices/hfet1`, `hfet2`: `.model
+        // … NHFET|PHFET`, levels 5 and 6): VACASK builds no HFET module
+        // (`devices/spice/`), so the card is refused (W0104), not copied as
+        // a master named `nhfet` ("Device 'nhfet' not found."; ZERO-LEDGER
+        // P1-066).
+        .spice_model_type("nhfet")
+        .spice_model_type("phfet")
         .spectre_analysis("hb")
         .spectre_analysis("sweep")
         .spectre_analysis("xf")

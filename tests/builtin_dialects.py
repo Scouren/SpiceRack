@@ -1393,6 +1393,8 @@ def vacask(d):
         .spice_model_type("res")
         .spice_model_type("cap")
         .spice_model_type("ind")
+        .spice_model_type("nhfet")
+        .spice_model_type("phfet")
         .spectre_analysis("hb")
         .spectre_analysis("sweep")
         .spectre_analysis("xf")

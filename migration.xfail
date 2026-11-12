@@ -4143,3 +4143,9 @@ vacask/test/test_noise.sim xyce refused differently: W0023 at a save card that a
 vacask/test/test_resistor.sim hspice written differently: one `.option post` for a save list that asks `all`: was none (P3-043)
 vacask/test/test_resistor.sim xyce written differently: `.print dc V(*)` for a save list that asks `all` (P3-043)
 vacask/test/test_visrc.sim xyce refused differently: W0023 at a save card that asks `all` beside analyses of no one `.print` kind (P3-043)
+
+# S4: P1-066-vacask-hfet: an ngspice HFET model card (`nhfet`, `phfet`) is refused for VACASK (W0104), which builds no
+# HFET module; it was copied as a master `nhfet` ("Device 'nhfet' not found."). Oracle: VACASK's devices/spice/ and a run
+# (research/impl/evidence/P1-066-vacask-hfet/vacask.txt).
+spice-bench/ngspice/tests/hfet/id_vgs.sp vacask now refused: an ngspice HFET model card has no VACASK module: W0104 (P1-066)
+spice-bench/ngspice/tests/hfet/inverter.sp vacask now refused: an ngspice HFET model card has no VACASK module: W0104 (P1-066)

@@ -38,8 +38,6 @@ ngspice/tests/general/fourbitadder.sp mismatch # tran v(x1.x1.x1.x6.8): 0.000047
 ngspice/tests/general/mosamp.sp mismatch # tran v(5): 7.48424320532575 leaves the tube at t=0.000005006817099418725 (tol 1.363e-1)
 ngspice/tests/general/rc.sp target-fails # no raw file tran1.raw: Rise time of pulse transient must be grater than 0. | vin (1 0) vsource dc=0 mag=1e0 type="pulse" val0=0 val1=1e0 delay=0 ri ... | ^ | 14
 ngspice/tests/general/rca3040.sp mismatch # tran v(31): -0.05902549482449474 leaves the tube at t=0.00000011444936933892054 (tol 5.924e-4)
-ngspice/tests/hfet/id_vgs.sp target-fails # no raw file dc1.raw: Device 'nhfet' not found. | model hfet nhfet (rdi=0 rsi=0 m=2.57 lambda=0.17 vs=1.5e5 mu=0.385 vt0 ... | ^ | 7:1 (0x24) in .cross_sim_deck.
-ngspice/tests/hfet/inverter.sp target-fails # no raw file tran1.raw: Device 'nhfet' not found. | model adrv nhfet (rd=60 rs=60 m=2.57 lambda=0.17 vs=1.5e5 mu=0.385 vt0 ... | ^ | 7:1 (0x24) in .cross_sim_dec
 ngspice/tests/mos6/simpleinv.sp mismatch # tran i(vin): 0.0000009674103010281582 leaves the tube at t=0.0000000606399999999999 (tol 9.868e-8)
 ngspice/tests/regression/lib-processing/ex1a.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'RES'.
 ngspice/tests/regression/lib-processing/ex1b.sp target-fails # no raw file op1.raw: Syntax error, unexpected end of file while looking for section 'RES'.
