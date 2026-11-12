@@ -1,0 +1,10 @@
+op_divider: the operating point of a resistor divider under a DC source (out = 5 * 2k/3k); the source and the load have names without a SPICE letter, so the rename map is under test
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+src (in 0) vsource dc=5.0
+r1 (in out) resistor r=1k
+lower (out 0) resistor r=2k
+control
+  analysis op1 op
+endc

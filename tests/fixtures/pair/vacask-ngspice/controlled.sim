@@ -1,0 +1,23 @@
+controlled: the four linear controlled sources (vcvs, vccs, cccs, ccvs) at an operating point
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model vcvs vcvs
+model vccs vccs
+model cccs cccs
+model ccvs ccvs
+v1 (in 0) vsource dc=1.0
+r1 (in 0) resistor r=1k
+e1 (e 0 in 0) vcvs gain=2.0
+re (e 0) resistor r=1k
+g1 (0 g in 0) vccs gain=1m
+rg (g 0) resistor r=1k
+vsense (in s) vsource dc=0.0
+rs (s 0) resistor r=1k
+f1 (0 f) cccs ctlinst="vsense" gain=3.0
+rf (f 0) resistor r=1k
+h1 (h 0) ccvs ctlinst="vsense" gain=500.0
+rh (h 0) resistor r=1k
+control
+  analysis op1 op
+endc

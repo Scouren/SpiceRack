@@ -1,0 +1,13 @@
+diode: a diode (sp_diode, SPICE level 1) behind a resistor, its forward curve swept by the source
+load "spice/resistor.osdi"
+load "spice/diode.osdi"
+model vsource vsource
+model resistor sp_resistor
+model dmod sp_diode is=1e-14 n=1.05 rs=10.0
+v1 (in 0) vsource dc=0.0
+r1 (in a) resistor r=1k
+d1 (a 0) dmod
+control
+  sweep s1 instance="v1" parameter="dc" from=0.0 to=2.0 step=0.1
+  analysis dc1 op
+endc
