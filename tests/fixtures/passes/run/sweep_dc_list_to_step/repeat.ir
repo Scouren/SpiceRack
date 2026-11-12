@@ -1,0 +1,2 @@
+file "a.sp" deck
+  analysis dc (source_dc v1) (list values=[0.1461, 0.1461])

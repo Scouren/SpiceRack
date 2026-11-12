@@ -19,16 +19,18 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod dc_axes_to_loops`, `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
+pub mod dc_axes_to_loops;
 pub mod ic_next_only;
 pub mod loop_end;
 pub mod names_dropped;
 pub mod names_given;
 pub mod run_items_together;
 pub mod save_set_to_all;
+pub mod sweep_forms;
 pub mod tran_ceiling_given;
 pub mod tran_first_step_to_print;
 pub mod tran_print_step;
@@ -227,6 +229,39 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[save_set_to_all::SAVE_SET_KEPT],
         run: save_set_to_all::save_set_to_all,
     },
+    sweep(
+        "sweep_dc_lin_points_to_step",
+        (RunExtra::SweepDcLinPoints, RunExtra::SweepDcLinStep),
+        &[sweep_forms::SWEEP_KEPT],
+        sweep_forms::sweep_dc_lin_points_to_step,
+    ),
+    sweep(
+        "sweep_dc_list_to_step",
+        (RunExtra::SweepDcList, RunExtra::SweepDcLinStep),
+        &[sweep_forms::SWEEP_KEPT],
+        sweep_forms::sweep_dc_list_to_step,
+    ),
+    sweep(
+        "sweep_freq_list_to_lin_points",
+        (RunExtra::SweepFreqList, RunExtra::SweepFreqLinPoints),
+        &[sweep_forms::FREQ_LIST_KEPT],
+        sweep_forms::sweep_freq_list_to_lin_points,
+    ),
+    // after the sweep rows: a loop's values are listed from the forms they leave
+    Pass {
+        name: "dc_axis_device_param_to_loop",
+        removes: ir::Feature::Run(RunExtra::DcAxisDeviceParam),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_axis_device_param_to_loop,
+    },
+    Pass {
+        name: "dc_axis_model_param_to_loop",
+        removes: ir::Feature::Run(RunExtra::DcAxisModelParam),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_axis_model_param_to_loop,
+    },
     // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",
@@ -393,6 +428,42 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        sweep_forms::SWEEP_KEPT,
+        ir::Info {
+            title: "a DC axis no linear step states exactly",
+            cite: "rewrite/IR-RUN.md §1; ngspice-45 dctrcurv.c",
+            explain: "The target's DC axis is linear by step. This axis's values are no such grid: a value is not a literal, the list is not arithmetic or repeats a value, the step does not terminate within a literal's 18 digits, or ngspice's end test (2.2e-13, absolute) would run another number of points. The analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        sweep_forms::FREQ_LIST_KEPT,
+        ir::Info {
+            title: "a frequency list other than one value of an AC analysis",
+            cite: "rewrite/IR-RUN.md §1; ngspice-45 acan.c",
+            explain: "The target sweeps frequency by decade, octave or a linear count. One listed frequency of an AC analysis is a linear sweep of one point; two or more are not exact (ngspice's linear sweep of two points runs one, and its end test scales with reltol), and another analysis's list is not rewritten. The analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        dc_axes_to_loops::DC_AXIS_KEPT,
+        ir::Info {
+            title: "a DC axis over a device or model parameter the target cannot sweep",
+            cite: "rewrite/IR-RUN.md §1; INV-semantics 8.09",
+            explain: "The target's DC analysis sweeps a source, an element's value or the temperature, so this axis would become a loop of operating points. That is exact only for an analysis that restarts each point (a loop's points start afresh, a continued sweep from the previous point), that stands at its run's top with no analysis after it (the loop keeps its last value), whose peeled axes a loop can sweep, over values stated as decimal literals (no log grid). One of these fails, so the analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        dc_axes_to_loops::AS_LOOPS,
+        ir::Info {
+            title: "a DC analysis written as loops of operating points",
+            cite: "rewrite/IR-RUN.md §1; rewrite/AMEND-A12.md A32",
+            explain: "The source's one DC plot over every axis is written as one plot per pass of these loops, outermost slowest: an operating point each, or a DC over the axes left inside. The peeled axes' swept vectors are not written; their values at each pass are the loops' lists, in order. The note's argument is the analysis's name: its results are given back under it.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         run_items_together::HOLDS_RUN_ITEMS,
         ir::Info {
             title: "a circuit item between run items that holds run items",
@@ -402,6 +473,28 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
 ];
+
+/// What a `dc_axes_to_loops` row's output may add: list sweep loops that keep their last value
+/// over the kinds of target a DC axis has, their names, an operating point in their bodies.
+const DC_LOOPS: ir::FeatureSet = ir::FeatureSet::EMPTY
+    .with(ir::Feature::Item(ir::ItemKind::Loop))
+    .with(ir::Feature::Placed(
+        ir::ScopeKind::Loop,
+        ir::ItemKind::Analysis,
+    ))
+    .with(ir::Feature::Placed(ir::ScopeKind::Loop, ir::ItemKind::Loop))
+    .with(ir::Feature::Analysis(ir::AnalysisKind::Op))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Run(RunExtra::LoopKeepLast))
+    .with(ir::Feature::Run(RunExtra::SweepLoopList))
+    .with(ir::Feature::Run(RunExtra::LoopOverOp))
+    .with(ir::Feature::Run(RunExtra::LoopNamed))
+    .with(ir::Feature::Run(RunExtra::LoopUnnamed))
+    .with(ir::Feature::Run(RunExtra::LoopParam))
+    .with(ir::Feature::Run(RunExtra::LoopSourceDc))
+    .with(ir::Feature::Run(RunExtra::LoopElementValue))
+    .with(ir::Feature::Run(RunExtra::LoopDeviceParam))
+    .with(ir::Feature::Run(RunExtra::LoopModelParam));
 
 // ---- private ----
 
@@ -433,6 +526,22 @@ const fn to_from_here(
         name,
         removes: ir::Feature::Run(modes.0),
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(modes.1)),
+        notes,
+        run,
+    }
+}
+
+/// A `sweep_forms` row: it removes the form `forms.0` and requires the form `forms.1`.
+const fn sweep(
+    name: &'static str,
+    forms: (RunExtra, RunExtra),
+    notes: &'static [ir::Code],
+    run: fn(&mut ir::Design, &mut ir::Diags),
+) -> Pass {
+    Pass {
+        name,
+        removes: ir::Feature::Run(forms.0),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(forms.1)),
         notes,
         run,
     }

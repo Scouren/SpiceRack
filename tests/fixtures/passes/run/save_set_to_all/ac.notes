@@ -1,1 +1,5 @@
-U0412  # the ac analysis writes its own default set in the source, only v(out) in a save for every kind
+# The run (save v(out), then op, ac, tran; VACASK and ngspice-45 on one RC deck):
+#   VACASK  op1.raw: out | ac1.raw: frequency in mid out v1:flow(br) | tr1.raw: time out
+#   ngspice .save v(out): Operating Point: v(out) | AC Analysis: frequency v(out) | Transient: time v(out)
+# so a save for every kind would drop in, mid and v1's branch from the ac results.
+U0412  # the ac analysis writes its own default set in the source

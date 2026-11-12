@@ -8,8 +8,12 @@
 //! `tests/fixtures/pair/vacask-ngspice/elaborate_top.sim`: v(2) = 8.1818 = 10·4.5k/5.5k with
 //! the top's divider and the body's parallel resistor both in the circuit).
 //!
-//! Left with a note (`ELABORATE_KEPT`): a second `Elaborate` (ngspice cannot swap its top
-//! circuit), one after a run item, a named subcircuit some element instantiates or with a
+//! Left with a note (`ELABORATE_KEPT`): a second `Elaborate` (ngspice has one top circuit and
+//! cannot swap it; 33 of VACASK's corpus decks, census on c3ab0175, in three shapes: 29 run two
+//! epochs over disjoint test circuits, `demo/spice/mos1.sim` first; 2 run three,
+//! `demo/bsim3-ptm/mirror.sim` first; `test/test_build.sim` builds its circuit up, the default
+//! top, then `par1`, then `par1` and `par2`; no pass states them: one deck per epoch or a master
+//! script is a product decision, not a rule), one after a run item, a named subcircuit some element instantiates or with a
 //! formal without a default, and a name two spliced bodies (or a body and the top) both define.
 //!
 //! Cites: `rewrite/AMEND-A12.md` R1; `rewrite/DIALECT-VACASK.md` §6 (VS V1, V2).

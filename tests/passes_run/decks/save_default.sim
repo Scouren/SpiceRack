@@ -1,0 +1,19 @@
+save scoped, default ac
+load "spice/resistor.osdi"
+load "spice/inductor.osdi"
+load "spice/diode.osdi"
+model vsource vsource
+model resistor sp_resistor
+model inductor sp_inductor
+model dm sp_diode is=1e-14 rs=10
+v1 (in 0) vsource dc=1.0 mag=1.0
+r1 (in out) resistor r=1k
+l1 (out mid) inductor l=1m
+d1 (mid 0) dm
+control
+  options rawfile="ascii"
+  save v(out)
+  analysis op1 op
+  analysis ac1 ac from=1.0 to=10.0 mode="dec" points=1
+  analysis op2 op
+endc
