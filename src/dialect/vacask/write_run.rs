@@ -5,10 +5,20 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cmd-overview, cmd-sweep.
 //!
-//! Contents: `admits`, `analysis` (crate-private)
+//! Contents: `admits`, `control_span`, `analysis` (crate-private)
 
 use super::write::Writer;
 use crate::ir;
+
+/// The first and last index into `design.items(top)` of the items the one `control` … `endc`
+/// block holds (the run items, and VACASK's own opaques of a control command), or `None` when the
+/// file has none. The spine writes `control` before the first and `endc` after the last.
+///
+/// Stub (S4.3): `None` while `FEATURES` holds no run item.
+pub(super) fn control_span(design: &ir::Design, top: ir::ScopeId) -> Option<(usize, usize)> {
+    let _ = (design, top);
+    None
+}
 
 /// One run item of the top scope, in the `control` block.
 ///
