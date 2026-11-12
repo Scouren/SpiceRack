@@ -10,12 +10,13 @@
 //! IR-DECISIONS.md` R4, R5 (a periodic small-signal analysis follows an `Hb` or `Pss`).
 //!
 //! Contents: `pub(crate) trait DetailFacts` (`DetailFacts::handles`, `DetailFacts::map_exprs`,
+//! `DetailFacts::map_names`,
 //! `DetailFacts::features`,
 //! `DetailFacts::fault`, `DetailFacts::dump`, `DetailFacts::parse`, `DetailFacts::generate`),
 //! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
 //! `pub(crate) fn base_just_before`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
 //! `pub(crate) fn fault_of`, `pub(crate) fn dump_of`, `pub(crate) fn parse_of`,
-//! `pub(crate) fn gen_of`; `RowFacts` for `Analysis`
+//! `pub(crate) fn gen_of`, `pub(crate) fn analysis_name` (gen); `RowFacts` for `Analysis`
 
 use crate::analysis::{Analysis, AnalysisKind, RunDetail};
 use crate::build::Builder;
@@ -27,14 +28,13 @@ use crate::facts::{ExprUse, Handle, RowFacts};
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-#[cfg(any(test, feature = "gen"))]
-use crate::id::NameId;
-use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::plan::{target_refs, target_refs_into};
 use crate::run_exprs::{Roots, exprs_of};
 use crate::run_extra::RunExtra;
+use crate::run_names::{Names, names_of};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::loop_depth;
 use crate::run_words::{put_name, take_enum, take_name, word};
@@ -53,6 +53,9 @@ pub(crate) trait DetailFacts: RunDetail {
     /// Visits the row's expression roots, its pools' included, as `handles` lists them (A23);
     /// the caller stores the row back.
     fn map_exprs(&mut self, r: &mut Roots<'_>);
+    /// Visits the row's element names, its pools' included, in field order (A32); the caller
+    /// stores the row back.
+    fn map_names(&mut self, r: &mut Names<'_>);
     /// Adds the row's `RunExtra` and option features.
     fn features(&self, design: &Design, set: &mut FeatureSet);
     /// The first broken invariant of the row's own fields: `FieldDomain`, or `HandleRange` for a
@@ -187,6 +190,11 @@ impl RowFacts for Analysis {
         by_detail!(row.kind, (), exprs_of(design, row.detail, f));
     }
 
+    fn map_element_names(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut [NameId])) {
+        let row: Analysis = design.row(at.index);
+        by_detail!(row.kind, (), names_of(design, row.detail, f));
+    }
+
     fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
         // `map_refs`'s order: a DC sweep's axes' targets
         if self.kind != AnalysisKind::Dc {
@@ -204,9 +212,12 @@ impl RowFacts for Analysis {
 
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
-        if !self.name.is_none() {
-            *set = set.with(Feature::Run(RunExtra::AnalysisNamed));
-        }
+        let named = if self.name.is_none() {
+            RunExtra::AnalysisUnnamed
+        } else {
+            RunExtra::AnalysisNamed
+        };
+        *set = set.with(Feature::Run(named));
         by_detail!(self.kind, (), features_of(design, self.detail, set));
     }
 
@@ -271,6 +282,13 @@ impl RowFacts for Analysis {
         if !features.contains(crate::feature::Feature::Expr(crate::expr::ExprTag::Num)) {
             return ItemRef::NONE; // every run row's fields need literals (`Gen::expr`)
         }
+        let naming = [RunExtra::AnalysisNamed, RunExtra::AnalysisUnnamed];
+        if !naming
+            .into_iter()
+            .any(|x| features.contains(Feature::Run(x)))
+        {
+            return ItemRef::NONE; // an analysis is named or not: one of the two is needed
+        }
         let design = b.design();
         let several = features.contains(Feature::Run(RunExtra::SeveralAnalyses));
         // Generation appends, so the table's rows are the design's analyses (no dead rows).
@@ -299,14 +317,10 @@ impl RowFacts for Analysis {
             && features.contains(Feature::Run(RunExtra::FourHarmonicsOption))
             && g.chance(2)
         {
-            crate::option::gen_nfreqs(g, scope, b, features);
+            crate::state_gen::gen_nfreqs(g, scope, b, features);
         }
         // The name first: the text, and so the parse, interns it before the detail's names.
-        let name = if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
-            g.fresh_name(b)
-        } else {
-            NameId::NONE
-        };
+        let name = analysis_name(g, b, features);
         let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
             .expect("a possible kind's detail generates");
         let item = b.push(
@@ -330,12 +344,7 @@ impl RowFacts for Analysis {
                 .collect();
             if !follow.is_empty() {
                 let kind = follow[g.below(follow.len() as u32) as usize];
-                let name =
-                    if features.contains(Feature::Run(RunExtra::AnalysisNamed)) && g.chance(4) {
-                        g.fresh_name(b)
-                    } else {
-                        NameId::NONE
-                    };
+                let name = analysis_name(g, b, features);
                 let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
                     .expect("a periodic kind generates right after its base");
                 b.push(
@@ -419,6 +428,21 @@ pub(crate) fn base_just_before(design: &Design, scope: ScopeId) -> bool {
     })
 }
 
+/// A generated analysis's name, as `AnalysisNamed`/`AnalysisUnnamed` allow (one of the two is
+/// in the set: `generate` checked it).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn analysis_name(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet) -> NameId {
+    crate::run_words::gen_name(
+        g,
+        b,
+        features,
+        RunExtra::AnalysisNamed,
+        RunExtra::AnalysisUnnamed,
+        4,
+    )
+    .expect("a naming feature is in the set")
+}
+
 // ---- private ----
 
 /// Whether `kind`'s detail generator succeeds here under `features` (its only failures; the
@@ -442,7 +466,10 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
         AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {
             base_just_before(b.design(), scope) && sweep_possible(features, SweepUse::Freq)
         }
-        AnalysisKind::Dc => sweep_possible(features, SweepUse::Dc),
+        AnalysisKind::Dc => {
+            sweep_possible(features, SweepUse::Dc)
+                && (has(RunExtra::DcAxisNamed) || has(RunExtra::DcAxisUnnamed))
+        }
         AnalysisKind::Ac
         | AnalysisKind::Noise
         | AnalysisKind::Xf

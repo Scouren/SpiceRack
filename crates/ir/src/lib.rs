@@ -39,7 +39,7 @@
 //!   `dump`, `parse`
 //! - circuit owner: `ElemHead`, `CircuitExtra`, `DetailKind`, `ElemKind`, `Element`, `NO_ROW`, `Model`,
 //!   `ModelFamily`, `Polarity`, `Wave`, `WaveKind`, `WaveRef`, `WaveRow`
-//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `Reset`, `ResetSet`, `Restorable`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
+//! - run owner: `Analysis`, `AnalysisKind`, `AnalysisKinds`, `Reset`, `ResetSet`, `Restorable`, `Listed`, `listed`, `Setting`, `in_force`, `run_walks`, `RunDetail`, `RunDetails`, `RunExtra`, `Edge`, `Event`,
 //!   `EventKind`, `MeasureKind`, `Stat`, `Env`, `IcScope`, `NodeSet`, `NodeSetKind`,
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
@@ -143,11 +143,15 @@ pub mod probe;
 pub mod reset;
 mod run_exprs;
 pub mod run_extra;
+mod run_names;
 mod run_words;
+#[cfg(any(test, feature = "gen"))]
+mod state_gen;
 mod state_order;
 pub mod stats;
 pub mod sweep;
 pub mod tran;
+mod xf_facts;
 
 pub use analysis::{Analysis, AnalysisKind, AnalysisKinds, RunDetail, RunDetails};
 pub use build::Builder;
@@ -179,6 +183,7 @@ pub use reset::{Reset, ResetSet, Restorable};
 pub use rewrite::{rewrite_exprs, rewrite_exprs_in, rewrite_tree};
 pub use run_extra::RunExtra;
 pub use span::Span;
+pub use state_order::{Listed, Setting, in_force, listed, run_walks};
 pub use stats::{Statistics, Vary, VaryDist};
 pub use sweep::{SweepBounds, SweepEnd, SweepKind, SweepSpec};
 pub use table::Table;

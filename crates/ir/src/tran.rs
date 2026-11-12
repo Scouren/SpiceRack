@@ -27,6 +27,8 @@ use crate::analysis_facts::DetailFacts;
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
+#[cfg(any(test, feature = "gen"))]
+use crate::design::ItemRow;
 use crate::diag::Diags;
 use crate::facts::Handle;
 use crate::feature::FeatureSet;
@@ -35,6 +37,11 @@ use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::List;
 use crate::id::{ExprId, ExprList, ScopeId};
+#[cfg(any(test, feature = "gen"))]
+use crate::item::ItemKind;
+#[cfg(any(test, feature = "gen"))]
+use crate::option::OptionRow;
+#[cfg(any(test, feature = "gen"))]
 use crate::option_key::OptionKey;
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
@@ -43,6 +50,7 @@ use crate::probe::{
 };
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
+use crate::run_names::Names;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
 use crate::run_words::{
@@ -124,7 +132,8 @@ pub struct Four {
     pub fundamental: ExprId,
     /// The number of harmonics, the fundamental included and the DC term not (LTspice `Nh`), or
     /// `NONE` when the deck's `OptionKey::NFreqs` gives it (ngspice, `fourier.c:69`, A16;
-    /// checked: such an option exists). `nfreqs` counts the DC term too: `nfreqs = n` is
+    /// checked: an `nfreqs` option is in force at the analysis in its walk, `state_order::in_force`;
+    /// an option of an unrelated file gives it nothing). `nfreqs` counts the DC term too: `nfreqs = n` is
     /// `harmonics = n − 1`. A reader states its simulator's default count here
     /// when the deck sets no option.
     pub harmonics: ExprId,
@@ -188,6 +197,10 @@ impl DetailFacts for Tran {
         if let StepCeiling::Given(e) = &mut self.ceiling {
             r.expr(e);
         }
+    }
+
+    fn map_names(&mut self, _r: &mut Names<'_>) {
+        // no element name
     }
 
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
@@ -366,6 +379,10 @@ impl DetailFacts for Four {
         r.probes(self.outputs);
     }
 
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        r.probes(self.outputs);
+    }
+
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(set, !is_one(design, self.periods), RunExtra::FourPeriods);
         flag(set, !self.grid.is_none(), RunExtra::FourGrid);
@@ -380,14 +397,9 @@ impl DetailFacts for Four {
             return Some(Violation::HandleRange);
         };
         let given = !self.fundamental.is_none() && !self.periods.is_none();
-        // An absent count is the deck's `nfreqs`: the design must set one (O(options)).
-        let count = !self.harmonics.is_none()
-            || design
-                .options
-                .rows()
-                .iter()
-                .any(|o| o.key == OptionKey::NFreqs);
-        domain_unless(given && count && !outputs.is_empty() && outputs.iter().all(probe_valid))
+        // An absent count is the `nfreqs` option in force at the analysis: its walk's, checked
+        // once per design (`state_order::four_counts`), not here.
+        domain_unless(given && !outputs.is_empty() && outputs.iter().all(probe_valid))
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -427,20 +439,20 @@ impl DetailFacts for Four {
     #[cfg(any(test, feature = "gen"))]
     fn generate(
         g: &mut Gen,
-        _scope: ScopeId,
+        scope: ScopeId,
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
         let fundamental = g.expr(b, features, Reads::Constant);
-        // The count from the deck's option only when one is already there (looked for among
-        // the last few options: O(1) per row).
-        let options = b.design().options.rows();
+        // The count from the deck's option only when one is in force here: the item just
+        // before, in the same scope (`gen_nfreqs` puts it there; O(1) per row).
+        let d = b.design();
+        let before = d.items(scope).last().copied();
         let from_option = has(features, RunExtra::FourHarmonicsOption)
-            && options
-                .iter()
-                .rev()
-                .take(16)
-                .any(|o| o.key == OptionKey::NFreqs);
+            && before.is_some_and(|i| {
+                i.kind == ItemKind::Option
+                    && OptionRow::table(d).get(i.index).key == OptionKey::NFreqs
+            });
         let harmonics = if from_option {
             ExprId::NONE
         } else {

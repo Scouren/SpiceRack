@@ -22,7 +22,8 @@
 //!   `FeatureSet::contains(&self, Feature) -> bool`, `FeatureSet::is_empty(&self) -> bool`,
 //!   `FeatureSet::iter(&self) -> impl Iterator<Item = Feature>`
 //! - `pub fn features_used(&Design) -> FeatureSet`
-//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
+//! - crate: `pub(crate) fn design_level(&Design, &mut FeatureSet)`,
+//!   `pub(crate) fn unplaced_level(&Design, &mut FeatureSet)`, `pub(crate) fn item_features(&Design, ItemRef, ScopeId, &mut ExprWalk, &mut FeatureSet)`,
 //!   `pub(crate) fn chain_kinds(&Design, ScopeId) -> [bool; ScopeKind::COUNT]`, `pub(crate) struct ExprWalk` (`ExprWalk::new`,
 //!   `ExprWalk::tree`), `pub(crate) fn expr_roots(&Design, &[Handle]) -> Vec<ExprId>`,
 //!   `pub(crate) fn roots_with_use(&Design, &[Handle]) -> Vec<(ExprId, ExprUse)>`; re-exported from
@@ -424,9 +425,17 @@ pub fn features_used(design: &Design) -> FeatureSet {
     set
 }
 
-/// The features of the whole design, no item's: each owner's
-/// `design_features` hook (A9). `check_legal` reports these at `Span::NONE`.
+/// The features of the whole design, no item's: each owner's `design_features` hook (A9).
+/// `check_legal` reports the run owner's at their items (`analysis::feature_items`) and the rest
+/// (`unplaced_level`) at `Span::NONE`.
 pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
+    unplaced_level(design, set);
+    crate::analysis::design_features(design, set);
+}
+
+/// The design-level features that name no item: a deck without a title, the circuit owner's
+/// hook.
+pub(crate) fn unplaced_level(design: &Design, set: &mut FeatureSet) {
     let untitled = |f| {
         let file = design.file(f);
         file.role == Role::Deck
@@ -439,7 +448,6 @@ pub(crate) fn design_level(design: &Design, set: &mut FeatureSet) {
         *set = set.with(Feature::Extra(Extra::DeckWithoutTitle));
     }
     crate::element::design_features(design, set);
-    crate::analysis::design_features(design, set);
 }
 
 /// The features of one reachable item in `scope`: its kind, its row's own (`RowFacts::features`),
