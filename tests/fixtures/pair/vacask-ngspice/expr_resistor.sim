@@ -1,0 +1,10 @@
+expr_resistor: a resistor whose value is an expression, at the top level (every VACASK resistor has a model): written for ngspice as `r1 in 0 {expr} resistor`, which ngspice-45 rejects ("unknown parameter (resistor)"); the literal form `r1 in 0 3k resistor` runs
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+parameters k=3.0
+v1 (in 0) vsource dc=1.0
+r1 (in 0) resistor r=1k*k
+control
+  analysis op1 op
+endc

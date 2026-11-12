@@ -395,14 +395,15 @@ fn read_back(to: &DialectRow, spine: &Spine) -> Result<(), Fail> {
     let normal =
         |d: &ir::Design| laws::canonical(&laws::read_all(ir_row, &laws::write_all(d, ir_row)));
     let (want, got) = (normal(&spine.legal), normal(&back));
-    let at = want.lines().zip(got.lines()).position(|(w, g)| w != g);
-    let said = match at {
-        Some(k) => format!(
-            "legalized `{}`, read back `{}`",
-            want.lines().nth(k).unwrap_or(""),
-            got.lines().nth(k).unwrap_or("")
-        ),
-        None => format!(
+    // Every differing line, the first four: a known difference must not hide another.
+    let pairs = want.lines().zip(got.lines()).filter(|(w, g)| w != g);
+    let lines: Vec<String> = pairs
+        .take(4)
+        .map(|(w, g)| format!("legalized `{}`, read back `{}`", w.trim(), g.trim()))
+        .collect();
+    let said = match lines.is_empty() {
+        false => lines.join(" | "),
+        true => format!(
             "{} lines legalized, {} read back",
             want.lines().count(),
             got.lines().count()
