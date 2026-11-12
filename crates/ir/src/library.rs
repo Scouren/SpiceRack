@@ -29,8 +29,10 @@ use crate::text::{Ctx, Words};
 /// models of the family name the family, not the library.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DeviceLibrary {
-    /// The path as the source spelled it (a variant such as `spice/sn/resistor.osdi` kept as
-    /// written); `NONE`: the target's default file for the family.
+    /// `NONE`: the dialect's default file for the family, the one proven over the family's whole
+    /// typed parameter set; set: another proven file, kept as the source spelled it (such as
+    /// `spice/resistor.osdi`). Spelling in both cases, never a different meaning: no check or
+    /// feature reads it, and a pass that drops libraries drops the row whatever its path (R45).
     pub path: NameId,
     /// The equation family the library implements.
     pub family: ModelFamily,

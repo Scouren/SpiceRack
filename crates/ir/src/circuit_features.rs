@@ -486,6 +486,10 @@ fn pwl(p: Pwl, add: &mut impl FnMut(X)) {
         (p.join == PwlJoin::Ramp, X::PwlJoinRamp),
         (p.join == PwlJoin::RampWidth, X::PwlJoinRampWidth),
         (p.join == PwlJoin::Extrapolate, X::PwlJoinExtrapolate),
+        (
+            p.repeat == PwlRepeat::Period && p.join == PwlJoin::Jump,
+            X::PwlPeriodJump,
+        ),
         (p.file != NameId::NONE, X::PwlFile),
     ];
     for (on, x) in flags {

@@ -1641,8 +1641,10 @@ mod tests {
             let def = b.define(DefKind::Module, module, top, load);
             let name = b.name("m");
             let mut row = model(name, family, Polarity::None);
-            if family == ModelFamily::Module {
-                row.module = Ref { name: module, def };
+            match family {
+                ModelFamily::Module => row.module = Ref { name: module, def },
+                ModelFamily::CodeModel | ModelFamily::Other => row.word = b.name("xcode"),
+                _ => {}
             }
             b.model(top, row, Span::NONE);
             let h = b.head("n1", &["a", "0"], Some("m"), &[], ExprId::NONE);

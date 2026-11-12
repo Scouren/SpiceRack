@@ -94,7 +94,7 @@ frequencies in hertz, phases in degrees.
 | `Pulse` | `v1 v2 delay rise fall width period cycles law given_zero` | `cycles` above 0 is a count, `NONE` or any other value unlimited (A17); a zero `rise` under `AsGiven` is an ideal edge (5.04, 5.05); `law: PulseLaw::{Spice, Vacask}` (A12 C1: VACASK needs `rise > 0`, `fall <= 0` is no falling edge, `period <= 0` one pulse) |
 | `Sin` | `offset amplitude freq delay damping phase_deg cycles pre given_zero` | `phase_deg` is the phase at `t = delay`; `pre` says what the source is before the delay: ngspice `HoldDelayValue` (A17, from `vsrcload.c`); Xyce and HSPICE as their slices confirm (5.06, 5.07) |
 | `Exp` | `v1 v2 td1 tau1 td2 tau2 td2_from given_zero` | `td2` counts from `td2_from: TdFrom::{Zero, Td1}` (A12 C2: SPICE from 0, VACASK from `td1`; the reader no longer adds) (5.08) |
-| `Pwl` | `points` (t, v pairs, absolute times), `delay`, `repeat_from`, `repeat_join` | relative times are accumulated by the reader; before the first point the first value holds, after the last the last value, unless `repeat` says otherwise; no reader writes a point (A22, R42: it would repeat an operand and give two t = 0 points when the first time evaluates to 0); a simulator with another rule before the first point gets a mode member when its slice shows it (none today); `PwlJoin::Extrapolate` (VACASK `period=`): on [xN, period) and on [0, x1) of the wrapped time τ, the line through (xN, yN) and (period + x1, y1) evaluated at τ itself (VACASK 36be560, `src_pwl.sim`: (1u, 1) (2u, 3) with period 4u gives 4.333 at 0, 3.833 at 0.75u, 1 at 1u, 2.667 at 2.5u, 1.733 at 3.9u, 4.267 at 4.1u; (0, 0) (1u, 1) with period 2u gives 0.5 at 1.5u and 3.5u; a delay shifts τ and the operating point reads the line at τ = 0; VACASK refuses x1 = 0 with xN = period and y1 ≠ yN, and xN > period: its writer's refusals) (5.09–5.11) |
+| `Pwl` | `points` (t, v pairs, absolute times), `delay`, `repeat_from`, `repeat_join` | relative times are accumulated by the reader; before the first point the first value holds, after the last the last value, unless `repeat` says otherwise; no reader writes a point (A22, R42: it would repeat an operand and give two t = 0 points when the first time evaluates to 0); a simulator with another rule before the first point gets a mode member when its slice shows it (none today); `PwlJoin::Extrapolate` (VACASK `period=`): on [xN, period) and on [0, x1) of the wrapped time τ, the line through (xN, yN) and (period + x1, y1) evaluated at τ itself; each join of a periodic PWL sets a feature, `Jump` there `PwlPeriodJump` (A24: VACASK only extrapolates) (VACASK 36be560, `src_pwl.sim`: (1u, 1) (2u, 3) with period 4u gives 4.333 at 0, 3.833 at 0.75u, 1 at 1u, 2.667 at 2.5u, 1.733 at 3.9u, 4.267 at 4.1u; (0, 0) (1u, 1) with period 2u gives 0.5 at 1.5u and 3.5u; a delay shifts τ and the operating point reads the line at τ = 0; VACASK refuses x1 = 0 with xN = period and y1 ≠ yN, and xN > period: its writer's refusals) (5.09–5.11) |
 | `Sffm` | `offset amplitude carrier_freq mod_index signal_freq delay phase_c_deg phase_m_deg law pre given_zero` | named, never positional; `law` as §1 states the clamp and the defaults only; what it is before the delay is `pre: PreDelay` as for `Sin` and `Am` (A12 C3: VACASK holds its value at `delay`, ngspice is 0 for t ≤ delay, the delay included) (5.01, 5.02) |
 | `Am` | the general formula of 5.03 with every term a field, `pre` | each dialect's AM is a restriction of it |
 | `TrNoise`, `TrRandom` | ngspice's fields | time domain only, superposed on a given DC value; a `TrRandom` before its first draw and at the operating point is its offset (A17) |
@@ -185,10 +185,15 @@ subcircuit instance with a declared `m`, has none); a model parameter `level`, `
 
 `ItemKind::DeviceLibrary` with row `DeviceLibrary { family: ModelFamily, path: NameId }`: the
 simulator's own implementation of `family` is available from here on; `path` `NONE` is the
-target's default file, a variant path (`spice/sn/…`) is kept as written. IR text:
+dialect's default file for the family, the one proven over the family's whole typed parameter
+set; a path names another proven file, kept as written (R45). The path is spelling, never
+meaning: no `check` or feature reads it, and a pass that drops libraries drops the row whatever
+its path. IR text:
 `device_library <family> [path="<path>"]`. Features: `Item(DeviceLibrary)`;
 `CircuitExtra::ModelWithoutLibrary` (design-level, `element::design_features`: a reachable model
-whose family has no reachable library of that family); `CircuitExtra::ElementWithoutModel`
+whose family has no reachable library of that family; `Module`, `CodeModel` and `Other` are
+exempt beside the builtins, R44: their code comes from a `Load` or is unbound, never from a
+family's library); `CircuitExtra::ElementWithoutModel`
 (item-level: an element whose `model.name` is `NONE`; VACASK instantiates every device through a
 model, run n2). Neutral passes add and remove libraries and models; readers and writers stay
 inverse.
