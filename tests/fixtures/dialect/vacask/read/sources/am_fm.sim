@@ -1,0 +1,6 @@
+am and fm
+model vsource vsource
+v1 (a 0) vsource type="am"
+v2 (b 0) vsource type="am" sinedc=0.5 ampl=2 freq=10k tdphase=30 delay=20u modfreq=1k modphase=45 modindex=0.7
+v3 (c 0) vsource type="fm"
+v4 (d 0) vsource type="fm" sinedc=0.5 ampl=2 freq=10k tdphase=30 delay=20u modfreq=1k modphase=45 modindex=0.7

@@ -387,13 +387,14 @@ fn vacask_ac(deck: &str) -> Vec<(String, f64)> {
 }
 
 /// The covering property of every element kind of a proven family (`Elem(Resistor)`,
-/// `Elem(Capacitor)`, `Elem(Inductor)`, `Elem(Diode)`, `Elem(Mosfet)`) for the laws'
+/// `Elem(Capacitor)`, `Elem(Inductor)`, `Elem(Diode)`, `Elem(Mosfet)`) and of an instance of a
+/// user module (`Elem(ModuleModel)`: its `load`, a model of the module) for the laws'
 /// reach list (R55): the generator rarely draws one whose master is a visible model of its own
 /// proven family with the module's terminal count (what `admits` asks), so this builds such
 /// designs (IR text through the builder, seeded values from a pool of VACASK literals and
 /// parameter reads), checks `legalize` admits them, writes them, reads them back and compares
 /// meaning (`eq_meaning` through the canonical text). Floors: 64 designs, each holding every
-/// one of the five kinds.
+/// one of the six kinds.
 #[test]
 fn proven_device_kinds_round_trip() {
     let values = ["1n", "2.5", "3", "-1", "1e-3", "p", "p*2", "100u"];
@@ -407,31 +408,29 @@ fn proven_device_kinds_round_trip() {
     let mut held = 0;
     for seed in 0..64 {
         let mut v = || values[next(values.len())];
-        let text = format!(
+        // Each `@` takes the next value from the pool.
+        let template = format!(
             "file \"k{seed}.sim\" deck\n  title \"kinds\"\n  device_library capacitor\n  \
              device_library inductor\n  device_library mos1\n  device_library resistor\n  \
-             device_library diode\n  param p = 2i\n  \
-             model c capacitor\n  model l inductor\n  model m mos1 polarity={}\n  \
-             model r resistor\n  model d diode params=(is={})\n  \
-             element resistor r1 (b 0) model=r value={} tce={}\n  \
-             element diode d1 (a b) model=d area={} dtemp={}\n  \
-             element capacitor c1 (a 0) model=c value={} tc1={}\n  \
-             element inductor l1 (a b) model=l value={} scale={}\n  \
-             element mosfet m1 (a b 0 0) model=m params=(w={} l={}) mult={}\n",
-            ["n", "p"][seed % 2],
-            v(),
-            v(),
-            v(),
-            v(),
-            v(),
-            v(),
-            v(),
-            v(),
-            v(),
-            v(),
-            v(),
-            v()
+             device_library diode\n  load osdi \"amp.osdi\" modules=(amp)\n  param p = 2i\n  \
+             model u module params=(gain=@) module=amp\n  \
+             element module_model u1 (a b 0) model=u params=(rin=@) mult=@\n  \
+             model c capacitor\n  model l inductor\n  model m mos1 polarity={pol}\n  \
+             model r resistor\n  model d diode params=(is=@)\n  \
+             element resistor r1 (b 0) model=r value=@ tce=@\n  \
+             element diode d1 (a b) model=d area=@ dtemp=@\n  \
+             element capacitor c1 (a 0) model=c value=@ tc1=@\n  \
+             element inductor l1 (a b) model=l value=@ scale=@\n  \
+             element mosfet m1 (a b 0 0) model=m params=(w=@ l=@) mult=@\n",
+            pol = ["n", "p"][seed % 2]
         );
+        let mut text = String::new();
+        for c in template.chars() {
+            match c {
+                '@' => text.push_str(v()),
+                c => text.push(c),
+            }
+        }
         let (mut design, _) = read(&Sources::one("want.ir", &text), "ir");
         let before = canonical(&design);
         let back = written(&mut design);
@@ -443,6 +442,7 @@ fn proven_device_kinds_round_trip() {
             back.files()[0].1
         );
         let kinds = [
+            ir::ElemKind::ModuleModel,
             ir::ElemKind::Resistor,
             ir::ElemKind::Diode,
             ir::ElemKind::Capacitor,
@@ -452,5 +452,5 @@ fn proven_device_kinds_round_trip() {
         let used = ir::features_used(&again);
         held += usize::from(kinds.iter().all(|&k| used.contains(ir::Feature::Elem(k))));
     }
-    assert!(held >= 64, "designs holding all five kinds: {held}");
+    assert!(held >= 64, "designs holding all six kinds: {held}");
 }

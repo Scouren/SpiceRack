@@ -487,3 +487,12 @@ fn ip_parameter_reads_in_a_behavioural_source() {
         "$intparam() requires a single identifier argument."
     ));
 }
+
+#[test]
+fn fx_spice_text_is_no_vacask_statement() {
+    // A statement no VACASK rule reads is one VACASK rejects (the reader keeps it Unread P2004).
+    assert!(says(
+        &run("vacask", "fx.sim"),
+        "Syntax error, unexpected string."
+    ));
+}

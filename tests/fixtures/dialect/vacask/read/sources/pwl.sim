@@ -1,0 +1,7 @@
+pwl
+model vsource vsource
+v1 (a 0) vsource type="pwl" wave=[0, 0, 1u, 1]
+v2 (b 0) vsource type="pwl" wave=[1u, 1, 2u, 3] delay=1u
+v3 (c 0) vsource type="pwl" wave=[0, 0, 1u, 1] period=2u
+v4 (d 0) vsource type="pwl" wave=[1u, 1, 2u, 3] period=4u
+v5 (e 0) vsource type="pwl" file="points.txt"

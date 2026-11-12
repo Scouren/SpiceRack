@@ -1,0 +1,32 @@
+# Oracle: runs src-refused, each VACASK's own message: "Rise time of pulse transient must be
+# grater than 0." (p2; also rise=-1n), "Parameter td2 of exponential transient must be greater
+# than 0." (no td2: its default 0), "Frequency of sinusoidal transient must be greater than 0.",
+# "Parameter 'foo' not found.", a vsource has two terminals (VD), an unknown `type`, a PWL with
+# an odd count (VD), "Peer instance '' not found." (cccs without ctlinst; mutual without
+# ind2), "Parameter '$mfactor' not found." (mutual), a mutual with terminals, an exp time
+# constant absent (its default 0) or 0: "NaN found in vector" at the first analysis (src-r-tau);
+# a second instance of a name in one scope ("An instance with name 'v4' already exists.", run
+# dup, R2101) and terminals without parentheses (run np, P2107): the devices area's codes.
+# codes: R2101 P2107 S0004 S0004 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 P2201 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004 S0004
+file "refused.sim" deck
+  title "refused sources"
+  model vsource source_v
+  model f cccs
+  model m mutual
+  opaque vacask invalid "v1 (a 0) vsource type=\"pulse\" rise=0"
+  opaque vacask invalid "v2 (a 0) vsource type=\"pulse\" rise=-1n"
+  opaque vacask invalid "v3 (a 0) vsource type=\"exp\" tau1=1u tau2=1u"
+  opaque vacask invalid "v4 (a 0) vsource type=\"sine\" freq=0"
+  opaque vacask invalid "v5 (a 0) vsource dc=1 foo=2"
+  opaque vacask invalid "v6 (a 0 b) vsource dc=1"
+  opaque vacask invalid "v7 (a 0) vsource type=\"sawtooth\""
+  opaque vacask invalid "v8 (a 0) vsource type=\"pwl\" wave=[0, 0, 1u]"
+  opaque vacask invalid "f1 (a 0) f gain=2"
+  opaque vacask invalid "m1 () m k=0.5 ind1=\"l1\""
+  opaque vacask invalid "m2 () m k=0.5 ind1=\"l1\" ind2=\"l2\" $mfactor=2"
+  opaque vacask invalid "m3 (a 0) m k=0.5 ind1=\"l1\" ind2=\"l2\""
+  opaque vacask invalid "v9 (a 0) vsource type=\"exp\" td2=1u tau1=1u"
+  opaque vacask invalid "v10 (a 0) vsource type=\"exp\" td2=1u tau1=0 tau2=1u"
+  element vsource v12 (a 0) model=vsource dc=1i
+  opaque vacask invalid "v12 (a 0) vsource dc=2"
+  opaque vacask invalid "v11 a 0 vsource dc=1"

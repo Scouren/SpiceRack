@@ -1,0 +1,9 @@
+# Oracle: R39, A20, run t3 (z0 50, f 1k and nl 1 are VACASK's defaults: left out); VD cir-loading
+# (the family's file, tables.rs).
+file "tline.sim" deck
+  title "tline_ideal written"
+  device_library tline_ideal
+  model tl tline_ideal
+  element lossless_line t1 (a 0 b 0) model=tl z0=75i td=2n
+  element lossless_line t2 (a 0 c 0) model=tl z0=50 freq=100meg nl=0.5
+  element lossless_line t3 (a 0 d 0) model=tl z0=50 freq=1k nl=1 mult=2i

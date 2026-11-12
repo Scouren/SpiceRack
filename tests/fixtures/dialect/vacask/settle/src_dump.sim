@@ -1,0 +1,16 @@
+source defaults
+load "inductor.osdi"
+model vsource vsource
+model cccs cccs
+model mutual mutual
+model ind inductor
+v1 (a 0) vsource dc=1
+f1 (a 0) cccs ctlinst="v1" $mfactor=3
+l1 (a 0) ind l=1m
+l2 (a 0) ind l=1m
+m1 () mutual ind1="l1" ind2="l2"
+control
+  print instance("v1")
+  print instance("f1")
+  print instance("m1")
+endc

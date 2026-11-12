@@ -1,0 +1,6 @@
+# Oracle: VD dev-builtin-mutual (k, ind1, ind2 by instance name; k's default 0 left out).
+file "mutual.sim" deck
+  title "mutual written"
+  model m mutual
+  element coupling m1 () model=m inductors=(l1 l2) k=0.5
+  element coupling m2 () model=m inductors=(la lb) k=0
