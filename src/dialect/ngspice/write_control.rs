@@ -117,12 +117,12 @@ pub(super) fn needs_script(design: &ir::Design, scope: ir::ScopeId) -> bool {
 }
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
-/// (R21, `Write::admits`). `_next` is the item after `item` in its scope (`ItemRef::NONE` at the
+/// (R21, `Write::admits`). `next` is the item after `item` in its scope (`ItemRef::NONE` at the
 /// end), handed by the spine so the check needs no walk of its own.
 pub(super) fn admits(
     design: &ir::Design,
     item: ir::ItemRef,
-    _next: ir::ItemRef,
+    next: ir::ItemRef,
     diags: &mut ir::Diags,
 ) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
@@ -132,7 +132,7 @@ pub(super) fn admits(
             if !alter_value(design, &a) {
                 refuse(ALTER_VALUE);
             }
-            if a.target.kind == ir::TargetKind::Param && !before_reset(design, item) {
+            if a.target.kind == ir::TargetKind::Param && !applied(design, next) {
                 refuse(PARAM_RESET);
             }
         }
@@ -273,37 +273,17 @@ fn alter_value(d: &ir::Design, a: &ir::Alter) -> bool {
     a.target.kind == ir::TargetKind::Param || matches!(d.expr(a.value), ir::Expr::Num(_))
 }
 
-/// The items of `item`'s scope and its index there.
-// ponytail: a scan of `reachable` per call (quadratic in a deck's items); keep a scope index
-// on `Out` if a corpus deck makes it show
-fn siblings(d: &ir::Design, item: ir::ItemRef) -> (&[ir::ItemRef], usize) {
-    let scope = d
-        .reachable()
-        .iter()
-        .find(|(i, _)| *i == item)
-        .map(|&(_, s)| s)
-        .expect("ngspice write: the item is reachable");
-    let items = d.items(scope);
-    let at = items
-        .iter()
-        .position(|&i| i == item)
-        .expect("an item of its scope");
-    (items, at)
-}
-
 /// `i` as a parameter alter.
 fn param_alter(d: &ir::Design, i: ir::ItemRef) -> Option<ir::Alter> {
     let a: ir::Alter = (i.kind == ir::ItemKind::Alter).then(|| d.row(i.index))?;
     (a.target.kind == ir::TargetKind::Param).then_some(a)
 }
 
-/// Whether a parameter alter stands right before a `Reset`, other parameter alters between.
-fn before_reset(d: &ir::Design, item: ir::ItemRef) -> bool {
-    let (items, at) = siblings(d, item);
-    let after = items[at + 1..]
-        .iter()
-        .find(|&&i| param_alter(d, i).is_none());
-    after.is_some_and(|i| i.kind == ir::ItemKind::Reset)
+/// Whether a parameter alter followed by `next` is applied by a `Reset`: `next` is the
+/// `Reset`, or another parameter alter (whose own check looks one item further).
+fn applied(d: &ir::Design, next: ir::ItemRef) -> bool {
+    next.kind == ir::ItemKind::Reset
+        || (next != ir::ItemRef::NONE && param_alter(d, next).is_some())
 }
 
 /// How many loops enclose `item`'s body, itself included (a made-up variable's number).
