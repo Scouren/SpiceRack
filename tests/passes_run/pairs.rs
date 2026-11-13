@@ -35,6 +35,8 @@ pub const PENDING_PAIRS: &[&str] = &[
     "drop_option_trtol",
     // proven on ngspice by `passes_run/options.rs` (prints): no VACASK deck holds a print
     "drop_print",
+    // proven by the reference evaluator (`passes_run/args.rs`); its pair deck is ngspice -> VACASK
+    "analysis_param_args_to_values",
     "whole_run_option_first",
     "whole_run_env_first",
     "whole_run_node_set_first",

@@ -7,8 +7,8 @@
 
 use super::{
     alter_at_reset, dc_axes_to_loops, drop_print, fs, ic_next_only, inert_options, loop_end,
-    names_dropped, names_given, run_items_together, save_set_to_all, sweep_forms, tc,
-    tran_print_step, wr,
+    names_dropped, names_given, param_arguments, run_items_together, save_set_to_all, sweep_forms,
+    tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -254,6 +254,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a parameter alter whose reset would undo other script state",
             cite: "R70; rewrite/AMEND-A12.md A43",
             explain: "The target's parameter alter takes effect at the next reset, so a reset would follow it; a reset also undoes value alters, options, temperatures and saves in force from earlier in the run (or every earlier pass in a loop's body), and one of those is in force here, so the alter is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        param_arguments::PARAM_ARG_KEPT,
+        ir::Info {
+            title: "an analysis or loop argument that reads a parameter its value cannot replace",
+            cite: "R68; rewrite/AMEND-A12.md A42",
+            explain: "The target takes no circuit parameter in an analysis's or loop's argument, so a read there is written as the parameter's value. Here it cannot be: the parameter is not a top-level one with a constant value, an alter, a loop or a statistics block may change it, or the read stands in a function's body. The item is refused.",
             kind: ir::Kind::Note,
         },
     ),

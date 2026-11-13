@@ -11,6 +11,8 @@
 #[path = "common/memcap.rs"]
 mod memcap;
 
+#[path = "passes_run/args.rs"]
+mod args;
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
 #[path = "passes_run/continuation.rs"]
@@ -117,6 +119,11 @@ fn inert_options_leave_the_raw_file_alone() {
 #[test]
 fn inert_options_keep_what_an_ir_row_reads() {
     options::inert_options_keep_what_an_ir_row_reads();
+}
+
+#[test]
+fn param_arguments_keep_every_field_value() {
+    args::param_arguments_keep_every_field_value(SEEDS, SIZE);
 }
 
 #[test]
