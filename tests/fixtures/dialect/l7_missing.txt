@@ -28,17 +28,13 @@ ngspice Analysis(Stb) owed from=vacask
 ngspice Analysis(DcInc) owed from=vacask
 ngspice Analysis(TimedOp) owed from=hspice
 ngspice Expr(List) unspoken
-ngspice Func(PowRe) unspoken
 ngspice Func(Atan2) unspoken
 ngspice Func(Hypot) owed from=vacask
-ngspice Func(Clamp) unspoken
 ngspice Func(Ddt) unspoken
 ngspice Func(Idt) unspoken
-ngspice FuncDyn(PowRe) unspoken
 ngspice FuncDyn(Atan2) owed from=vacask
 ngspice FuncDyn(Hypot) owed from=vacask
 ngspice FuncDyn(Fmod) unspoken
-ngspice FuncDyn(Clamp) unspoken
 ngspice FuncDyn(Idt) owed from=vacask
 ngspice Binary(IntDiv) unspoken
 ngspice BinaryDyn(IntDiv) unspoken
@@ -323,14 +319,10 @@ vacask Analysis(Pstb) unspoken
 vacask Analysis(TimedOp) owed from=hspice
 vacask Expr(Freq) owed from=ngspice,hspice
 vacask Expr(List) unspoken
-vacask Func(PowRe) unspoken
 vacask Func(Atan2) unspoken
-vacask Func(Clamp) unspoken
 vacask Func(Ddt) unspoken
 vacask Func(Idt) unspoken
-vacask FuncDyn(PowRe) unspoken
 vacask FuncDyn(Fmod) unspoken
-vacask FuncDyn(Clamp) unspoken
 vacask Binary(IntDiv) unspoken
 vacask BinaryDyn(IntDiv) unspoken
 vacask Dist(Limit) owed from=ngspice,hspice

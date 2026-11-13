@@ -2,5 +2,5 @@ file "p.sp" deck
   param a = 2
   param t = pow_abs($temp, 2)
   param u = pow_abs(t, 2)
-  param s = pow(abs(a), 2)
+  param s = pow_re(abs(a), 2)
   element behav b1 (n 0) expr=(pow_abs(v(n), 2))

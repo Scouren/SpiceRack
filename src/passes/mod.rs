@@ -118,7 +118,7 @@ pub fn legalize(design: &mut ir::Design, target: &ir::FeatureSet, diags: &mut ir
 
 /// The features legal for `target` under `passes` (A32): the least fixed point of "the target
 /// has it, or a pass removes it whose `requires` are all legal". Two passes that remove each
-/// other's output (`powabs_to_pow`, `pow_to_powabs`) make neither legal for a target with
+/// other's output (`pow_to_powabs`, and `powabs_to_powre` then `powre_to_pow`) make neither legal for a target with
 /// neither feature. Bounded: each round adds a feature or stops, at most one round per pass.
 pub fn legal(passes: &[&Pass], target: &ir::FeatureSet) -> ir::FeatureSet {
     let mut legal = *target;
