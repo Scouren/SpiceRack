@@ -7,6 +7,8 @@
 # States: `owed from=<rows>` another row with a reader holds it in its FEATURES (a design read there
 # carries it here: a pass or a citation is owed now); `unspoken` no row's reader holds it (it waits
 # for the dialect that will). After `#`: the lead's sorting (the rule or citation owed, its owner).
+# hspice (hspice-2, dialect-hspice): the features the HSPICE writer lacks today; the reader
+# areas copied from the ngspice dialect's shape claim what the settle decks pinned on ESPice.
 ngspice Item(Statistics) unspoken
 ngspice Elem(FluxInductor) unspoken
 ngspice Elem(Laplace) unspoken
@@ -48,6 +50,7 @@ ngspice Extra(IfConditionDynamic) unspoken
 ngspice Extra(StringValue) owed from=vacask
 ngspice Extra(ListValue) unspoken
 ngspice Extra(FormalOuterRead) unspoken
+ngspice Extra(StringCompare) unspoken
 ngspice Circuit(MultVSource) owed from=vacask
 ngspice Circuit(MultControlledVoltage) owed from=vacask
 ngspice Circuit(MultInstanceParallel) unspoken
@@ -95,6 +98,26 @@ ngspice Circuit(ModelAko) unspoken
 ngspice Circuit(SffmPreOffset) owed from=hspice
 ngspice Circuit(DcAtZeroPattern) unspoken
 ngspice Circuit(TcBaseTnom) unspoken
+ngspice Circuit(BjtBcSatAreabOnly) owed from=vacask
+ngspice Circuit(ModelSubSatEmissionNs) owed from=vacask
+ngspice Circuit(DiodeWlMultOnce) owed from=vacask
+ngspice Circuit(DiodeSidewallOwnF1) owed from=vacask
+ngspice Circuit(DiodeXomAbsent1e14) owed from=vacask
+ngspice Circuit(VdmosKpAbsent20) owed from=vacask
+ngspice Circuit(VdmosTcvthRaises) owed from=vacask
+ngspice Circuit(VdmosClampByFc) owed from=vacask
+ngspice Circuit(MosSmallSignalExact) owed from=vacask
+ngspice Circuit(Mos6SmallSignalExact) owed from=vacask
+ngspice Circuit(BjtIrbSmallSignalExact) owed from=vacask
+ngspice Circuit(VdmosMultChargesCopies) owed from=vacask
+ngspice Circuit(DiodeIsrReversePresent) owed from=vacask
+ngspice Circuit(DiodeIsrSmallSignalExact) owed from=vacask
+ngspice Circuit(DiodeTtFactorClamped) owed from=vacask
+ngspice Circuit(TrigExact) owed from=vacask
+ngspice Circuit(ExpExact) owed from=vacask
+ngspice Circuit(LogZeroError) owed from=vacask
+ngspice Circuit(DivExact) owed from=vacask
+ngspice Circuit(AsinEdgeFails) owed from=vacask
 ngspice Run(TranStartup) unspoken
 ngspice Run(TranNoise) owed from=vacask
 ngspice Run(TranSegments) unspoken
@@ -112,6 +135,9 @@ ngspice Run(SweepLoopLog) unspoken
 ngspice Run(SweepFreqLinStep) owed from=vacask
 ngspice Run(SweepFreqLog) unspoken
 ngspice Run(SweepEndOnStop) unspoken
+ngspice Run(SweepEndStretch) unspoken
+ngspice Run(SweepEndNgDecade) unspoken
+ngspice Run(SweepCountNgLin) unspoken
 ngspice Run(SweepCenterSpan) unspoken
 ngspice Run(NoiseAcSweep) unspoken
 ngspice Run(NoiseCurrentOutput) unspoken
@@ -333,6 +359,7 @@ vacask Extra(IfConditionDynamic) unspoken
 vacask Extra(ListValue) unspoken
 vacask Extra(FormalOuterRead) unspoken
 vacask Extra(FormalUnboundRead) owed from=ngspice,hspice
+vacask Extra(StringCompare) unspoken
 vacask Circuit(MultInstanceParallel) unspoken
 vacask Circuit(MultInstanceNgspiceAppend) owed from=ngspice,hspice
 vacask Circuit(IcInOp) unspoken
@@ -396,6 +423,26 @@ vacask Circuit(TcBaseTnom) unspoken
 vacask Circuit(TcBaseFixed27) owed from=ngspice,hspice
 vacask Circuit(TcLawDirect) owed from=ngspice,hspice
 vacask Circuit(TcLawReciprocal) owed from=ngspice,hspice
+vacask Circuit(BjtBcSatAreaTimesAreab) owed from=ngspice
+vacask Circuit(ModelSubSatLastFactor) owed from=ngspice
+vacask Circuit(DiodeWlMultTwice) owed from=ngspice
+vacask Circuit(DiodeSidewallBottomF1) owed from=ngspice
+vacask Circuit(DiodeXomAbsent1e4) owed from=ngspice
+vacask Circuit(VdmosKpAbsent35) owed from=ngspice
+vacask Circuit(VdmosTcvthLowers) owed from=ngspice
+vacask Circuit(VdmosClampByN) owed from=ngspice
+vacask Circuit(MosSmallSignalHand) owed from=ngspice
+vacask Circuit(Mos6SmallSignalAbsent) owed from=ngspice
+vacask Circuit(BjtIrbSmallSignalFrozen) owed from=ngspice
+vacask Circuit(VdmosMultChargesOff) owed from=ngspice
+vacask Circuit(DiodeIsrReverseNone) owed from=ngspice
+vacask Circuit(DiodeIsrSmallSignalHand) owed from=ngspice
+vacask Circuit(DiodeTtFactorUnclamped) owed from=ngspice
+vacask Circuit(TrigReduceCast) owed from=ngspice
+vacask Circuit(ExpClamp1e99) owed from=ngspice
+vacask Circuit(LogZeroMinus1e99) owed from=ngspice
+vacask Circuit(DivGminGuard) owed from=ngspice
+vacask Circuit(AsinEdgeZero) owed from=ngspice
 vacask Run(TranStartup) unspoken
 vacask Run(TranSegments) unspoken
 vacask Run(DcAxisSubcktParam) unspoken
@@ -403,6 +450,9 @@ vacask Run(SweepDcLog) unspoken
 vacask Run(SweepLoopLog) unspoken
 vacask Run(SweepFreqLog) unspoken
 vacask Run(SweepEndOnStop) unspoken
+vacask Run(SweepEndStretch) unspoken
+vacask Run(SweepEndNgDecade) unspoken
+vacask Run(SweepCountNgLin) unspoken
 vacask Run(SweepCenterSpan) unspoken
 vacask Run(NoiseSummary) owed from=ngspice,hspice
 vacask Run(NoiseAcSweep) unspoken
@@ -623,9 +673,6 @@ vacask Placed(Loop,Element) unspoken
 vacask Placed(Loop,Print) unspoken
 vacask Placed(Loop,Measure) unspoken
 vacask DistDyn(Limit) unspoken
-
-# hspice (hspice-2, dialect-hspice): the features the HSPICE writer lacks today; the reader
-# areas copied from the ngspice dialect's shape claim what the settle decks pinned on ESPice.
 hspice Item(Load) owed from=ngspice,vacask
 hspice Item(Statistics) unspoken
 hspice Item(Alter) owed from=ngspice,vacask
@@ -679,6 +726,7 @@ hspice Extra(IfConditionDynamic) unspoken
 hspice Extra(StringValue) owed from=vacask
 hspice Extra(ListValue) unspoken
 hspice Extra(FormalOuterRead) unspoken
+hspice Extra(StringCompare) unspoken
 hspice Circuit(MultVSource) owed from=vacask
 hspice Circuit(MultControlledVoltage) owed from=vacask
 hspice Circuit(MultInstanceParallel) unspoken
@@ -729,6 +777,46 @@ hspice Circuit(SffmPreHold) owed from=ngspice,vacask
 hspice Circuit(SffmPreZero) owed from=ngspice
 hspice Circuit(DcAtZeroPattern) unspoken
 hspice Circuit(TcBaseTnom) unspoken
+hspice Circuit(BjtBcSatAreaTimesAreab) owed from=ngspice
+hspice Circuit(BjtBcSatAreabOnly) owed from=vacask
+hspice Circuit(ModelSubSatLastFactor) owed from=ngspice
+hspice Circuit(ModelSubSatEmissionNs) owed from=vacask
+hspice Circuit(DiodeWlMultTwice) owed from=ngspice
+hspice Circuit(DiodeWlMultOnce) owed from=vacask
+hspice Circuit(DiodeSidewallBottomF1) owed from=ngspice
+hspice Circuit(DiodeSidewallOwnF1) owed from=vacask
+hspice Circuit(DiodeXomAbsent1e4) owed from=ngspice
+hspice Circuit(DiodeXomAbsent1e14) owed from=vacask
+hspice Circuit(VdmosKpAbsent35) owed from=ngspice
+hspice Circuit(VdmosKpAbsent20) owed from=vacask
+hspice Circuit(VdmosTcvthLowers) owed from=ngspice
+hspice Circuit(VdmosTcvthRaises) owed from=vacask
+hspice Circuit(VdmosClampByN) owed from=ngspice
+hspice Circuit(VdmosClampByFc) owed from=vacask
+hspice Circuit(MosSmallSignalHand) owed from=ngspice
+hspice Circuit(MosSmallSignalExact) owed from=vacask
+hspice Circuit(Mos6SmallSignalAbsent) owed from=ngspice
+hspice Circuit(Mos6SmallSignalExact) owed from=vacask
+hspice Circuit(BjtIrbSmallSignalFrozen) owed from=ngspice
+hspice Circuit(BjtIrbSmallSignalExact) owed from=vacask
+hspice Circuit(VdmosMultChargesOff) owed from=ngspice
+hspice Circuit(VdmosMultChargesCopies) owed from=vacask
+hspice Circuit(DiodeIsrReverseNone) owed from=ngspice
+hspice Circuit(DiodeIsrReversePresent) owed from=vacask
+hspice Circuit(DiodeIsrSmallSignalHand) owed from=ngspice
+hspice Circuit(DiodeIsrSmallSignalExact) owed from=vacask
+hspice Circuit(DiodeTtFactorUnclamped) owed from=ngspice
+hspice Circuit(DiodeTtFactorClamped) owed from=vacask
+hspice Circuit(TrigReduceCast) owed from=ngspice
+hspice Circuit(TrigExact) owed from=vacask
+hspice Circuit(ExpClamp1e99) owed from=ngspice
+hspice Circuit(ExpExact) owed from=vacask
+hspice Circuit(LogZeroMinus1e99) owed from=ngspice
+hspice Circuit(LogZeroError) owed from=vacask
+hspice Circuit(DivGminGuard) owed from=ngspice
+hspice Circuit(DivExact) owed from=vacask
+hspice Circuit(AsinEdgeZero) owed from=ngspice
+hspice Circuit(AsinEdgeFails) owed from=vacask
 hspice Run(TranStartup) unspoken
 hspice Run(TranNoise) owed from=vacask
 hspice Run(TranSegments) unspoken
@@ -743,6 +831,9 @@ hspice Run(SweepLoopLog) unspoken
 hspice Run(SweepFreqLinStep) owed from=vacask
 hspice Run(SweepFreqLog) unspoken
 hspice Run(SweepEndOnStop) unspoken
+hspice Run(SweepEndStretch) unspoken
+hspice Run(SweepEndNgDecade) unspoken
+hspice Run(SweepCountNgLin) unspoken
 hspice Run(SweepCenterSpan) unspoken
 hspice Run(NoiseAcSweep) unspoken
 hspice Run(NoiseCurrentOutput) unspoken
