@@ -1,0 +1,14 @@
+differential ic with other entries: "a", "b", 2.0, "b", 1.0
+// settle (device_ic_to_tran_ic): VACASK: a/b 3/1 at 0 (differential a-b=2 with b=1)
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+r1 (a 0) res r=1k
+r2 (b 0) res r=2k
+c1 (a b) cap c=1u
+c2 (b 0) cap c=1u
+control
+  options rawfile="ascii"
+  analysis tr tran stop=1m step=10u maxstep=10u icmode="uic" ic={"a", "b", 2.0, "b", 1.0}
+endc

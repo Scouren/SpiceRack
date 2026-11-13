@@ -1,0 +1,33 @@
+sinh on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b78 (d78 0) v=sinh(-2.5)
+r78 (d78 0) r r=1k
+b79 (d79 0) v=sinh(-1.0)
+r79 (d79 0) r r=1k
+b80 (d80 0) v=sinh(-0.5)
+r80 (d80 0) r r=1k
+b81 (d81 0) v=sinh(-0.0)
+r81 (d81 0) r r=1k
+b82 (d82 0) v=sinh(0.0)
+r82 (d82 0) r r=1k
+b83 (d83 0) v=sinh(0.5)
+r83 (d83 0) r r=1k
+b84 (d84 0) v=sinh(1.0)
+r84 (d84 0) r r=1k
+b85 (d85 0) v=sinh(2.5)
+r85 (d85 0) r r=1k
+b86 (d86 0) v=sinh(1e-3)
+r86 (d86 0) r r=1k
+b88 (d88 0) v=sinh(-3)
+r88 (d88 0) r r=1k
+b89 (d89 0) v=sinh(0)
+r89 (d89 0) r r=1k
+b90 (d90 0) v=sinh(3)
+r90 (d90 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

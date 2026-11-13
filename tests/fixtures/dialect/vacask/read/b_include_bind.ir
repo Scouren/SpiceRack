@@ -1,0 +1,16 @@
+# Oracle: settle b_incsec (VACASK 36be560: a read in section mc of a parameter of section dfl,
+# which mc includes, binds before and after the include line, early=pd*10 is 1, late is 2.2;
+# a deck read binds the parameter of the section it includes). `pd#2` is dfl's pd, `late#5`
+# mc's late (the neutral lookup would not find either from where it is read).
+# codes:
+file "b_include_bind.sim" deck
+  title "reads bound through an included section"
+  include "b_include_bind--lib.lib" section=mc
+  param top = late#5*2i
+file "b_include_bind--lib.lib" library
+  section dfl
+    param pd = 0.1
+  section mc
+    param early = pd#2*10i
+    include "b_include_bind--lib.lib" section=dfl
+    param late = pd#2+1i

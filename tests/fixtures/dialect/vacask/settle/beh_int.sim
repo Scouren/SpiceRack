@@ -1,0 +1,7 @@
+int in a behavioural source
+model vsource vsource
+vone (one 0) vsource dc=1
+b0 (d0 0) v=int(2.5*v(one))
+control
+  analysis op1 op
+endc

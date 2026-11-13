@@ -1,0 +1,18 @@
+# codes: P1110 P1110 P1110
+file "instance_cycle.sp" deck
+  title "instance_cycle"
+  comment " oracle: settle/instance_self.sp, settle/instance_cycle.sp ('unknown subckt: x1.xw.xw…', exit 1; X0024); the neighbour leaf in top is a hierarchy"
+  subckt w (a b)
+    element resistor R1 (a b) value=1k
+    opaque ngspice invalid "xw a 0 w"
+  subckt p (a b)
+    opaque ngspice invalid "xq a b q"
+  subckt q (a b)
+    opaque ngspice invalid "xp a b p"
+  subckt leaf (a)
+    element resistor R2 (a 0) value=1k
+  subckt top (a)
+    element instance xl (a) model=leaf
+  element instance X1 (n1 0) model=w
+  element instance X2 (n1 0) model=p
+  element instance X3 (n1) model=top

@@ -13,7 +13,7 @@ use spicerack::passes;
 pub const PENDING_PAIRS: &[&str] = &[
     // proven on both simulators by `passes_run/dc_loops.rs`, not a pair deck: the pair harness
     // compares one DC plot with one, and the rule writes one op plot a pass
-    "dc_axis_device_param_to_loop",
+    // (dc_axis_device_param_to_loop's pair deck is vacask-ngspice/dc_device_param.sim)
     "dc_axis_model_param_to_loop",
     "dc_restart_to_loops",
     // proven on ngspice by `passes_run/options.rs` (the raw file unchanged); no VACASK deck holds
@@ -62,6 +62,7 @@ pub const PENDING_PAIRS: &[&str] = &[
     "tran_print_step_to_simulator",
     "tran_simulator_step_to_print",
     "tran_first_step_to_print",
+    "device_ic_to_tran_ic",
     "loop_restore_to_keep_last",
     "loop_keep_last_to_restore",
 ];

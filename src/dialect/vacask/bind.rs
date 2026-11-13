@@ -1,7 +1,9 @@
 //! Binding by VACASK's rule (RUN n1, m1; VD cir-hier "Scope", cir-masters): a name resolves in
-//! its own subcircuit (its branches and sections), then the top of its file, then the top of every
-//! other file (VACASK's include is textual); never in an enclosing subcircuit, and a name only an
-//! enclosing subcircuit defines stays unbound and is refused (`R2003`). Parameter reads
+//! its own subcircuit (its branches and sections), then the top of its file (the sections that
+//! hold the outermost subcircuit, too: a section is no scope of VACASK's), then the top of every
+//! other file; each scope with what its includes splice into it (`Visible`: VACASK's include is
+//! textual, settle b_incsec); never in an enclosing subcircuit, and a name only an enclosing
+//! subcircuit defines stays unbound and is refused (`R2003`). Parameter reads
 //! (`reads`) and element masters (`masters`) are bound after every file is read, since a
 //! forward reference is legal (RUN n5). And the instance head every element area reads
 //! (`head`): the exact name, the terminals with the ground names as `0`, the master's name, the
@@ -13,6 +15,7 @@
 
 use super::read::{self, Lower};
 use super::read_structure;
+use super::visible::Visible;
 use crate::ir;
 use crate::syntax::ast::{NONE, Node};
 
@@ -77,14 +80,19 @@ pub(super) fn head(l: &Lower<'_, '_, '_>, n: Node) -> Head {
 
 /// Binds every recorded master by VACASK's rule; one only an enclosing subcircuit defines is
 /// refused (`R2003`).
-pub(super) fn masters(b: &mut ir::Builder<'_>, masters: &[Master], diags: &mut ir::Diags) {
+pub(super) fn masters(
+    b: &mut ir::Builder<'_>,
+    visible: &Visible,
+    masters: &[Master],
+    diags: &mut ir::Diags,
+) {
     for m in masters {
         let row: ir::Element = b.design().row(m.item.index);
         let (Some(kind), false) = (row.kind.master_kind(), row.model.name.is_none()) else {
             continue;
         };
         let name = row.model.name;
-        let (def, enclosing) = find(b.design(), m.scope, kind, name);
+        let (def, enclosing) = find(b.design(), visible, m.scope, kind, name);
         if enclosing {
             diags.push(read_structure::ENCLOSING, m.span, 0);
         }
@@ -99,6 +107,7 @@ pub(super) fn masters(b: &mut ir::Builder<'_>, masters: &[Master], diags: &mut i
 /// textual). A read only an enclosing subcircuit could bind stays unbound, refused (`R2003`).
 pub(super) fn reads(
     b: &mut ir::Builder<'_>,
+    visible: &Visible,
     reads: &[(ir::ExprId, ir::ScopeId, ir::Span)],
     diags: &mut ir::Diags,
 ) {
@@ -107,7 +116,7 @@ pub(super) fn reads(
         let ir::Expr::Param(r) = design.expr(e) else {
             unreachable!("a recorded read is a parameter read");
         };
-        let (def, enclosing) = find(design, scope, ir::DefKind::Param, r.name);
+        let (def, enclosing) = find(design, visible, scope, ir::DefKind::Param, r.name);
         if enclosing {
             diags.push(read_structure::ENCLOSING, span, 0);
         }
@@ -123,47 +132,57 @@ pub(super) fn reads(
 /// enclosing subcircuit defines it.
 fn find(
     design: &ir::Design,
+    visible: &Visible,
     scope: ir::ScopeId,
     kind: ir::DefKind,
     name: ir::NameId,
 ) -> (ir::DefId, bool) {
     let (own, top) = region(design, scope);
+    let file = design.scope(scope).file;
+    let others = design
+        .files()
+        .filter(|&f| f != file)
+        .map(|f| design.file(f).top);
+    let def = own
+        .into_iter()
+        .chain(top)
+        .chain(others)
+        .map(|s| visible.at(s, kind, name))
+        .find(|d| !d.is_none())
+        .unwrap_or(ir::DefId::NONE);
     let found = design.lookup(scope, kind, name);
-    let in_own = !found.is_none() && {
-        let at = design.def(found).scope;
-        own.contains(&at) || design.scope(at).kind == ir::ScopeKind::File
-    };
-    if in_own {
-        return (found, false);
-    }
-    let at_top = design.lookup(top, kind, name);
-    let def = match at_top.is_none() {
-        false => at_top,
-        true => design
-            .files()
-            .map(|f| design.file(f).top)
-            .filter(|&t| t != top)
-            .map(|t| design.lookup(t, kind, name))
-            .find(|d| !d.is_none())
-            .unwrap_or(ir::DefId::NONE),
-    };
     (def, !found.is_none() && def.is_none())
 }
 
 /// The scopes of `scope`'s own region (it and its ancestors up to its subcircuit's body or its
-/// file's top) and its file's top scope.
-fn region(design: &ir::Design, scope: ir::ScopeId) -> (Vec<ir::ScopeId>, ir::ScopeId) {
-    let mut own = Vec::new();
+/// file's top), and the top's: the ancestors of its outermost subcircuit up to the file's top
+/// (empty when the own region reaches the top).
+fn region(design: &ir::Design, scope: ir::ScopeId) -> (Vec<ir::ScopeId>, Vec<ir::ScopeId>) {
+    let mut chain = Vec::new();
     let mut at = scope;
     // Bounded: each step moves to a parent, and the scope tree is acyclic (`ir::check`).
     for _ in 0..SCOPE_DEPTH_MAX {
-        own.push(at);
+        chain.push(at);
         let s = design.scope(at);
-        if matches!(s.kind, ir::ScopeKind::Subckt | ir::ScopeKind::File) || s.parent.is_none() {
+        if s.kind == ir::ScopeKind::File || s.parent.is_none() {
             break;
         }
         at = s.parent;
     }
-    let top = design.file(design.scope(scope).file).top;
-    (own, top)
+    let is_subckt = |s: &ir::ScopeId| design.scope(*s).kind == ir::ScopeKind::Subckt;
+    let own_end = chain
+        .iter()
+        .position(is_subckt)
+        .map_or(chain.len(), |k| k + 1);
+    let top_start = chain
+        .iter()
+        .rposition(is_subckt)
+        .map_or(chain.len(), |k| k + 1);
+    assert!(
+        own_end <= top_start,
+        "the own region ends at or before the top's start"
+    );
+    let top = chain.split_off(top_start);
+    chain.truncate(own_end);
+    (chain, top)
 }

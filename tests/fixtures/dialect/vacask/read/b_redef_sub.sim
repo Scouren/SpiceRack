@@ -1,0 +1,6 @@
+a subcircuit in the deck and a model of its name in an included section
+load "spice/resistor.osdi"
+subckt rm (x y)
+  parameters k=1
+ends
+include "b_redef_sub--lib.lib" section=a

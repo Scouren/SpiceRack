@@ -17,7 +17,7 @@
 //! Contents: `pub(super) type Row`, `pub(super) const CODES: &[Row]` (this area's),
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
-//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `WRAP`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
+//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `WRAP`, `INCLUDE_CYCLE`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
 //! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `DEFAULT_CYCLE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
@@ -65,6 +65,9 @@ pub(super) const CALL_ARITY: Code = Code::new(b'P', 1013);
 /// model parameter): wrappers that wrap parts of it (`{a}+{b}`), or one inside another
 /// (`'a+{b}'`; settle `wrap_*.sp`): `InvalidInSource`.
 pub(super) const WRAP: Code = Code::new(b'P', 1014);
+/// An `.include` or `.lib` call whose file includes, itself or through others, the file that
+/// holds it: ngspice-45 crashes (settle `inc_cycle.sp`, exit 139): `InvalidInSource`.
+pub(super) const INCLUDE_CYCLE: Code = Code::new(b'P', 1015);
 /// A `.param` the same scope defines again later: ngspice keeps the last (INV 3.01); this one
 /// is `Inert`.
 pub(super) const DUPLICATE_PARAM: Code = Code::new(b'R', 1001);
@@ -163,6 +166,12 @@ pub(super) const CODES: &[Row] = &[
         "a value whose braces or quotes ngspice rejects",
         "ngspice-45 runs (settle wrap_*.sp: '; sign expected.', 'Syntax error: letter [{]')",
         "numparam replaces each {...} on its own and reads no wrapper inside another in a .param or a model parameter; kept as InvalidInSource text.",
+    ),
+    row(
+        INCLUDE_CYCLE,
+        "an include cycle",
+        "ngspice-45 run (settle inc_cycle.sp: a segmentation fault, exit 139)",
+        "a file that includes, through others, the file that includes it; kept as InvalidInSource text.",
     ),
     row(
         FIRST_LAST,

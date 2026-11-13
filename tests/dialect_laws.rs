@@ -51,7 +51,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
-    ("l5", "ngspice", "seed 19 Untyped: a whole-run `option no_init` in a `.lib` section is written as `.control` / `option noinit` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area. (Seed 11's causes are gone: a script number word keeps its long digits, settle loop_long.sp; an element-value loop over `g149` is refused by the writer, W1407)"),
+    ("l5", "vacask", "seed 0 Untyped (the round's generator; on step2-vacask-b the row's seeds 1 and 38 hid it): a device_library of a family whose module is not proven (jfet_parker_skellern, vbic) is written `load \"spice/jfet2.osdi\"` / `load \"vbic_1p3.osdi\"` and reads back as a plain load (tables::library, da95fe25), so write_structure::admit lets through a library the reader cannot read back; and the literal 141.585peta reads back as 141.585e15. A finding for the VACASK writer (vacask); goes with its admit agreeing with tables::library"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the

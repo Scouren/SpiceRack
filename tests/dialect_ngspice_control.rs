@@ -253,7 +253,7 @@ fn a_written_card_deck_runs_on_ngspice_to_the_original_raw_file() {
 
 #[test]
 fn generated_script_plans_read_back_to_their_meaning() {
-    // Oracle: law L5 (`read(write(x)) ≅ x`, `eq_meaning`) on designs this test builds from a
+    // Oracle: law L5 (`read(write(x)) ≅ x`, `eq_meaning`, x the legalized design) on designs this test builds from a
     // seed, with literal loop values, which the shared generator never draws (its loop values
     // are expressions, which ngspice's `foreach` cannot spell: W1402). Every loop form the
     // writer spells (a named and an unnamed KeepLast list sweep, nested), every alter target,
@@ -273,8 +273,10 @@ fn generated_script_plans_read_back_to_their_meaning() {
         }
         let written = write_entry(&legal);
         let (back, _) = read_deck("g.sp", &written);
+        // the legalized design in normal form (its text read back): a pass appends rows
+        let legal = parse_ir("legal", &dump(&legal));
         assert!(
-            back.eq_meaning(&design),
+            back.eq_meaning(&legal),
             "seed {seed}:\n{text}\nwritten as\n{written}\nread back as\n{}",
             dump(&back)
         );
@@ -293,7 +295,8 @@ fn script_items_ngspice_cannot_spell_are_refused() {
     // binary's; a foreach word is no expression (control.c:462-466); an alter takes one number
     // (device.c ft_getpnames); alterparam applies at a reset that drops live alters
     // (runcoms2.c:172-240); a bare alter of a device other than R, C, L (V, I for a DC) sets its
-    // own default parameter (spiceif.c:951; L5 seed 11's `g149`).
+    // own default parameter (spiceif.c:951; L5 seed 11's `g149`); a script command drops a
+    // field's braces (settle script_tran_brace.sp: 'unknown parameter on .tran', F12).
     #[rustfmt::skip] // a table: one row per line
     const REFUSED: &[(&str, &str, &str)] = &[
         ("a load naming its modules", "  load osdi \"a.osdi\" modules=(m1)", "W1405"),
@@ -309,6 +312,7 @@ fn script_items_ngspice_cannot_spell_are_refused() {
         ("an alter of a model nothing defines", "  alter (model_param nope vth0) value=2", "W1408"),
         ("a loop over an element nothing holds", "  element resistor r1 (a 0) value=1\n  loop sweep keep_last (element_value r9) (list values=[1])", "W1408"),
         ("a DC axis over a source nothing holds", "  analysis dc (source_dc vnope) (lin start=0 stop=1 step=1)", "W1408"),
+        ("F12: a script transient with an expression field", "  element resistor r1 (a 0) value=1k\n  alter (element_value r1) value=2k\n  analysis tran stop=1u print_step=0.1u max_step=(1u / 50)", "W1305"),
         ("F7: a parameter alter between two analyses", "  param a = 1\n  analysis op\n  alter (param a) value=2 at_reset\n  analysis op", "W1401"),
     ];
 
@@ -385,6 +389,10 @@ fn plan_text(seed: u64) -> String {
         "(param p)",
     ];
     const RESET: &str = "reset values options temp tnom saves";
+    #[rustfmt::skip] // the analyses with number fields, the one form a script command spells
+    const ANALYSES: [&str; 5] = ["analysis op", "analysis tran stop=5u print_step=1u cap=ngspice_rule",
+        "analysis ac (dec start=1 stop=1meg points=10)", "analysis sp (lin start=1 stop=10 points=2)",
+        "analysis disto (dec start=1k stop=10k points=5)"];
     const VALUES: [&str; 6] = ["1k", "2.2k", "0.5", "10u", "-1", "3meg"];
     // every alter target defined (W1408: ngspice runs on past an alter of what is not there)
     let mut out = String::from(
@@ -392,11 +400,8 @@ fn plan_text(seed: u64) -> String {
     );
     let item = |depth: usize, out: &mut String, next: &mut dyn FnMut(u64) -> u64| {
         let pad = "  ".repeat(depth + 1);
-        match next(3) {
-            0 => out.push_str(&format!("{pad}analysis op\n")),
-            1 => out.push_str(&format!(
-                "{pad}analysis tran stop=5u print_step=1u cap=ngspice_rule\n"
-            )),
+        match next(6) {
+            k @ 0..=4 => out.push_str(&format!("{pad}{}\n", ANALYSES[k as usize])),
             _ => {
                 let t = TARGETS[next(5) as usize];
                 if t == "(param p)" {

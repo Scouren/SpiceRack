@@ -1,0 +1,11 @@
+* two sections for inc_section_*.sp
+.lib s1
+.subckt sub a
+R1 a 0 2k
+.ends
+.endl s1
+.lib s2
+.subckt other a
+R1 a 0 4k
+.ends
+.endl s2

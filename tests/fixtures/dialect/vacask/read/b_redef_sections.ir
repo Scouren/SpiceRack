@@ -1,0 +1,12 @@
+# Oracle: settle b_redef_sections (VACASK 36be560: two included sections defining p,
+# "Parameter redefinition.", exit 1): section b's p is the second definition, P2030.
+# codes: P2030
+file "b_redef_sections.sim" deck
+  title "two included sections defining one parameter"
+  include "b_redef_sections--lib.lib" section=a
+  include "b_redef_sections--lib.lib" section=b
+file "b_redef_sections--lib.lib" library
+  section a
+    param p = 1i
+  section b
+    param p = 2i

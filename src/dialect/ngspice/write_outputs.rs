@@ -177,7 +177,15 @@ fn spell(design: &ir::Design, p: &ir::Probe, ctx: Ctx) -> Option<String> {
             }
         }
         ProbeKind::I => format!("i({})", element(&a)?),
-        ProbeKind::Param => format!("@{}[{}]", element(&a)?, path(p.b).first()?),
+        ProbeKind::Param => {
+            // only a name the device has a vector for (F13: `@i1[i]` is empty, `write` fails)
+            let (dev, name) = (element(&a)?, *path(p.b).first()?);
+            let letter = dev.rsplit('.').next()?.bytes().next()?.to_ascii_lowercase();
+            if !super::outputs::readable(letter, name) {
+                return None;
+            }
+            format!("@{dev}[{name}]")
+        }
         _ => return None,
     })
 }

@@ -1,0 +1,15 @@
+recursion
+subckt s (a b)
+  x1 (a b) s
+ends
+subckt p (a b)
+  xq (a b) q
+ends
+subckt q (a b)
+  xp (a b) p
+ends
+subckt u (a b)
+  xu (a b) u
+ends
+x0 (n 0) s
+x2 (n 0) p

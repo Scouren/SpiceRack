@@ -1,0 +1,12 @@
+# Oracle: settle b_redef_mixed (VACASK 36be560: a subcircuit and a model share one namespace,
+# "A model/subcircuit with name 'rm' already exists.", exit 1); b_redef_sub_before/after (two
+# subcircuits): the included section's model is the second definition, P2030.
+# codes: P2030
+file "b_redef_sub.sim" deck
+  title "a subcircuit in the deck and a model of its name in an included section"
+  device_library resistor
+  subckt rm (x y) k=1i
+  include "b_redef_sub--lib.lib" section=a
+file "b_redef_sub--lib.lib" library
+  section a
+    model rm resistor

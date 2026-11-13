@@ -57,6 +57,10 @@ const REFUSED: &[(&str, &str)] = &[
         "  save (vdiff (a) (b))",
     ),
     ("save of a part", "  save (v mag (a))"),
+    (
+        "F13: a save of an output the device has no vector for (settle device_output_missing.sp)",
+        "  element isource i1 (a 0) dc=1m\n  save (all_v) (all_branch_i) (param (i1) (i))",
+    ),
     ("print of an op table", "  print op (v (a))"),
     (
         "measure of an op analysis",

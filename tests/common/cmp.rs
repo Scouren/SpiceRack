@@ -29,15 +29,37 @@
 //! Shared by `test_cross_sim` and `test_pair` (`#[path]`; each crate root
 //! also holds `tube` and `vacask`).
 //!
+//! Under `uic` the point at t = 0 is compared by neither harness: it is each simulator's unsolved
+//! start (VACASK stores the stated initial conditions as they stand, a floating capacitor's
+//! a = 2, b = 0; ngspice stores its first consistent solve, a = 0.667, b = -1.333), a solution of
+//! the circuit on neither side (`without_start`, called by the cross-sim `uic_start` and by the
+//! pair test when the legalized design's transient has `uic`: a fact of the run, never a deck
+//! key). Every point from the first step on is compared, so a wrong initial condition still
+//! shows. It is the cross-sim harness's existing rule given one home, a guard for a simulator
+//! that stores its unsolved start: neither pair cell needs it today, since ngspice-45 stores no
+//! row at t = 0 and the comparison covers only the time both runs hold (it was not shown red).
+//!
+//! The pair test's refinement class (`simulator-differs:refinement`, rulings R84) is not a pass
+//! and not a conversion finding: a transient that leaves the tube is run again with both decks'
+//! step capped at span/2000 (`sim::refined`), and agreeing there, its difference is the two
+//! simulators' step control. span/2000 because span/200 is not fine enough: dio.sim (a diode's
+//! reverse recovery) and resonator.sim (a lossless LC) still differ at span/200 and agree at
+//! span/2000, as at span/20000. A factor on the truncation-error test (`trtol`,
+//! `tran_lteratio`) is a hint and never mapped (R84): giving both the same factor does not give
+//! them the same steps (resonator with `trtol=3.5` still left the tube). It covers transients
+//! only: a DC or AC difference has no step to refine and stays `mismatch`.
+//!
 //! Cites: ngspice manual §11.1.1 (`.options` RELTOL, VNTOL, ABSTOL, TRTOL
 //! defaults); Xyce Reference Guide 7.10 §2.1.20 (`.options device`/`timeint`
 //! RELTOL, ABSTOL defaults).
 //!
 //! Contents:
 //! - `pub struct Tol`, `Tol::of(decks: &[&str]) -> Tol` (an autonomous deck's transient by period
-//!   and peak-to-peak), `Tol::tighten(&mut self, key: &str, value: f64) -> Result<(), String>`
+//!   and peak-to-peak), `Tol::tighten(&mut self, key: &str, value: f64) -> Result<(), String>`,
+//!   `Tol::scaled(self, f: f64) -> Tol`
 //! - `pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String>`
 //! - `pub fn kind(p: &RawData) -> &'static str`, `pub fn normal(name: &str) -> String`
+//! - `pub fn without_start(plots: &mut [RawData])` (the `uic` rule)
 
 use std::collections::HashMap;
 
@@ -183,21 +205,42 @@ impl Tol {
     /// `key` (`reltol`, `vntol`, `abstol`, `tube`) set to `value`, which
     /// may only tighten: `Err` for an unknown key, a negative value, or one
     /// above the default (RELTOL 1e-3, VNTOL 1e-6 V, ABSTOL 1e-12 A, tube
-    /// 0.01), which would loosen the simulators' own accuracy.
+    /// 0.01), which would loosen the simulators' own accuracy. VNTOL and
+    /// ABSTOL may not go below the default either: they are each simulator's
+    /// own solver floor (a MOSFET in cutoff carries -2.502e-12 A on ngspice-45
+    /// at any abstol and -2.693e-12 A on VACASK at its default 1e-12, the same
+    /// once VACASK's abstol is 1e-15), so a deck asking for less than the
+    /// solvers give would fail on their tolerance, not on the conversion.
     #[allow(dead_code)] // `test_cross_sim` tightens nothing; `test_pair` does
     pub fn tighten(&mut self, key: &str, value: f64) -> Result<(), String> {
-        let (slot, default) = match key {
-            "reltol" => (&mut self.reltol, RELTOL),
-            "vntol" => (&mut self.vntol, VNTOL),
-            "abstol" => (&mut self.abstol, ABSTOL),
-            "tube" => (&mut self.tube, 0.01),
+        let (slot, default, floor) = match key {
+            "reltol" => (&mut self.reltol, RELTOL, 0.0),
+            "vntol" => (&mut self.vntol, VNTOL, VNTOL),
+            "abstol" => (&mut self.abstol, ABSTOL, ABSTOL),
+            "tube" => (&mut self.tube, 0.01, 0.0),
             _ => return Err(format!("{key}: not a tolerance")),
         };
-        if !(0.0..=default).contains(&value) {
+        if value > default {
             return Err(format!("{key} = {value:e} loosens the default {default:e}"));
+        }
+        if value.is_nan() || value < floor {
+            return Err(format!(
+                "{key} = {value:e} is below the simulators' own floor {floor:e}"
+            ));
         }
         *slot = value;
         Ok(())
+    }
+
+    /// Every value tolerance (RELTOL, VNTOL, ABSTOL) times `f`, for the pair
+    /// test's margin probe only (`PAIR_MARGINS`, triage): not a deck's key.
+    #[allow(dead_code)] // `test_cross_sim` has no margin probe
+    pub fn scaled(mut self, f: f64) -> Tol {
+        assert!((0.0..=1.0).contains(&f), "a fraction of the tolerance");
+        self.reltol *= f;
+        self.vntol *= f;
+        self.abstol *= f;
+        self
     }
 }
 
@@ -256,6 +299,31 @@ pub fn normal(name: &str) -> String {
         return format!("{inner}#branch");
     }
     n
+}
+
+/// Each transient plot of `plots` without its point at t = 0 (the `uic` rule: module doc).
+pub fn without_start(plots: &mut [RawData]) {
+    for p in plots {
+        let timed = kind(p) == "tran";
+        let at0 = p
+            .real_data
+            .first()
+            .is_some_and(|t| t.first() == Some(&0.0) && t.len() > 1);
+        if timed && at0 {
+            p.real_data
+                .iter_mut()
+                .filter(|c| !c.is_empty())
+                .for_each(|c| {
+                    c.remove(0);
+                });
+            p.complex_data
+                .iter_mut()
+                .filter(|c| !c.is_empty())
+                .for_each(|c| {
+                    c.remove(0);
+                });
+        }
+    }
 }
 
 // ---- private ----

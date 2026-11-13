@@ -1,0 +1,3 @@
+a parameter in the deck and in an included section
+parameters pd=0.5
+include "b_redef_param--lib.lib" section=a

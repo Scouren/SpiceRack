@@ -12,7 +12,7 @@
 //! 3.06; IR-KERNEL A10 (a head default is read from the subcircuit's body).
 //!
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
-//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::head`, `Declared::top_head`, `Declared::arity`, `Declared::class`,
+//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::head`, `Declared::top_head`, `Declared::cycles`, `Declared::arity`, `Declared::class`,
 //! `pub(super) struct Script`, `pub(super) fn script(&Ast, &Tokens) -> Script`
 
 use std::collections::HashMap;
@@ -41,6 +41,10 @@ pub(super) struct Declared {
     arity: HashMap<(u32, String), usize>,
     /// The file's root block.
     root: u32,
+    /// `(block, folded subcircuit name)` → its `.subckt` node (the first definition).
+    nodes: HashMap<(u32, String), u32>,
+    /// Each `.subckt` node → the masters (folded) of the X cards directly in its body.
+    masters: HashMap<u32, Vec<String>>,
 }
 
 /// A file's script facts (R49): its script statements in file order, and whether a dot card
@@ -144,10 +148,23 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
                             d.heads
                                 .entry((block, name::key(&name)))
                                 .or_insert_with(|| (port_count(ast, toks, s), heads.collect()));
+                            d.nodes.entry((block, name::key(&name))).or_insert(s.0);
                         }
                     }
                     d.parent.insert(s.0, block);
                     stack.push(s);
+                }
+                Tag::Instance if ast.tag(container) == Tag::Subckt => {
+                    let card = toks.text(ast.main_token(s));
+                    if card.starts_with(['x', 'X']) {
+                        let line = rest(toks, ast, s);
+                        let words = line
+                            .split_whitespace()
+                            .take_while(|w| !w.contains('=') && !w.eq_ignore_ascii_case("params:"));
+                        if let Some(m) = words.last() {
+                            d.masters.entry(block).or_default().push(name::key(m));
+                        }
+                    }
                 }
                 Tag::If => {
                     let mut b = Some(s);
@@ -249,6 +266,42 @@ impl Declared {
         Some((*ports, f))
     }
 
+    /// Whether an X card in `block` naming `name` closes a cycle of instances (X0024): the
+    /// subcircuit it names is one that encloses `block`, or reaches one through the X cards of
+    /// its body and theirs (a worklist, each subcircuit once). This file's definitions only.
+    pub(super) fn cycles(&self, block: Node, name: &str) -> bool {
+        let mut enclosing = Vec::new();
+        let mut at = Some(block.0);
+        // Bounded by the nesting.
+        for _ in 0..=self.parent.len() {
+            let Some(b) = at else { break };
+            if self.nodes.values().any(|&n| n == b) {
+                enclosing.push(b);
+            }
+            at = self.parent.get(&b).copied();
+        }
+        let Some(first) = self.resolve(block.0, name) else {
+            return false;
+        };
+        let mut seen = vec![first];
+        let mut todo = vec![first];
+        // Bounded: each subcircuit is pushed once.
+        while let Some(sub) = todo.pop() {
+            if enclosing.contains(&sub) {
+                return true;
+            }
+            for m in self.masters.get(&sub).into_iter().flatten() {
+                if let Some(next) = self.resolve(sub, m)
+                    && !seen.contains(&next)
+                {
+                    seen.push(next);
+                    todo.push(next);
+                }
+            }
+        }
+        false
+    }
+
     /// The formal count of the `.func name` visible from `block`: the nearest block outward that
     /// defines it; `None` when this file has none there.
     pub(super) fn arity(&self, block: Node, name: &str) -> Option<usize> {
@@ -334,6 +387,23 @@ fn text(block: u32, def: Def, name: &str, text: String, formals: Vec<String>) ->
         name: name.to_string(),
         text,
         formals,
+    }
+}
+
+impl Declared {
+    /// The `.subckt` node `name` names from `block`: the nearest block outward that defines it.
+    fn resolve(&self, block: u32, name: &str) -> Option<u32> {
+        let key = name::key(name);
+        let mut at = Some(block);
+        // Bounded by the nesting.
+        for _ in 0..=self.parent.len() {
+            let b = at?;
+            if let Some(&n) = self.nodes.get(&(b, key.clone())) {
+                return Some(n);
+            }
+            at = self.parent.get(&b).copied();
+        }
+        None
     }
 }
 

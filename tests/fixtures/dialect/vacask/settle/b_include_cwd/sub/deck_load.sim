@@ -1,0 +1,7 @@
+b_load_cwd: a bare load from a deck in a subfolder
+load "myres.osdi"
+model rm sp_resistor
+r1 (n 0) rm r=3k
+control
+  print instance("r1")
+endc

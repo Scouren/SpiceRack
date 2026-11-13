@@ -1,0 +1,35 @@
+abs on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b221 (d221 0) v=abs(-2.5*($temp/$temp))
+r221 (d221 0) r r=1k
+b222 (d222 0) v=abs(-1.0*($temp/$temp))
+r222 (d222 0) r r=1k
+b223 (d223 0) v=abs(-0.5*($temp/$temp))
+r223 (d223 0) r r=1k
+b224 (d224 0) v=abs(-0.0*($temp/$temp))
+r224 (d224 0) r r=1k
+b225 (d225 0) v=abs(0.0*($temp/$temp))
+r225 (d225 0) r r=1k
+b226 (d226 0) v=abs(0.5*($temp/$temp))
+r226 (d226 0) r r=1k
+b227 (d227 0) v=abs(1.0*($temp/$temp))
+r227 (d227 0) r r=1k
+b228 (d228 0) v=abs(2.5*($temp/$temp))
+r228 (d228 0) r r=1k
+b229 (d229 0) v=abs(1e-3*($temp/$temp))
+r229 (d229 0) r r=1k
+b230 (d230 0) v=abs(1e3*($temp/$temp))
+r230 (d230 0) r r=1k
+b231 (d231 0) v=abs(-3*($temp/$temp))
+r231 (d231 0) r r=1k
+b232 (d232 0) v=abs(0*($temp/$temp))
+r232 (d232 0) r r=1k
+b233 (d233 0) v=abs(3*($temp/$temp))
+r233 (d233 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

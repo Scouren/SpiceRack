@@ -67,6 +67,11 @@ pub enum Ran {
 /// file dies at the cap (SIGXFSZ) instead of filling the disk.
 const FSIZE: u64 = 2 << 30;
 
+/// The same for a checked run (`run_checked`, the pair test's): 512 MiB a file, so a census's
+/// disk peak is bounded by its workers times the files a run writes times this, whatever the
+/// deck; a run past it is [`Ran::Timeout`] (a resource limit, named, never a result).
+const CHECKED_FSIZE: u64 = 512 << 20;
+
 /// The deck's own name inside the run directory: hidden, so it never shadows
 /// a file of the corpus beside it.
 const DECK: &str = ".cross_sim_deck";
@@ -214,7 +219,10 @@ fn run_in(
     c.arg((10 * secs).to_string())
         .arg("prlimit")
         .arg(format!("--cpu={secs}"))
-        .arg(format!("--fsize={FSIZE}"))
+        .arg(format!(
+            "--fsize={}",
+            if checked { CHECKED_FSIZE } else { FSIZE }
+        ))
         .env("OMP_NUM_THREADS", "1")
         .current_dir(dir);
     match sim {
@@ -610,7 +618,7 @@ mod tests {
     fn a_simulators_own_error_report_is_found() {
         // Oracle: the simulators' own output, recorded in .#testing (R70's F7 deck on
         // ngspice-45; VACASK on an analysis reading `$temp`, which exits 0 and writes op1.raw).
-        // A clean log of each has no report. Checks: 4.
+        // A clean log of each has no report. Checks: 5.
         let ng = "Circuit: alter_toplevel\nError: no such device or model name __topinst__\n\
                   No. of Data Rows : 1\n";
         let said = reported(Sim::Ngspice, ng);
@@ -624,6 +632,14 @@ mod tests {
         assert_eq!(
             said.as_deref(),
             Some("Variable or constant '$temp' not defined.")
+        );
+        // ngspice-45 -b on spice-bench's buggy-meas-tran.sp (light lane): a failed measure
+        // prints a line that does not start `Error`.
+        let meas = "Circuit: file: buggy-meas-tran.sp\n \
+                    .measure tran yint inter v(2) from=2m to=3m failed!\n";
+        assert_eq!(
+            reported(Sim::Ngspice, meas).as_deref(),
+            Some(".measure tran yint inter v(2) from=2m to=3m failed!")
         );
         assert_eq!(
             reported(Sim::Ngspice, "Circuit: rc\nNo. of Data Rows : 432\n"),

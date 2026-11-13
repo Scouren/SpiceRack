@@ -1,0 +1,9 @@
+b_incsec_top_after: the same parameter after the include ("Parameter redefinition.")
+load "spice/resistor.osdi"
+include "lib.lib" section=mc
+parameters pd=0.5
+model vsource vsource
+v1 (n 0) vsource dc=1
+control
+  analysis op1 op
+endc

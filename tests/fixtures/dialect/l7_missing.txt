@@ -29,7 +29,7 @@ ngspice Analysis(DcInc) owed from=vacask
 ngspice Analysis(TimedOp) unspoken
 ngspice Expr(List) unspoken
 ngspice Func(PowRe) unspoken
-ngspice Func(Atan2) owed from=vacask
+ngspice Func(Atan2) unspoken
 ngspice Func(Hypot) owed from=vacask
 ngspice Func(Clamp) unspoken
 ngspice Func(Ddt) unspoken
@@ -102,7 +102,6 @@ ngspice Circuit(TcBaseTnom) unspoken
 ngspice Run(TranStartup) unspoken
 ngspice Run(TranNoise) owed from=vacask
 ngspice Run(TranSegments) unspoken
-ngspice Run(DcRestart) unspoken
 ngspice Run(DcAxisParam) owed from=vacask
 ngspice Run(DcAxisSubcktParam) unspoken
 ngspice Run(DcAxisOption) owed from=vacask
@@ -133,7 +132,6 @@ ngspice Run(PssDriven) unspoken
 ngspice Run(PeriodicRelative) unspoken
 ngspice Run(LoopTable) unspoken
 ngspice Run(LoopMonteCarlo) owed from=vacask
-ngspice Run(LoopRestore) owed from=vacask
 ngspice Run(LoopTemp) owed from=vacask
 ngspice Run(LoopSubcktParam) unspoken
 ngspice Run(LoopOption) owed from=vacask
@@ -171,7 +169,6 @@ ngspice Run(NodeSetMidRun) owed from=vacask
 ngspice Run(NodeSetFromHere) owed from=vacask
 ngspice Run(PssOscDiff) unspoken
 ngspice Run(PssArgumentOmitted) unspoken
-ngspice Run(AlterParamAtOnce) owed from=vacask
 ngspice Run(DcOuterCarries) owed from=vacask
 ngspice Option(MethodEuler) owed from=vacask
 ngspice Option(MaxStep) unspoken
@@ -298,8 +295,6 @@ vacask Elem(Laplace) unspoken
 vacask Elem(FreqTable) unspoken
 vacask Elem(Delay) unspoken
 vacask Elem(Bjt) owed from=ngspice
-vacask Elem(Jfet) owed from=ngspice
-vacask Elem(Mesfet) owed from=ngspice
 vacask Elem(Igbt) unspoken
 vacask Elem(VSwitch) owed from=ngspice
 vacask Elem(ISwitch) owed from=ngspice
@@ -329,6 +324,7 @@ vacask Analysis(TimedOp) unspoken
 vacask Expr(Freq) owed from=ngspice
 vacask Expr(List) unspoken
 vacask Func(PowRe) unspoken
+vacask Func(Atan2) unspoken
 vacask Func(Clamp) unspoken
 vacask Func(Ddt) unspoken
 vacask Func(Idt) unspoken
@@ -348,7 +344,6 @@ vacask Extra(FormalOuterRead) unspoken
 vacask Extra(FormalUnboundRead) owed from=ngspice
 vacask Circuit(MultInstanceParallel) unspoken
 vacask Circuit(MultInstanceNgspiceAppend) owed from=ngspice
-vacask Circuit(IcUicOnly) owed from=ngspice
 vacask Circuit(IcInOp) unspoken
 vacask Circuit(PassiveDynamicValue) owed from=ngspice
 vacask Circuit(PassiveAc) owed from=ngspice
@@ -489,11 +484,9 @@ vacask Run(ResetValues) owed from=ngspice
 vacask Run(ResetOptions) owed from=ngspice
 vacask Run(ResetTemp) owed from=ngspice
 vacask Run(ResetTnom) owed from=ngspice
-vacask Run(AnalysisParamArgument) owed from=ngspice
 vacask Run(PssArgumentOmitted) unspoken
 vacask Run(AlterParamAtReset) owed from=ngspice
 vacask Run(DcOuterAfresh) owed from=ngspice
-vacask Option(TrTol) owed from=ngspice
 vacask Option(PivTol) owed from=ngspice
 vacask Option(PivRel) owed from=ngspice
 vacask Option(MethodGear) owed from=ngspice
