@@ -408,15 +408,16 @@ mod tests {
     /// R48 (d): a generated element that names a model mostly names one the design defines,
     /// visible from it (the generator binds it; `check` confirms the binding is legal).
     /// Oracle: the share of elements with a bound model, per kind that takes a model, over
-    /// 1000 seeds of the circuit set, against a floor; each kind is seen often enough to count.
+    /// 1500 seeds of the circuit set, against a floor; each kind is seen often enough to count.
     #[test]
     fn a_named_model_mostly_exists() {
         const FLOOR: f64 = 0.6;
-        // the rarest kinds (a source naming a builtin model) are seen 14 to 19 times here
+        // the rarest kinds (a source naming a builtin model) are seen 20 to 30 times here: a
+        // source with no visible model is now bare, not a fresh name, so 1500 seeds
         const SEEN_MIN: u32 = 12;
         let mut named = [0u32; ElemKind::COUNT];
         let mut bound = [0u32; ElemKind::COUNT];
-        for seed in 0..1000u64 {
+        for seed in 0..1500u64 {
             let d = generate(seed, &circuit_set(), SIZE);
             for (item, _) in d.reachable() {
                 if item.kind != ItemKind::Element {
@@ -444,5 +445,46 @@ mod tests {
             low.is_empty(),
             "below {FLOOR} or seen under {SEEN_MIN} times: {low:?}"
         );
+    }
+
+    /// An element whose model is optional (a passive, an independent or controlled source, a
+    /// lossless line) is drawn bare or bound to a visible model of its family, never with a
+    /// fresh name no statement defines: no simulator runs `capacitor c1 (a 0) model=g30` with no
+    /// `g30` anywhere, and such a draw starves the laws of the kind (vacask-2, seed 1). A kind
+    /// that needs a model may still name an absent one (R48 d: an absent kit stays legal).
+    #[test]
+    fn an_optional_model_is_bare_or_bound() {
+        let optional = [
+            ElemKind::Resistor,
+            ElemKind::Capacitor,
+            ElemKind::Inductor,
+            ElemKind::VSource,
+            ElemKind::ISource,
+            ElemKind::Vcvs,
+            ElemKind::Vccs,
+            ElemKind::Cccs,
+            ElemKind::Ccvs,
+            ElemKind::LosslessLine,
+        ];
+        // with bare elements allowed, and without (VACASK's set: every instance names a model)
+        let strict = full_set()
+            .minus(FeatureSet::EMPTY.with(Feature::Circuit(CircuitExtra::ElementWithoutModel)));
+        for (seed, set) in (0..300u64).flat_map(|s| [(s, full_set()), (s, strict)]) {
+            let d = generate(seed, &set, SIZE);
+            for (item, _) in d.reachable() {
+                if item.kind != ItemKind::Element {
+                    continue;
+                }
+                let e: spicerack_ir::Element = d.row(item.index);
+                let fresh = !e.model.name.is_none() && !e.model.is_resolved();
+                assert!(
+                    !(optional.contains(&e.kind) && fresh),
+                    "seed {seed}: {:?} {} names the undefined model {}",
+                    e.kind,
+                    d.str(e.name),
+                    d.str(e.model.name)
+                );
+            }
+        }
     }
 }
