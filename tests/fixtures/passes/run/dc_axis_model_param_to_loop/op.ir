@@ -2,4 +2,4 @@ file "a.sp" deck
   model dmod diode
   element vsource v1 (a 0) dc=0.7
   element diode d1 (a 0) model=dmod
-  analysis dc (model_param dmod is) (list values=[1e-14, 2e-14]) restart
+  analysis dc (model_param dmod is) (list values=[1e-14, 2e-14]) afresh

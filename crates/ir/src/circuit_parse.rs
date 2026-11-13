@@ -219,7 +219,7 @@ pub(crate) fn parse_library(
     // bounded: each pass consumes at least one word of the line
     while !words.at_end() {
         match words.key() {
-            Some("path") => match words.string(diags) {
+            Some("path") => match words.path(diags) {
                 Some(p) => path = b.name(&p),
                 None => return ItemRef::NONE,
             },

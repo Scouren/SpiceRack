@@ -147,6 +147,11 @@ pub(super) const PROVEN: &[&str] = &[
     // (run semi_bjt; VD dev-spice "Known differences", base-collector saturation current).
     "sp_diode",
     "sp_mos1",
+    // F11: each a pair deck at step 4 (tests/fixtures/pair/vacask-ngspice/sp_*inv.sim).
+    "sp_mos3",
+    "sp_mos6",
+    "sp_mos9",
+    "sp_jfet1",
 ];
 
 /// A shipped module's parameter names, as `params.txt` lists them.

@@ -1,0 +1,17 @@
+# Oracle: settle b_cycle_self, b_cycle_two (VACASK 36be560: "Hierarchical recursion
+# detected." at the instance that closes the cycle, when the top level reaches it): every
+# instance on the cycle is InvalidInSource P2130 (the IR holds no instance cycle, X0024);
+# settle b_cycle_unused (a cycle nothing instantiates runs): Private P2131.
+# codes: P2130 P2130 P2130 P2131 S0002 S0004 S0004 S0004
+file "b_recursion.sim" deck
+  title "recursion"
+  subckt s (a b)
+    opaque vacask invalid "x1 (a b) s"
+  subckt p (a b)
+    opaque vacask invalid "xq (a b) q"
+  subckt q (a b)
+    opaque vacask invalid "xp (a b) p"
+  subckt u (a b)
+    opaque vacask private "xu (a b) u"
+  element instance x0 (n 0) model=s
+  element instance x2 (n 0) model=p

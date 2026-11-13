@@ -57,6 +57,7 @@ pub mod build;
 pub mod build_expr;
 mod case;
 pub mod check;
+mod check_legal;
 mod check_scopes;
 pub mod class;
 pub mod design;
@@ -69,12 +70,11 @@ pub mod feature;
 pub mod form;
 #[cfg(any(test, feature = "gen"))]
 mod gen_expr;
-#[cfg(any(test, feature = "gen"))]
-mod gen_rows;
 pub mod id;
 pub mod item;
 pub mod item_facts;
 mod item_facts_defs;
+mod item_facts_scopes;
 pub mod item_text;
 pub mod link;
 pub mod literal;
@@ -103,6 +103,7 @@ mod circuit_tables;
 mod circuit_text;
 pub mod controlled;
 pub mod element;
+mod hierarchy;
 pub mod letter;
 pub mod library;
 pub mod line;
@@ -123,6 +124,7 @@ pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 pub use wave_eval::{At, WaveDomain, source_value, wave_value};
 
 // run owner
+#[macro_use]
 pub mod analysis;
 mod analysis_facts;
 pub mod build_run;
@@ -171,7 +173,7 @@ pub use id::{
     Ref, ScopeId, TextId,
 };
 pub use item::{DefKind, ItemKind, LoadKind, OpaqueClass, Role, ScopeKind};
-pub use link::{UnboundRead, link, unbound_reads};
+pub use link::{UnboundRead, UnboundTarget, link, unbound_reads, unbound_targets};
 pub use mark::Mark;
 pub use measure::{Edge, Event, EventKind, MeasureKind, Stat};
 pub use option::{Applies, Env, IcScope, NodeSet, NodeSetKind, OptionRow};

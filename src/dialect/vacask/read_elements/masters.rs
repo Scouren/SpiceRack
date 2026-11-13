@@ -11,8 +11,12 @@
 //! And each instance's master and `type` word, so a `sweep` can tell an independent source's DC
 //! value from a device parameter (R64: `Aimed`, `Declared::aim`, `Declared::by_section`).
 //!
-//! Contents: `Declared`, `Master`, `Found`, `declare`, `find`, `Aimed`, `Declared::aim`, `Declared::by_section`
-//! (crate-private to the dialect)
+//! And each subcircuit instance on a cycle of the instance graph (`Declared::recursion`: VACASK's
+//! "Hierarchical recursion detected.", settle b_cycle_self, b_cycle_two; one nothing reaches
+//! from the top level runs, b_cycle_unused).
+//!
+//! Contents: `Declared`, `Master`, `Found`, `declare`, `find`, `Aimed`, `Declared::aim`,
+//! `Declared::by_section`, `Declared::recursion` (crate-private to the dialect)
 
 use std::collections::{HashMap, HashSet};
 
@@ -40,6 +44,9 @@ pub(in crate::dialect::vacask) struct Declared {
     /// read by section, so its text outside every section is skipped (settle
     /// star_outside_section); a file included whole reads it all (settle plain_include).
     section_included: HashSet<String>,
+    /// Each subcircuit instance on a cycle of the instance graph → whether the top level (or an
+    /// `elaborate`) reaches the cycle.
+    recursive: HashMap<(Holder, String), bool>,
 }
 
 /// What a run statement's instance parameter aims at ([`Declared::aim`]).
@@ -86,6 +93,13 @@ pub(in crate::dialect::vacask) enum Found {
 /// An instance's master name (`None`: a behavioural source) and its `type="…"` word.
 type Inst = (Option<String>, Option<String>);
 
+/// An edge of the instance graph: its holder's node, its body's node, the instance (`None`: an
+/// `elaborate`'s edge from the top).
+type Edge<'a> = (usize, usize, Option<&'a (Holder, String)>);
+
+// ponytail: every scope outside a subcircuit is one `Top` and an include inside a subcircuit
+// body is not followed for the kind lookup (`find`, `aim`); the binding itself (`visible.rs`)
+// follows both. Raise it when a deck has an include inside a subcircuit body.
 /// Which scope holds a declaration: the top of every file (VACASK's include is textual), or a
 /// subcircuit, by its file and its statement's start byte (the IR item's span start).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -189,6 +203,7 @@ pub(in crate::dialect::vacask) fn declare(csts: &[(Cst<'_>, ir::ScopeId)]) -> De
             }
         }
     }
+    out.recursive = recursive(&out);
     out
 }
 
@@ -313,6 +328,23 @@ impl Declared {
         self.section_included.contains(file_name(path))
     }
 
+    /// Whether the subcircuit instance `name` of the current scope closes a cycle of the instance
+    /// graph (`None`: it does not), and if so whether the top level or an `elaborate` reaches it.
+    pub(in crate::dialect::vacask) fn recursion(
+        &self,
+        l: &Lower<'_, '_, '_>,
+        name: &str,
+    ) -> Option<bool> {
+        self.recursive.get(&(holder(l), name.to_string())).copied()
+    }
+
+    /// The body `master` names from `at`: the holder's own subcircuit, then the top's.
+    fn body(&self, at: Holder, master: &str) -> Option<Holder> {
+        [at, Holder::Top]
+            .iter()
+            .find_map(|&h| self.bodies.get(&(h, master.to_string())).copied())
+    }
+
     /// The master `name` seen from `at`: the holder's own, then the top's.
     fn master(&self, at: Holder, name: &str) -> Option<&Master> {
         [at, Holder::Top]
@@ -341,6 +373,91 @@ fn holder(l: &Lower<'_, '_, '_>) -> Holder {
         }
     }
     Holder::Top
+}
+
+/// Each instance on a cycle of `d`'s instance graph (holders as nodes, an instance an edge from
+/// its holder to its master's body; the top level's edges to each `elaborate`d body too) → whether
+/// the top reaches its holder. An edge is on a cycle when both ends share a strongly connected
+/// component (Kosaraju, two explicit-stack walks).
+fn recursive(d: &Declared) -> HashMap<(Holder, String), bool> {
+    let mut index: HashMap<Holder, usize> = HashMap::from([(Holder::Top, 0)]);
+    let mut nodes = vec![Holder::Top];
+    let mut id = |h: Holder| {
+        *index.entry(h).or_insert_with(|| {
+            nodes.push(h);
+            nodes.len() - 1
+        })
+    };
+    // (from, to, the instance; `None` for an `elaborate`'s edge)
+    let mut edges: Vec<Edge<'_>> = Vec::new();
+    for (key, (master, _)) in &d.instances {
+        if let Some(body) = master.as_deref().and_then(|m| d.body(key.0, m)) {
+            edges.push((id(key.0), id(body), Some(key)));
+        }
+    }
+    let elaborated = d.elaborated.iter().flat_map(|(_, _, subs)| subs);
+    for body in elaborated.filter_map(|s| d.body(Holder::Top, s)) {
+        edges.push((0, id(body), None));
+    }
+    let n = nodes.len();
+    let (mut adj, mut radj) = (vec![Vec::new(); n], vec![Vec::new(); n]);
+    for &(u, w, _) in &edges {
+        adj[u].push(w);
+        radj[w].push(u);
+    }
+    // First walk: the finish order. Bounded: each node is entered once, each edge read once.
+    let (mut seen, mut order) = (vec![false; n], Vec::with_capacity(n));
+    for s in 0..n {
+        if std::mem::replace(&mut seen[s], true) {
+            continue;
+        }
+        let mut stack = vec![(s, 0usize)];
+        while let Some((v, k)) = stack.pop() {
+            match adj[v].get(k) {
+                Some(&w) => {
+                    stack.push((v, k + 1));
+                    if !std::mem::replace(&mut seen[w], true) {
+                        stack.push((w, 0));
+                    }
+                }
+                None => order.push(v),
+            }
+        }
+    }
+    assert!(order.len() == n, "every node finished once");
+    // Second walk, on the reversed graph in reverse finish order: the components.
+    let mut comp = vec![usize::MAX; n];
+    for (c, &s) in order.iter().rev().enumerate() {
+        if comp[s] != usize::MAX {
+            continue;
+        }
+        comp[s] = c;
+        let mut stack = vec![s];
+        while let Some(v) = stack.pop() {
+            for &w in &radj[v] {
+                if comp[w] == usize::MAX {
+                    comp[w] = c;
+                    stack.push(w);
+                }
+            }
+        }
+    }
+    // What the top reaches. Bounded: each node is pushed once.
+    let mut reached = vec![false; n];
+    reached[0] = true;
+    let mut stack = vec![0];
+    while let Some(v) = stack.pop() {
+        for &w in &adj[v] {
+            if !std::mem::replace(&mut reached[w], true) {
+                stack.push(w);
+            }
+        }
+    }
+    edges
+        .into_iter()
+        .filter(|&(u, w, _)| comp[u] == comp[w])
+        .filter_map(|(u, _, key)| key.map(|k| (k.clone(), reached[u])))
+        .collect()
 }
 
 /// The last part of `path` (after the last `/`).

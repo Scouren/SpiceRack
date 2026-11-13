@@ -14,6 +14,7 @@
 //! Contents: `pub struct Vacask` (`impl Read`, `impl Write`), `pub static VACASK: Vacask`,
 //! `pub static FEATURES: ir::FeatureSet`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
+mod atan2;
 mod bind;
 mod codes;
 mod expr_read;
@@ -30,6 +31,7 @@ mod read_run;
 mod read_sources;
 mod read_structure;
 mod tables;
+mod visible;
 mod write;
 mod write_elements;
 mod write_models;
@@ -126,9 +128,9 @@ impl Write for Vacask {
         design: &ir::Design,
         file: ir::FileId,
         out: &mut String,
-        _diags: &mut ir::Diags,
+        diags: &mut ir::Diags,
     ) {
-        write::write(design, file, out);
+        write::write(design, file, out, diags);
     }
 }
 

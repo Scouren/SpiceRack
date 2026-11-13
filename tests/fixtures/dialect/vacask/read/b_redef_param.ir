@@ -1,0 +1,11 @@
+# Oracle: settle b_incsec_top_before, b_incsec_top_after (VACASK 36be560: "Parameter
+# redefinition.", exit 1, in either order): the second definition in the expanded text, dfl's
+# pd, gets P2030; both definitions stay in the IR.
+# codes: P2030
+file "b_redef_param.sim" deck
+  title "a parameter in the deck and in an included section"
+  param pd = 0.5
+  include "b_redef_param--lib.lib" section=a
+file "b_redef_param--lib.lib" library
+  section a
+    param pd = 0.1

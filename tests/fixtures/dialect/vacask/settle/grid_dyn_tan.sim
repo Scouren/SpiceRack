@@ -1,0 +1,35 @@
+tan on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b26 (d26 0) v=tan(-2.5*($temp/$temp))
+r26 (d26 0) r r=1k
+b27 (d27 0) v=tan(-1.0*($temp/$temp))
+r27 (d27 0) r r=1k
+b28 (d28 0) v=tan(-0.5*($temp/$temp))
+r28 (d28 0) r r=1k
+b29 (d29 0) v=tan(-0.0*($temp/$temp))
+r29 (d29 0) r r=1k
+b30 (d30 0) v=tan(0.0*($temp/$temp))
+r30 (d30 0) r r=1k
+b31 (d31 0) v=tan(0.5*($temp/$temp))
+r31 (d31 0) r r=1k
+b32 (d32 0) v=tan(1.0*($temp/$temp))
+r32 (d32 0) r r=1k
+b33 (d33 0) v=tan(2.5*($temp/$temp))
+r33 (d33 0) r r=1k
+b34 (d34 0) v=tan(1e-3*($temp/$temp))
+r34 (d34 0) r r=1k
+b35 (d35 0) v=tan(1e3*($temp/$temp))
+r35 (d35 0) r r=1k
+b36 (d36 0) v=tan(-3*($temp/$temp))
+r36 (d36 0) r r=1k
+b37 (d37 0) v=tan(0*($temp/$temp))
+r37 (d37 0) r r=1k
+b38 (d38 0) v=tan(3*($temp/$temp))
+r38 (d38 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

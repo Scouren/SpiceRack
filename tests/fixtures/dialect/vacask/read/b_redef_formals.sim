@@ -1,0 +1,2 @@
+two included subcircuits with formals of one name
+include "b_redef_formals--lib.inc"

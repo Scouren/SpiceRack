@@ -13,10 +13,12 @@
 //! `DetailFacts::map_names`,
 //! `DetailFacts::features`,
 //! `DetailFacts::fault`, `DetailFacts::dump`, `DetailFacts::parse`, `DetailFacts::generate`),
-//! `pub(crate) fn detail_get`, `pub(crate) fn report`, `pub(crate) fn base_before`,
+//! `pub(crate) fn report`, `pub(crate) fn base_before`,
 //! `pub(crate) fn base_just_before`, `pub(crate) fn handles_of`, `pub(crate) fn features_of`,
 //! `pub(crate) fn fault_of`, `pub(crate) fn dump_of`, `pub(crate) fn parse_of`,
-//! `pub(crate) fn gen_of`, `pub(crate) fn analysis_name` (gen); `RowFacts` for `Analysis`
+//! `pub(crate) fn gen_of`, `pub(crate) fn analysis_name` (gen),
+//! `pub(crate) fn check_run_arguments`, `pub(crate) fn run_arguments_read_param`,
+//! `pub(crate) fn run_arguments` (gen); `RowFacts` for `Analysis`
 
 use crate::analysis::{Analysis, AnalysisKind, RunDetail};
 use crate::build::Builder;
@@ -31,7 +33,7 @@ use crate::r#gen::Gen;
 use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind};
 use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
-use crate::plan::{target_refs, target_refs_into};
+use crate::plan::target_refs;
 use crate::run_exprs::{Roots, exprs_of};
 use crate::run_extra::RunExtra;
 use crate::run_names::{Names, names_of};
@@ -94,37 +96,18 @@ const PERIODIC: [AnalysisKind; 4] = [
 /// without one). Exhaustive: a new kind fails to compile here.
 macro_rules! by_detail {
     ($kind:expr, $none:expr, $f:ident ( $($a:expr),* )) => {
-        match $kind {
-            AnalysisKind::Op | AnalysisKind::DcInc => $none,
-            AnalysisKind::Dc => $f::<Dc>($($a),*),
-            AnalysisKind::Ac => $f::<Ac>($($a),*),
-            AnalysisKind::Tran => $f::<Tran>($($a),*),
-            AnalysisKind::Noise => $f::<Noise>($($a),*),
-            AnalysisKind::Tf => $f::<Tf>($($a),*),
-            AnalysisKind::DcXf => $f::<DcXf>($($a),*),
-            AnalysisKind::Xf => $f::<Xf>($($a),*),
-            AnalysisKind::Sens => $f::<Sens>($($a),*),
-            AnalysisKind::SensAc => $f::<SensAc>($($a),*),
-            AnalysisKind::Pz => $f::<Pz>($($a),*),
-            AnalysisKind::Sp => $f::<Sp>($($a),*),
-            AnalysisKind::Net => $f::<Net>($($a),*),
-            AnalysisKind::Four => $f::<Four>($($a),*),
-            AnalysisKind::Disto => $f::<Disto>($($a),*),
-            AnalysisKind::Hb => $f::<Hb>($($a),*),
-            AnalysisKind::Pss => $f::<Pss>($($a),*),
-            AnalysisKind::Pac => $f::<Pac>($($a),*),
-            AnalysisKind::Pnoise => $f::<Pnoise>($($a),*),
-            AnalysisKind::Pxf => $f::<Pxf>($($a),*),
-            AnalysisKind::Pstb => $f::<Pstb>($($a),*),
-            AnalysisKind::Stb => $f::<Stb>($($a),*),
-            AnalysisKind::TimedOp => $f::<TimedOp>($($a),*),
-        }
+        with_analysis_details!(by_detail_arms!($kind, $none, $f, ($($a),*)))
     };
 }
 
-/// The detail row at `index` of `D`'s table, or `None` when out of range.
-pub(crate) fn detail_get<D: RunDetail>(design: &Design, index: u32) -> Option<D> {
-    D::rows(design).get(index as usize).copied()
+/// `by_detail!`'s match over the list of `with_analysis_details!`.
+macro_rules! by_detail_arms {
+    (($kind:expr, $none:expr, $f:ident, $args:tt) $($v:ident => $row:ty, $field:ident;)*) => {
+        match $kind {
+            AnalysisKind::Op | AnalysisKind::DcInc => $none,
+            $(AnalysisKind::$v => $f::<$row> $args,)*
+        }
+    };
 }
 
 /// Appends violation `v` of item `at` (`arg`: the item's row).
@@ -175,7 +158,7 @@ impl RowFacts for Analysis {
         if row.kind != AnalysisKind::Dc {
             return;
         }
-        let Some(dc) = detail_get::<Dc>(design, row.detail) else {
+        let Some(dc) = crate::circuit_text::get_row::<Dc>(design, row.detail) else {
             return;
         };
         let start = dc.axes.start as usize;
@@ -195,21 +178,6 @@ impl RowFacts for Analysis {
         by_detail!(row.kind, (), names_of(design, row.detail, f));
     }
 
-    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        // `map_refs`'s order: a DC sweep's axes' targets
-        if self.kind != AnalysisKind::Dc {
-            return;
-        }
-        let Some(dc) = detail_get::<Dc>(design, self.detail) else {
-            return;
-        };
-        let start = dc.axes.start as usize;
-        let end = (start + dc.axes.len as usize).min(design.run.dc_axes.len());
-        for axis in &design.run.dc_axes[start.min(end)..end] {
-            target_refs_into(&axis.target, out);
-        }
-    }
-
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         *set = set.with(Feature::Analysis(self.kind));
         let named = if self.name.is_none() {
@@ -219,6 +187,11 @@ impl RowFacts for Analysis {
         };
         *set = set.with(Feature::Run(named));
         by_detail!(self.kind, (), features_of(design, self.detail, set));
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        if run_arguments_read_param(design, &handles) {
+            *set = set.with(Feature::Run(RunExtra::AnalysisParamArgument));
+        }
     }
 
     fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
@@ -230,6 +203,9 @@ impl RowFacts for Analysis {
         if let Some(v) = fault {
             report(design, at, v, out);
         }
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        check_run_arguments(design, at, &handles, out);
         let rows = Analysis::table(design).rows();
         let earlier = &rows[..(at.index as usize).min(rows.len())];
         if !self.name.is_none() && earlier.iter().any(|a| a.name == self.name) {
@@ -321,8 +297,10 @@ impl RowFacts for Analysis {
         }
         // The name first: the text, and so the parse, interns it before the detail's names.
         let name = analysis_name(g, b, features);
-        let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
-            .expect("a possible kind's detail generates");
+        let detail = run_arguments(g, features, |g| {
+            by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+        })
+        .expect("a possible kind's detail generates");
         let item = b.push(
             scope,
             Analysis { kind, name, detail },
@@ -345,8 +323,10 @@ impl RowFacts for Analysis {
             if !follow.is_empty() {
                 let kind = follow[g.below(follow.len() as u32) as usize];
                 let name = analysis_name(g, b, features);
-                let detail = by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
-                    .expect("a periodic kind generates right after its base");
+                let detail = run_arguments(g, features, |g| {
+                    by_detail!(kind, Some(u32::MAX), gen_of(g, scope, b, features))
+                })
+                .expect("a periodic kind generates right after its base");
                 b.push(
                     scope,
                     Analysis { kind, name, detail },
@@ -361,21 +341,21 @@ impl RowFacts for Analysis {
 
 /// `DetailFacts::handles` of `D`'s row at `index`, when it exists.
 pub(crate) fn handles_of<D: DetailFacts>(design: &Design, index: u32, out: &mut Vec<Handle>) {
-    if let Some(d) = detail_get::<D>(design, index) {
+    if let Some(d) = crate::circuit_text::get_row::<D>(design, index) {
         d.handles(design, out);
     }
 }
 
 /// `DetailFacts::features` of `D`'s row at `index`, when it exists.
 pub(crate) fn features_of<D: DetailFacts>(design: &Design, index: u32, set: &mut FeatureSet) {
-    if let Some(d) = detail_get::<D>(design, index) {
+    if let Some(d) = crate::circuit_text::get_row::<D>(design, index) {
         d.features(design, set);
     }
 }
 
 /// `DetailFacts::fault` of `D`'s row at `index`; `DetailRow` when it does not exist.
 pub(crate) fn fault_of<D: DetailFacts>(design: &Design, index: u32) -> Option<Violation> {
-    match detail_get::<D>(design, index) {
+    match crate::circuit_text::get_row::<D>(design, index) {
         Some(d) => d.fault(design),
         None => Some(Violation::DetailRow),
     }
@@ -383,7 +363,8 @@ pub(crate) fn fault_of<D: DetailFacts>(design: &Design, index: u32) -> Option<Vi
 
 /// `DetailFacts::dump` of `D`'s row at `index` (a checked design has it).
 pub(crate) fn dump_of<D: DetailFacts>(design: &Design, ctx: &Ctx, index: u32, out: &mut String) {
-    let d = detail_get::<D>(design, index).expect("dump of a checked design: the detail exists");
+    let d = crate::circuit_text::get_row::<D>(design, index)
+        .expect("dump of a checked design: the detail exists");
     d.dump(design, ctx, out);
 }
 
@@ -443,6 +424,86 @@ pub(crate) fn analysis_name(g: &mut Gen, b: &mut Builder<'_>, features: &Feature
     .expect("a naming feature is in the set")
 }
 
+/// R68/A42: the constant roots `handles` lists (an analysis's own arguments, a sweep loop's
+/// range) whose class is `Temp` or above, each reported as `RunArgumentClass` at `at`.
+pub(crate) fn check_run_arguments(
+    design: &Design,
+    at: ItemRef,
+    handles: &[Handle],
+    out: &mut Diags,
+) {
+    let table = crate::class::def_classes(design);
+    for (root, use_) in crate::feature::roots_with_use(design, ItemRef::NONE, handles) {
+        let class = crate::class::tree_class(design, root, table);
+        if use_ == ExprUse::Constant && class >= crate::class::ExprClass::Temp {
+            let code = violation_code(Violation::RunArgumentClass);
+            out.push_at(code, design, at, root.0);
+        }
+    }
+}
+
+/// R68/A42: whether a constant root `handles` lists (an analysis's own argument, a sweep
+/// loop's range) reads a parameter (`RunExtra::AnalysisParamArgument`): in its own tree, or in
+/// the body of a function it calls, transitively (a formal's read is not one), so inlining a
+/// call neither adds nor removes the feature. O(the roots' trees and the bodies they reach).
+pub(crate) fn run_arguments_read_param(design: &Design, handles: &[Handle]) -> bool {
+    let roots = crate::feature::roots_with_use(design, ItemRef::NONE, handles);
+    let mut work: Vec<ExprId> = roots
+        .into_iter()
+        .filter(|&(_, use_)| use_ == ExprUse::Constant)
+        .map(|(root, _)| root)
+        .collect();
+    let mut called: Vec<crate::id::DefId> = Vec::new();
+    let mut nodes = Vec::new();
+    // bounded: each root once, each function body once
+    while let Some(root) = work.pop() {
+        nodes.clear();
+        crate::class::tree_nodes(design, root, &mut nodes);
+        for &e in &nodes {
+            match design.expr(e) {
+                crate::expr::Expr::Param(r) => {
+                    let formal = r
+                        .def
+                        .index_checked(design.defs.len())
+                        .is_some_and(|k| design.defs[k].kind == DefKind::Func);
+                    if !formal {
+                        return true;
+                    }
+                }
+                crate::expr::Expr::UserCall(r, _) => {
+                    let Some(k) = r.def.index_checked(design.defs.len()) else {
+                        continue;
+                    };
+                    let def = design.defs[k];
+                    let body = def.kind == DefKind::Func && def.item.kind == ItemKind::Func;
+                    if body && !called.contains(&r.def) {
+                        called.push(r.def);
+                        work.push(design.row::<crate::item::Func>(def.item.index).body);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+/// Runs `f` with the generator drawing an analysis's own arguments (R68/A42): constant class
+/// only, and a parameter read only when the set holds `AnalysisParamArgument`.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn run_arguments<T>(
+    g: &mut Gen,
+    features: &FeatureSet,
+    f: impl FnOnce(&mut Gen) -> T,
+) -> T {
+    let saved = (g.constant_only, g.param_reads);
+    let reads = features.contains(Feature::Run(RunExtra::AnalysisParamArgument));
+    (g.constant_only, g.param_reads) = (true, saved.1 && reads);
+    let value = f(g);
+    (g.constant_only, g.param_reads) = saved;
+    value
+}
+
 // ---- private ----
 
 /// Whether `kind`'s detail generator succeeds here under `features` (its only failures; the
@@ -464,7 +525,11 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
                     .into_iter()
                     .any(has))
         }
-        AnalysisKind::Pss => has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous),
+        AnalysisKind::Pss => {
+            (has(RunExtra::PssDriven) || has(RunExtra::PssAutonomous))
+                && (has(RunExtra::PssArgumentOmitted)
+                    || has(RunExtra::PssScIter) && has(RunExtra::PssSteadyCoeff))
+        }
         AnalysisKind::Pac | AnalysisKind::Pnoise | AnalysisKind::Pxf | AnalysisKind::Pstb => {
             base_just_before(b.design(), scope) && sweep_possible(features, SweepUse::Freq)
         }

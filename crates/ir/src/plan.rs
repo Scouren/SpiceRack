@@ -23,13 +23,14 @@
 //! Contents:
 //! - `pub struct Loop`, `pub enum LoopKind`, `pub enum LoopEnd`, `pub struct SweepLoop`,
 //!   `pub struct TableLoop`, `pub struct MonteCarlo`, `pub enum Variations`, `pub enum Sampler`,
-//!   `pub struct Alter`, `pub struct Elaborate`, `pub type RefList`, `pub struct Target`, `pub enum TargetKind`, `pub type TargetList`,
+//!   `pub struct Alter`, `pub enum AlterEffect`, `pub struct Elaborate`, `pub type RefList`, `pub struct Target`, `pub enum TargetKind`, `pub type TargetList`,
 //!   `pub const LOOP_DEPTH_MAX`; on each enum: `ALL`, `COUNT`
 //! - `Target::TEMP`, `TargetKind::def_kind(self) -> Option<DefKind>`,
+//!   `TargetKind::is_parameter(self) -> bool`,
 //!   `Design::targets(&self, TargetList) -> &[Target]`, `Design::refs(&self, RefList) -> &[Ref]`
 //! - the run rows' target facts: `pub(crate) TargetKind::reads_b`,
 //!   `pub(crate) TargetKind::has_path`, `pub(crate) enum TargetUse`,
-//!   `pub(crate) fn target_handles`, `pub(crate) fn target_refs`, `pub(crate) fn target_refs_into`, `pub(crate) fn target_valid`,
+//!   `pub(crate) fn target_handles`, `pub(crate) fn target_refs`, `pub(crate) fn target_valid`,
 //!   `pub(crate) fn target_features`, `pub(crate) fn dump_target`, `pub(crate) fn parse_target`,
 //!   `pub(crate) fn gen_target`, `pub(crate) fn target_kinds`, `pub(crate) fn gen_ref`
 //! - (`RowFacts` for `Loop` and `Alter`, and the loop details' facts: `plan_facts.rs`)
@@ -174,6 +175,32 @@ pub struct Alter {
     pub target: Target,
     /// Its new value; never `NONE`. A string value (VACASK `type="dc"`) is an `Expr::Str`.
     pub value: ExprId,
+    /// When an alter of a parameter (`TargetKind::Param`, `SubcktParam`) takes effect for the
+    /// analyses after it (R70/A43); `AtOnce` for every other target (checked).
+    pub effect: AlterEffect,
+}
+
+/// When a parameter alter takes effect (R70/A43). R58's evidence: VACASK re-elaborates at the
+/// alter (`alter instance("__topinst__") a=2` between two operating points gives the new value
+/// at the second: the pair deck `alter_toplevel.sim`, `pair-test` b213ada2); ngspice's
+/// `alterparam` takes effect only at the next `reset`, which re-reads the deck with it
+/// (ngspice-45 settle runs, `step2-ngspice` d8221c3e, `tests/fixtures/dialect/ngspice/settle/`:
+/// `alter_param_noreset.sp`, `.param a=1`, `V1 n 0 {a}`, op, `alterparam a=2`, op, prints
+/// v(n) = 1.00000000e+00 both times, with no message and exit 0; `alter_param_reset.sp`, the
+/// same with `reset` before the second op, prints 1.00000000e+00 then 2.00000000e+00).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum AlterEffect {
+    /// Where it stands: every later analysis sees the new value, every other state kept
+    /// (VACASK; `RunExtra::AlterParamAtOnce`).
+    AtOnce,
+    /// From the first full `Reset` after it in run order (one of every class: ngspice's
+    /// `reset` is all or nothing, its writer refuses a partial one, W1406), never if none
+    /// follows (ngspice `alterparam`; `RunExtra::AlterParamAtReset`). That reset undoes the
+    /// device and model alters before it (it re-reads the deck) and applies this one instead;
+    /// no reset undoes a parameter alter. A partial reset does not apply it: a definition, no
+    /// dialect writes one (`state_order::in_force`, `Setting::Param`).
+    AtReset,
 }
 
 /// From here on, the top circuit is the named subcircuits' bodies, together (VACASK repeated
@@ -262,7 +289,7 @@ const _: () = assert!(size_of::<Loop>() == 16);
 const _: () = assert!(size_of::<SweepLoop>() == 52);
 const _: () = assert!(size_of::<TableLoop>() == 16);
 const _: () = assert!(size_of::<MonteCarlo>() == 20);
-const _: () = assert!(size_of::<Alter>() == 28);
+const _: () = assert!(size_of::<Alter>() == 32);
 const _: () = assert!(size_of::<Elaborate>() == 8);
 const _: () = assert!(size_of::<Target>() == 24);
 
@@ -310,6 +337,12 @@ impl TargetKind {
         }
     }
 
+    /// Whether this kind is a parameter of the design (`Param`, `SubcktParam`): the targets an
+    /// `AlterEffect` applies to (R70).
+    pub const fn is_parameter(self) -> bool {
+        matches!(self, TargetKind::Param | TargetKind::SubcktParam)
+    }
+
     /// Whether `Target::b` names a parameter for this kind.
     pub(crate) const fn reads_b(self) -> bool {
         matches!(
@@ -331,6 +364,13 @@ impl LoopKind {
     /// Every kind, in declaration order.
     pub const ALL: [LoopKind; 3] = [LoopKind::Sweep, LoopKind::Table, LoopKind::MonteCarlo];
     /// Kind count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+impl AlterEffect {
+    /// Every effect, in declaration order.
+    pub const ALL: [AlterEffect; 2] = [AlterEffect::AtOnce, AlterEffect::AtReset];
+    /// Effect count.
     pub const COUNT: usize = Self::ALL.len();
 }
 
@@ -375,20 +415,12 @@ pub(crate) fn target_refs(t: &mut Target, f: &mut dyn FnMut(&mut Ref, DefKind)) 
     }
 }
 
-/// Appends a target's reference, as `target_refs` visits it (the read-only twin).
-pub(crate) fn target_refs_into(t: &Target, out: &mut Vec<(Ref, DefKind)>) {
-    if let Some(kind) = t.kind.def_kind() {
-        out.push((t.a, kind));
-    }
-}
-
 /// Appends a target's handles: `a` as a reference when its kind names a definition, else as a
 /// name; `b`; `path`.
 pub(crate) fn target_handles(t: &Target, out: &mut Vec<Handle>) {
-    if t.kind.def_kind().is_some() {
-        out.push(Handle::Ref(t.a));
-    } else {
-        out.push(Handle::Name(t.a.name));
+    match t.kind.def_kind() {
+        Some(kind) => out.push(Handle::Ref(t.a, kind)),
+        None => out.push(Handle::Name(t.a.name)),
     }
     out.extend([Handle::Name(t.b), Handle::Names(t.path)]);
 }
@@ -541,7 +573,12 @@ pub(crate) fn target_kinds(features: &FeatureSet, used: TargetUse) -> Vec<Target
             // A28: an alter of the temperature or an option is an `Env` or option row
             let state =
                 used == TargetUse::Alter && matches!(k, TargetKind::Temp | TargetKind::Option);
-            ok && !state && (k != TargetKind::Option || any_key)
+            // R70/A43: a parameter alter states its effect, so one of the twins is needed
+            let effect = [RunExtra::AlterParamAtOnce, RunExtra::AlterParamAtReset]
+                .iter()
+                .any(|&x| features.contains(Feature::Run(x)));
+            let effect = used != TargetUse::Alter || !k.is_parameter() || effect;
+            ok && !state && effect && (k != TargetKind::Option || any_key)
         })
         .collect()
 }

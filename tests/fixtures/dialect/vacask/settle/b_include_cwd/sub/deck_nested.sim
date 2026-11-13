@@ -1,0 +1,8 @@
+b_include_nested: an include an included file names, resolved from a deck in a subfolder
+load "spice/resistor.osdi"
+model rm sp_resistor
+include "inc/a.inc"
+r1 (n 0) rm r=p*1k
+control
+  print instance("r1")
+endc

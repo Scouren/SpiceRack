@@ -1,0 +1,3 @@
+two included sections defining one parameter
+include "b_redef_sections--lib.lib" section=a
+include "b_redef_sections--lib.lib" section=b

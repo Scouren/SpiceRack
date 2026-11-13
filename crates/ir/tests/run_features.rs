@@ -30,7 +30,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::TranNoise, "  analysis tran stop=1u print_step=1n noise_fmax=1g noise_fmin=1meg cap=none", T),
     (RunExtra::TranSegments, "  analysis tran stop=1u print_step=1n segments=[1n, 2u] cap=none", T),
     (RunExtra::DcNested, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (source_dc v2) (lin start=0 stop=1 step=1)", D),
-    (RunExtra::DcRestart, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) restart", D),
+    (RunExtra::DcRestart, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) afresh", D),
     (RunExtra::DcAxisTemp, "  analysis dc (temp) (lin start=0 stop=1 step=1)", D),
     (RunExtra::DcAxisParam, "  analysis dc (param p) (lin start=0 stop=1 step=1)", D),
     (RunExtra::DcAxisSubcktParam, "  analysis dc (subckt_param div r) (lin start=0 stop=1 step=1)", D),
@@ -184,10 +184,23 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::DcAxisUnnamed, D, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1"),
     (RunExtra::LoopUnnamed, L, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op"),
     (RunExtra::TranPrintStep, T, "  analysis tran stop=1u cap=none"),
+    // R68/A42: an analysis argument or sweep range that reads a parameter; a pss that omits one
+    // of its four optional arguments
+    (RunExtra::AnalysisParamArgument, "  param k = 1\n  analysis tran stop=(1u * k) print_step=1n cap=none", "  param k = 1\n  analysis tran stop=1u print_step=1n cap=none"),
+    (RunExtra::PssArgumentOmitted, "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10", PF),
+    // R70/A43: when a parameter alter takes effect
+    (RunExtra::AlterParamAtOnce, AL, "  alter (param p) value=1 at_reset"),
+    (RunExtra::AlterParamAtReset, "  alter (param p) value=1 at_reset", AL),
+    // R75: an axis above the innermost carries the last solve into its next step, or not
+    (RunExtra::DcOuterCarries, D2, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (temp) (list values=[1]) afresh"),
+    (RunExtra::DcOuterAfresh, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (temp) (list values=[1]) afresh", D2),
 ];
 
 const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
+const PF: &str = "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10 steady_coeff=1m";
 const D: &str = "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1)";
+const D2: &str =
+    "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (temp) (list values=[1])";
 const A: &str = "  analysis ac (lin start=1 stop=2 step=1)";
 const N: &str = "  analysis noise (v (out)) source=v1 (lin start=1 stop=2 step=1)";
 const SP: &str = "  analysis sp (lin start=1 stop=2 step=1)";
@@ -325,5 +338,46 @@ fn a_threshold_reads_the_circuit_through_a_parameter() {
     assert!(
         !threshold_reads_circuit("  param p = 2\n", "p"),
         "a constant parameter's threshold is not"
+    );
+}
+
+#[test]
+fn a_sweep_range_or_an_axis_reading_a_parameter_is_the_feature() {
+    // R68/A42 (2): the sweep range of a loop and of a DC axis count as the analysis's own
+    // arguments; a target that is a parameter does not (oracle: the ruling's words)
+    let x = Feature::Run(RunExtra::AnalysisParamArgument);
+    let decks = [
+        (
+            "  param k = 1\n  loop sweep (temp) (list values=[k])\n    analysis op",
+            true,
+        ),
+        (
+            "  param k = 1\n  analysis dc (source_dc v1) (lin start=0 stop=k step=1)",
+            true,
+        ),
+        (
+            "  param k = 1\n  analysis dc (param k) (lin start=0 stop=1 step=1)",
+            false,
+        ),
+    ];
+    for (deck, uses) in decks {
+        assert_eq!(features(deck).contains(x), uses, "{deck}");
+    }
+}
+
+#[test]
+fn a_loop_bodys_shape_reads_its_run_items_only() {
+    // the lead's finding (pass_laws p3, `drop_unused_funcs`, seed 47): a function definition in
+    // a loop body runs nothing (its place is `Placed(Loop, Func)`), so dropping it changes
+    // neither `LoopOverOp` nor `SweepBodyNotOne`. Oracle: each member's doc, read by hand
+    let has = |lines: &str, x: RunExtra| features(lines).contains(Feature::Run(x));
+    let with_func = "  loop sweep (temp) (list values=[1])\n    func f(x) = x\n    analysis op";
+    let without = "  loop sweep (temp) (list values=[1])\n    analysis op";
+    for x in [RunExtra::LoopOverOp, RunExtra::SweepBodyNotOne] {
+        assert_eq!(has(with_func, x), has(without, x), "{x:?}");
+    }
+    assert!(
+        has(with_func, RunExtra::LoopOverOp),
+        "one operating point, a definition beside it"
     );
 }

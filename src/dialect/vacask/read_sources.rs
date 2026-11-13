@@ -68,7 +68,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(F::Circuit(X::GivenZeroAsGiven))
     .with(F::Circuit(X::MultVSource))
     .with(F::Circuit(X::MultISource))
-    .with(F::Circuit(X::MultControlled))
+    .with(F::Circuit(X::MultControlledCurrent))
+    .with(F::Circuit(X::MultControlledVoltage))
     .with(F::Circuit(X::PulseVacask))
     .with(F::Circuit(X::SinPreHold))
     .with(F::Circuit(X::ExpTd2FromTd1))
@@ -235,11 +236,7 @@ pub(super) fn source(l: &mut Lower<'_, '_, '_>, n: Node) {
     }
     let h = l.cst.ast.header(n);
     let name = read::field_name(l.cst, h.name);
-    let d = l.b.design();
-    let taken = d.items(l.scope).iter().any(|at| {
-        at.kind == ir::ItemKind::Element && d.str(d.row::<ir::Element>(at.index).name) == name
-    });
-    if taken {
+    if l.element_here(&name) {
         return read::opaque(
             l,
             n,

@@ -18,8 +18,6 @@ use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
 use crate::id::ScopeId;
-#[cfg(any(test, feature = "gen"))]
-use crate::probe::gen_probe;
 use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
 use crate::run_exprs::Roots;
 use crate::run_names::Names;
@@ -69,7 +67,7 @@ impl DetailFacts for DcXf {
         features: &FeatureSet,
     ) -> Option<Self> {
         Some(DcXf {
-            output: gen_probe(g, b, features, true),
+            output: crate::dc_ac_facts::gen_output(g, b, features),
         })
     }
 }
@@ -113,7 +111,7 @@ impl DetailFacts for Sens {
         features: &FeatureSet,
     ) -> Option<Self> {
         Some(Sens {
-            output: gen_probe(g, b, features, true),
+            output: crate::dc_ac_facts::gen_output(g, b, features),
         })
     }
 }
@@ -162,7 +160,7 @@ impl DetailFacts for Xf {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let output = gen_probe(g, b, features, true);
+        let output = crate::dc_ac_facts::gen_output(g, b, features);
         Some(Xf {
             output,
             sweep: gen_sweep(g, b, features, SweepUse::Freq),
@@ -214,7 +212,7 @@ impl DetailFacts for SensAc {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let output = gen_probe(g, b, features, true);
+        let output = crate::dc_ac_facts::gen_output(g, b, features);
         Some(SensAc {
             output,
             sweep: gen_sweep(g, b, features, SweepUse::Freq),

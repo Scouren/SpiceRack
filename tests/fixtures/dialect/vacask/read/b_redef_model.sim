@@ -1,0 +1,4 @@
+a model in an included section and in the deck after it
+load "spice/resistor.osdi"
+include "b_redef_model--lib.lib" section=a
+model rm sp_resistor

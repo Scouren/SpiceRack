@@ -404,4 +404,45 @@ mod tests {
         }
         assert!(made, "no seed made a resistor model");
     }
+
+    /// R48 (d): a generated element that names a model mostly names one the design defines,
+    /// visible from it (the generator binds it; `check` confirms the binding is legal).
+    /// Oracle: the share of elements with a bound model, per kind that takes a model, over
+    /// 1000 seeds of the circuit set, against a floor; each kind is seen often enough to count.
+    #[test]
+    fn a_named_model_mostly_exists() {
+        const FLOOR: f64 = 0.6;
+        // the rarest kinds (a source naming a builtin model) are seen 14 to 19 times here
+        const SEEN_MIN: u32 = 12;
+        let mut named = [0u32; ElemKind::COUNT];
+        let mut bound = [0u32; ElemKind::COUNT];
+        for seed in 0..1000u64 {
+            let d = generate(seed, &circuit_set(), SIZE);
+            for (item, _) in d.reachable() {
+                if item.kind != ItemKind::Element {
+                    continue;
+                }
+                let e: spicerack_ir::Element = d.row(item.index);
+                let takes_model = e.kind.master_kind() == Some(spicerack_ir::DefKind::Model);
+                if takes_model && !e.model.name.is_none() {
+                    named[e.kind as usize] += 1;
+                    bound[e.kind as usize] += u32::from(e.model.is_resolved());
+                }
+            }
+        }
+        let mut low = Vec::new();
+        for kind in ElemKind::ALL {
+            if kind.master_kind() != Some(spicerack_ir::DefKind::Model) {
+                continue;
+            }
+            let (n, k) = (named[kind as usize], bound[kind as usize]);
+            if n < SEEN_MIN || f64::from(k) < FLOOR * f64::from(n) {
+                low.push(format!("{kind:?}: {k} of {n} bound"));
+            }
+        }
+        assert!(
+            low.is_empty(),
+            "below {FLOOR} or seen under {SEEN_MIN} times: {low:?}"
+        );
+    }
 }

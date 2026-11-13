@@ -99,7 +99,9 @@ pub static GROUPS: &[Group] = &[
 /// (the first such pass per feature per round) and then `ir::check`ed, until nothing is
 /// missing or a round changes nothing. Then `ir::check_legal` reports what is left: one
 /// `U0001` row per (item, feature) at the item. A check violation after a pass is that pass's
-/// bug (a debug assertion).
+/// bug (a debug assertion). A pass's note is reported once per (code, item, argument, span)
+/// however many rounds ran it (R69 d): a rule that leaves its item runs again each round while
+/// the feature is there.
 ///
 /// The bound: a round that changes something runs at least one pass, and a pass runs only on a
 /// feature legal for the target, whose chain of passes ends in the target's own features after
@@ -158,6 +160,9 @@ fn legalize_with(
     let bound = passes.len() + 1;
     let mut missing = ir::features_used(design).minus(*target);
     let mut rounds = 0;
+    // the notes already reported, by (code, item, argument, span); dropped as they are pushed,
+    // so the caller's earlier rows are never touched and each row is looked up once (O(1))
+    let mut noted = std::collections::HashSet::new();
     while !missing.is_empty() {
         assert!(rounds < bound, "legalize: the passes do not settle");
         rounds += 1;
@@ -167,7 +172,16 @@ fn legalize_with(
                 continue;
             }
             open = open.minus(ir::FeatureSet::EMPTY.with(pass.removes));
-            (pass.run)(design, diags);
+            let mut fresh = ir::Diags::new();
+            (pass.run)(design, &mut fresh);
+            for d in fresh.rows() {
+                let key = (d.code, d.item, d.arg, d.span.file, d.span.start);
+                match (noted.insert(key), d.item == ir::ItemRef::NONE) {
+                    (false, _) => {}
+                    (true, true) => diags.push(d.code, d.span, d.arg),
+                    (true, false) => diags.push_at(d.code, design, d.item, d.arg),
+                }
+            }
             let checked = diags.len();
             ir::check(design, diags);
             debug_assert_eq!(
@@ -376,6 +390,49 @@ mod tests {
             "no half-converted design"
         );
         assert_eq!(codes, [ir::diag::UNSUPPORTED]);
+    }
+
+    /// R69 d: a rule that leaves its item with its note runs again on each round while the
+    /// feature is there; `legalize` reports its note once. Two rounds are forced by a second
+    /// rule that removes the globals in the first.
+    #[test]
+    fn a_rule_run_on_two_rounds_notes_its_item_once() {
+        const KEPT: ir::Code = ir::Code::new(b'U', 999);
+        fn keep(d: &mut ir::Design, diags: &mut ir::Diags) {
+            let found = d
+                .reachable()
+                .into_iter()
+                .find(|(i, _)| i.kind == ir::ItemKind::Comment);
+            if let Some((item, _)) = found {
+                diags.push_at(KEPT, d, item, 7);
+            }
+        }
+        let keeper = Pass {
+            name: "keeper",
+            removes: ir::Feature::Item(ir::ItemKind::Comment),
+            requires: ir::FeatureSet::EMPTY,
+            notes: &[KEPT],
+            run: keep,
+        };
+        let churn = stub(
+            "churn",
+            ir::ItemKind::Global,
+            ir::ItemKind::Param,
+            global_to_param,
+        );
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        let text = "file \"a.sp\" deck\n  title \"t\"\n  comment \"c\"\n  global g\n";
+        ir::parse(text, &mut design.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        let target = without(&[ir::ItemKind::Comment, ir::ItemKind::Global]);
+        legalize_with(&[&keeper, &churn], &mut design, &target, &mut diags);
+        let codes: Vec<ir::Code> = diags.rows().iter().map(|d| d.code).collect();
+        assert_eq!(
+            codes,
+            [KEPT, ir::diag::UNSUPPORTED],
+            "one note, one refusal"
+        );
     }
 
     #[test]

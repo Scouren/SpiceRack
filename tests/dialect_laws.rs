@@ -25,6 +25,8 @@
 #[path = "common/memcap.rs"]
 mod memcap;
 
+#[path = "common/feature_states.rs"]
+mod feature_states;
 #[path = "common/known_reach.rs"]
 mod known_reach;
 #[path = "common/laws.rs"]
@@ -49,9 +51,8 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
-    ("l5", "ngspice", "seed 63 Untyped: a `FromHere` option in a `.subckt` body is written as a `.control` block there and reads back as one Script opaque (P1404); ngspice runs such a block once, before the deck's, iff the subckt has an instance (settle control_in_subckt.sp, control_in_subckt_unused.sp), which no IR item states: waits for the lead's ruling on what a FromHere run item in a subckt means (refuse it in the writer, or an IR violation). (Seed 19's section case is fixed: needs_script reads the file's sections, settle control_in_section.sp)"),
-    ("l7", "ngspice", "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)"),
-    ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
+    ("l5", "ngspice", "seed 63 Untyped: a `FromHere` option in a `.subckt` body is written as a `.control` block there and reads back as one Script opaque (P1404); ngspice runs such a block once, before the deck's, iff the subckt has an instance (settle control_in_subckt.sp, control_in_subckt_unused.sp), which no IR item states: an IR violation by R98, waits for the IR owner's check and generator change. (Seed 19's section case is fixed: needs_script reads the file's sections, settle control_in_section.sp)"),
+    ("l5", "vacask", "seed 0 Untyped (the round's generator; on step2-vacask-b the row's seeds 1 and 38 hid it): a device_library of a family whose module is not proven (jfet_parker_skellern, vbic) is written `load \"spice/jfet2.osdi\"` / `load \"vbic_1p3.osdi\"` and reads back as a plain load (tables::library, da95fe25), so write_structure::admit lets through a library the reader cannot read back; and the literal 141.585peta reads back as 141.585e15. A finding for the VACASK writer (vacask); goes with its admit agreeing with tables::library"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the
@@ -95,7 +96,8 @@ impl Write for Panicky {
     fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
         for (item, _) in design.reachable() {
             if item.kind != ir::ItemKind::Element {
-                diags.push_at(ir::Code::new(b'W', 9001), design, item, 0);
+                // a catalogued refusal: the harness asserts every emitted code has a row
+                diags.push_at(dialect::STRICT_UNREAD, design, item, 0);
             }
         }
     }
@@ -253,23 +255,25 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
 #[test]
 fn l7_legalized_designs_use_only_the_writers_features() {
     let all = dialect::irtext::IrText.features();
-    laws("l7", |_row, writer| {
-        for f in all.minus(*writer.features()).iter() {
-            let removed = spicerack::passes::all().any(|p| p.removes == f);
-            if !removed {
-                return Err(format!("lacks {f:?}: no pass removes it, and no citation"));
-            }
+    laws("l7", |row, writer| {
+        // a citation is of a lacked feature no pass makes legal, with its evidence (A34)
+        let stale = feature_states::stale(row, writer);
+        if !stale.is_empty() {
+            return Err(format!("stale citations: {}", stale.join("; ")));
         }
         for seed in SEEDS {
             let mut design = generate(seed, all, SIZE);
             let mut diags = ir::Diags::new();
             spicerack::passes::legalize(&mut design, writer.features(), &mut diags);
-            let refused: Vec<u32> = diags
+            // one row per item that carries a feature: compared as the set of features
+            let mut refused: Vec<u32> = diags
                 .rows()
                 .iter()
                 .filter(|d| d.code == ir::diag::UNSUPPORTED)
                 .map(|d| d.arg)
                 .collect();
+            refused.sort_unstable();
+            refused.dedup();
             let left: Vec<u32> = ir::features_used(&design)
                 .minus(*writer.features())
                 .iter()

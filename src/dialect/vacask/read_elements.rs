@@ -29,7 +29,7 @@
 //! cir-instance, cir-mfactor, dev-builtin-behavioral.
 //!
 //! Contents: `FEATURES`, `CODES`, `UNRESOLVED`, `NOT_FORMAL`, `NO_MFACTOR`, `TERMINALS`, `TOO_MANY`, `NO_PARENS`,
-//! `DUPLICATE`, `REPEATED`, `NOISY`, `repeated`,
+//! `DUPLICATE`, `REPEATED`, `RECURSION`, `RECURSION_UNREACHED`, `NOISY`, `repeated`,
 //! `Declared`, `declare`, `instance`
 //! (crate-private)
 
@@ -55,6 +55,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Elem(ir::ElemKind::Inductor))
     .with(ir::Feature::Elem(ir::ElemKind::Diode))
     .with(ir::Feature::Elem(ir::ElemKind::Mosfet))
+    .with(ir::Feature::Elem(ir::ElemKind::Jfet))
+    .with(ir::Feature::Elem(ir::ElemKind::Mesfet))
     .with(ir::Feature::Elem(ir::ElemKind::ModuleModel))
     .with(ir::Feature::Elem(ir::ElemKind::Instance))
     .with(ir::Feature::Elem(ir::ElemKind::Unresolved))
@@ -92,6 +94,10 @@ pub(super) const NO_PARENS: ir::Code = ir::Code::new(b'P', 2107);
 pub(super) const DUPLICATE: ir::Code = ir::Code::new(b'R', 2101);
 /// A parameter given twice on one line.
 pub(super) const REPEATED: ir::Code = ir::Code::new(b'P', 2108);
+/// A subcircuit instance on a cycle of the instance graph the top level reaches.
+pub(super) const RECURSION: ir::Code = ir::Code::new(b'P', 2130);
+/// The same on a cycle nothing reaches from the top level, which VACASK never elaborates.
+pub(super) const RECURSION_UNREACHED: ir::Code = ir::Code::new(b'P', 2131);
 /// A `noisy=` that is not the literal 0 or 1.
 pub(super) const NOISY: ir::Code = ir::Code::new(b'P', 2106);
 
@@ -167,6 +173,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             cite: "run rep (`r=1k r=2k` on an instance, `rsh=1 rsh=2` on a model, `g=2 g=3` on a subckt instance: \"Parameter first defined here.\")",
             explain: "VACASK refuses a statement that gives one parameter twice.",
             kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        RECURSION,
+        ir::Info {
+            title: "a subcircuit that instantiates itself",
+            cite: "settle b_cycle_self, b_cycle_two (VACASK 36be560: \"Hierarchical recursion detected.\")",
+            explain: "VACASK refuses a hierarchy in which a subcircuit instantiates itself, directly or through other subcircuits, when the top level reaches it; the instance that closes the cycle is kept as VACASK's text.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        RECURSION_UNREACHED,
+        ir::Info {
+            title: "a recursive subcircuit instance nothing elaborates",
+            cite: "settle b_cycle_unused (VACASK 36be560 runs the deck)",
+            explain: "VACASK elaborates only what the top level reaches, so a cycle nothing instantiates runs; the IR holds no instance cycle, so the instance is kept as VACASK's text.",
+            kind: ir::Kind::Note,
         },
     ),
     (
@@ -294,7 +318,7 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(NO_PARENS));
     }
     let h = super::bind::head(l, n);
-    if defined_here(l, &h.name) {
+    if l.element_here(&h.name) {
         return read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(DUPLICATE));
     }
     let (name, nodes) = (h.name, h.terminals);
@@ -315,6 +339,13 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
     match find(l, l.declared, &master) {
         Found::Enclosing => read::opaque(l, n, ir::OpaqueClass::InvalidInSource, Some(ENCLOSING)),
         Found::Nowhere => unresolved(l, n, &name, &nodes, &master, &entries),
+        Found::Here(Master::Subckt { .. }) if l.declared.recursion(l, &name).is_some() => {
+            let (class, code) = match l.declared.recursion(l, &name) {
+                Some(true) => (ir::OpaqueClass::InvalidInSource, RECURSION),
+                _ => (ir::OpaqueClass::Private, RECURSION_UNREACHED),
+            };
+            read::opaque(l, n, class, Some(code));
+        }
         Found::Here(Master::Subckt { ports, params }) => {
             subckt(l, n, (&name, &nodes, &master), ports, &params, &entries);
         }
@@ -331,15 +362,6 @@ pub(super) fn repeated(entries: &[(String, u32)]) -> bool {
 }
 
 // ---- private ----
-
-/// Whether an element named `name` already stands in the current scope.
-fn defined_here(l: &Lower<'_, '_, '_>, name: &str) -> bool {
-    let d = l.b.design();
-    d.items(l.scope)
-        .iter()
-        .filter(|at| at.kind == ir::ItemKind::Element)
-        .any(|at| d.str(d.row::<ir::Element>(at.index).name) == name)
-}
 
 /// Checks every value of `entries` in `ctx` (A2: before the first push).
 fn check(l: &Lower<'_, '_, '_>, entries: &[(String, u32)], ctx: Context) -> Result<(), Refusal> {
@@ -499,9 +521,12 @@ fn field(kind: ir::ElemKind, p: &str) -> Option<&'static str> {
         (K::Resistor, "tce") => "tce",
         (K::Resistor | K::Capacitor | K::Inductor, "scale") => "scale",
         (K::Resistor, "noisy") => "noisy",
-        (K::Resistor | K::Capacitor | K::Inductor | K::Diode | K::Mosfet, "temp") => "temp",
-        (K::Resistor | K::Capacitor | K::Inductor | K::Diode | K::Mosfet, "dtemp") => "dtemp",
-        (K::Diode, "area") => "area",
+        (K::Resistor | K::Capacitor | K::Inductor, "temp") => "temp",
+        (K::Resistor | K::Capacitor | K::Inductor, "dtemp") => "dtemp",
+        // A semiconductor's typed fields (`Semi`): never a parameter beside them (X-domain).
+        (K::Diode | K::Bjt | K::Mosfet | K::Jfet | K::Mesfet, "temp") => "temp",
+        (K::Diode | K::Bjt | K::Mosfet | K::Jfet | K::Mesfet, "dtemp") => "dtemp",
+        (K::Diode | K::Bjt | K::Jfet | K::Mesfet, "area") => "area",
         _ => return None,
     })
 }

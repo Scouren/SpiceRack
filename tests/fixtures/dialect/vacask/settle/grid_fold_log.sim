@@ -1,0 +1,21 @@
+log on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b174 (d174 0) v=log(0.5)
+r174 (d174 0) r r=1k
+b175 (d175 0) v=log(1.0)
+r175 (d175 0) r r=1k
+b176 (d176 0) v=log(2.5)
+r176 (d176 0) r r=1k
+b177 (d177 0) v=log(1e-3)
+r177 (d177 0) r r=1k
+b178 (d178 0) v=log(1e3)
+r178 (d178 0) r r=1k
+b181 (d181 0) v=log(3)
+r181 (d181 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

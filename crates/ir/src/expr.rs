@@ -233,9 +233,10 @@ pub enum Func {
     /// The real part of the complex power: `Pow` where `Pow` is defined, `|x|ʸ·cos(πy)` for
     /// `x < 0` and a fractional `y` (Xyce `**`, `pow`, `pwr`).
     PowRe,
-    /// The smaller of two arguments.
+    /// The smaller of two arguments; of Int type when both are Int, else Real (the value
+    /// unchanged either way: `min(3, 2.5)` is 2.5 Real, `min(3, 5)` is 3 Int).
     Min,
-    /// The larger of two arguments.
+    /// The larger of two arguments; of Int type when both are Int, else Real.
     Max,
     /// The largest whole number `<= x`.
     Floor,
@@ -269,7 +270,12 @@ pub enum Func {
     Acos,
     /// Arc tangent, in `(−π/2, π/2)`.
     Atan,
-    /// `atan2(y, x)` (C), in `[−π, π]`; `atan2(0, 0)` is 0.
+    /// `atan2(y, x)`, exactly C's `atan2` (Rust `f64::atan2`): in `[−π, π]`, the angle of the
+    /// point `(x, y)`; for `x < 0` it is `atan(y/x) + π` when `y >= +0` and `atan(y/x) − π` when
+    /// `y <= −0`, so `atan2(+0, −1)` is `π` and `atan2(−0, −1)` is `−π`; `atan2(±0, +0)` is `±0`.
+    /// Not VACASK's `atan2`, which omits the `+π` (R76; `tests/fixtures/funcs/atan2_vacask.sim`,
+    /// printed in `atan2_vacask.out`: `atan2(1, −1)` = −0.785398, `atan2(0, −1)` = −0, against
+    /// 2.35619 and π here).
     Atan2,
     /// Hyperbolic sine.
     Sinh,

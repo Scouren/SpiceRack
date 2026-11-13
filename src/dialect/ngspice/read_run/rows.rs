@@ -34,22 +34,18 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
                     Swept::Temp => ir::Target::TEMP,
                 };
                 let (a, b, c) = (emit(lw, st, a), emit(lw, st, b), emit(lw, st, c));
+                // ngspice's nested `.dc` starts each outer step afresh and carries inside the
+                // inner sweep (R75, latch_desc.sp); rows are innermost first
+                let afresh = !rows.is_empty();
                 rows.push(DcAxis {
                     target,
                     sweep: ir::SweepSpec::lin_step(a, b, c),
                     name: ir::NameId::NONE,
+                    afresh,
                 });
             }
             let axes = lw.b.dc_axes(&rows);
-            lw.b.analysis(
-                scope,
-                None,
-                Dc {
-                    axes,
-                    restart: false,
-                },
-                span,
-            );
+            lw.b.analysis(scope, None, Dc { axes }, span);
         }
         Card::Ac(s) => {
             let sweep = emit_sweep(lw, st, s);

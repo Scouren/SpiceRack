@@ -17,7 +17,8 @@
 //! Cites: VD cir-subckt, cir-subckt-nested, cir-conditional, cir-nodes, cir-loading,
 //! input-embed, input-include.
 //!
-//! Contents: `PLACEMENTS`, `FEATURES`, `CODES`, `REDEFINED`, `IN_BRANCH`, `ENCLOSING`, `TOP_ONLY`, and the area
+//! Contents: `PLACEMENTS`, `FEATURES`, `CODES`, `REDEFINED`, `IN_BRANCH`, `INCLUDED_TWICE`,
+//! `ENCLOSING`, `TOP_ONLY`, and the area
 //! functions
 //! `title`, `include`, `section`, `subckt`, `if_chain`, `param`, `global`, `ground`, `load`,
 //! `embed` (crate-private)
@@ -106,6 +107,9 @@ pub(super) const PLACEMENTS: ir::FeatureSet = ir::FeatureSet::placed(
 pub(super) const REDEFINED: ir::Code = ir::Code::new(b'R', 2001);
 /// A statement an `@if` branch may not hold (`parameters`, `subckt`).
 pub(super) const IN_BRANCH: ir::Code = ir::Code::new(b'P', 2005);
+/// A name defined both in a scope and in what its includes bring in, or by two included files
+/// or sections (the argument: the first definition's `DefId`).
+pub(super) const INCLUDED_TWICE: ir::Code = ir::Code::new(b'P', 2030);
 /// A name only an enclosing subcircuit defines.
 pub(super) const ENCLOSING: ir::Code = ir::Code::new(b'R', 2003);
 /// A statement VACASK allows only at the top level (`load`, `embed`, `global`, `ground`).
@@ -119,6 +123,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a name defined twice in one scope",
             cite: "DIALECT-VACASK Appendix A runs n3 (\"Parameter redefinition.\"), dp1 (\"Terminal '1' is not unique.\"); INV-semantics 3.01",
             explain: "VACASK refuses a second definition of a parameter or a subcircuit in one scope, and a subcircuit port named twice; the first parameter is kept, a subcircuit so written is kept as text, and the deck is refused.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        INCLUDED_TWICE,
+        ir::Info {
+            title: "a name defined twice once includes are expanded",
+            cite: "settle b_incsec_top_before, b_incsec_top_after (\"Parameter redefinition.\"), b_redef_model_*, b_redef_sub_* (\"A model/subcircuit with name … already exists.\"), b_redef_sections; VACASK exits 1 on each",
+            explain: "VACASK's include is textual: a parameter, model or subcircuit defined in a scope and again in a file or section it includes (or in two included sections) is a redefinition in either order, and VACASK refuses the deck. The diagnostic stands at the second definition in the expanded text; its argument is the first.",
             kind: ir::Kind::Refusal,
         },
     ),

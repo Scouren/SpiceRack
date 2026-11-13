@@ -21,10 +21,8 @@
 //! Contents: `Context`, `Refusal`, `FEATURES`, `CODES`, `NOT_A_NUMBER`, `NOT_FINITE`, `WIDE_INT`, `CALL_ARITY`, `PARAM_READ_ARG`,
 //! `PROBE_IN_PARAM`, `check_expr`, `expr`, `names_read`, `unescape` (crate-private)
 
-use super::name;
-use super::number;
 use super::read::Lower;
-use super::tables;
+use super::{atan2, name, number, tables};
 use crate::ir;
 use crate::syntax::ast::{Name, Node, Tag};
 
@@ -191,11 +189,14 @@ pub(super) fn expr(
     ctx: Context,
 ) -> Result<ir::ExprId, Refusal> {
     check_expr(l, node, ctx)?;
-    Ok(build(l, node, ctx))
+    l.folded = ctx == Context::Behavioural && atan2::literal_only(l, node);
+    let e = build(l, node, ctx);
+    l.folded = false;
+    Ok(e)
 }
 
 /// Every name the expression at CST node `node` reads (identifiers and words, `$temp` among
-/// them), in walk order; calls' and probes' arguments included, a vector's elements not (a
+/// them, and the names of the functions it calls), in walk order; calls' and probes' arguments included, a vector's elements not (a
 /// vector value is Private, G13).
 pub(super) fn names_read(l: &Lower<'_, '_, '_>, node: u32) -> Vec<String> {
     let ast = &l.cst.ast;
@@ -220,7 +221,10 @@ pub(super) fn names_read(l: &Lower<'_, '_, '_>, node: u32) -> Vec<String> {
                 let at = ast.rhs(n);
                 todo.extend([ast.lhs(n), ast.extra(at), ast.extra(at + 1)]);
             }
-            Tag::Call | Tag::Probe => todo.extend(call_args(l, n)),
+            Tag::Call | Tag::Probe => {
+                out.push(name_of(l, n));
+                todo.extend(call_args(l, n));
+            }
             _ => {}
         }
     }
@@ -425,6 +429,12 @@ fn check(
             if dynamic && tables::DYNAMIC_LACKS.contains(&name.as_str()) {
                 return Err(private);
             }
+            if ctx == Context::Behavioural && tables::BEHAVIOURAL_LACKS.contains(&name.as_str()) {
+                return Err(private);
+            }
+            if name == "atan2" && atan2::holds_draw(l, &args) {
+                return Err(refuse(atan2::DRAW, ir::OpaqueClass::Private));
+            }
             args.iter().try_for_each(|&a| down(a))
         }
         _ => Err(private),
@@ -472,7 +482,13 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
             let (op, operand) = (token(l, n), ast.lhs(n));
             if op == "-" && is_number(l, Node(operand)) {
                 let number = number::lex(&token(l, Node(operand))).expect("checked");
-                return number::push(l.b, &number, true);
+                // A real `-0.0` is −0, which a literal row cannot hold: VACASK keeps a node a
+                // source holds at −0 and merges one at 0 (settle grid_fold_sin, `sin(-0.0)`).
+                let real_zero =
+                    !number.int && number.long.is_none() && number.literal.mantissa == 0;
+                if !real_zero {
+                    return number::push(l.b, &number, true);
+                }
             }
             let x = build(l, operand, ctx);
             match op.as_str() {
@@ -531,6 +547,12 @@ fn build(l: &mut Lower<'_, '_, '_>, node: u32, ctx: Context) -> ir::ExprId {
                 ("idt", [x, ic]) if is_zero(l, *ic) => vec![*x],
                 _ => raw,
             };
+            // R76a: VACASK's static atan2 is not C's; its dynamic one is (but a signed zero).
+            if name == "atan2" && (ctx != Context::Behavioural || l.folded) {
+                let (y, x) = (raw[0], raw[1]);
+                let arg = |l: &mut Lower<'_, '_, '_>, k: usize| build(l, [y, x][k], ctx);
+                return super::atan2::atan2(l, &arg);
+            }
             let args: Vec<ir::ExprId> = raw.into_iter().map(|a| build(l, a, ctx)).collect();
             if let Some((func, _)) = tables::function(&name) {
                 return l.b.call(func, &args);

@@ -1,0 +1,63 @@
+pow on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b339 (d339 0) v=pow(0.5*($temp/$temp), -2.0*($temp/$temp))
+r339 (d339 0) r r=1k
+b340 (d340 0) v=pow(0.5*($temp/$temp), -0.5*($temp/$temp))
+r340 (d340 0) r r=1k
+b341 (d341 0) v=pow(0.5*($temp/$temp), -0.0*($temp/$temp))
+r341 (d341 0) r r=1k
+b342 (d342 0) v=pow(0.5*($temp/$temp), 0.0*($temp/$temp))
+r342 (d342 0) r r=1k
+b343 (d343 0) v=pow(0.5*($temp/$temp), 0.5*($temp/$temp))
+r343 (d343 0) r r=1k
+b344 (d344 0) v=pow(0.5*($temp/$temp), 2.0*($temp/$temp))
+r344 (d344 0) r r=1k
+b345 (d345 0) v=pow(0.5*($temp/$temp), -3*($temp/$temp))
+r345 (d345 0) r r=1k
+b346 (d346 0) v=pow(0.5*($temp/$temp), 3*($temp/$temp))
+r346 (d346 0) r r=1k
+b347 (d347 0) v=pow(0.5*($temp/$temp), 0*($temp/$temp))
+r347 (d347 0) r r=1k
+b348 (d348 0) v=pow(2.0*($temp/$temp), -2.0*($temp/$temp))
+r348 (d348 0) r r=1k
+b349 (d349 0) v=pow(2.0*($temp/$temp), -0.5*($temp/$temp))
+r349 (d349 0) r r=1k
+b350 (d350 0) v=pow(2.0*($temp/$temp), -0.0*($temp/$temp))
+r350 (d350 0) r r=1k
+b351 (d351 0) v=pow(2.0*($temp/$temp), 0.0*($temp/$temp))
+r351 (d351 0) r r=1k
+b352 (d352 0) v=pow(2.0*($temp/$temp), 0.5*($temp/$temp))
+r352 (d352 0) r r=1k
+b353 (d353 0) v=pow(2.0*($temp/$temp), 2.0*($temp/$temp))
+r353 (d353 0) r r=1k
+b354 (d354 0) v=pow(2.0*($temp/$temp), -3*($temp/$temp))
+r354 (d354 0) r r=1k
+b355 (d355 0) v=pow(2.0*($temp/$temp), 3*($temp/$temp))
+r355 (d355 0) r r=1k
+b356 (d356 0) v=pow(2.0*($temp/$temp), 0*($temp/$temp))
+r356 (d356 0) r r=1k
+b366 (d366 0) v=pow(3*($temp/$temp), -2.0*($temp/$temp))
+r366 (d366 0) r r=1k
+b367 (d367 0) v=pow(3*($temp/$temp), -0.5*($temp/$temp))
+r367 (d367 0) r r=1k
+b368 (d368 0) v=pow(3*($temp/$temp), -0.0*($temp/$temp))
+r368 (d368 0) r r=1k
+b369 (d369 0) v=pow(3*($temp/$temp), 0.0*($temp/$temp))
+r369 (d369 0) r r=1k
+b370 (d370 0) v=pow(3*($temp/$temp), 0.5*($temp/$temp))
+r370 (d370 0) r r=1k
+b371 (d371 0) v=pow(3*($temp/$temp), 2.0*($temp/$temp))
+r371 (d371 0) r r=1k
+b372 (d372 0) v=pow(3*($temp/$temp), -3*($temp/$temp))
+r372 (d372 0) r r=1k
+b373 (d373 0) v=pow(3*($temp/$temp), 3*($temp/$temp))
+r373 (d373 0) r r=1k
+b374 (d374 0) v=pow(3*($temp/$temp), 0*($temp/$temp))
+r374 (d374 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

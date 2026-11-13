@@ -25,8 +25,16 @@ pub enum CircuitExtra {
     MultVSource,
     /// `mult` on a current source (Xyce ignores it, 5.16).
     MultISource,
-    /// `mult` on a controlled source (linear, `Poly`, `Table`, `Behav`, `Laplace`, `FreqTable`, `Delay`).
-    MultControlled,
+    /// `mult` on a controlled source with a current output (`Vccs`, `Cccs`, a current `Poly`,
+    /// `Table`, `Laplace` or `FreqTable`, a `Behav` of any output but a voltage): parallel
+    /// copies. R58's evidence: ngspice holds it (G, F, a current B take `m`) and lacks
+    /// `MultControlledVoltage` (its writer's admit refuses `m` on E, H, a voltage POLY, table
+    /// or B: ngspice's `m` multiplies a voltage, `controlled.rs` runs); VACASK holds both
+    /// (`$mfactor`).
+    MultControlledCurrent,
+    /// `mult` on a controlled source with a voltage output (`Vcvs`, `Ccvs`, `Delay`, a voltage
+    /// `Poly`, `Table`, `Laplace`, `FreqTable` or `Behav`). `MultControlledCurrent`'s split.
+    MultControlledVoltage,
     /// `mult` on a diode, BJT, MOSFET, JFET, MESFET or IGBT.
     MultSemi,
     /// `mult` on a subcircuit instance under `MultLaw::Parallel` (ESPice ignores it, B10, 6.01).
@@ -45,7 +53,9 @@ pub enum CircuitExtra {
     // passive and instance fields
     /// An R, C or L whose `value` reads the circuit (ngspice runs it as a B source, 6.14, 6.16).
     PassiveDynamicValue,
-    /// An R, C or L with `noisy == false` (D82, 6.17).
+    /// A resistor (or a circuit-valued element, ngspice's behavioural rewrite, 6.14) with
+    /// `noisy == false` (D82, 6.17); a constant C or L has no thermal noise to switch off
+    /// (`check`, A19).
     PassiveNoiseless,
     /// A resistor's AC resistance (`Passive::ac`, ng only, 6.17).
     PassiveAc,
@@ -53,7 +63,10 @@ pub enum CircuitExtra {
     PassiveScale,
     /// Instance `tc1`/`tc2` on an R, C or L (6.12).
     PassiveTc,
-    /// The exponential coefficient `tce` (6.13).
+    /// A resistor's exponential coefficient `tce` (6.13). A resistor's by domain (R74): ngspice
+    /// takes it on R only (res.c against cap.c and ind.c), VACASK's sp_capacitor and
+    /// sp_inductor list no `tce` (print instance, 36be560), and Xyce 7.10 refuses it on C and L
+    /// ("Unrecognized parameter TCE for device C1"); `check` reports it elsewhere.
     PassiveTce,
     /// An instance's absolute temperature (`temp_abs` on `Passive`, `Semi`, `Behav`).
     InstanceTemp,
@@ -264,13 +277,14 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 108] = [
+    pub const ALL: [CircuitExtra; 109] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
         CircuitExtra::MultVSource,
         CircuitExtra::MultISource,
-        CircuitExtra::MultControlled,
+        CircuitExtra::MultControlledCurrent,
+        CircuitExtra::MultControlledVoltage,
         CircuitExtra::MultSemi,
         CircuitExtra::MultInstanceParallel,
         CircuitExtra::MultInstanceNgspiceAppend,

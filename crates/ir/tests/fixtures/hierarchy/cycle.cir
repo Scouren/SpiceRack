@@ -1,0 +1,14 @@
+cycle of subcircuits: p instantiates q, q instantiates p
+.subckt p a
+r1 a 0 1k
+x1 a q
+.ends
+.subckt q a
+r1 a 0 1k
+x1 a p
+.ends
+v1 n 0 1
+x0 n p
+.op
+.print op v(n)
+.end
