@@ -1,0 +1,25 @@
+asin on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b40 (d40 0) v=asin(-1.0)
+r40 (d40 0) r r=1k
+b41 (d41 0) v=asin(-0.5)
+r41 (d41 0) r r=1k
+b42 (d42 0) v=asin(-0.0)
+r42 (d42 0) r r=1k
+b43 (d43 0) v=asin(0.0)
+r43 (d43 0) r r=1k
+b44 (d44 0) v=asin(0.5)
+r44 (d44 0) r r=1k
+b45 (d45 0) v=asin(1.0)
+r45 (d45 0) r r=1k
+b47 (d47 0) v=asin(1e-3)
+r47 (d47 0) r r=1k
+b50 (d50 0) v=asin(0)
+r50 (d50 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

@@ -6,7 +6,7 @@
 //! Oracle: VACASK 36be560 itself (its own dialect, R5), and ngspice-45 for the decks that
 //! settle a pair (`q13.cir`, `sp2.cir`); closed forms where the appendix gives one.
 //!
-//! Contents: tests, and for `settle_syntax` `Run`, `run`, `says`.
+//! Contents: tests, and for `settle_syntax` and `grid` `Run`, `run`, `says`, `raw`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -57,6 +57,13 @@ pub(super) fn says(run: &Run, message: &str) -> bool {
     run.out.contains(message)
 }
 
+/// The plot of raw file `name` the run wrote.
+pub(super) fn raw(run: &Run, name: &str) -> RawData {
+    let bytes = std::fs::read(run.dir.path().join(name))
+        .unwrap_or_else(|_| panic!("no {name}; the run said:\n{}", run.out));
+    parse_raw(&bytes).expect("a raw file")
+}
+
 // ---- private ----
 
 /// The values a `print (…)` line printed after each label, in order.
@@ -92,13 +99,6 @@ fn resistances(run: &Run) -> Vec<(String, f64)> {
         }
     }
     out
-}
-
-/// The plot of raw file `name` the run wrote.
-fn raw(run: &Run, name: &str) -> RawData {
-    let bytes = std::fs::read(run.dir.path().join(name))
-        .unwrap_or_else(|_| panic!("no {name}; the run said:\n{}", run.out));
-    parse_raw(&bytes).expect("a raw file")
 }
 
 /// Column `var` of `plot` at the point nearest `x` on its axis.

@@ -1,0 +1,10 @@
+b_print_param: a control print sees a var, not a circuit parameter of the deck itself
+load "spice/resistor.osdi"
+model rm sp_resistor
+parameters q=7
+r1 (n 0) rm r=q
+control
+  var w=3
+  print ("w", w)
+  print ("q", q)
+endc

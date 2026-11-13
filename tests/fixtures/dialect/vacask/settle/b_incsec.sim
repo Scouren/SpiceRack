@@ -1,0 +1,11 @@
+b_incsec: reads through an included section (ra 2.2, rb 1, rc 10, r9 1000, x1:r1 3000)
+load "spice/resistor.osdi"
+include "lib.lib" section=mc
+model vsource vsource
+v1 (n 0) vsource dc=1
+ra (n 0) rm r=late
+rb (n 0) rm r=early
+rc (n 0) rm r=ov
+control
+  print instance("ra", "rb", "rc", "r9", "x1:r1")
+endc

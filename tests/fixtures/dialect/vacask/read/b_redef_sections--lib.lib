@@ -1,0 +1,6 @@
+section a
+  parameters p=1
+endsection
+section b
+  parameters p=2
+endsection

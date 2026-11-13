@@ -1,0 +1,14 @@
+section a
+  parameters p=1
+  model rm sp_resistor
+  subckt cell (x y)
+    r1 (x y) rm r=1k
+  ends
+endsection
+section b
+  parameters p=2
+  model rm sp_resistor
+  subckt cell (x y)
+    r1 (x y) rm r=2k
+  ends
+endsection

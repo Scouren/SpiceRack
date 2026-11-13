@@ -1,0 +1,11 @@
+b_redef_sections: a name defined on both sides of an include (VACASK exits 1)
+load "spice/resistor.osdi"
+
+include "rlib.lib" section=a
+include "rlib.lib" section=b
+model vsource vsource
+v1 (n 0) vsource dc=1
+x1 (n 0) cell
+control
+  analysis op1 op
+endc

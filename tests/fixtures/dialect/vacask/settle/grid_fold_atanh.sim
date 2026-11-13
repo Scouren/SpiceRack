@@ -1,0 +1,21 @@
+atanh on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b145 (d145 0) v=atanh(-0.5)
+r145 (d145 0) r r=1k
+b146 (d146 0) v=atanh(-0.0)
+r146 (d146 0) r r=1k
+b147 (d147 0) v=atanh(0.0)
+r147 (d147 0) r r=1k
+b148 (d148 0) v=atanh(0.5)
+r148 (d148 0) r r=1k
+b151 (d151 0) v=atanh(1e-3)
+r151 (d151 0) r r=1k
+b154 (d154 0) v=atanh(0)
+r154 (d154 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

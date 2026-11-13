@@ -1,0 +1,15 @@
+acosh on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b137 (d137 0) v=acosh(2.5*($temp/$temp))
+r137 (d137 0) r r=1k
+b139 (d139 0) v=acosh(1e3*($temp/$temp))
+r139 (d139 0) r r=1k
+b142 (d142 0) v=acosh(3*($temp/$temp))
+r142 (d142 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

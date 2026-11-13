@@ -1,0 +1,35 @@
+cos on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b13 (d13 0) v=cos(-2.5*($temp/$temp))
+r13 (d13 0) r r=1k
+b14 (d14 0) v=cos(-1.0*($temp/$temp))
+r14 (d14 0) r r=1k
+b15 (d15 0) v=cos(-0.5*($temp/$temp))
+r15 (d15 0) r r=1k
+b16 (d16 0) v=cos(-0.0*($temp/$temp))
+r16 (d16 0) r r=1k
+b17 (d17 0) v=cos(0.0*($temp/$temp))
+r17 (d17 0) r r=1k
+b18 (d18 0) v=cos(0.5*($temp/$temp))
+r18 (d18 0) r r=1k
+b19 (d19 0) v=cos(1.0*($temp/$temp))
+r19 (d19 0) r r=1k
+b20 (d20 0) v=cos(2.5*($temp/$temp))
+r20 (d20 0) r r=1k
+b21 (d21 0) v=cos(1e-3*($temp/$temp))
+r21 (d21 0) r r=1k
+b22 (d22 0) v=cos(1e3*($temp/$temp))
+r22 (d22 0) r r=1k
+b23 (d23 0) v=cos(-3*($temp/$temp))
+r23 (d23 0) r r=1k
+b24 (d24 0) v=cos(0*($temp/$temp))
+r24 (d24 0) r r=1k
+b25 (d25 0) v=cos(3*($temp/$temp))
+r25 (d25 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

@@ -1,0 +1,9 @@
+ceil
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+b0 (d0 0) v=ceil(0.0)
+r0 (d0 0) r r=1k
+control
+  analysis op1 op
+endc

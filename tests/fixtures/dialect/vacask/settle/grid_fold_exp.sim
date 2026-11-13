@@ -1,0 +1,33 @@
+exp on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b156 (d156 0) v=exp(-2.5)
+r156 (d156 0) r r=1k
+b157 (d157 0) v=exp(-1.0)
+r157 (d157 0) r r=1k
+b158 (d158 0) v=exp(-0.5)
+r158 (d158 0) r r=1k
+b159 (d159 0) v=exp(-0.0)
+r159 (d159 0) r r=1k
+b160 (d160 0) v=exp(0.0)
+r160 (d160 0) r r=1k
+b161 (d161 0) v=exp(0.5)
+r161 (d161 0) r r=1k
+b162 (d162 0) v=exp(1.0)
+r162 (d162 0) r r=1k
+b163 (d163 0) v=exp(2.5)
+r163 (d163 0) r r=1k
+b164 (d164 0) v=exp(1e-3)
+r164 (d164 0) r r=1k
+b166 (d166 0) v=exp(-3)
+r166 (d166 0) r r=1k
+b167 (d167 0) v=exp(0)
+r167 (d167 0) r r=1k
+b168 (d168 0) v=exp(3)
+r168 (d168 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

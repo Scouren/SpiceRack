@@ -1,0 +1,13 @@
+b_redef_sub_after: a name defined on both sides of an include (VACASK exits 1)
+load "spice/resistor.osdi"
+
+include "rlib.lib" section=a
+subckt cell (x y)
+  r1 (x y) rm r=5k
+ends
+model vsource vsource
+v1 (n 0) vsource dc=1
+x1 (n 0) cell
+control
+  analysis op1 op
+endc
