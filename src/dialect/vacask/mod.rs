@@ -12,7 +12,8 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §1–§4, §7; `REWRITE-PLAN.md` §4.1, §4.3.
 //!
 //! Contents: `pub struct Vacask` (`impl Read`, `impl Write`), `pub static VACASK: Vacask`,
-//! `pub const LAWS: ir::Laws`, `pub static FEATURES: ir::FeatureSet`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
+//! `pub const LAWS: ir::Laws`, `pub static FEATURES: ir::FeatureSet`,
+//! `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
 mod atan2;
 mod bind;
@@ -51,9 +52,10 @@ pub struct Vacask;
 /// The one value the `vacask` row of `dialect::BUILTIN` points at.
 pub static VACASK: Vacask = Vacask;
 
-/// The device laws the VACASK modules the flake pins computes by (R90): one variant of each of the IR's law points, the
-/// second of each pair of `crates/ir/src/laws.rs` (each variant's doc names the run). Every
-/// read states them (`Builder::set_laws`), so [`FEATURES`] holds their members.
+/// The laws the VACASK modules the flake pins compute by: one variant of each of the IR's law
+/// points (devices R90–R96, functions R93a), the second of each pair in `crates/ir/src/laws.rs`
+/// (each variant's doc names the run). Every read states them (`Builder::set_laws`), so
+/// [`FEATURES`] holds their members.
 pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::BcSatAreabOnly,
     ir::Law::SubSatEmissionNs,
@@ -70,6 +72,11 @@ pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::DiodeIsrReversePresent,
     ir::Law::DiodeIsrSmallSignalExact,
     ir::Law::DiodeTtFactorClamped,
+    ir::Law::TrigExact,
+    ir::Law::ExpExact,
+    ir::Law::LogZeroError,
+    ir::Law::DivExact,
+    ir::Law::AsinEdgeFails,
 ]);
 
 /// What VACASK spells: the union of every area's part, and exactly the reader's image (law L5).

@@ -34,11 +34,14 @@ mod known;
 mod memcap;
 #[path = "common/p2.rs"]
 mod p2;
+#[path = "common/p3.rs"]
+mod p3;
 
 use std::path::Path;
 
 use known::{Fails, Known};
 use p2::p2_on;
+use p3::p3_on;
 use spicerack::dialect;
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
@@ -287,18 +290,6 @@ fn p3_the_output_uses_only_the_inputs_features_and_requires() {
     });
 }
 
-/// P3's self-test (R65, A39): on `v(n) + 1` beside a static `2 * 3`, a pass that writes
-/// `v(n) + 1 * 1` only moves `Mul` from its static into its dynamic member, which P3 passes; one
-/// that writes `v(n) + (1 - 1)` adds `Sub`, which neither form used, and P3 catches it.
-#[test]
-fn p3_passes_a_changed_form_and_catches_a_new_operator() {
-    let form_only = stub("form_only", mul_one);
-    p3_on(&form_only, p3_design()).expect("a moved form is no new feature");
-    let adds = stub("adds_sub", sub_one);
-    let found = p3_on(&adds, p3_design()).expect_err("Sub is new in either form");
-    assert!(found.contains("BinaryDyn(Sub)"), "{found}");
-}
-
 #[test]
 fn p4_twice_is_once() {
     laws("p4", |pass| {
@@ -429,78 +420,6 @@ fn note_first_comment(design: &mut ir::Design, diags: &mut ir::Diags) {
     if let Some((item, _)) = first {
         diags.push_at(LEAKY, design, item, 0);
     }
-}
-
-/// P3 on one design: what `pass` leaves uses nothing outside what the design used plus
-/// `requires`, an expression feature compared without its form (R65, A39).
-fn p3_on(pass: &Pass, mut design: ir::Design) -> Result<(), String> {
-    let allowed = ir::features_used(&design).union(pass.requires);
-    let allowed: Vec<ir::Feature> = allowed.iter().map(static_member).collect();
-    let mut diags = ir::Diags::new();
-    (pass.run)(&mut design, &mut diags);
-    let used = ir::features_used(&design);
-    let extra: Vec<ir::Feature> = used
-        .iter()
-        .filter(|&f| !allowed.contains(&static_member(f)))
-        .collect();
-    match extra.is_empty() {
-        true => Ok(()),
-        false => Err(format!("it adds {extra:?}")),
-    }
-}
-
-/// A function, operator or draw's static member; every other feature itself. A root's form is
-/// a fact about the root (R51), so a pass that merges two roots or drops a caller moves what it
-/// did not write between the two members (R65).
-fn static_member(feature: ir::Feature) -> ir::Feature {
-    match feature {
-        ir::Feature::FuncDyn(f) => ir::Feature::Func(f),
-        ir::Feature::BinaryDyn(op) => ir::Feature::Binary(op),
-        ir::Feature::UnaryDyn(op) => ir::Feature::Unary(op),
-        ir::Feature::DistDyn(d) => ir::Feature::Dist(d),
-        other => other,
-    }
-}
-
-/// A self-test pass of one rule, no `requires` and no notes.
-fn stub(name: &'static str, run: fn(&mut ir::Design, &mut ir::Diags)) -> Pass {
-    Pass {
-        name,
-        removes: ir::Feature::Item(ir::ItemKind::Comment),
-        requires: ir::FeatureSet::EMPTY,
-        notes: &[],
-        run,
-    }
-}
-
-/// P3's self-test design: a static `Mul` and a dynamic `Add` over a literal.
-fn p3_design() -> ir::Design {
-    let text = "file \"d.sp\" deck\n  param a = 2 * 3\n  element behav b1 (n 0) expr=(v(n) + 1)\n";
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    ir::parse(text, &mut design.builder(), &mut diags);
-    assert!(diags.is_empty(), "{:?}", diags.rows());
-    design
-}
-
-/// Every literal of a dynamic root `x` becomes `x * x`.
-fn mul_one(design: &mut ir::Design, _: &mut ir::Diags) {
-    literal_to(design, ir::BinOp::Mul);
-}
-
-/// Every literal of a dynamic root `x` becomes `x - x`.
-fn sub_one(design: &mut ir::Design, _: &mut ir::Diags) {
-    literal_to(design, ir::BinOp::Sub);
-}
-
-fn literal_to(design: &mut ir::Design, op: ir::BinOp) {
-    let changed = ir::rewrite_exprs_in(design, ir::Form::Dynamic, &mut |b, e| {
-        let ir::Expr::Num(_) = b.design().expr(e) else {
-            return None;
-        };
-        Some(b.binary(op, e, e))
-    });
-    assert_eq!(changed, 1, "one dynamic root holds a literal");
 }
 
 /// `≅`: the canonical IR text of every file.

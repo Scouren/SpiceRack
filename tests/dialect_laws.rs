@@ -337,9 +337,11 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
             let path = design.str(design.file(entry).path).to_string();
             let mut alone = ir::Diags::new();
             let first = dialect::write(&design, entry, row, &mut alone);
-            // The same files in reverse order, rebuilt through the IR text.
+            // The other files in reverse order, rebuilt through the IR text. The entry stays
+            // first: being the entry is the file's own role (it carries the design's `laws` line,
+            // R90), not another file.
             let mut files: Vec<String> = design.files().map(|f| one_file(&design, f)).collect();
-            files.reverse();
+            files[1..].reverse();
             let permuted = read_text(ir_row, &files.concat()).0;
             let mut diags = ir::Diags::new();
             let again = dialect::write(&permuted, permuted.find_file(&path), row, &mut diags);

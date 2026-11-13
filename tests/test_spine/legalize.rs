@@ -222,3 +222,63 @@ fn refusals(rows: &[ir::Diag]) -> Vec<(ir::ItemRef, ir::Code, u32)> {
         .map(|d| (d.item, d.code, d.arg))
         .collect()
 }
+
+/// R90a: a design whose law carriers all converted (here: none carries) ends stating the
+/// target's law; one with an unconverted carrier is refused and keeps its own.
+#[test]
+fn a_legal_design_ends_stating_the_targets_laws_and_a_refused_one_keeps_its_own() {
+    let vacask = dialect::by_name("vacask").expect("the vacask row");
+    let deck = |body: &str| {
+        let text = format!("laws log_zero_minus_1e99\nfile \"a.sp\" deck\n  title \"t\"\n{body}");
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(&text, &mut design.builder(), &mut diags);
+        assert!(diags.is_empty(), "{:?}", diags.rows());
+        design
+    };
+    let mut plain = deck("  element resistor r1 (a 0) value=1\n");
+    let mut diags = ir::Diags::new();
+    dialect::legalize_with(&mut plain, vacask, Roots::Entry, &mut diags);
+    assert!(refusals(diags.rows()).is_empty(), "{:?}", diags.rows());
+    assert!(
+        plain.laws().contains(ir::Law::LogZeroError),
+        "{:?}",
+        plain.laws()
+    );
+    assert!(!plain.laws().contains(ir::Law::LogZeroMinus1e99));
+    let mut carried = deck("  element behav b1 (n 0) expr=(ln(v(n)))\n");
+    let mut diags = ir::Diags::new();
+    dialect::legalize_with(&mut carried, vacask, Roots::Entry, &mut diags);
+    let member = ir::Feature::Circuit(ir::Law::LogZeroMinus1e99.member());
+    let at_member = diags
+        .rows()
+        .iter()
+        .any(|d| d.code == ir::diag::UNSUPPORTED && d.arg == u32::from(member.index()));
+    assert!(at_member, "the carrier is refused: {:?}", diags.rows());
+    assert!(carried.laws().contains(ir::Law::LogZeroMinus1e99));
+}
+
+/// The pairing `restate_laws` relies on: `Law::ALL` lists each point's two variants adjacent,
+/// so a design stating an adjacent pair is a `LawConflict` for `ir::check`.
+#[test]
+fn law_all_lists_each_points_two_variants_adjacent() {
+    for pair in ir::Law::ALL.chunks(2) {
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse("file \"a.sp\" deck\n", &mut design.builder(), &mut diags);
+        design.builder().set_laws(ir::Laws::of(pair));
+        let mut found = ir::Diags::new();
+        ir::check(&design, &mut found);
+        assert!(!found.is_empty(), "{pair:?}: one point, a conflict");
+    }
+    for k in (1..ir::Law::ALL.len() - 1).step_by(2) {
+        let across = [ir::Law::ALL[k], ir::Law::ALL[k + 1]];
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse("file \"a.sp\" deck\n", &mut design.builder(), &mut diags);
+        design.builder().set_laws(ir::Laws::of(&across));
+        let mut found = ir::Diags::new();
+        ir::check(&design, &mut found);
+        assert!(found.is_empty(), "{across:?}: two points, no conflict");
+    }
+}

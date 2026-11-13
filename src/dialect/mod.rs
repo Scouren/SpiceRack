@@ -344,7 +344,8 @@ pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)
 /// first-seen order, less those at an item a later drop removed (the `U0314` note at its
 /// definition says what went), then the last round's refusals in that round's order: an
 /// earlier round's refusals are recomputed on the changed design. Legality is of the whole
-/// design.
+/// design. A design refused nowhere ends stating the target's laws (R90a: per law point, the
+/// variant the writer's features hold), as the target's reader would state them.
 ///
 /// # Panics
 /// When `to` has no writer (the caller checks the row).
@@ -397,6 +398,9 @@ pub fn legalize_with(
         kept.retain(|n| !gone.contains(&n.item));
         kept.extend(dropped.rows().iter().copied());
     };
+    if last.is_empty() {
+        restate_laws(design, writer.features());
+    }
     for d in kept.iter().chain(&last) {
         if d.item.index == ir::ItemRef::NONE.index {
             diags.push(d.code, d.span, d.arg);
@@ -517,6 +521,28 @@ fn transpile_with(
     );
     let text = write(&design, entry, to, &mut diags);
     Ok(Written { text, notes: diags })
+}
+
+/// The design's laws restated as the target's (R90a): per law point (two variants, adjacent in
+/// `Law::ALL`), the one variant `features` holds replaces the stated one; a point whose
+/// variants `features` holds both or neither of is left. Meaning-neutral after a legalize with
+/// no refusal: nothing then carries a variant the target lacks, and a point's carriers do not
+/// depend on its variant.
+fn restate_laws(design: &mut ir::Design, features: &ir::FeatureSet) {
+    const _: () = assert!(ir::Law::ALL.len().is_multiple_of(2), "two variants per law point");
+    let mut laws = design.laws();
+    for point in ir::Law::ALL.chunks(2) {
+        let held: Vec<ir::Law> = point
+            .iter()
+            .copied()
+            .filter(|l| features.contains(ir::Feature::Circuit(l.member())))
+            .collect();
+        if let [target] = held[..] {
+            let others = laws.iter().filter(|l| !point.contains(l));
+            laws = others.fold(ir::Laws::EMPTY, ir::Laws::with).with(target);
+        }
+    }
+    design.builder().set_laws(laws);
 }
 
 /// The foreign step of a [`legalize_with`] round: every `Opaque` of another text family

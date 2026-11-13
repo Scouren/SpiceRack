@@ -25,7 +25,8 @@
 //! Cites: `rewrite/DIALECT-NGSPICE.md`; `REWRITE-PLAN.md` §2–§4; `rewrite/SPINE.md`.
 //!
 //! Contents: `pub struct Ngspice`, `pub struct Flavour`, `pub static NGSPICE: Ngspice`,
-//! `pub const LAWS: ir::Laws`, `pub const FEATURES: ir::FeatureSet`, `pub use codes::info`; `impl Read for Ngspice`,
+//! `pub const LAWS: ir::Laws`, `pub const FEATURES: ir::FeatureSet`, `pub use codes::info`;
+//! `impl Read for Ngspice`,
 //! `impl Write for Ngspice`
 
 mod bind;
@@ -81,9 +82,10 @@ pub static NGSPICE: Ngspice = Ngspice {
     flavour: Flavour {},
 };
 
-/// The device laws ngspice-45 computes by (R90): one variant of each of the IR's law points, the
-/// first of each pair of `crates/ir/src/laws.rs` (each variant's doc names the run). Every
-/// read states them (`Builder::set_laws`), so [`FEATURES`] holds their members.
+/// The laws ngspice-45 computes by: one variant of each of the IR's law points (devices
+/// R90–R96, functions R93a), the first of each pair in `crates/ir/src/laws.rs` (each variant's
+/// doc names the run). Every read states them (`Builder::set_laws`), so [`FEATURES`] holds
+/// their members.
 pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::BcSatAreaTimesAreab,
     ir::Law::SubSatLastFactor,
@@ -100,6 +102,11 @@ pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::DiodeIsrReverseNone,
     ir::Law::DiodeIsrSmallSignalHand,
     ir::Law::DiodeTtFactorUnclamped,
+    ir::Law::TrigReduceCast,
+    ir::Law::ExpClamp1e99,
+    ir::Law::LogZeroMinus1e99,
+    ir::Law::DivGminGuard,
+    ir::Law::AsinEdgeZero,
 ]);
 
 /// What ngspice-45 spells natively: the union of the areas' sets, each the image of its reader
