@@ -1,0 +1,10 @@
+non-integer sweep counts
+control
+  analysis a1 ac from=1k to=100k mode="dec" points=2.5
+  analysis a2 ac from=1k to=100k mode="dec" points=2.6
+  analysis a3 ac from=1k to=2k mode="lin" points=1.5
+  analysis a4 ac from=1k to=2k mode="lin" points=2.5
+  analysis a5 ac from=1k to=100k mode="dec" points=5.0/2
+  analysis a6 ac from=1k to=2k mode="lin" points=5.0/2
+  analysis a7 ac from=1k to=100k mode="dec" points=2*2
+endc

@@ -2,7 +2,7 @@
 //! `Target` and a `SweepSpec`; the range forms are shared with the frequency sweeps of the
 //! small-signal analyses (`from`/`to` with `step`, or `mode="lin|dec|oct"` with `points`, or
 //! `values=[…]`). A lin `points` counts intervals (VD cmd-sweep, cmd-analysis-ac), so the IR's
-//! count is one more; targets `instance=`/`parameter=` (a device parameter, hierarchical names
+//! count is one more, and a count that is no integer is truncated toward zero (R99b); targets `instance=`/`parameter=` (a device parameter, hierarchical names
 //! split at `:`; an instance no file declares is VACASK's error, settle run/nosuch_sweep;
 //! `instance="__topinst__"` is the top-level parameter `parameter=`, R70; `parameter="dc"` of an independent source of type dc is its DC value, R64, and
 //! of a waveform source, whose `dc` VACASK ignores, Private: settle run/sweep_source), `model=`/`parameter=` (bound to the top level's model), `option="temp"` (the
@@ -66,6 +66,48 @@ pub(super) const BAD: Why = Why {
     class: ir::OpaqueClass::InvalidInSource,
     code: Some(REJECTED),
 };
+
+/// A literal count: an integer as written, or a number cut to its integer literal.
+enum Whole {
+    Int,
+    Cut(ir::Literal),
+}
+
+/// Bindings that bind nothing: a read leaves the expression without a constant value.
+struct Unbound;
+
+impl ir::eval::Bindings for Unbound {
+    fn param(&self, _: ir::Ref) -> Option<f64> {
+        None
+    }
+    fn voltage(&self, _: ir::NameId, _: ir::NameId) -> Option<f64> {
+        None
+    }
+    fn current(&self, _: ir::NameId) -> Option<f64> {
+        None
+    }
+    fn time(&self) -> Option<f64> {
+        None
+    }
+    fn temp(&self) -> Option<f64> {
+        None
+    }
+    fn freq(&self) -> Option<f64> {
+        None
+    }
+    fn tstep(&self) -> Option<f64> {
+        None
+    }
+    fn tstop(&self) -> Option<f64> {
+        None
+    }
+    fn tnom(&self) -> Option<f64> {
+        None
+    }
+    fn draw(&self, _: ir::Dist, _: ir::DrawWhen, _: ir::DrawPer, _: &[f64]) -> Option<f64> {
+        None
+    }
+}
 
 /// A form the IR has no field for, under `code`.
 pub(super) const fn private(code: ir::Code) -> Why {
@@ -307,8 +349,8 @@ pub(super) fn spec(l: &mut Lower<'_, '_, '_>, s: Spec) -> ir::SweepSpec {
     match s.kind {
         ir::SweepKind::Lin if s.step != NONE => ir::SweepSpec::lin_step(from, to, value(l, s.step)),
         ir::SweepKind::Lin => ir::SweepSpec::lin_points(from, to, plus_one(l, s.points)),
-        ir::SweepKind::Dec => ir::SweepSpec::dec(from, to, value(l, s.points)),
-        _ => ir::SweepSpec::oct(from, to, value(l, s.points)),
+        ir::SweepKind::Dec => ir::SweepSpec::dec(from, to, count(l, s.points)),
+        _ => ir::SweepSpec::oct(from, to, count(l, s.points)),
     }
 }
 
@@ -378,17 +420,38 @@ fn option_aim(name: &str) -> Option<Aim> {
     (own && !name.ends_with("_debug")).then(|| Aim::PrivateOption(name.to_string()))
 }
 
-/// `node` plus one: an integer literal's successor, `x` for `x - 1`, else `node + 1`.
+/// The count at `node` as VACASK takes it: truncated toward zero, silently (R99b, F61). A
+/// literal becomes its truncation, an expression not of Int type `to_int` of itself.
+fn count(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
+    match whole(l, node) {
+        Some(Whole::Int) => value(l, node),
+        Some(Whole::Cut(n)) => l.b.literal(n),
+        None => {
+            let e = value(l, node);
+            truncated(l, e)
+        }
+    }
+}
+
+/// `node` plus one, the count of intervals truncated first: a literal's successor, `x` for
+/// `x - 1`, else the count `+ 1`.
 fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
     let ast = &l.cst.ast;
-    if ast.tag(Node(node)) == Tag::Num
-        && let Ok(x) = number::lex(l.cst.tokens.text(ast.main_token(Node(node))))
-        && x.int
-        && x.literal.mantissa < i64::MAX
+    let int = (ast.tag(Node(node)) == Tag::Num)
+        .then(|| number::lex(l.cst.tokens.text(ast.main_token(Node(node)))).ok())
+        .flatten()
+        .filter(|x| x.int)
+        .map(|x| x.literal);
+    let cut = match whole(l, node) {
+        Some(Whole::Cut(n)) => Some(n),
+        _ => None,
+    };
+    if let Some(n) = int.or(cut)
+        && n.mantissa < i64::MAX
     {
         let next = ir::Literal {
-            mantissa: x.literal.mantissa + 1,
-            ..x.literal
+            mantissa: n.mantissa + 1,
+            ..n
         };
         return l.b.literal(next);
     }
@@ -401,8 +464,47 @@ fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
     {
         return x;
     }
+    let e = truncated(l, e);
     let one = l.b.literal(int_one());
     l.b.binary(ir::BinOp::Add, e, one)
+}
+
+/// The literal at `node`: an integer as written, or another number cut to the integer literal
+/// toward zero; `None` for any other node.
+fn whole(l: &Lower<'_, '_, '_>, node: u32) -> Option<Whole> {
+    let ast = &l.cst.ast;
+    if ast.tag(Node(node)) != Tag::Num {
+        return None;
+    }
+    let x = number::lex(l.cst.tokens.text(ast.main_token(Node(node)))).ok()?;
+    if x.int {
+        return Some(Whole::Int);
+    }
+    let v = l.b.design().literal_value(x.literal);
+    let t = v.trunc();
+    // a whole number written as a real (`2.`, the writer's spelling of a Real count) stands
+    if t == v {
+        return Some(Whole::Int);
+    }
+    // past 2^53 no integer literal is exact: the caller wraps the literal instead
+    if t.abs() >= 9.0e15 {
+        return None;
+    }
+    number::lex(&format!("{}", t as i64))
+        .ok()
+        .map(|n| Whole::Cut(n.literal))
+}
+
+/// `e` as VACASK truncates a count: itself when truncation leaves it (a `to_int`, or a constant
+/// of Int type or of whole value), else `to_int(e)`.
+fn truncated(l: &mut Lower<'_, '_, '_>, e: ir::ExprId) -> ir::ExprId {
+    let d = l.b.design();
+    let int = matches!(d.expr(e), ir::Expr::Call(ir::Func::ToInt, _))
+        || ir::eval::eval_typed(d, e, &Unbound).is_ok_and(|v| v.int || v.number.fract() == 0.0);
+    match int {
+        true => e,
+        false => l.b.call(ir::Func::ToInt, &[e]),
+    }
 }
 
 /// Whether `node` is a negative literal: `-` over a nonzero number.
