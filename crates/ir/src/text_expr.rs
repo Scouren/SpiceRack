@@ -253,7 +253,7 @@ pub fn write_string(s: &str, out: &mut String) {
 pub fn write_ref(design: &Design, r: Ref, kind: DefKind, ctx: &Ctx, out: &mut String) {
     write_name(design.str(r.name), out);
     let would_bind = (!ctx.scope.is_none()).then(|| design.lookup(ctx.scope, kind, r.name));
-    mark(r, would_bind, out);
+    mark(design, r, would_bind, out);
 }
 
 /// Appends a parenthesized, blank-separated name list, `(a b c)` (what `Words::names` reads).
@@ -490,18 +490,43 @@ fn expr_ref(design: &Design, r: Ref, ctx: &Ctx, call: bool, out: &mut String) {
             found
         })
     };
-    mark(r, would_bind, out);
+    mark(design, r, would_bind, out);
 }
 
 /// The mark after a reference's name, given what a bare spelling would bind to (`None`: no
 /// context, so only `?` and `#k` are exact).
-fn mark(r: Ref, would_bind: Option<DefId>, out: &mut String) {
+fn mark(design: &Design, r: Ref, would_bind: Option<DefId>, out: &mut String) {
     let resolved = r.is_resolved();
     match would_bind {
         Some(found) if found == r.def || (!resolved && found.is_none()) => {}
         Some(_) | None if !resolved => out.push('?'),
-        Some(_) | None => out.push_str(&format!("#{}", r.def.0)),
+        Some(_) | None => out.push_str(&format!("#{}", def_mark(design, r.def))),
     }
+}
+
+/// A definition's number in IR text: its place among the definitions of the listed items, in
+/// item order (`Design::reachable`) and within an item in creation order, which is the index
+/// `parse` gives it. So two designs that differ only in the order their definitions were made
+/// dump to one text (pair-2's twinless OSDI decks). A definition no listed item makes keeps its
+/// raw index. O(definitions + items) once per design state (a cache).
+fn def_mark(design: &Design, def: DefId) -> u32 {
+    let order = design.def_order.get_or_init(|| {
+        let mut by_item: std::collections::HashMap<ItemRef, Vec<u32>> =
+            std::collections::HashMap::new();
+        for (k, d) in design.defs.iter().enumerate() {
+            by_item.entry(d.item).or_default().push(k as u32);
+        }
+        let mut order: Vec<u32> = (0..design.defs.len() as u32).collect();
+        let mut next = 0u32;
+        for (item, _) in design.reachable() {
+            for &k in by_item.get(&item).map_or(&[][..], Vec::as_slice) {
+                order[k as usize] = next;
+                next += 1;
+            }
+        }
+        order
+    });
+    order.get(def.index()).copied().unwrap_or(def.0)
 }
 
 /// A byte of a bare name in a name position.

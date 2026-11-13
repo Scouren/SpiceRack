@@ -38,7 +38,7 @@
 //! ref      = name                    bound by `link` after the whole text (exact name, from the
 //!                                    item's scope outward); unresolved if nothing matches
 //!          | name "?"                deliberately unresolved (def NONE)
-//!          | name "#" digits         bound to that definition (only when lookup binds elsewhere)
+//!          | name "#" digits         bound to the k-th definition in item order (only when lookup binds elsewhere)
 //! ```
 //!
 //! Kernel items (owners' items follow the same shape: keyword, then the row's fields in
