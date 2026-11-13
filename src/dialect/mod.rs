@@ -43,7 +43,7 @@
 //!   `pub const PATH_AS_READ: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path}`; `pub mod facade`, `pub mod irtext`,
-//!   `pub mod hspice`, `pub mod ngspice`, `pub mod vacask`
+//!   `pub mod hspice`, `pub mod ngspice`, `pub mod spectre`, `pub mod vacask`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
 //! - `pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)`
@@ -58,6 +58,7 @@ pub mod hspice;
 pub mod irtext;
 pub mod ngspice;
 mod sources;
+pub mod spectre;
 pub mod vacask;
 
 pub use crate::passes::structure::unused::Roots;
@@ -166,6 +167,12 @@ pub static BUILTIN: &[DialectRow] = &[
         text_family: "hspice",
         read: Some(&hspice::HSPICE),
         write: Some(&hspice::HSPICE),
+    },
+    DialectRow {
+        name: "spectre",
+        text_family: "spectre",
+        read: Some(&spectre::SPECTRE),
+        write: Some(&spectre::SPECTRE),
     },
 ];
 
@@ -499,6 +506,7 @@ pub fn info(code: ir::Code) -> Option<ir::Info> {
         .or_else(|| ir::diag::info(code))
         .or_else(|| ngspice::info(code))
         .or_else(|| hspice::info(code))
+        .or_else(|| spectre::info(code))
 }
 
 /// Whether `code` refuses a deck: its row is a refusal, or no catalogue holds it (a missing

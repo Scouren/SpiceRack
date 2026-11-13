@@ -1,0 +1,5 @@
+// AM with ammodoffset (RUN-SP P4-055: the modulation coefficient is 1 whatever ammodindex is: v = ampl*(ammodoffset + sin(...))*sin(...), fitted to 8e-13 for mi in 0..1.5)
+simulator lang=spectre
+v1 (a 0) vsource type=sine sinedc=0 ampl=2 freq=1M ammodoffset=0.5 ammodindex=0.8 ammodfreq=100k
+r1 (a 0) resistor r=1k
+tran1 tran stop=20u maxstep=1n

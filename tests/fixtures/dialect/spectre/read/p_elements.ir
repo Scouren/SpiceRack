@@ -1,0 +1,22 @@
+# tests/spectre/p_elements.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).
+# codes: S0003 P6008
+laws default_temp_27 default_tnom_27
+file "p_elements.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  element vsource v1 (in 0) dc=2
+  element resistor r1 (in out) value=2k
+  element resistor r2 (out 0) value=1k
+  element capacitor c1 (out 0) value=1n
+  element isource i1 (0 n1) dc=1m
+  element inductor l1 (n1 n2) value=1u
+  element resistor r4 (n2 0) value=1k
+  element vcvs e1 (e 0 out 0) gain=2
+  element resistor re (e 0) value=1k
+  element vccs g1 (0 g out 0) gain=1m
+  element resistor rg (g 0) value=1k
+  element cccs f1 (0 f) gain=3 sense=v1
+  element resistor rf (f 0) value=1
+  element ccvs h1 (h 0) gain=100 sense=v1
+  element resistor rh (h 0) value=1k
+  analysis op name=op1

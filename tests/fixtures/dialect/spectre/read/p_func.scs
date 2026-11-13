@@ -1,0 +1,14 @@
+// t
+
+simulator lang=spectre
+
+real dbl(real x) {
+    return 2*x;
+}
+parameters rb=1k
+
+v1 (in 0) vsource dc=2
+r1 (in out) resistor r=dbl(500)
+r2 (out 0) resistor r=rb
+
+op1 dc

@@ -1,0 +1,16 @@
+// t
+
+simulator lang=spectre
+
+parameters rr=2k
+
+if (rr > 1k) {
+parameters rl=1k
+} else {
+parameters rl=3k
+}
+v1 (in 0) vsource dc=2
+r1 (in out) resistor r=1k
+r2 (out 0) resistor r=rl
+
+op1 dc

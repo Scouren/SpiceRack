@@ -1,0 +1,15 @@
+# tests/spectre/p_branch_param.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).
+# codes: S0003 P6008
+laws default_temp_27 default_tnom_27
+file "p_branch_param.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  param rr = 2k
+  if (rr > 1k)
+    param rl = 1k
+  else
+    param rl = 3k
+  element vsource v1 (in 0) dc=2
+  element resistor r1 (in out) value=1k
+  element resistor r2 (out 0) value=rl
+  analysis op name=op1

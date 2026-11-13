@@ -1,0 +1,25 @@
+# tests/spectre/t_m3_diodes.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).
+# codes: S0003 P6008 S0001 P6001 S0001 P6001
+laws default_temp_27 default_tnom_27
+file "t_m3_diodes.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  param sw_nsd_pw_cj = 1
+  param sw_func_nsd_pw_cj = 1
+  param rs_int = 981 * 1e-12
+  opaque spectre unread "model ndiode diode level=3 tlevc=1 area=1T cjo=sw_nsd_pw_cj*1e-12 m=440m vj=729m cjsw=3.6001e-011*1e-6*sw_func_nsd_pw_cj mjsw=900u vjsw=200m cta=792u ctp=10u pta=1.2287m ptp=0 js=2.75f jsw=(0.6f)*exp((1-1/(1.2928))*(((temp+273.15)/((30)+273.15)-1)*(1.05)/(8.6173303e-5*(temp+273.15))+(2)*ln((temp+273.15)/((30)+273.15)))) n=1.2928 rs=rs_int ik=1.3e-009/1e-12 bv=11.7/sw_func_nsd_pw_cj ibv=1.06m trs=0 eg=1.05 xti=2 tnom=30 tbv1=0 gap1=473u gap2=1.11k lm=0 lp=0 wm=0 wp=0 xm=0 xoi=10k xom=10k xp=0 xw=0 nz=1.2928 fcs=500m dskip=no jmax=100000000T ns=1.2928"
+  opaque spectre unread "model dj diode level=3 js=10f jsw=(1f)*exp((1-1/(1.05))*(((temp+273.15)/((30)+273.15)-1)*(1.11)/(8.6173303e-5*(temp+273.15))+(3)*ln((temp+273.15)/((30)+273.15)))) n=1.05 rs=10 cjo=1m m=400m vj=800m cjsw=1n mjsw=300m vjsw=700m tlevc=1 cta=1m ctp=1m pta=1m ptp=1m bv=12 ibv=1m tnom=30 xti=3 tlev=1 tbv1=-1m xom=10k xoi=10k lm=0 wm=0 eg=1.11 nz=1.05 fcs=500m dskip=no jmax=100000000T ns=1.05"
+  element vsource v1 (1 0) dc=2
+  element resistor r1 (1 2) value=1k
+  element diode d1 (2 0) model=dj params=(perim=3) area=500m
+  element vsource v2 (3 0) dc=-20
+  element resistor r2 (3 4) value=1k
+  element diode d2 (4 0) model=dj params=(perim=3) area=500m
+  element vsource v3 (5 0) dc=2
+  element resistor r3 (5 6) value=1k
+  element diode d3 (6 0) model=ndiode params=(perim=2) area=250m
+  element vsource v4 (7 0) dc=-20
+  element resistor r4 (7 8) value=1k
+  element diode d4 (8 0) model=ndiode params=(perim=2) area=250m
+  env temp=60 whole_run
+  analysis op name=op1

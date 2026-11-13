@@ -1,0 +1,11 @@
+# tests/fixtures/dialect/spectre/authored/tline_td.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).
+# codes: S0003 P6008
+laws default_temp_27 default_tnom_27
+file "tline_td.scs" deck
+  title "// a matched tline given by z0 and td is an ideal delay (RUN-SP P5-028: out = 0.5*src(t-2n) to 1.8e-13)"
+  opaque spectre inert "simulator lang=spectre"
+  element vsource v1 (in 0) dc=0 wave=pulse(v1=0 v2=1 delay=1n rise=100p fall=100p width=5n period=20n)
+  element resistor rs (in a) value=50
+  element lossless_line t1 (a 0 out 0) z0=50 td=2n
+  element resistor rl (out 0) value=50
+  analysis tran name=tran1 stop=20n max_step=10p

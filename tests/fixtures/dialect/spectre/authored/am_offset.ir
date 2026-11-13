@@ -1,0 +1,9 @@
+# tests/fixtures/dialect/spectre/authored/am_offset.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).
+# codes: S0003 P6008
+laws default_temp_27 default_tnom_27
+file "am_offset.scs" deck
+  title "// AM with ammodoffset (RUN-SP P4-055: the modulation coefficient is 1 whatever ammodindex is: v = ampl*(ammodoffset + sin(...))*sin(...), fitted to 8e-13 for mi in 0..1.5)"
+  opaque spectre inert "simulator lang=spectre"
+  element vsource v1 (a 0) dc=0 wave=am(offset=0 amplitude=2 mod_offset=0.5 mod_index=1 mod_freq=100k carrier_freq=1meg delay=0 phase_m_deg=0 phase_c_deg=0 mod_time=carrier_phase)
+  element resistor r1 (a 0) value=1k
+  analysis tran name=tran1 stop=20u max_step=1n
