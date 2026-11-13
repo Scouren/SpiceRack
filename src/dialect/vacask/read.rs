@@ -318,6 +318,14 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
         l.comments_until(u32::MAX, true);
     }
     let visible = super::visible::Visible::new(out.design());
+    for (second, first) in visible.redefinitions(out.design()) {
+        diags.push_at(
+            read_structure::INCLUDED_TWICE,
+            out.design(),
+            second,
+            first.0,
+        );
+    }
     bind::reads(out, &visible, &reads, diags);
     bind::masters(out, &visible, &masters, diags);
 }
@@ -423,11 +431,14 @@ pub(super) fn unclosed(cst: &Cst<'_>, n: Node) -> bool {
 /// One statement's dispatch: by its CST tag, and for a `Card` by its head word.
 fn statement(l: &mut Lower<'_, '_, '_>, n: Node) {
     let ast = &l.cst.ast;
-    let leaf = !matches!(
+    // A leaf, or a subcircuit's head line (`unclosed` stops at the first statement end, so a
+    // body is never scanned): `subckt s (a b` with no `)` to the end of the file is VACASK's
+    // syntax error (the reader fixtures' bracket mutants, b_redef_sub).
+    let checked = !matches!(
         ast.tag(n),
-        Tag::Title | Tag::Section | Tag::Subckt | Tag::If | Tag::Else | Tag::Control
+        Tag::Title | Tag::Section | Tag::If | Tag::Else | Tag::Control
     );
-    if leaf && unclosed(l.cst, n) {
+    if checked && unclosed(l.cst, n) {
         return opaque(
             l,
             n,

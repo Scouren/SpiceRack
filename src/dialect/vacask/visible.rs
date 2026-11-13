@@ -4,8 +4,11 @@
 //! include statement; VACASK resolves a name after the whole netlist is parsed, so a read
 //! standing before the include line sees them too (settle b_incsec: `early=pd*10` before
 //! `include … section=dfl` reads dfl's `pd`). A name defined both there and in the including
-//! scope is VACASK's "Parameter redefinition." (settle b_incsec_top_*), so the order in which
-//! the spliced scopes are searched picks no winner VACASK would accept otherwise.
+//! scope is VACASK's "Parameter redefinition." (settle b_incsec_top_*), a model or subcircuit so
+//! defined "A model/subcircuit with name … already exists." (b_redef_*), two included sections
+//! defining one name the same (b_redef_sections): `Visible::redefinitions` finds each such second
+//! definition in the expanded text's order, so the order in which `at` searches the spliced
+//! scopes picks no winner VACASK accepts.
 //!
 //! Only the definitions a scope holds itself count (not its parents'): a library's text outside
 //! every section is skipped when it is read by section (settle star_outside_section).
@@ -13,7 +16,8 @@
 //! Cites: settle b_incsec*.sim (VACASK 36be560); R3 (the reader binds), R71 (the ngspice reader's
 //! table, `ngspice/visible.rs`, whose shape this copies; the order rule is VACASK's).
 //!
-//! Contents: `Visible`, `Visible::new`, `Visible::at` (crate-private to the dialect)
+//! Contents: `Visible`, `Visible::new`, `Visible::at`, `Visible::redefinitions` (crate-private to
+//! the dialect)
 
 use std::collections::{HashMap, HashSet};
 
@@ -25,6 +29,8 @@ pub(super) struct Visible {
     own: HashMap<(ir::ScopeId, ir::DefKind, ir::NameId), ir::DefId>,
     /// A scope that holds an include → every scope spliced into it, transitively, in text order.
     spliced: HashMap<ir::ScopeId, Vec<ir::ScopeId>>,
+    /// A scope that holds an include → the scopes its includes read directly, in text order.
+    direct: HashMap<ir::ScopeId, Vec<ir::ScopeId>>,
 }
 
 impl Visible {
@@ -44,7 +50,11 @@ impl Visible {
             }
         }
         let spliced = direct.keys().map(|&s| (s, closure(&direct, s))).collect();
-        Visible { own, spliced }
+        Visible {
+            own,
+            spliced,
+            direct,
+        }
     }
 
     /// The definition of `(kind, name)` that `scope` holds itself or through its includes.
@@ -54,6 +64,74 @@ impl Visible {
             .chain(spliced)
             .find_map(|&s| self.own.get(&(s, kind, name)).copied())
             .unwrap_or(ir::DefId::NONE)
+    }
+}
+
+impl Visible {
+    /// Every definition VACASK reads as a second one of its name in a scope's expanded text
+    /// (its items with each include's target in its place), with the first: a parameter after a
+    /// parameter, a model or subcircuit after a model or subcircuit (one namespace: "A
+    /// model/subcircuit with name … already exists."). Each second definition once, in scope
+    /// order. A second definition in one scope never reaches the IR (R2001), so each pair spans
+    /// an include.
+    pub(super) fn redefinitions(&self, d: &ir::Design) -> Vec<(ir::ItemRef, ir::DefId)> {
+        let mut defs_of: HashMap<ir::ItemRef, Vec<ir::DefId>> = HashMap::new();
+        for (k, def) in d.definitions().iter().enumerate() {
+            let id = ir::DefId(u32::try_from(k).expect("definitions fit a u32"));
+            defs_of.entry(def.item).or_default().push(id);
+        }
+        let mut scopes: Vec<ir::ScopeId> = self.direct.keys().copied().collect();
+        scopes.sort_by_key(|s| s.index());
+        let mut out = Vec::new();
+        let mut reported = HashSet::new();
+        for scope in scopes {
+            let mut first: HashMap<(bool, ir::NameId), ir::DefId> = HashMap::new();
+            for def in self.expanded(d, scope, &defs_of) {
+                let row = d.def(def);
+                let class = match row.kind {
+                    ir::DefKind::Param => false,
+                    ir::DefKind::Model | ir::DefKind::Subckt => true,
+                    _ => continue,
+                };
+                match first.get(&(class, row.name)) {
+                    None => drop(first.insert((class, row.name), def)),
+                    Some(&f) if f != def && reported.insert(def) => out.push((row.item, f)),
+                    Some(_) => {}
+                }
+            }
+        }
+        out
+    }
+
+    /// The definitions `scope`'s expanded text holds, in its order (an explicit stack of
+    /// (scope, next item); each scope entered once, so an include cycle ends).
+    fn expanded(
+        &self,
+        d: &ir::Design,
+        scope: ir::ScopeId,
+        defs_of: &HashMap<ir::ItemRef, Vec<ir::DefId>>,
+    ) -> Vec<ir::DefId> {
+        let mut out = Vec::new();
+        let mut entered = HashSet::from([scope]);
+        let mut stack = vec![(scope, 0usize)];
+        // Bounded: each scope is pushed once and each frame advances over its items.
+        while let Some((at, k)) = stack.pop() {
+            let Some(&item) = d.items(at).get(k) else {
+                continue;
+            };
+            stack.push((at, k + 1));
+            // only what the item defines in `at` (a subcircuit item also carries its formals,
+            // which stand in its body)
+            let own = defs_of.get(&item).into_iter().flatten();
+            out.extend(own.filter(|&&def| d.def(def).scope == at));
+            if item.kind == ir::ItemKind::Include
+                && let Some(target) = target(d, item)
+                && entered.insert(target)
+            {
+                stack.push((target, 0));
+            }
+        }
+        out
     }
 }
 

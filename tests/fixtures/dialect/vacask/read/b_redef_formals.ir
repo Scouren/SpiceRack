@@ -1,0 +1,10 @@
+# Oracle: corpus benchmark/c6288/vacask/models.inc (two subcircuits each with formals w l ld ls,
+# included by runme.sim, which VACASK runs): a formal stands in its subcircuit's body, so two
+# subcircuits' formals of one name are no redefinition (no P2030).
+# codes:
+file "b_redef_formals.sim" deck
+  title "two included subcircuits with formals of one name"
+  include "b_redef_formals--lib.inc"
+file "b_redef_formals--lib.inc" library
+  subckt nm (d) w=1i
+  subckt pm (d) w=2i

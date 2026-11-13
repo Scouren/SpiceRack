@@ -68,6 +68,52 @@ fn vacask_binds_through_an_included_section_before_and_after_the_include() {
 }
 
 #[test]
+fn vacask_refuses_a_name_defined_on_both_sides_of_an_include() {
+    // a model or subcircuit (one namespace) in the deck before or after an include of a section
+    // that defines it too, or a subcircuit against a model; two included sections defining one
+    // parameter: each a redefinition, exit 1
+    let cases = [
+        (
+            "b_redef_model_before",
+            "A model/subcircuit with name 'rm' already exists.",
+        ),
+        (
+            "b_redef_model_after",
+            "A model/subcircuit with name 'rm' already exists.",
+        ),
+        (
+            "b_redef_sub_before",
+            "A model/subcircuit with name 'cell' already exists.",
+        ),
+        (
+            "b_redef_sub_after",
+            "A model/subcircuit with name 'cell' already exists.",
+        ),
+        (
+            "b_redef_mixed",
+            "A model/subcircuit with name 'rm' already exists.",
+        ),
+        ("b_redef_sections", "Parameter redefinition."),
+    ];
+    for (deck, message) in cases {
+        let out = vacask(deck);
+        assert!(out.contains(message), "{deck}: {out}");
+    }
+}
+
+#[test]
+fn a_control_print_sees_a_var_and_no_circuit_parameter() {
+    // b_print_param: `print ("w", w)` of a control `var` prints, `print ("q", q)` of the deck's
+    // own `parameters q=7` is "not defined": the control block's view (R68), not an include's
+    let out = vacask("b_print_param");
+    assert!(out.contains("w 3"), "{out}");
+    assert!(
+        out.contains("Variable or constant 'q' not defined."),
+        "{out}"
+    );
+}
+
+#[test]
 fn the_reader_binds_a_read_and_a_master_through_an_included_section() {
     let d = read();
     // section mc of lib.lib reads dfl's pd and pt

@@ -97,6 +97,9 @@ type Inst = (Option<String>, Option<String>);
 /// `elaborate`'s edge from the top).
 type Edge<'a> = (usize, usize, Option<&'a (Holder, String)>);
 
+// ponytail: every scope outside a subcircuit is one `Top` and an include inside a subcircuit
+// body is not followed for the kind lookup (`find`, `aim`); the binding itself (`visible.rs`)
+// follows both. Raise it when a deck has an include inside a subcircuit body.
 /// Which scope holds a declaration: the top of every file (VACASK's include is textual), or a
 /// subcircuit, by its file and its statement's start byte (the IR item's span start).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

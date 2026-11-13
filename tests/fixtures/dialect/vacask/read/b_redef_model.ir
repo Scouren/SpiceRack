@@ -1,0 +1,12 @@
+# Oracle: settle b_redef_model_after (VACASK 36be560: "A model/subcircuit with name 'rm'
+# already exists.", exit 1; b_redef_model_before the same): the deck's model after the include
+# is the second definition, P2030.
+# codes: P2030
+file "b_redef_model.sim" deck
+  title "a model in an included section and in the deck after it"
+  device_library resistor
+  include "b_redef_model--lib.lib" section=a
+  model rm resistor
+file "b_redef_model--lib.lib" library
+  section a
+    model rm resistor

@@ -1,0 +1,10 @@
+b_redef_model_before: a name defined on both sides of an include (VACASK exits 1)
+load "spice/resistor.osdi"
+model rm sp_resistor
+include "rlib.lib" section=a
+model vsource vsource
+v1 (n 0) vsource dc=1
+x1 (n 0) cell
+control
+  analysis op1 op
+endc
