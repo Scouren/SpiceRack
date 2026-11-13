@@ -115,6 +115,11 @@ fn inert_options_leave_the_raw_file_alone() {
 }
 
 #[test]
+fn inert_options_keep_what_an_ir_row_reads() {
+    options::inert_options_keep_what_an_ir_row_reads();
+}
+
+#[test]
 fn klu_within_its_rounding() {
     options::klu_within_its_rounding();
 }

@@ -13,7 +13,12 @@
 //! 1e-12), another solver's rounding. `tests/passes_run/options.rs` reruns all fifteen.
 //!
 //! An option in a loop's body or a branch, or one a loop or alter targets, is left with
-//! `OPTION_KEPT`: dropping it changes the body's shape (a loop of one op, `LoopOverOp`).
+//! `OPTION_KEPT`: dropping it changes the body's shape (a loop of one op, `LoopOverOp`). So is
+//! every option an IR row reads, whatever the raw file says: `nfreqs` in a design with a Fourier
+//! analysis that has no harmonic count of its own (`Four::harmonics`; `state_order::four_counts`
+//! checks one is in force: dropping it failed `ir::check`, `round9`'s finding on ir-next
+//! 43a034a4), `fourgridsize` in one with a Fourier analysis that has no grid (`Four::grid`).
+//! No IR row reads the other thirteen keys (a grep of `crates/ir` for each).
 //!
 //! Not dropped, and why (R83; the same runs; each owed until a census deck is freed by it):
 //!
@@ -115,6 +120,22 @@ pub fn drop_option(design: &mut ir::Design, diags: &mut ir::Diags, key: ir::Opti
     );
     let carriers: Vec<ir::ItemRef> = rows.rows().iter().map(|d| d.item).collect();
     let reachable = design.reachable();
+    // an option an IR row reads is never inert there: a Fourier analysis with no harmonic count
+    // takes it from `nfreqs`, one with no grid from `fourgridsize` (`Four::harmonics`,
+    // `Four::grid`); no row reads the other keys (`crates/ir`: grep of the keys)
+    let read = reachable.iter().any(|&(i, _)| {
+        i.kind == ir::ItemKind::Analysis && {
+            let a = design.row::<ir::Analysis>(i.index);
+            a.kind == ir::AnalysisKind::Four && {
+                let f = design.detail::<ir::tran::Four>(a.detail);
+                match key {
+                    K::NFreqs => f.harmonics.is_none(),
+                    K::FourGridSize => f.grid.is_none(),
+                    _ => false,
+                }
+            }
+        }
+    });
     let mut drop = Vec::new();
     for &(item, scope) in &reachable {
         if !carriers.contains(&item) {
@@ -123,7 +144,7 @@ pub fn drop_option(design: &mut ir::Design, diags: &mut ir::Diags, key: ir::Opti
         // an option in a loop body or a branch is left: dropping it changes the body's shape
         // (a loop of one op, `LoopOverOp`), a feature of its own
         let top = design.scope(scope).kind == ir::ScopeKind::File;
-        if item.kind == ir::ItemKind::Option && top {
+        if item.kind == ir::ItemKind::Option && top && !read {
             diags.push_at(OPTION_DROPPED, design, item, index);
             drop.push((item, scope));
         } else {
