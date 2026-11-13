@@ -119,3 +119,56 @@ Runs on ngspice-45, VACASK, Xyce 7.10 and ESPice in HSPICE mode (decks:
 
 `PreDelay::Offset` had no wave left (AM's and SFFM's offset refused in groups 3 and 4), so the
 member is gone; every wave's IR-text default `pre` is now `hold_delay_value`.
+
+## Group 5: the census rerun (2026-11-13), what the newer specs and rounds left
+
+Census: `tests/ir_usage.rs` of `differences` (one call adapted to the trunk's `Sources::load`) run on
+`ir-next` c06e5b00, which holds the IR at 85682f7e, in a throwaway clone (nothing pushed). Its
+no-reader list has 251 members: 99 already decided in groups 1–4 (above), 58 placements (an item
+kind in a scope kind, a combination and not a member: listed at the end), and 94 checked here against
+the goal-2 specs `rewrite/DIALECT-{XYCE,HSPICE,LTSPICE,SPECTRE,ESPICE,NGSPICE,VACASK}.md` on
+`differences` (ba636e25), then, where no spec row names it, against the member's own doc and the
+inventories, as groups 2 and 4 did. **None is deleted**: every one has a goal-2 citation.
+
+**A spec row states it (50):** `BinaryDyn(BitAnd)`, `BinaryDyn(BitOr)`, `BinaryDyn(BitXor)`,
+`UnaryDyn(BitNot)` VACASK:126, :293; `Circuit(ElementParasitics)` LTSPICE:58;
+`Circuit(MultInstanceParallel)` XYCE:71; `Circuit(PwlJoinRampWidth)`, `Circuit(PwlPeriodJump)`
+SPECTRE:106; `Circuit(SinCycles)` LTSPICE:60; `Circuit(SinSecondTone)` SPECTRE:103;
+`Circuit(SourceNoisePsd)` SPECTRE:117; `Circuit(SourceParasitics)` LTSPICE:58; `Circuit(SourceTc)`
+SPECTRE:105; `DrawPer(Instance)`, `DrawPer(Run)` SPECTRE:76; `Elem(Delay)` SPECTRE:111; `Expr(List)`
+SPECTRE:45; `Family(BsimBulk)`, `Family(Psp103)` VACASK:101; `Family(BsimSoi)`, `Family(Gaas)`,
+`Family(Hisim1)`, `Family(Mos0)` SPECTRE:92; `Family(CapacitorMultiplier)`,
+`Family(InductorMultiplier)`, `Family(ResistorMultiplier)` XYCE:74; `Family(DiodeLtspice)`
+LTSPICE:62; `Family(DiodePspice)` XYCE:86; `Family(DiodeSpectre)` SPECTRE:93; `Family(Ekv)`,
+`Family(HbtUcsd)`, `Family(Mextram)` HSPICE:84; `Family(JfetShockley)` XYCE:87; `Family(Relay)`
+SPECTRE:114; `Family(SwitchHystSmooth)` LTSPICE:61; `Func(Atan2)`, `Func(Ramp)` XYCE:58;
+`Func(PowRe)`, `FuncDyn(PowRe)` XYCE:49; `Func(PowSigned)` XYCE:50; `FuncDyn(ExpLin14)` NGSPICE:63;
+`Run(AlterString)` VACASK:153; `Run(SweepCenterSpan)` SPECTRE:128; `Run(SweepDcLog)`,
+`Run(SweepFreqLog)`, `Run(SweepLoopLog)` SPECTRE:126; `Run(SweepEndNgDecade)` HSPICE:91;
+`Run(SweepEndOnStop)` LTSPICE:71; `Run(TranCapSpan10)` XYCE:84; `Run(TranStartup)` LTSPICE:69.
+
+**A spec names it as a lead not yet run (25), kept until its run:** `Circuit(AmModCarrierPhase)`
+SPECTRE:103; `Circuit(BehavRpar)` LTSPICE:99; `Circuit(CouplingCore)`, `Circuit(SwitchControlExpr)`,
+`Family(CoreJilesAtherton)`, `Family(CurrentSwitchLogCubic)`, `Family(SwitchLogCubic)` XYCE:131
+(and R103's runs for the switch); `Circuit(LineLengthVel)` SPECTRE:112; `Circuit(PwlRepeatCount)`,
+`Family(CurrentSwitchHystSmooth)` LTSPICE:100; `Elem(Module)` SPECTRE:143, HSPICE:128;
+`Family(DiodePspiceTemp)` SPECTRE:93; `Family(Hicum0)` XYCE:132; `Family(HspiceW)` HSPICE:123;
+`Family(VdmosRpi)` XYCE:133; `Func(ExpLin14)`, `Func(StepHalf)`, `FuncDyn(Sqr)` NGSPICE:63, :71;
+`Func(Idt)`, `Func(ToReal)` SPECTRE:62, VACASK:115, :514; `Option(GminDc)`, `Option(MaxStep)`,
+`Option(Search)` HSPICE:126; `Run(IcEveryOp)` XYCE:76, VACASK:296; `Run(NoiseRefSourceAc)` XYCE:97.
+
+**No spec row yet, kept on the rulings or the member's own inventory citation (19):**
+`Extra(StringCompare)` (the strings runs, `crates/ir/tests/fixtures/strings/`: VACASK computes it);
+`Run(SweepEndStretch)`, `Run(SweepCountNgLin)` (R99/R99a: VACASK's and ngspice's sweep laws, runrules'
+runs); `Circuit(PortNoiseTemp)` (sp, INV-semantics 5.17); `Circuit(PortPower)` (ng, INV-constructs
+E24); `Circuit(PwlJoinRamp)` (lt); `Circuit(SemiInitialOn)` (Spectre `region=on`, A24);
+`Circuit(SourcePac)` (sp, D129); `Family(DiodeIdeal)` (lt, 7.19); `Family(Igbt)` (lt, D103, as
+`Elem(Igbt)` in group 2); `Family(JfetHspice2)` (hs, 7.03); `Family(Juncap200)` (xy, D120);
+`Option(GminTran)` (hs `gmin`); `Run(FourPeriods)` (lt `Np`); `Run(HbHybrid)` (xy);
+`Run(McSampleList)`, `Run(NoiseAcSweep)`, `Run(TranSegments)` (hs); `DistDyn(Limit)` (the dynamic form
+of ngspice's `limit` draw, a member of the form grid, not one of its own).
+
+**Placements (58), not members:** an item kind listed in a scope kind that no reader writes there
+(`Placed(Branch|Loop|Section|Subckt, K)`). They are combinations of kept members; the ones no
+simulator gives a meaning are already refused (`RunOrderInSubckt` for the run-order kinds in a
+subcircuit, R98; a title outside a deck's top). The rest wait for the lead's call per kind.
