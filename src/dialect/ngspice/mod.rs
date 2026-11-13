@@ -136,6 +136,7 @@ impl Read for Ngspice {
 
     /// Every file of `src`, in its order (entries in `src.form()`, the rest libraries).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
     }
 }

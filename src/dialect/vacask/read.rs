@@ -262,7 +262,6 @@ pub(super) fn references(text: &str) -> Vec<Reference> {
 /// Reads every file of `src` into `out`: entries in `src`'s role, the rest as libraries.
 pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
     assert!(!src.files().is_empty(), "vacask::read: a file to read");
-    out.set_laws(super::LAWS);
     let lex = Lang::VACASK.lexicon().expect("VACASK has a lexicon");
     let entries = src.entries().len();
     let role = |k: usize| match k < entries {

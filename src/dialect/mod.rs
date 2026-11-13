@@ -533,7 +533,10 @@ fn transpile_with(
 /// no refusal: nothing then carries a variant the target lacks, and a point's carriers do not
 /// depend on its variant.
 fn restate_laws(design: &mut ir::Design, features: &ir::FeatureSet) {
-    const _: () = assert!(ir::Law::ALL.len().is_multiple_of(2), "two variants per law point");
+    const _: () = assert!(
+        ir::Law::ALL.len().is_multiple_of(2),
+        "two variants per law point"
+    );
     let mut laws = design.laws();
     for point in ir::Law::ALL.chunks(2) {
         let held: Vec<ir::Law> = point

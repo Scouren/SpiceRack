@@ -196,10 +196,7 @@ fn each_write_fixture_writes_to_its_text() {
 
 #[test]
 fn each_write_fixture_reads_back_to_its_design() {
-    for name in WRITE {
-        if pending("write").contains(name) {
-            continue;
-        }
+    for name in WRITE.iter().filter(|n| !pending("write").contains(n)) {
         let mut design = parse_ir(name, &text("write", name, "ir"));
         // the text runs under the reader's build's laws, which every read states (R90, R90a)
         design.builder().set_laws(spicerack::dialect::ngspice::LAWS);

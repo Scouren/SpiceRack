@@ -99,6 +99,7 @@ impl Read for Vacask {
 
     /// Every file of `src`, in `src`'s order (`read.rs`).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
     }
 }
