@@ -44,6 +44,7 @@ const READ: &[&str] = &[
     "if_chain",
     "include_lib",
     "limit_three",
+    "max_one_arg",
     "negation_refused",
     "numbers",
     "numbers_long",

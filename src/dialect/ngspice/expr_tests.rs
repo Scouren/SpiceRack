@@ -206,7 +206,9 @@ fn what_ngspice_rejects_or_the_ir_lacks_is_coded() {
     };
     // runs: `{2*-q}` "wrongly determined negation", `{5-+2}`, `{!-1}`, `1k5` in braces
     assert_eq!(fail("2*-q"), invalid(codes::NEGATION));
-    for text in ["5-+2", "!-1", "1k5", "(1", "1)", "1 2", "min(1)", "1?2"] {
+    // `min(1)` is no error: numparam's min of one argument is that argument (settle
+    // max_one_arg.sp)
+    for text in ["5-+2", "!-1", "1k5", "(1", "1)", "1 2", "1?2"] {
         assert_eq!(fail(text), invalid(codes::EXPR_INVALID), "{text}");
     }
     assert_eq!(fail("1?2:0?1?3:4:5"), invalid(codes::TERNARY_NEST));

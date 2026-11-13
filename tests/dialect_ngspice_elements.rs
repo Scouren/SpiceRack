@@ -46,6 +46,7 @@ const READ: &[&str] = &[
     "rcl_dynamic",
     "rcl_dynamic_quoted",
     "rcl_dynamic_refused",
+    "rcl_dynamic_ternary",
     "resistor",
     "resistor_ignored",
     "semi_refused",
