@@ -1,0 +1,8 @@
+# codes:
+file "numparam_round.sp" deck
+  title "numparam_round"
+  comment " oracle: settle numparam_round.sp (a {…} or '…' numparam substitutes as '% 23.15e' text, which INPevaluate reads digit by digit: its 16 digits are the value; a bare number is read whole)"
+  element vsource v1 (a 0) dc=1.045338514128860e0
+  element vsource v2 (b 0) dc=1.045338514128860e0
+  element vsource v3 (c 0) dc=1.0453385141288605
+  element resistor r1 (a 0) value=2.500000000000000e0

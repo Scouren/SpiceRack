@@ -37,7 +37,7 @@ use super::number::{self, Scan};
 use super::read::{Lower, Stmt};
 use super::tables::{self, Eval};
 use super::value::{Val, emit};
-use super::value::{Wrap, parens, unwrap};
+use super::value::{Wrap, parens, substituted, unwrap};
 use crate::ir::{self, CircuitExtra as X, ElemKind as K, Feature, FeatureSet, ItemKind};
 
 /// What the element area reads: every kind below, and the field members its rules produce.
@@ -303,7 +303,12 @@ pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, text: &str) -> Result<Val, Fail>
     } else {
         Eval::Numparam
     };
-    expr_read::parse_in(&inner, eval).map(Val::Tree)
+    let tree = expr_read::parse_in(&inner, eval)?;
+    Ok(if eval == Eval::Numparam {
+        substituted(tree)
+    } else {
+        Val::Tree(tree)
+    })
 }
 
 /// A B-source field (`v=`, `i=`, `vol=`, `cur=`, `value=`, a table's input, an R/C/L value run
