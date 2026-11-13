@@ -111,7 +111,7 @@ fn the_last_param_wins_and_a_read_before_it_binds_to_it() {
         opaque(&d, top, 1),
         (OpaqueClass::Inert, ".param a=1".to_string())
     );
-    assert!(codes_of(&diags).contains(&codes::DUPLICATE_PARAM));
+    assert!(codes_of(&diags).contains(&codes::REDEFINED));
     let b = param(&d, top, 2);
     let a = param(&d, top, 3);
     assert_eq!((d.str(b.name), d.str(a.name)), ("b", "a"));

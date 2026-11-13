@@ -1,0 +1,6 @@
+file "a.sp" deck
+  param a = 1
+  analysis op
+  alter (param a) value=2 at_reset
+  reset values options temp tnom saves
+  analysis op

@@ -11,10 +11,17 @@ use spicerack::passes;
 /// The run passes whose simulator proof (a pair deck naming it in `proves =`) is to come:
 /// compared by name with the decks, both ways.
 pub const PENDING_PAIRS: &[&str] = &[
+    // its pair deck is Xyce -> ngspice, xyce-2's `tests/fixtures/pair/xyce-ngspice/noise.cir`
+    // (branch dialect-xyce): the marker goes when that deck names it in `proves =`
+    "noise_ref_source_ac_to_unit",
+    // its pair decks are ngspice -> Xyce, xyce-2's `ngspice-xyce/tran_uic.sp` and
+    // `tran_uic_float.sp` (branch dialect-xyce), once Xyce's reader holds a device `ic=`
+    "device_ic_uic_to_in_op",
     // proven on both simulators by `passes_run/dc_loops.rs`, not a pair deck: the pair harness
     // compares one DC plot with one, and the rule writes one op plot a pass
     // (dc_axis_device_param_to_loop's pair deck is vacask-ngspice/dc_device_param.sim)
     "dc_axis_model_param_to_loop",
+    "dc_restart_to_loops",
     // proven on ngspice by `passes_run/options.rs` (the raw file unchanged); no VACASK deck holds
     // these options
     "drop_option_noacct",
@@ -35,6 +42,8 @@ pub const PENDING_PAIRS: &[&str] = &[
     "drop_option_trtol",
     // proven on ngspice by `passes_run/options.rs` (prints): no VACASK deck holds a print
     "drop_print",
+    // proven by the reference evaluator (`passes_run/args.rs`); its pair deck is ngspice -> VACASK
+    "analysis_param_args_to_values",
     "whole_run_option_first",
     "whole_run_env_first",
     "whole_run_node_set_first",

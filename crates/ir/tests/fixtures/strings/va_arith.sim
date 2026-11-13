@@ -1,0 +1,11 @@
+string under an arithmetic operator
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+parameters s="tt"
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=s+1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

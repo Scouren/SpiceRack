@@ -1,0 +1,13 @@
+jfet1 m3 (27 C, m=3), lin (vgs=0.0, vds=0.2), dc
+.model nm njf level=1 vt0=-2 beta=1e-4 lambda=0.02 rd=10 rs=10 cgs=2p cgd=1p pb=0.8 is=1e-14 n=1 fc=0.5 b=0.9 tcv=2e-3 bex=-1.5 xti=3 eg=1.11
+vd d 0 dc 0.2
+vg g 0 dc 0.0
+j1 d g 0 nm area=2 m=3
+.temp 27
+.options reltol=1e-9 abstol=1e-15
+.control
+set numdgt=12
+op
+print i(vd)
+.endc
+.end

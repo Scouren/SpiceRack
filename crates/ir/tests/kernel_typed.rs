@@ -386,7 +386,7 @@ fn typed_operators_meet_integer_literals_in_generated_designs() {
     for seed in 0..200u64 {
         let d = generate(seed, &FeatureSet::ALL, size);
         let int = |e: ExprId| matches!(d.expr(e), Expr::Num(n) if d.num(n).form == NumForm::Int);
-        for k in 0..d.expr_count() {
+        for k in 0..d.expr_count_all() {
             let (is_typed, show) = match d.expr(ExprId(k as u32)) {
                 Expr::Binary(BinOp::DivTyped | BinOp::IntDiv, a, b) => (true, int(a) && int(b)),
                 Expr::Binary(

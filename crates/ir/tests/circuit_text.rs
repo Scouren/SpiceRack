@@ -56,6 +56,26 @@ mod tests {
         b.head(name, terms, None, &[], ExprId::NONE)
     }
 
+    /// R90: the stated laws are one `laws` line before the entry file, in `Law::ALL` order; a
+    /// word that names no law refuses the line and states nothing.
+    #[test]
+    fn laws_line() {
+        use spicerack_ir::{Law, Laws};
+        same(
+            "laws bc_sat_areab_only diode_sidewall_own_f1\nfile \"t.sp\" deck\n",
+            |b, _| b.set_laws(Laws::of(&[Law::DiodeSidewallOwnF1, Law::BcSatAreabOnly])),
+        );
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        parse(
+            "laws areab_only\nfile \"t.sp\" deck\n",
+            &mut d.builder(),
+            &mut diags,
+        );
+        assert!(!diags.is_empty(), "an unknown law word is refused");
+        assert!(d.laws().is_empty());
+    }
+
     #[test]
     fn resistor() {
         same(

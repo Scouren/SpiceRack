@@ -3,7 +3,7 @@
 //!
 //! | area | files | codes |
 //! |---|---|---|
-//! | core and structure (S3.0) | `read.rs`, `expr_read.rs`, `number.rs`, `read_structure.rs`, `write_structure.rs` | `P1001–P1099`, `R1001–R1099`, `W1001–W1099` |
+//! | core and structure (S3.0) | `read.rs`, `expr_read.rs`, `number.rs`, `read_structure.rs`, `read_include.rs`, `write_structure.rs` | `P1001–P1099`, `R1001–R1099`, `W1001–W1099` |
 //! | elements and sources (S3.1) | `read_elements.rs`, `read_sources.rs`, `write_elements.rs`, `write_sources.rs` | `P1100–P1199`, `R1100–R1199`, `W1100–W1199` |
 //! | models (S3.2) | `read_models.rs`, `write_models.rs`, `families.rs` | `P1200–P1299`, `R1200–R1299`, `W1200–W1299` |
 //! | run and outputs (S3.3) | `read_run.rs`, `write_run.rs`, `read_outputs.rs`, `write_outputs.rs` | `P1300–P1399`, `R1300–R1399`, `W1300–W1399` |
@@ -17,7 +17,7 @@
 //! Contents: `pub(super) type Row`, `pub(super) const CODES: &[Row]` (this area's),
 //! `pub(super) const RANGES: &[(&str, u16, &[Row])]`, the S3.0 codes as constants
 //! (`pub(super) const UNREAD`, `EXPR_INVALID`, `EXPR_NO_MEMBER`, `TERNARY_NEST`,
-//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `WRAP`, `INCLUDE_CYCLE`, `DUPLICATE_PARAM`, `DUPLICATE_DEF`,
+//! `PARAM_READS_CIRCUIT`, `MALFORMED`, `UNCLOSED`, `BRANCH_DEF`, `GLOBAL_GROUND`, `NEGATION`, `FIRST_LAST`, `CALL_ARITY`, `WRAP`, `INCLUDE_CYCLE`, `MODE_PS`, `MODE_LT`, `START_UP`, `REDEFINED`, `DUPLICATE_DEF`,
 //! `MISSING_FILE`, `DUPLICATE_ELEMENT`, `DEFAULT_CYCLE`, `UNSPELLED_VALUE`), `pub fn info(ir::Code) -> Option<ir::Info>`
 
 use super::{
@@ -68,11 +68,25 @@ pub(super) const WRAP: Code = Code::new(b'P', 1014);
 /// An `.include` or `.lib` call whose file includes, itself or through others, the file that
 /// holds it: ngspice-45 crashes (settle `inc_cycle.sp`, exit 139): `InvalidInSource`.
 pub(super) const INCLUDE_CYCLE: Code = Code::new(b'P', 1015);
-/// A `.param` the same scope defines again later: ngspice keeps the last (INV 3.01); this one
-/// is `Inert`.
-pub(super) const DUPLICATE_PARAM: Code = Code::new(b'R', 1001);
-/// A `.subckt`, `.func` or `.lib` section defined twice in one scope, or a `.param` naming a
-/// subcircuit parameter: ngspice's winner is not established; `Unread`.
+/// A statement ngspice's PSpice compatibility mode (`set ngbehavior=` with `ps`, in the deck's
+/// `.spiceinit`) rewrites; `arg` the row of `mode.rs`'s inventory: `Unread` (R87).
+pub(super) const MODE_PS: Code = Code::new(b'P', 1016);
+/// A statement ngspice's LTspice compatibility mode (`lt`) rewrites; `arg` the row: `Unread`.
+pub(super) const MODE_LT: Code = Code::new(b'P', 1017);
+/// A statement another start-up command changes (`set stepsizelimit`: a transient step at
+/// most `tstep`); `arg` 1: `Unread`.
+pub(super) const START_UP: Code = Code::new(b'P', 1018);
+/// A definition ngspice drops for another of its name in its scope: a `.param` or `.func`
+/// defined again later (it keeps the last: INV 3.01, settle `dup_func.sp`), a `.subckt` or
+/// `.lib` section defined again earlier (it keeps the first: settle `dup_subckt.sp`,
+/// `dup_section.sp`); the loser is `Inert`.
+pub(super) const REDEFINED: Code = Code::new(b'R', 1001);
+/// A `.param` in a subcircuit body naming one of its head parameters: ngspice-45 replaces the
+/// default with it and an instance's value still wins (settle `dup_formal.sp`); read as that
+/// default when its value reads no name (the card then `Inert`, or this note beside the card's
+/// other assignments), else `Unread` (a default is read where
+/// the instance stands, a body `.param` in the body: settle `dup_formal_reads.sp`). Also a
+/// head parameter named twice: `Unread`.
 pub(super) const DUPLICATE_DEF: Code = Code::new(b'R', 1002);
 /// An include or library call whose file is not among the sources.
 pub(super) const MISSING_FILE: Code = Code::new(b'R', 1003);
@@ -180,16 +194,34 @@ pub(super) const CODES: &[Row] = &[
         "numparam passes such a function its first and last argument and evaluates the middle one only for its side effects; read the same way.",
     ),
     row(
-        DUPLICATE_PARAM,
-        "a parameter defined again later in its scope",
-        "rewrite/INV-semantics.md 3.01",
-        "ngspice keeps the last definition; this one changes no number and is kept as Inert text.",
+        MODE_PS,
+        "a statement ngspice's PSpice compatibility mode rewrites",
+        "ngspice-45 frontend/inpcompat.c, inpcom.c, ptfuncs.c (mode.rs's inventory row in arg); rewrite/RULINGS.md R87",
+        "the deck's .spiceinit sets ngbehavior with ps, under which ngspice reads this statement otherwise than plain ngspice; no rule reads the mode yet: kept as text (Unread).",
+    ),
+    row(
+        MODE_LT,
+        "a statement ngspice's LTspice compatibility mode rewrites",
+        "ngspice-45 frontend/inpcompat.c, inp2r.c, inp2c.c, inp2l.c, ptfuncs.c, numparam/xpressn.c (mode.rs's row in arg); R87",
+        "the deck's .spiceinit sets ngbehavior with lt, under which ngspice reads this statement otherwise than plain ngspice; no rule reads the mode yet: kept as text (Unread).",
+    ),
+    row(
+        START_UP,
+        "a statement a .spiceinit command changes",
+        "ngspice-45 (set stepsizelimit: a transient step at most tstep); R87",
+        "the deck's .spiceinit sets stepsizelimit; no rule reads it yet: kept as text (Unread).",
+    ),
+    row(
+        REDEFINED,
+        "a definition another of its name in its scope replaces",
+        "rewrite/INV-semantics.md 3.01; ngspice-45 runs (settle dup_subckt.sp: \"redefinition of .subckt cell, ignored\"; dup_func.sp; dup_section.sp)",
+        "ngspice keeps the last .param or .func and the first .subckt or .lib section of a name; the other changes no number and is kept as Inert text.",
     ),
     row(
         DUPLICATE_DEF,
-        "a definition repeated in one scope",
-        "rewrite/DIALECT-NGSPICE.md §3",
-        "which one ngspice keeps is not established for this kind; the repeat is kept as text (Unread).",
+        "a .param naming its subcircuit's head parameter, or a head parameter named twice",
+        "ngspice-45 runs (settle dup_formal.sp: the body .param replaces the default, an instance's value still wins; dup_formal_reads.sp)",
+        "a value that reads no name is read as the head parameter's default (the card kept as Inert text); any other, and a head parameter named twice, is kept as text (Unread).",
     ),
     row(
         DEFAULT_CYCLE,

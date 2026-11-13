@@ -19,20 +19,24 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod alter_at_reset`, `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod device_ic_in_op`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod noise_ref_unit`, `pub mod param_arguments`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
 //! `codes.rs`)
 
+pub mod alter_at_reset;
 mod codes;
 pub mod dc_axes_to_loops;
 pub mod device_ic;
+pub mod device_ic_in_op;
 pub mod drop_print;
 pub mod ic_next_only;
 pub mod inert_options;
 pub mod loop_end;
 pub mod names_dropped;
 pub mod names_given;
+pub mod noise_ref_unit;
+pub mod param_arguments;
 pub mod run_items_together;
 pub mod save_set_to_all;
 pub mod sweep_forms;
@@ -76,27 +80,37 @@ pub(super) const PASSES: &[Pass] = &[
     to_from_here(
         "whole_run_option_to_from_here",
         (RunExtra::OptionWholeRun, RunExtra::OptionFromHere),
-        &[wr::MID_RUN, wr::RESET_RESTORES, wr::FROM_HERE_SAME],
+        &[
+            wr::MID_RUN,
+            wr::RESET_RESTORES,
+            wr::FROM_HERE_SAME,
+            wr::IN_SUBCKT,
+        ],
         wr::whole_run_option_to_from_here,
     ),
     to_from_here(
         "whole_run_env_to_from_here",
         (RunExtra::EnvWholeRun, RunExtra::EnvFromHere),
-        &[wr::MID_RUN, wr::RESET_RESTORES, wr::FROM_HERE_SAME],
+        &[
+            wr::MID_RUN,
+            wr::RESET_RESTORES,
+            wr::FROM_HERE_SAME,
+            wr::IN_SUBCKT,
+        ],
         wr::whole_run_env_to_from_here,
     ),
     // a node set is no class a reset restores
     to_from_here(
         "whole_run_node_set_to_from_here",
         (RunExtra::NodeSetWholeRun, RunExtra::NodeSetFromHere),
-        &[wr::MID_RUN, wr::FROM_HERE_SAME],
+        &[wr::MID_RUN, wr::FROM_HERE_SAME, wr::IN_SUBCKT],
         wr::whole_run_node_set_to_from_here,
     ),
     // two saves never set one thing: they add up
     to_from_here(
         "whole_run_save_to_from_here",
         (RunExtra::SaveWholeRun, RunExtra::SaveFromHere),
-        &[wr::MID_RUN, wr::RESET_RESTORES],
+        &[wr::MID_RUN, wr::RESET_RESTORES, wr::IN_SUBCKT],
         wr::whole_run_save_to_from_here,
     ),
     Pass {
@@ -151,6 +165,13 @@ pub(super) const PASSES: &[Pass] = &[
         run: fs::tran_first_step_to_print,
     },
     Pass {
+        name: "noise_ref_source_ac_to_unit",
+        removes: ir::Feature::Run(ir::RunExtra::NoiseRefSourceAc),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[noise_ref_unit::NOISE_REF_KEPT],
+        run: noise_ref_unit::noise_ref_source_ac_to_unit,
+    },
+    Pass {
         name: "device_ic_to_tran_ic",
         removes: ir::Feature::Circuit(ir::CircuitExtra::IcUicOnly),
         requires: ir::FeatureSet::EMPTY
@@ -161,6 +182,13 @@ pub(super) const PASSES: &[Pass] = &[
             .with(ir::Feature::Run(RunExtra::NodeSetMidRun)),
         notes: &[device_ic::DEVICE_IC_KEPT],
         run: device_ic::device_ic_to_tran_ic,
+    },
+    Pass {
+        name: "device_ic_uic_to_in_op",
+        removes: ir::Feature::Circuit(ir::CircuitExtra::IcUicOnly),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Circuit(ir::CircuitExtra::IcInOp)),
+        notes: &[device_ic_in_op::IC_OP_READ],
+        run: device_ic_in_op::device_ic_uic_to_in_op,
     },
     Pass {
         name: "ic_beyond_next_to_next_only",
@@ -282,6 +310,34 @@ pub(super) const PASSES: &[Pass] = &[
         requires: DC_LOOPS,
         notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
         run: dc_axes_to_loops::dc_axis_model_param_to_loop,
+    },
+    Pass {
+        name: "dc_restart_to_loops",
+        removes: ir::Feature::Run(RunExtra::DcRestart),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_restart_to_loops,
+    },
+    Pass {
+        name: "alter_param_at_once_to_at_reset",
+        removes: ir::Feature::Run(RunExtra::AlterParamAtOnce),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Run(RunExtra::AlterParamAtReset))
+            .with(ir::Feature::Item(ir::ItemKind::Reset))
+            .with(ir::Feature::Run(RunExtra::ResetValues))
+            .with(ir::Feature::Run(RunExtra::ResetOptions))
+            .with(ir::Feature::Run(RunExtra::ResetTemp))
+            .with(ir::Feature::Run(RunExtra::ResetTnom))
+            .with(ir::Feature::Run(RunExtra::ResetSaves)),
+        notes: &[alter_at_reset::ALTER_KEPT],
+        run: alter_at_reset::alter_param_at_once_to_at_reset,
+    },
+    Pass {
+        name: "analysis_param_args_to_values",
+        removes: ir::Feature::Run(RunExtra::AnalysisParamArgument),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[param_arguments::PARAM_ARG_KEPT],
+        run: param_arguments::analysis_param_args_to_values,
     },
     // one row per option proven inert (`inert_options.rs`)
     inert(inert_options::INERT[0]),

@@ -43,6 +43,7 @@ const READ: &[&str] = &[
     "print_tran",
     "probe_unread",
     "save_all",
+    "save_no_vector",
     "save_probes",
     "save_script",
 ];

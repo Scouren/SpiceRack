@@ -103,7 +103,10 @@ impl RowFacts for Param {
         let class = g.class;
         let name = g.fresh();
         let item = b.param(scope, &name, value, Span::NONE);
-        g.note(DefId((b.design().definitions().len() - 1) as u32), class);
+        g.note(
+            DefId((b.design().definitions_all().len() - 1) as u32),
+            class,
+        );
         item
     }
 }
@@ -207,7 +210,10 @@ impl RowFacts for Func {
         let name = g.fresh();
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
         let item = b.func(scope, &name, &args, body, Span::NONE);
-        g.note(DefId((b.design().definitions().len() - 1) as u32), class);
+        g.note(
+            DefId((b.design().definitions_all().len() - 1) as u32),
+            class,
+        );
         item
     }
 }

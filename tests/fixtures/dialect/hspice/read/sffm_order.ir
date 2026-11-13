@@ -1,0 +1,7 @@
+# codes:
+file "sffm_order.sp" deck
+  title "sffm_order"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): v(1) = 1.000327 at 20 ns: SFFM(VO VA FC MDI FS), SPICE order"
+  element vsource v1 (1 0) wave=sffm(offset=1 amplitude=2 carrier_freq=1k mod_index=3 signal_freq=100 given_zero=spice_default) dc_rule=wave_at_zero
+  element resistor r1 (1 0) value=1k
+  analysis tran stop=0.2m print_step=0.05m cap=ngspice_rule

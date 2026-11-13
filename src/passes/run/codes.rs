@@ -6,9 +6,9 @@
 //! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`
 
 use super::{
-    dc_axes_to_loops, device_ic, drop_print, fs, ic_next_only, inert_options, loop_end,
-    names_dropped, names_given, run_items_together, save_set_to_all, sweep_forms, tc,
-    tran_print_step, wr,
+    alter_at_reset, dc_axes_to_loops, device_ic, device_ic_in_op, drop_print, fs, ic_next_only,
+    inert_options, loop_end, names_dropped, names_given, noise_ref_unit, param_arguments,
+    run_items_together, save_set_to_all, sweep_forms, tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -47,6 +47,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a whole-run state item a positional one sets the same thing as",
             cite: "rewrite/AMEND-A12.md A14",
             explain: "The deck sets this quantity both for the whole run and from a point on; which of the two holds after that point is not stated, so the item keeps its mode and is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        wr::IN_SUBCKT,
+        ir::Info {
+            title: "a whole-run state item inside a subcircuit body",
+            cite: "R98 (X0028); R27",
+            explain: "The target holds state from where it stands, and no positional state item may stand in a subcircuit body: a body is instantiated, not run. Moving the item to the deck's top would change what it holds for (a body holds per instance and names its own nodes, which the top cannot say for a subcircuit used twice or never), so it is refused.",
             kind: ir::Kind::Note,
         },
     ),
@@ -188,9 +197,9 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
     (
         dc_axes_to_loops::DC_AXIS_KEPT,
         ir::Info {
-            title: "a DC axis over a device or model parameter the target cannot sweep",
+            title: "a DC analysis ngspice's .dc cannot state, and no loop of it is exact",
             cite: "rewrite/IR-RUN.md §1; INV-semantics 8.09",
-            explain: "The target's DC analysis sweeps a source, an element's value or the temperature, so this axis would become a loop of operating points. That is exact only for an analysis that restarts each point (a loop's points start afresh, a continued sweep from the previous point), that stands at its run's top with no analysis after it (the loop keeps its last value), whose peeled axes a loop can sweep, over values stated as decimal literals (no log grid). One of these fails, so the analysis is refused.",
+            explain: "ngspice's DC analysis sweeps a source, an element's value or the temperature, continuing its innermost axis point to point and starting each outer step afresh; this one asks otherwise, so it would become loops of operating points. That is exact only when every peeled axis starts afresh (a loop's pass reruns from the initial guess; an axis that carries the previous solve stays refused, R72), the analysis stands at its run's top with no analysis after it (the loops keep their last values), each peeled axis has a target a loop can sweep and values stated as decimal literals. One of these fails, so the analysis is refused.",
             kind: ir::Kind::Note,
         },
     ),
@@ -249,6 +258,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        alter_at_reset::ALTER_KEPT,
+        ir::Info {
+            title: "a parameter alter whose reset would undo other script state",
+            cite: "R70; rewrite/AMEND-A12.md A43",
+            explain: "The target's parameter alter takes effect at the next reset, so a reset would follow it; a reset also undoes value alters, options, temperatures and saves in force from earlier in the run (or every earlier pass in a loop's body), and one of those is in force here, so the alter is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         device_ic::DEVICE_IC_MOVED,
         ir::Info {
             title: "a capacitor's initial condition moved into the uic transients' conditions",
@@ -258,11 +276,38 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        param_arguments::PARAM_ARG_KEPT,
+        ir::Info {
+            title: "an analysis or loop argument that reads a parameter its value cannot replace",
+            cite: "R68; rewrite/AMEND-A12.md A42",
+            explain: "The target takes no circuit parameter in an analysis's or loop's argument, so a read there is written as the parameter's value. Here it cannot be: the parameter is not a top-level one with a constant value, an alter, a loop or a statistics block may change it, or the read stands in a function's body. The item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         device_ic::DEVICE_IC_KEPT,
         ir::Info {
             title: "a device initial condition the target's node conditions cannot state",
             cite: "rewrite/AMEND-A12.md A22",
             explain: "Under uic SPICE starts each storage element from its own state; the target starts from node voltages. They agree only when the node voltages the conditions assign give every capacitor exactly its own initial condition (zero without one) and leave every other element with a state of its own, and every voltage source, on nodes at zero. Here they do not (or the condition is an inductor's or a semiconductor's, inside a subcircuit, or not a literal), so the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        noise_ref_unit::NOISE_REF_KEPT,
+        ir::Info {
+            title: "a noise analysis referred to its source's AC magnitude, which is not surely 1",
+            cite: "INV-semantics.md 8.10; crates/ir/src/dc_ac.rs (NoiseRef)",
+            explain: "The input-referred noise is the output noise divided by a gain: to the input source's own AC magnitude here, to a unit input on the target. The two are one number only when that magnitude is 1. Here it is not a literal 1 (or the source is not one top-level source, or a loop or an alter may change it between runs), so the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        device_ic_in_op::IC_OP_READ,
+        ir::Info {
+            title: "a uic-only device initial condition an operating point of the design would read",
+            cite: "crates/ir/src/passive.rs (IcMode); xyce-2's run device_ic_op.cir",
+            explain: "The source applies this initial condition only to a transient that skips the operating point; the target holds it in every operating point too. The two agree only when the design solves no operating point, i.e. every analysis is a uic transient. Here some analysis solves one, so the item is refused.",
             kind: ir::Kind::Note,
         },
     ),

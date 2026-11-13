@@ -1,0 +1,4 @@
+file "p.sp" deck
+  param a = 2
+  param p = min(max(a, -1), 1.5)
+  element behav b1 (n 0) expr=(clamp(v(n), 0, a))

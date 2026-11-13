@@ -1,0 +1,12 @@
+# codes:
+file "if_param.sp" deck
+  title "if_param"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): i(v1) = -1e-3: .if (sel==1) chooses .param r=1k"
+  param sel = 1
+  if (sel == 1)
+    param r = 1k
+  else
+    param r = 2k
+  element vsource v1 (1 0) dc=1
+  element resistor r1 (1 0) value=r
+  analysis dc (source_dc v1) (lin start=1 stop=1 step=1)

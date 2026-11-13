@@ -25,7 +25,7 @@
 //! Contents: `pub fn div_typed_to_div(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn div_typed_to_div_dyn(&mut ir::Design, &mut ir::Diags)`
 
-use super::nodes::{binary_form, form, kids, live, note_left};
+use super::nodes::{binary_form, form, kids, note_left};
 use super::reach::tag_reach;
 use super::tags::{INT, REAL, Tags};
 use super::{MIXED_DIVISION, OTHER_FORM_READS};
@@ -54,7 +54,7 @@ fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
         (tx == REAL || ty == REAL, tx == INT && ty == INT)
     };
     let mut ints = true;
-    let live = live(design);
+    let live = design.live_exprs();
     for &e in &live {
         if let ir::Expr::Binary(ir::BinOp::DivTyped, x, y) = design.expr(e) {
             let (real, int) = decided(&mut tags, design, x, y);
@@ -109,7 +109,7 @@ fn other_form_operands(design: &mut ir::Design, dynamic: bool, tags: &mut Tags) 
         }
     }
     let mut out = Vec::new();
-    let mut seen = vec![false; design.expr_count()];
+    let mut seen = vec![false; design.expr_count_all()];
     let mut stack = Vec::new();
     for (root, use_) in roots {
         if root.is_none() || ![other, ir::Form::Both].contains(&ir::root_form(design, root, use_)) {

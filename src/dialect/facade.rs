@@ -26,7 +26,7 @@
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use super::{Citation, DialectRow, Policy, Sources, by_name, transpile};
+use super::{Citation, DialectRow, Policy, Roots, Sources, by_name, transpile, transpile_with};
 use crate::ir;
 use crate::syntax::diag::{self, Code};
 use crate::syntax::render;
@@ -115,9 +115,10 @@ pub fn render_text(
 }
 
 /// `file` of `kit` (its entry) and every kit file it reaches through `from`'s references,
-/// through `transpile`, leniently, in today's types: one read and one `legalize` of the kit per
-/// call (today's `render_kit` writes one file per call; a caller of the spine writes them all
-/// after one `legalize`).
+/// through `transpile`, leniently and with every definition a root (a kit: `Roots::Every`,
+/// R80a), in today's types: one read and one `legalize` of the kit per call (today's
+/// `render_kit` writes one file per call; a caller of the spine writes them all after one
+/// `legalize`).
 ///
 /// # Errors
 /// The refusal, as today's `Diags`.
@@ -148,12 +149,13 @@ pub fn render_kit(
             .map(|f| f.text.clone())
     };
     let path = entry.path.to_string_lossy();
-    let src = Sources::load(&[&path], form, reader, &mut loader);
+    let src = Sources::load(&[&path], form, reader, None, &mut loader);
     assert!(
         src.entries().len() == 1,
         "render_kit: the kit's own file loads"
     );
-    finish(transpile(&src, from, to, Policy::Lenient), &src, name, to)
+    let written = transpile_with(&src, from, to, Policy::Lenient, Roots::Every);
+    finish(written, &src, name, to)
 }
 
 /// `rows` in today's form: each code through [`old_code`], sorted by position (file, byte,

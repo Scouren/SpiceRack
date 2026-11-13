@@ -88,9 +88,11 @@ fn generated_save_plans_read_back_to_their_meaning() {
     let (mut designs, mut saves, mut resets) = (0, 0, 0);
     for seed in 0..256u64 {
         let text = save_plan(seed);
-        let Some((design, _)) = read_ir(&text) else {
+        let Some((mut design, _)) = read_ir(&text) else {
             panic!("seed {seed}: the plan does not read:\n{text}");
         };
+        // the text runs under the reader's build's laws, which every read states (R90, R90a)
+        design.builder().set_laws(spicerack::dialect::vacask::LAWS);
         let mut legal = design.clone();
         let written = write_entry(&mut legal);
         let (back, _) = read("g.sim", &written, "vacask");

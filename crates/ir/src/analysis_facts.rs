@@ -36,6 +36,7 @@ use crate::periodic::{Hb, Pac, Pnoise, Pss, Pstb, Pxf, Stb};
 use crate::plan::target_refs;
 use crate::run_exprs::{Roots, exprs_of};
 use crate::run_extra::RunExtra;
+use crate::run_fields::RunFields;
 use crate::run_names::{Names, names_of};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::loop_depth;
@@ -49,29 +50,40 @@ use crate::tran::{Four, Tran};
 /// What the run owner's generic code needs from a detail row (the `RowFacts` of a header kind
 /// reaches its detail through this, one exhaustive dispatch over the header's kind). Rung: the
 /// axis is the detail type, 31 exist; it mirrors `RowFacts` one level down.
-pub(crate) trait DetailFacts: RunDetail {
-    /// Appends every handle the row holds, its pools' elements included, in field order.
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+pub(crate) trait DetailFacts: RunDetail + RunFields {
+    /// Appends every handle the row holds, its pools' elements included, in field order (its
+    /// field table's, `run_fields.rs`).
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        crate::run_fields::field_handles(self, design, out);
+    }
     /// Visits the row's expression roots, its pools' included, as `handles` lists them (A23);
     /// the caller stores the row back.
-    fn map_exprs(&mut self, r: &mut Roots<'_>);
+    fn map_exprs(&mut self, r: &mut Roots<'_>) {
+        crate::run_fields::field_exprs(self, r);
+    }
     /// Visits the row's element names, its pools' included, in field order (A32); the caller
     /// stores the row back.
-    fn map_names(&mut self, r: &mut Names<'_>);
+    fn map_names(&mut self, r: &mut Names<'_>) {
+        crate::run_fields::field_names(self, r);
+    }
     /// Adds the row's `RunExtra` and option features.
     fn features(&self, design: &Design, set: &mut FeatureSet);
     /// The first broken invariant of the row's own fields: `FieldDomain`, or `HandleRange` for a
     /// pool list past its pool. `None` when valid.
     fn fault(&self, design: &Design) -> Option<Violation>;
     /// Appends the row's fields (each with its leading space).
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String);
+    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
+        crate::run_fields::field_dump(self, design, ctx, out);
+    }
     /// Reads the row's fields; `None` after a report.
     fn parse(
         words: &mut Words<'_>,
         scope: ScopeId,
         b: &mut Builder<'_>,
         diags: &mut Diags,
-    ) -> Option<Self>;
+    ) -> Option<Self> {
+        crate::run_fields::field_parse(words, scope, b, diags)
+    }
     /// A random valid row using only `features` for an item about to be appended to `scope`,
     /// or `None` when the set allows none.
     #[cfg(any(test, feature = "gen"))]

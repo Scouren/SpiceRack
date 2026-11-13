@@ -34,7 +34,6 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("osdi/mixed-models/bsimbulk_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
     ("osdi/mixed-models/psp_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
     ("osdi/psp103/psp_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
-    ("various/bjt_ac_par.sp", "legalize", "W1350: `save @q1[pi] @q1[go]`, names the bjt has no output for (outputs.txt; ngspice keeps an empty vector, settle device_outputs.sp); waits for the reader to read such a probe as what ngspice saves (nothing), R49"),
 ];
 
 /// The step names, in order.
@@ -153,7 +152,7 @@ fn decks(root: &Path) -> Vec<PathBuf> {
 fn run(row: &DialectRow, deck: &Path) -> Result<(), (&'static str, String)> {
     let path = deck.to_string_lossy().into_owned();
     let reader = row.read.expect("ngspice reads");
-    let src = Sources::load(&[&path], ir::Role::Deck, reader, &mut |p| {
+    let src = Sources::load(&[&path], ir::Role::Deck, reader, None, &mut |p| {
         std::fs::read(p)
             .ok()
             .map(|b| String::from_utf8_lossy(&b).into_owned())
@@ -195,6 +194,10 @@ fn run(row: &DialectRow, deck: &Path) -> Result<(), (&'static str, String)> {
             written.add(legal.str(legal.file(f).path), &text);
         }
         written.set_form(ir::Role::Deck);
+        // the deck runs beside its start-up file, written or not (R87)
+        if let Some((p, t)) = src.environment() {
+            written.set_environment(p, t);
+        }
         let mut back = ir::Design::new();
         let mut bd = ir::Diags::new();
         reader.read(&written, &mut back.builder(), &mut bd);

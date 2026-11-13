@@ -1,0 +1,13 @@
+f33_vacask_oct3_1k_5k: VACASK runs 8 frequencies, 1000, 1258.5, 1583.82, 1993.24, 2508.48, 3156.93, 3972.99, 5000
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=1.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  options rawfile="ascii"
+  analysis ac1 ac from=1k to=5k mode="oct" points=3
+endc

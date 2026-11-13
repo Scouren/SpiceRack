@@ -1,0 +1,7 @@
+# codes:
+file "dc_poi.sp" deck
+  title "dc_poi"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): 3, 1, 2, 2: '.dc v1 poi 4 3 1 2 2' keeps order and repeats"
+  element vsource v1 (1 0) dc=1
+  element resistor r1 (1 0) value=1k
+  analysis dc (source_dc v1) (list values=[3, 1, 2, 2])

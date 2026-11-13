@@ -1,0 +1,7 @@
+file "a.sp" deck
+  subckt s (a)
+    nodeset nodeset every_op node=(a) value=0.5 whole_run
+    element resistor r1 (a 0) value=1k
+  element instance x1 (n) model=s
+  nodeset nodeset every_op node=(n) value=0.2 whole_run
+  analysis op

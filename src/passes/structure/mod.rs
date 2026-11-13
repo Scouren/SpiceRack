@@ -20,7 +20,7 @@
 //! Contents: `pub mod constant_param_to_formal`, `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
 //! `pub mod drop_device_libraries`, `pub mod drop_unread_source_models`, `pub mod explicit_family_models`,
 //! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`, `pub mod name_with_letter`,
-//! `pub mod splice_elaborate`,
+//! `pub mod splice_elaborate`, `pub mod unused`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod constant_param_to_formal;
@@ -34,6 +34,7 @@ pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
 pub mod name_with_letter;
 pub mod splice_elaborate;
+pub mod unused;
 
 use super::Pass;
 use crate::ir;
@@ -334,6 +335,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a builtin source model something still reads",
             cite: "rewrite/IR-CIRCUIT.md §4a; rewrite/AMEND-A12.md C5",
             explain: "The target has no model for an independent source, so a source model nothing reads is dropped. This one is still read (an element names it, or a run item addresses it), so it cannot go and is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        unused::UNUSED_DROPPED,
+        ir::Info {
+            title: "an unused definition dropped for a refusal it held",
+            cite: "rewrite/RULINGS.md R80",
+            explain: "Nothing the deck runs uses this definition (no element, analysis, statement or used definition names it, reads it or calls it, and no unresolved name or opaque statement spells it), and it holds an item the target refuses (a feature the target lacks, or the target writer's own refusal), or it names a definition dropped for one, so it is dropped rather than refused. The note's argument packs the refusal's code and argument; a kit conversion keeps every definition.",
             kind: ir::Kind::Note,
         },
     ),

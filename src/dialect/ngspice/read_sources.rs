@@ -45,7 +45,7 @@ use super::expr_read::{self, Fail};
 use super::number;
 use super::read::{Lower, Stmt};
 use super::tables::{self, Eval};
-use super::value::{Val, Wrap, emit, parens, unwrap};
+use super::value::{Val, Wrap, emit, parens, substituted, unwrap};
 use crate::ir;
 use crate::ir::Feature as F;
 use crate::ir::circuit_extra::CircuitExtra as X;
@@ -200,9 +200,8 @@ struct Read {
 
 /// A `V` or `I` card.
 pub(super) fn source(lw: &mut Lower<'_, '_>, st: Stmt) {
-    let head = lw.toks.text(lw.ast.main_token(st.node)).to_string();
+    let (head, rest) = lw.card_head(st.node);
     let current = head.as_bytes()[0].eq_ignore_ascii_case(&b'i');
-    let rest = lw.rest(st.node);
     let c = match card::card(&rest, current) {
         Ok(c) => c,
         Err(Bad::Invalid) => {
@@ -249,7 +248,7 @@ pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, tok: &str) -> Result<Val, Fail> 
             class: ir::OpaqueClass::InvalidInSource,
         });
     }
-    expr_read::parse_in(text, Eval::Numparam).map(Val::Tree)
+    expr_read::parse_in(text, Eval::Numparam).map(substituted)
 }
 
 /// Appends an optional value (`NONE` when absent).

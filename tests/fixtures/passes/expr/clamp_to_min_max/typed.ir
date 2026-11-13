@@ -1,0 +1,4 @@
+file "p.sp" deck
+  param a = 3i
+  param p = clamp(a, 1i, 2i) /: 2i
+  param q = clamp(a, 1i, 2.5) /: 2i

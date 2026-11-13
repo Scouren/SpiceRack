@@ -1,0 +1,11 @@
+diode with area=1, forward 0.5 V
+.model dm d is=1e-14
+v1 a 0 0.5
+d1 a 0 dm area=1
+.options reltol=1e-9
+.control
+set numdgt=12
+op
+print i(v1)
+.endc
+.end

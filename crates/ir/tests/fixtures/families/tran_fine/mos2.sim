@@ -1,0 +1,16 @@
+mos2 transient, 80 C, m=3, pulse 0..3 V on the gate through 10k, 2k load from 3 V
+load "spice/mos2.osdi"
+load "spice/resistor.osdi"
+model vs vsource
+model r sp_resistor
+model nm sp_mos2 type=1 vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 lambda=0.02 nsub=1e16 ucrit=1e4 uexp=0.1 vmax=5e4 neff=1 xj=0.5u nfs=1e11 delta=0.5 ld=0.1u tox=20n cgso=3e-10 cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 fc=0.5 rd=10 rs=10
+vdd (dd 0) vs dc=3
+rl (dd d) r r=2k
+vin (in 0) vs type="pulse" val0=0 val1=3 delay=1n rise=1n fall=1n width=5n period=20n
+rg (in g) r r=10k
+vb (b 0) vs dc=-0.5
+m1 (d g 0 b) nm w=10u l=2u ad=20p as=20p pd=24u ps=24u $mfactor=3
+control
+  options temp=80 tnom=27 reltol=1e-6 abstol=1e-15 rawfile="ascii"
+  analysis tran1 tran step=2.5p stop=40n maxstep=5p
+endc

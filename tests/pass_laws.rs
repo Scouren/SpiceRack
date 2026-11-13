@@ -17,8 +17,9 @@
 //! no `.notes` fails, and so does a `.notes` that lists what the pass did not append; a fixture
 //! folder naming no registered pass fails.
 //!
-//! Failing passes are compared with [`KNOWN`] by name, strictly both ways; a law that ran on no
-//! generated design for a pass fails for it (a registered pass with no law run is a failure).
+//! Failures are compared with [`KNOWN`] by (pass, seed), strictly both ways
+//! (`common/known.rs`); a law that ran on no generated design for a pass fails for it (a
+//! registered pass with no law run is a failure).
 //! Meaning (the reference evaluator, or a simulator on both forms) is each pass's own test.
 //!
 //! Oracles: generated designs (`ir::gen::generate`, valid by construction), `ir::check`,
@@ -27,14 +28,20 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/known.rs"]
+mod known;
 #[path = "common/memcap.rs"]
 mod memcap;
 #[path = "common/p2.rs"]
 mod p2;
+#[path = "common/p3.rs"]
+mod p3;
 
 use std::path::Path;
 
+use known::{Fails, Known};
 use p2::p2_on;
+use p3::p3_on;
 use spicerack::dialect;
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};
@@ -54,9 +61,10 @@ const SIZE: Size = Size {
     files: 3,
 };
 
-/// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
-/// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[];
+/// The laws a pass fails today: (law, pass, the seeds it fails at, why). Strict both ways by
+/// (pass, seed) (`known::compare`): a seed that fails and is not listed fails, and so does a
+/// listed seed that passes.
+const KNOWN: &[Known] = &[];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
@@ -147,6 +155,22 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     (
         "dc_axis_model_param_to_loop",
         gen_sets::dc_loops(ir::RunExtra::DcAxisModelParam),
+    ),
+    (
+        "dc_restart_to_loops",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
+    ),
+    // a DC list sweep: the generator over every feature reaches none since the IR round
+    // (ir-next a2665caf's draws)
+    (
+        "sweep_dc_list_to_step",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
+    ),
+    ("analysis_param_args_to_values", gen_sets::PARAM_ARGS),
+    ("param_reads_to_typed", gen_sets::behav_reads()),
+    (
+        "sweep_dc_list_to_step",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
     ),
     (
         "tran_cap_ngspice_to_given",
@@ -252,8 +276,11 @@ fn p2_by_item_catches_a_pass_that_notes_one_item_and_leaves_two() {
         notes: &[LEAKY],
         run: note_first_comment,
     };
-    let found = p2_on(&leaky).expect_err("P2 sees the comments left with no note");
-    assert!(found.contains("keeps it with no note"), "{found}");
+    let found = p2_on(&leaky).evidence();
+    assert!(
+        found.contains("keeps it with no note"),
+        "P2 sees the comments left with no note: {found}"
+    );
     let design = generate(0, &ir::FeatureSet::ALL, SIZE);
     let spans: Vec<ir::Span> = carrying(&design, leaky.removes)
         .iter()
@@ -272,18 +299,6 @@ fn p3_the_output_uses_only_the_inputs_features_and_requires() {
             p3_on(pass, design).map_err(|m| format!("seed {seed}: {m}"))
         })
     });
-}
-
-/// P3's self-test (R65, A39): on `v(n) + 1` beside a static `2 * 3`, a pass that writes
-/// `v(n) + 1 * 1` only moves `Mul` from its static into its dynamic member, which P3 passes; one
-/// that writes `v(n) + (1 - 1)` adds `Sub`, which neither form used, and P3 catches it.
-#[test]
-fn p3_passes_a_changed_form_and_catches_a_new_operator() {
-    let form_only = stub("form_only", mul_one);
-    p3_on(&form_only, p3_design()).expect("a moved form is no new feature");
-    let adds = stub("adds_sub", sub_one);
-    let found = p3_on(&adds, p3_design()).expect_err("Sub is new in either form");
-    assert!(found.contains("BinaryDyn(Sub)"), "{found}");
 }
 
 #[test]
@@ -306,6 +321,7 @@ fn p4_twice_is_once() {
 fn p5_a_design_without_the_feature_is_untouched() {
     laws("p5", |pass| {
         let without = ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(pass.removes));
+        let mut fails = Fails::default();
         let mut ran = 0;
         for seed in SEEDS {
             let mut design = generate(seed, &without, SIZE);
@@ -317,13 +333,12 @@ fn p5_a_design_without_the_feature_is_untouched() {
             let mut diags = ir::Diags::new();
             (pass.run)(&mut design, &mut diags);
             if canonical(&design) != before {
-                return Err(format!(
-                    "seed {seed}: it changed a design without {:?}",
-                    pass.removes
-                ));
+                let m = format!("it changed a design without {:?}", pass.removes);
+                fails.seed(seed, m);
             }
         }
-        ran_on(ran)
+        fails.ran(ran_on(ran));
+        fails
     });
 }
 
@@ -353,46 +368,37 @@ fn every_fixture_reads_passes_and_writes_its_expected_text() {
 
 /// Runs `law` on every registered pass and compares the passes it fails on with [`KNOWN`],
 /// strictly: an unexpected failure and an unexpected pass both fail, each with its message.
-fn laws(name: &str, law: impl Fn(&Pass) -> Result<(), String>) {
-    let mut failing = Vec::new();
-    let mut messages = Vec::new();
-    for pass in passes::all() {
-        if let Err(m) = law(pass) {
-            failing.push(pass.name);
-            messages.push(format!("{}: {m}", pass.name));
-        }
-    }
-    let known: Vec<&str> = KNOWN.iter().filter(|k| k.0 == name).map(|k| k.1).collect();
-    assert_eq!(
-        failing,
-        known,
-        "{name}: failing passes against KNOWN\n{}",
-        messages.join("\n")
-    );
+fn laws(name: &str, law: impl Fn(&Pass) -> Fails) {
+    let failing: Vec<(&str, Fails)> = passes::all().map(|p| (p.name, law(p))).collect();
+    known::compare(name, &failing, KNOWN);
 }
 
-/// `law` on every generated design that uses `pass.removes`, over every feature and then over
-/// the pass's own [`GEN_SETS`] set if it has one; an error when none does.
-fn each_with(
-    pass: &Pass,
-    law: impl Fn(u64, ir::Design) -> Result<(), String>,
-) -> Result<(), String> {
+/// `law` on every generated design that uses `pass.removes`, over every feature (labels `seed
+/// <n>`) and then over the pass's own [`GEN_SETS`] set if it has one (`own set seed <n>`); a
+/// `ran on nothing` failure when none does.
+fn each_with(pass: &Pass, law: impl Fn(u64, ir::Design) -> Result<(), String>) -> Fails {
+    let mut fails = Fails::default();
     let mut ran = 0;
     let own = GEN_SETS
         .iter()
         .find(|(name, _)| *name == pass.name)
         .map(|(_, set)| *set);
-    for set in std::iter::once(ir::FeatureSet::ALL).chain(own) {
+    for (k, set) in std::iter::once(ir::FeatureSet::ALL).chain(own).enumerate() {
         for seed in SEEDS {
             let design = generate(seed, &set, SIZE);
             if !ir::features_used(&design).contains(pass.removes) {
                 continue;
             }
             ran += 1;
-            law(seed, design)?;
+            match (law(seed, design), k) {
+                (Ok(()), _) => {}
+                (Err(m), 0) => fails.seed(seed, m),
+                (Err(m), _) => fails.check(&format!("own set seed {seed}"), m),
+            }
         }
     }
-    ran_on(ran)
+    fails.ran(ran_on(ran));
+    fails
 }
 
 /// `Ok` when the law ran on at least one design.
@@ -425,78 +431,6 @@ fn note_first_comment(design: &mut ir::Design, diags: &mut ir::Diags) {
     if let Some((item, _)) = first {
         diags.push_at(LEAKY, design, item, 0);
     }
-}
-
-/// P3 on one design: what `pass` leaves uses nothing outside what the design used plus
-/// `requires`, an expression feature compared without its form (R65, A39).
-fn p3_on(pass: &Pass, mut design: ir::Design) -> Result<(), String> {
-    let allowed = ir::features_used(&design).union(pass.requires);
-    let allowed: Vec<ir::Feature> = allowed.iter().map(static_member).collect();
-    let mut diags = ir::Diags::new();
-    (pass.run)(&mut design, &mut diags);
-    let used = ir::features_used(&design);
-    let extra: Vec<ir::Feature> = used
-        .iter()
-        .filter(|&f| !allowed.contains(&static_member(f)))
-        .collect();
-    match extra.is_empty() {
-        true => Ok(()),
-        false => Err(format!("it adds {extra:?}")),
-    }
-}
-
-/// A function, operator or draw's static member; every other feature itself. A root's form is
-/// a fact about the root (R51), so a pass that merges two roots or drops a caller moves what it
-/// did not write between the two members (R65).
-fn static_member(feature: ir::Feature) -> ir::Feature {
-    match feature {
-        ir::Feature::FuncDyn(f) => ir::Feature::Func(f),
-        ir::Feature::BinaryDyn(op) => ir::Feature::Binary(op),
-        ir::Feature::UnaryDyn(op) => ir::Feature::Unary(op),
-        ir::Feature::DistDyn(d) => ir::Feature::Dist(d),
-        other => other,
-    }
-}
-
-/// A self-test pass of one rule, no `requires` and no notes.
-fn stub(name: &'static str, run: fn(&mut ir::Design, &mut ir::Diags)) -> Pass {
-    Pass {
-        name,
-        removes: ir::Feature::Item(ir::ItemKind::Comment),
-        requires: ir::FeatureSet::EMPTY,
-        notes: &[],
-        run,
-    }
-}
-
-/// P3's self-test design: a static `Mul` and a dynamic `Add` over a literal.
-fn p3_design() -> ir::Design {
-    let text = "file \"d.sp\" deck\n  param a = 2 * 3\n  element behav b1 (n 0) expr=(v(n) + 1)\n";
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    ir::parse(text, &mut design.builder(), &mut diags);
-    assert!(diags.is_empty(), "{:?}", diags.rows());
-    design
-}
-
-/// Every literal of a dynamic root `x` becomes `x * x`.
-fn mul_one(design: &mut ir::Design, _: &mut ir::Diags) {
-    literal_to(design, ir::BinOp::Mul);
-}
-
-/// Every literal of a dynamic root `x` becomes `x - x`.
-fn sub_one(design: &mut ir::Design, _: &mut ir::Diags) {
-    literal_to(design, ir::BinOp::Sub);
-}
-
-fn literal_to(design: &mut ir::Design, op: ir::BinOp) {
-    let changed = ir::rewrite_exprs_in(design, ir::Form::Dynamic, &mut |b, e| {
-        let ir::Expr::Num(_) = b.design().expr(e) else {
-            return None;
-        };
-        Some(b.binary(op, e, e))
-    });
-    assert_eq!(changed, 1, "one dynamic root holds a literal");
 }
 
 /// `≅`: the canonical IR text of every file.

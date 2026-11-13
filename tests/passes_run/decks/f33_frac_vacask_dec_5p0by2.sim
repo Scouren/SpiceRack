@@ -1,0 +1,14 @@
+f33_frac_vacask_dec_5p0by2: VACASK `mode="dec" points=5.0/2` from 1k to 100k runs 2 per decade (5 points): 2.5 truncated
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+// inline expression
+v1 (in 0) vsource dc=0.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  options rawfile="ascii"
+  analysis ac1 ac from=1k to=100k mode="dec" points=5.0/2
+endc

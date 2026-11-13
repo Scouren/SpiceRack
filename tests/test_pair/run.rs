@@ -8,7 +8,7 @@
 //! Cites: `rewrite/SPINE.md` §8a; REWRITE-PLAN §7.4 (which component each step names).
 //!
 //! Contents:
-//! - `pub struct Deck`, `pub struct Fail`, `pub struct Done`, `pub type Written`, `pub const JOBS`
+//! - `pub struct Deck`, `pub struct Fail`, `pub struct Done`, `pub type Written`, `pub const JOBS`, `pub const SECS`
 //! - `pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &PairFile) -> Done`
 //! - `pub fn determinism(from: &DialectRow, to: &DialectRow, decks: &[Deck], once: &BTreeMap<String, Written>) -> Vec<(String, String)>`
 //! - `pub fn convert(from: &DialectRow, to: &DialectRow, deck: &Deck) -> Option<Written>`
@@ -21,10 +21,8 @@ use spicerack::dialect::{self, DialectRow, Policy, Sources};
 use spicerack::ir;
 use spicerack::ir::ItemRow as _;
 
-use spicerack::result::RawData;
-
 use crate::files::PairFile;
-use crate::sim::{self, Ran};
+use crate::sim::{self, Ran, Sim};
 use crate::{Cell, cmp, laws, plots};
 
 /// A deck to run: its name in the cell's list, the source file (the simulator runs it there,
@@ -75,6 +73,9 @@ pub type Written = Vec<(String, String)>;
 /// The jobs step 6 converts the decks on, against one.
 pub const JOBS: usize = 8;
 
+/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
+pub const SECS: u64 = 60;
+
 /// What the spine made of one deck: the legalized design, the written files, the rename map
 /// (new name → source name, lower case), the names of its devices (every element but a
 /// subcircuit instance, under both names, lower case) and the statement names the target cannot
@@ -90,11 +91,16 @@ struct Spine {
     uic: bool,
 }
 
-/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
-const SECS: u64 = 60;
-
-/// The refinement oracle's step cap: a transient's span over this.
-const REFINE: f64 = 2000.0;
+/// A source simulator's words for a file it cannot open, lower case (ngspice-45: "Error opening
+/// osdi lib … No such file or directory!", "Library … couldn't be loaded!", "Could not find
+/// include file"; VACASK: "No such file or directory", and "File '<name>' not found" for a
+/// Verilog-A source the corpus does not ship).
+const ABSENT: [&str; 4] = [
+    "no such file or directory",
+    "couldn't be loaded",
+    "could not find include file",
+    "cannot open",
+];
 
 /// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
 /// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
@@ -149,31 +155,80 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         return stop(fails, 4, f, written);
     }
     // The written includes, relative to the entry's folder: the run directory holds the
-    // entry and links that folder's files.
-    // ponytail: an include outside that folder's top level is not run (the linked folder is
-    // read-only in the store); place it when a corpus deck needs it.
+    // entry and links that folder's files. An include the deck names by an absolute path (the
+    // spice-bench decks name their kits in the store, read-only) is placed under `abs/` at that
+    // path, and every written file's text names it there: only the path's spelling changes, so
+    // the run reads the written include and not the original.
+    // An include above the deck's folder is placed there (`../x`, `sim` nests the run), one in a
+    // subfolder in it (`sim` makes the linked subfolder a folder of links first).
     let base = std::path::Path::new(&entry.0)
         .parent()
         .unwrap_or(std::path::Path::new(""));
     let mut placed = Vec::new();
+    let mut moved = Vec::new();
     for (p, t) in rest {
-        match std::path::Path::new(p).strip_prefix(base) {
-            Ok(r) if !r.to_string_lossy().contains('/') => {
-                placed.push((r.to_string_lossy().into_owned(), t.clone()));
+        match (p.starts_with('/'), crate::files::relative(base, p)) {
+            (false, Some(r)) => placed.push((r, t.clone())),
+            (true, _) => {
+                moved.push((p.clone(), format!("abs{p}")));
+                placed.push((format!("abs{p}"), t.clone()));
             }
-            _ => {
+            (false, None) => {
                 let f = fail(
                     "harness-path",
-                    format!("written include {p} not beside the deck"),
+                    format!("written include {p} is the deck's own folder"),
                 );
                 return stop(fails, 4, f, written);
             }
         }
     }
+    // The source's includes above its folder, placed for its run as the written ones are.
+    let above: Vec<(String, String)> = deck.src.files()[1..]
+        .iter()
+        .filter(|(p, _)| !p.starts_with('/'))
+        .filter_map(|(p, t)| crate::files::relative(base, p).map(|r| (r, t.clone())))
+        .filter(|(r, _)| r.starts_with("../"))
+        .collect();
+    let relocate = |t: &str| {
+        moved
+            .iter()
+            .fold(t.to_string(), |t, (from, to)| t.replace(from.as_str(), to))
+    };
+    for f in &mut placed {
+        f.1 = relocate(&f.1);
+    }
+    let entry_text = relocate(&entry.1);
+    // A moved include that no written text names by the path it was written for would be read
+    // from the original: the run would not test the written file.
+    let named = |to: &String| {
+        entry_text.contains(to.as_str()) || placed.iter().any(|f| f.1.contains(to.as_str()))
+    };
+    if let Some((from, _)) = moved.iter().find(|(_, to)| !named(to)) {
+        let f = fail(
+            "harness-path",
+            format!("no written text names the include {from}"),
+        );
+        return stop(fails, 4, f, written);
+    }
+    let entry = &(entry.0.clone(), entry_text);
+    // The written deck is plain ngspice: the reader read the folder's `.spiceinit` mode into the
+    // design, so the init beside it would apply the mode twice (R87; the lead, 2026-11-13). An
+    // empty one stands in for the linked original.
+    if c.to_sim == Sim::Ngspice && deck.path.with_file_name(".spiceinit").exists() {
+        placed.push((".spiceinit".to_string(), String::new()));
+    }
     let rest = &placed[..];
     let text = &deck.src.files()[0].1;
+    let folder = deck.path.parent().unwrap_or(std::path::Path::new(""));
+    if let Some(n) = crate::files::absent_osdi(folder, text) {
+        let f = fail(
+            "source-environment",
+            format!("pre_osdi {n}: not in the corpus"),
+        );
+        return stop(fails, 4, f, written);
+    }
     let ran = guard(4, || {
-        let a = sim::run_checked(c.from_sim, &deck.path, text, &[], SECS);
+        let a = sim::run_checked(c.from_sim, &deck.path, text, &above, SECS);
         let b = sim::run_checked(
             c.to_sim,
             &deck.path.with_extension(c.to_ext),
@@ -200,58 +255,37 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         Ok((a, b)) => return stop(fails, 4, ran_fail(a, b), written),
         Err((_, f)) => return stop(fails, 4, f, written),
     };
-    let mut tol = cmp::Tol::of(&[text, &entry.1]);
-    for (k, v) in &pair.tightened {
-        tol.tighten(k, *v).expect("pair_file checked it");
-    }
-    match cmp::compare(&a, &b, tol) {
-        Err(why) => {
-            // The refinement oracle (cross-sim's `simulator-differs:refinement`): both decks
-            // with every transient's step capped at span/REFINE; agreeing there, the two
-            // simulators' step control made the difference, not the conversion.
-            let refined = sim::refined(c.from_sim, text, REFINE)
-                .zip(sim::refined(c.to_sim, &entry.1, REFINE))
-                .and_then(|(ra, rb)| {
-                    let a2 = sim::run_checked(c.from_sim, &deck.path, &ra, &[], SECS);
-                    let b2 = sim::run_checked(
-                        c.to_sim,
-                        &deck.path.with_extension(c.to_ext),
-                        &rb,
-                        rest,
-                        SECS,
-                    );
-                    match (a2, b2) {
-                        (Ran::Plots(mut x), Ran::Plots(mut y)) => Some({
-                            if spine.uic {
-                                cmp::without_start(&mut x);
-                                cmp::without_start(&mut y);
-                            }
-                            cmp::compare(
-                                &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
-                                &plots::only(
-                                    plots::renamed(plots::hierarchical(y), &spine.renames),
-                                    pair.vectors.as_ref(),
-                                ),
-                                tol,
-                            )
-                            .is_ok()
-                        }),
-                        _ => None,
+    if c.from == c.to {
+        if let Err(why) = crate::same::identical(&a, &b) {
+            // The oracle needs a source that reproduces itself: the source run again, and
+            // differing from its own first run, the deck is the simulator's, not ours (ngspice-45
+            // draws `trnoise` afresh each run whatever `.option seed` says).
+            let again = sim::run_checked(c.from_sim, &deck.path, text, &above, SECS);
+            let own = match again {
+                Ran::Plots(mut x) => {
+                    if spine.uic {
+                        cmp::without_start(&mut x);
                     }
-                });
-            let f = match refined {
-                Some(true) => fail(
-                    "simulator-differs:refinement",
-                    format!("{why}; both agree with every step capped at span/{REFINE}"),
+                    let x = plots::only(plots::hierarchical(x), pair.vectors.as_ref());
+                    crate::same::identical(&a, &x).err()
+                }
+                _ => Some("the second run failed".to_string()),
+            };
+            let f = match own {
+                Some(self_diff) => fail(
+                    "source-nondeterministic",
+                    format!("{why}; the source against itself: {self_diff}"),
                 ),
-                _ => fail("mismatch", why),
+                None => fail("differs", why),
             };
             fails.insert(4, f);
         }
-        Ok(()) if std::env::var_os("PAIR_MARGINS").is_some() => {
-            eprintln!("margin {}: {}", deck.name, margin(&a, &b, text, &entry.1));
+    } else {
+        let texts = (text.as_str(), entry.1.as_str(), rest);
+        let names = (spine.uic, &spine.renames);
+        if let Some(f) = crate::numbers::step(c, deck, pair, names, texts, (&a, &b)) {
+            fails.insert(4, f);
         }
-        Ok(()) => {}
     }
     if let Err(why) = plots::names(&a, &b, &spine.devices, &spine.axes) {
         fails.insert(5, fail("missing-vector", why));
@@ -563,32 +597,6 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
         .collect()
 }
 
-/// How much of step 4's value tolerance a passing pair uses (`PAIR_MARGINS=1`, triage). It
-/// measures the value band only: on a smooth transient the 1 % time tube covers the difference,
-/// so "passes at 0" there means not measured by this probe, never 0 %. Reports the smallest
-/// fraction `f` of RELTOL, VNTOL and ABSTOL (the transient's band scales with them) at which
-/// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
-/// below it (the worst vector, its value and the tolerance there).
-fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
-    let at = |f: f64| cmp::compare(a, b, cmp::Tol::of(&[src, written]).scaled(f));
-    let (mut lo, mut hi) = (0.0f64, 1.0f64);
-    // Bounded: seven halvings take the bracket under 1 %.
-    for _ in 0..7 {
-        let mid = (lo + hi) / 2.0;
-        match at(mid) {
-            Ok(()) => hi = mid,
-            Err(_) => lo = mid,
-        }
-    }
-    let below = at(lo).err().unwrap_or_else(|| {
-        "passes at 0: not measured by this probe (exact, or inside the time tube)".into()
-    });
-    format!(
-        "uses {:.0} % of the tolerance; below it: {below}",
-        hi * 100.0
-    )
-}
-
 /// Step 4's verdict when a run gave no plots: whose run, and why.
 fn ran_fail(a: Ran, b: Ran) -> Fail {
     match (a, b) {
@@ -596,7 +604,26 @@ fn ran_fail(a: Ran, b: Ran) -> Fail {
             "slow",
             "past the CPU budget or the output cap (512 MiB a file)".into(),
         ),
-        (Ran::Failed(why), _) => fail("source-fails", why),
+        // The target's outcome beside it: "source does not solve, target does" is a census
+        // class of its own (R96).
+        (Ran::Failed(why), b) => {
+            let target = match b {
+                Ran::Plots(_) => "ran".to_string(),
+                Ran::Failed(w) => format!("failed too: {w}"),
+                Ran::Timeout => "past its budget".to_string(),
+            };
+            // A file the deck names that is not where it runs (an include, an `.osdi` the
+            // corpus does not ship): the deck cannot run as it stands, a fact of the corpus.
+            let low = why.to_ascii_lowercase();
+            let absent = ABSENT.iter().any(|w| low.contains(w))
+                || (low.contains("file '") && low.contains("' not found"));
+            let class = if absent {
+                "source-environment"
+            } else {
+                "source-fails"
+            };
+            fail(class, format!("{why} | target: {target}"))
+        }
         (_, Ran::Failed(why)) => fail("target-fails", why),
         (Ran::Plots(_), Ran::Plots(_)) => unreachable!("a run without plots"),
     }

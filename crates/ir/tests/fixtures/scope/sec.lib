@@ -1,0 +1,4 @@
+* a library whose section holds the divider's lower resistor
+.lib sec
+r2 b 0 1k
+.endl sec

@@ -103,7 +103,7 @@ pub(super) fn load(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     // ponytail: decides from the whole definition table, dead rows included (the class of the
     // expression table's replaced rows); a live-definitions view replaces it in the `…_all()` round.
     let modules: Vec<ir::NameId> = d
-        .definitions()
+        .definitions_all()
         .iter()
         .filter(|def| def.kind == ir::DefKind::Module && def.item == at)
         .map(|def| def.name)

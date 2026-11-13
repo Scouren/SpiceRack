@@ -11,6 +11,8 @@
 #[path = "common/memcap.rs"]
 mod memcap;
 
+#[path = "passes_run/args.rs"]
+mod args;
 #[path = "passes_structure/bindings.rs"]
 mod bindings;
 #[path = "passes_run/continuation.rs"]
@@ -21,6 +23,8 @@ mod dc_loops;
 mod device_ic;
 #[path = "passes_run/first_step.rs"]
 mod first_step;
+#[path = "passes_run/freq_grids.rs"]
+mod freq_grids;
 #[allow(dead_code)] // `sources_only` is the laws'
 #[path = "passes_run/gen_sets.rs"]
 mod gen_sets;
@@ -122,6 +126,11 @@ fn inert_options_keep_what_an_ir_row_reads() {
 }
 
 #[test]
+fn param_arguments_keep_every_field_value() {
+    args::param_arguments_keep_every_field_value(SEEDS, SIZE);
+}
+
+#[test]
 fn klu_within_its_rounding() {
     options::klu_within_its_rounding();
 }
@@ -129,6 +138,21 @@ fn klu_within_its_rounding() {
 #[test]
 fn prints_leave_the_raw_file_alone() {
     options::prints_leave_the_raw_file_alone();
+}
+
+#[test]
+fn linear_frequency_sweeps_run_what_each_simulator_counts() {
+    freq_grids::linear_frequency_sweeps_run_what_each_simulator_counts();
+}
+
+#[test]
+fn log_frequency_sweeps_run_each_simulators_law() {
+    freq_grids::log_frequency_sweeps_run_each_simulators_law();
+}
+
+#[test]
+fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask() {
+    freq_grids::non_integer_counts_round_on_ngspice_and_truncate_on_vacask();
 }
 
 #[test]

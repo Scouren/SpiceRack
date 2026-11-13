@@ -88,7 +88,7 @@ mod tests {
             ..model(n, family, polarity)
         };
         b.model(top, row, Span::NONE);
-        let def = DefId(b.design().definitions().len() as u32 - 1);
+        let def = DefId(b.design().definitions_all().len() as u32 - 1);
         Ref { name: n, def }
     }
 
@@ -1104,6 +1104,26 @@ mod tests {
         assert_eq!(params, only(Violation::FieldDomain));
     }
 
+    /// R90: a design states one variant per law point; two of one point is `LawConflict` (once,
+    /// at no item), one of each point is legal.
+    #[test]
+    fn a_law_point_is_stated_once() {
+        use spicerack_ir::{Law, Laws};
+        let with = |laws: Laws| checked(move |b, _| b.set_laws(laws));
+        let both = Laws::of(&[Law::BcSatAreaTimesAreab, Law::BcSatAreabOnly]);
+        assert_eq!(with(both), only(Violation::LawConflict));
+        let twice = Laws::of(&[Law::DiodeSidewallBottomF1, Law::DiodeSidewallOwnF1])
+            .with(Law::SubSatLastFactor);
+        assert_eq!(with(twice), only(Violation::LawConflict));
+        let each = Laws::of(&[
+            Law::BcSatAreabOnly,
+            Law::SubSatLastFactor,
+            Law::DiodeWlMultOnce,
+            Law::DiodeSidewallBottomF1,
+        ]);
+        assert_eq!(with(each), Vec::<Code>::new());
+    }
+
     /// A model of a versioned family states its version (ng-models' L5 finding: "no version"
     /// means each simulator's own default); its neighbour, a family of one version with none
     /// stated, stays legal.
@@ -1260,5 +1280,15 @@ mod tests {
             Vec::<Code>::new(),
             "top level"
         );
+        // across files (ngspice 1bee7f37, settle inst_cycle_inc: "unknown subckt: x1.xb.xa…"):
+        // a in the deck calls b of the included file, b calls a; each instance bound by the
+        // reader's rule (`#k`), since the neutral lookup does not see through an include
+        let across = concat!(
+            "  include \"inc.sp\"\n",
+            "  subckt a (p)\n    element instance xb (p) model=b#1\n",
+            "file \"inc.sp\" library\n",
+            "  subckt b (p)\n    element instance xa (p) model=a#0\n",
+        );
+        assert_eq!(codes_of(across), vec![cycle, cycle], "across files");
     }
 }

@@ -16,9 +16,11 @@ use super::args::{
 };
 use super::script::{Block, Cmd, Node};
 use super::table::{
-    ANALYSES, CIRCUIT_OPTIONS, EFFECTS, FLOWS, FRONTEND_KEYS, INERT, OWNS, PRIVATE_VARS,
+    ANALYSES, CIRCUIT_OPTIONS, EFFECTS, FILES, FLOWS, FRONTEND_KEYS, INERT, OWNS, PRIVATE_VARS,
 };
-use super::{DISPLAY, EFFECT, FLOW, FORM, NO_COMMAND, NO_RESET, OWN, STATE_WITH_CARDS, UNROLL};
+use super::{
+    DISPLAY, EFFECT, FLOW, FORM, NO_COMMAND, NO_RESET, OUTPUT_FILE, OWN, STATE_WITH_CARDS, UNROLL,
+};
 use crate::dialect::ngspice::read_run;
 use crate::ir;
 
@@ -302,6 +304,7 @@ impl Interp {
                 });
             }
             "let" if c.rest().starts_with('@') => return Err(EFFECT),
+            _ if FILES.contains(&w) => out.push(opaque(ir::OpaqueClass::Private, OUTPUT_FILE)),
             _ if INERT.contains(&w) => out.push(opaque(ir::OpaqueClass::Inert, DISPLAY)),
             _ if EFFECTS.contains(&w) => return Err(EFFECT),
             _ if FLOWS.contains(&w) || w == "end" => return Err(FLOW),

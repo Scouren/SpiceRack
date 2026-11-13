@@ -301,6 +301,23 @@ fn reads_circuit(text: &str) -> bool {
     wanted(&text.to_ascii_lowercase().replace("temper", "_"))
 }
 
+/// Whether ngspice puts braces around a key's value before `inp_compat` reads the line
+/// (`inpcom.c` `inp_fix_param_values`): every value but one opening with a digit, `.`, `"`, `{`,
+/// a sign before a digit or `.digit`, `true` or `false`.
+fn ngspice_braces(value: &str) -> bool {
+    let v = value.trim_start();
+    let b = v.as_bytes();
+    let digit = |k: usize| b.get(k).is_some_and(u8::is_ascii_digit);
+    let lower = v.to_ascii_lowercase();
+    let plain = digit(0)
+        || matches!(b.first(), Some(b'.' | b'"' | b'{'))
+        || matches!(b.first(), Some(b'+' | b'-'))
+            && (digit(1) || b.get(1) == Some(&b'.') && digit(2))
+        || lower.starts_with("true")
+        || lower.starts_with("false");
+    !v.is_empty() && !plain
+}
+
 /// Whether `eval_tc`'s `%15.8e` changes a number (more than 9 significant digits).
 fn rounds(v: &Val) -> bool {
     match v {
@@ -325,8 +342,15 @@ fn dynamic(
     rest: &[Item],
     charge: bool,
 ) {
+    // a value key's `(…)` holding braces counts too: numparam replaces them first (settle
+    // ternary_braces.sp, the 38 decks' vdmos/dcdc.sp: `R = (time<1u ? {Rl} : {2*Rl})` runs);
+    // and so does any key value ngspice braces before (`inp_fix_param_values`: one not opening
+    // with a number, `.`, `"`, `true` or `false`; settle r_dyn_first_key.sp, the gf180 kit's
+    // `rb 11 21 npolyf_u_body l=r_l w=r_w r='…'` runs with R = r_l)
     let braces = |i: &Item| {
-        i.kind == Kind::Brace || (i.kind == Kind::Assign && i.value.starts_with(['{', '\'']))
+        i.kind == Kind::Brace
+            || (i.kind == Kind::Assign
+                && (i.value.contains(['{', '\'']) || ngspice_braces(&i.value)))
     };
     let Some(first) = rest.iter().position(braces) else {
         // "mal formed … instance": ngspice exits

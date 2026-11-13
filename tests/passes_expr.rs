@@ -18,6 +18,9 @@ mod memcap;
 mod bindings;
 #[path = "passes_expr/compare.rs"]
 mod compare;
+#[path = "passes_run/gen_sets.rs"]
+#[allow(dead_code)] // the run rules' sets beside the one used here
+mod gen_sets;
 #[path = "passes_expr/towers.rs"]
 mod towers;
 #[path = "passes_expr/typed.rs"]
@@ -35,7 +38,7 @@ use compare::{
 type Rule = (&'static str, &'static [&'static str], fn(ir::Expr) -> bool);
 
 /// The rules of [`RULES`] that decide by the tag table.
-const FOLLOW: &[&str] = &["sqr_to_mul", "ramp_to_ternary"];
+const FOLLOW: &[&str] = &["sqr_to_mul", "ramp_to_ternary", "clamp_to_min_max"];
 
 const RULES: &[Rule] = &[
     (
@@ -52,6 +55,27 @@ const RULES: &[Rule] = &[
             "pow(sqr(x), y)",
         ],
         |e| matches!(e, ir::Expr::Call(ir::Func::Pow, _)),
+    ),
+    (
+        "powre_to_pow",
+        &[
+            "pow_re(x, 2)",
+            "pow_re(x, 3)",
+            "pow_re(x, -1)",
+            "pow_re(abs(x), y)",
+            "pow_re(exp(x), 0.5)",
+        ],
+        |e| matches!(e, ir::Expr::Call(ir::Func::PowRe, _)),
+    ),
+    (
+        "clamp_to_min_max",
+        &[
+            "clamp(x, -1, 2)",
+            "clamp(x, y, 2)",
+            "clamp(x - y, y, x)",
+            "clamp(x, 1i, 2i) /: 2i",
+        ],
+        |e| matches!(e, ir::Expr::Call(ir::Func::Clamp, _)),
     ),
     (
         "round_half_even_to_away",
@@ -126,23 +150,23 @@ fn is_powabs(e: ir::Expr) -> bool {
 }
 
 #[test]
-fn powabs_to_pow_keeps_every_value() {
+fn powabs_to_powre_keeps_every_value() {
     let text = "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = pow_abs(x, y)\n";
-    let points = keeps_boundary_values("powabs_to_pow", text, ANY);
-    let generated = keeps_generated_values("powabs_to_pow", is_powabs, false);
+    let points = keeps_boundary_values("powabs_to_powre", text, ANY);
+    let generated = keeps_generated_values("powabs_to_powre", is_powabs, false);
     assert!(generated > 0, "no generated root held pow_abs");
-    eprintln!("powabs_to_pow: {points} boundary points, {generated} generated roots");
+    eprintln!("powabs_to_powre: {points} boundary points, {generated} generated roots");
 }
 
 #[test]
-fn powabs_to_pow_dyn_keeps_every_value() {
+fn powabs_to_powre_dyn_keeps_every_value() {
     // `$temp` makes the root dynamic (class Temp, R14); `0 * $temp` adds nothing to y
     let text =
         "file \"p.sp\" deck\n  param x = 1\n  param y = 1\n  param r = pow_abs(x, y + 0 * $temp)\n";
-    let points = keeps_boundary_values("powabs_to_pow_dyn", text, ANY);
-    let generated = keeps_generated_values("powabs_to_pow_dyn", is_powabs, false);
+    let points = keeps_boundary_values("powabs_to_powre_dyn", text, ANY);
+    let generated = keeps_generated_values("powabs_to_powre_dyn", is_powabs, false);
     assert!(generated > 0, "no generated root held a dynamic pow_abs");
-    eprintln!("powabs_to_pow_dyn: {points} boundary points, {generated} generated roots");
+    eprintln!("powabs_to_powre_dyn: {points} boundary points, {generated} generated roots");
 }
 
 #[test]
@@ -502,16 +526,10 @@ fn param_reads_to_typed_keeps_every_value_and_tag() {
         let points = keeps_boundary_values("param_reads_to_typed", &text, tags);
         eprintln!("param_reads_to_typed (x = {x}): {points} boundary points");
     }
-    // over every feature the generator reaches few behavioural sources: every element kind
-    // but Behav taken out
+    // over every feature the generator reaches few behavioural sources (gen_sets.rs)
     let read = |e| matches!(e, ir::Expr::Param(_));
-    let behav_only = ir::ElemKind::ALL
-        .into_iter()
-        .filter(|&k| k != ir::ElemKind::Behav)
-        .fold(ir::FeatureSet::ALL, |s, k| {
-            s.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)))
-        });
-    let generated = keeps_values_over("param_reads_to_typed", read, true, behav_only);
+    let set = gen_sets::behav_reads();
+    let generated = keeps_values_over("param_reads_to_typed", read, true, set);
     eprintln!("param_reads_to_typed: {generated} generated roots");
     assert!(generated > 0);
     assert_eq!(notes("param_reads_to_typed", "mixed"), [code(115)]);

@@ -1,0 +1,3 @@
+# a string or a list is an operand only through a parameter read (X0029)
+U0117  # u: t holds a string
+U0117  # v: l holds a list

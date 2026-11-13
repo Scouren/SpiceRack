@@ -16,7 +16,9 @@
 //! usable row, so a target that can say "no default" gets the clean form.
 //!
 //! Left with a note: a subcircuit whose body reads an enclosing model, function or subcircuit,
-//! or an enclosing parameter one of its own formals is named as (`READS_ENCLOSING`), or one defined in a branch, loop or section inside a subcircuit
+//! names an enclosing parameter in a row (a statistics block varying it, a target: the
+//! parameter itself, which a formal's copy is not), or reads an enclosing parameter one of its
+//! own formals is named as (`READS_ENCLOSING`), or one defined in a branch, loop or section inside a subcircuit
 //! (`NOT_IN_BODY`).
 //!
 //! Cites: `rewrite/AMEND-A12.md` K2, A15 K1, A32; R27; `rewrite/DIALECT-VACASK.md` §6.
@@ -182,15 +184,23 @@ fn subtree(design: &ir::Design, s2: ir::ItemRef) -> Vec<(ir::ItemRef, ir::ScopeI
 }
 
 /// The parameters of `l2` (the enclosing body) that `s2`'s subtree reads, in first-read order,
-/// or `None` when it reads any other definition there (a model, function, subcircuit).
+/// or `None` when it reads any other definition there (a model, function, subcircuit) or names
+/// one in a row reference.
 fn plan(design: &ir::Design, s2: ir::ItemRef, l2: ir::ScopeId) -> Option<Vec<ir::DefId>> {
     let mut formals: Vec<ir::DefId> = Vec::new();
     for (item, _) in subtree(design, s2) {
         let mut refs = Vec::new();
         design.item_refs(item, &mut refs);
-        let mut defs: Vec<ir::DefId> = refs.iter().map(|r| r.0.def).collect();
-        defs.extend(expr_reads(design, item));
-        for def in defs.into_iter().filter(|d| !d.is_none()) {
+        // a row reference names the definition itself (a statistics block's or a target's
+        // parameter), not its value: a formal holding a copy is another parameter
+        let named = refs.iter().map(|r| r.0.def).filter(|d| !d.is_none());
+        if named.into_iter().any(|d| design.def(d).scope == l2) {
+            return None;
+        }
+        for def in expr_reads(design, item)
+            .into_iter()
+            .filter(|d| !d.is_none())
+        {
             let d = design.def(def);
             if d.scope != l2 {
                 continue;
@@ -363,13 +373,13 @@ fn hoist_one(
     }
     // a name the landing scope already defines (in any case) is renamed, its references follow
     let taken = |d: &ir::Design, n: &str| {
-        d.definitions().iter().any(|x| {
+        d.definitions_all().iter().any(|x| {
             x.scope == l && x.kind == ir::DefKind::Subckt && d.str(x.name).eq_ignore_ascii_case(n)
         })
     };
     let base = editor.design().str(row.name).to_string();
     if taken(editor.design(), &base) {
-        let bound = editor.design().definitions().len() + 1;
+        let bound = editor.design().definitions_all().len() + 1;
         let fresh = (1..=bound)
             .map(|n| format!("{base}_{n}"))
             .find(|n| !taken(editor.design(), n))

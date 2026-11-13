@@ -307,6 +307,26 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a subcircuit that instantiates itself",
             "an instance's subcircuit reaches the subcircuit holding the instance, directly or through others, so the hierarchy has no finite elaboration; ngspice and VACASK refuse it.",
         ),
+        Violation::LawConflict => (
+            "two laws of one point stated",
+            "a design states the laws of the one simulator build it was written for, so one variant per point (R90); two say the numbers follow both.",
+        ),
+        Violation::RefScope => (
+            "a reference bound to a definition outside its reach",
+            "a name read inside one subcircuit (or a file it includes) binds to its own definitions and its enclosing scopes' only, never to a sibling subcircuit's formal, parameter, function, model or subcircuit; a function's formal is read only in that function's body.",
+        ),
+        Violation::RunOrderInSubckt => (
+            "a run-order item inside a subcircuit",
+            "an alter, a loop, a reset, a print, a measure, or an option, temperature, node set or save that holds from where it stands has a meaning only in the run's order; a subcircuit is instantiated, not executed, so no simulator gives it one there (R98).",
+        ),
+        Violation::StringOperand => (
+            "a string as an operand",
+            "a string is a value, or one side of `==` or `!=`; under any other operator, as a function's argument or as a condition it has no meaning: VACASK refuses it (\"Operation not supported for string and real.\"), ngspice has no string parameter.",
+        ),
+        Violation::TargetAlias => (
+            "a device-parameter target that names an element's value or a source's dc",
+            "a resistor's r, a capacitor's c, an inductor's l is an element-value target and an independent source's dc a source-dc target: one meaning has one form, so the text reads back as what was written.",
+        ),
         Violation::StringOrListField => (
             "a typed field that holds a string or a list",
             "a row's own expression field is a number, except the fields its row names as strings (a model's version, an alter's value, a private option's value); a list is a value only of a parameter, a formal's default or a parameter list.",

@@ -100,7 +100,7 @@ fn spliceable(design: &ir::Design, e: ir::ItemRef, top: ir::ScopeId) -> Option<V
         }
         scopes.push(s.body);
     }
-    for d in design.definitions() {
+    for d in design.definitions_all() {
         let spliced = circuits.contains(&d.item) && d.kind == ir::DefKind::Subckt;
         if scopes.contains(&d.scope) && !spliced {
             let key = (d.kind, design.str(d.name).to_ascii_lowercase());
