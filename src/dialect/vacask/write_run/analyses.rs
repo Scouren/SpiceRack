@@ -7,7 +7,7 @@
 //! Every analysis and axis has its name: `FEATURES` holds the named forms only, and the run
 //! group's naming rows give one (R59, A35).
 //!
-//! Contents: `analysis`, `range`, `target` (crate-private)
+//! Contents: `analysis`, `range`, `sweeps`, `below_one`, `target` (crate-private)
 
 use super::{name_of, quote};
 use crate::dialect::vacask::expr_write::write_expr;
@@ -131,6 +131,46 @@ pub(super) fn range(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
         "lin" => minus_one(d, s.points, out),
         _ => write_expr(d, s.points, out),
     }
+}
+
+/// The sweeps item `at` writes as ranges: an analysis's frequency sweep or DC axes, a sweep
+/// loop's.
+pub(super) fn sweeps(d: &ir::Design, at: ir::ItemRef) -> Vec<ir::SweepSpec> {
+    use ir::AnalysisKind as K;
+    match at.kind {
+        ir::ItemKind::Analysis => {
+            let row: ir::Analysis = d.row(at.index);
+            match row.kind {
+                K::Dc => {
+                    let dc: ir::dc_ac::Dc = d.detail(row.detail);
+                    axes(d, dc.axes).iter().map(|a| a.sweep).collect()
+                }
+                K::Ac => vec![d.detail::<ir::dc_ac::Ac>(row.detail).sweep],
+                K::Xf => vec![d.detail::<ir::dc_ac::Xf>(row.detail).sweep],
+                K::Stb => vec![d.detail::<ir::periodic::Stb>(row.detail).sweep],
+                K::Sp => vec![d.detail::<ir::dc_ac::Sp>(row.detail).sweep],
+                K::Noise => vec![d.detail::<ir::dc_ac::Noise>(row.detail).sweep],
+                _ => Vec::new(),
+            }
+        }
+        ir::ItemKind::Loop => {
+            let row: ir::Loop = d.row(at.index);
+            match row.kind {
+                ir::LoopKind::Sweep => vec![d.detail::<ir::plan::SweepLoop>(row.detail).sweep],
+                _ => Vec::new(),
+            }
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Whether `s` is a lin count sweep whose count is a literal below one (a negative interval
+/// count, run132).
+pub(super) fn below_one(d: &ir::Design, s: ir::SweepSpec) -> bool {
+    s.kind == ir::SweepKind::Lin
+        && s.step.is_none()
+        && !s.points.is_none()
+        && matches!(d.expr(s.points), ir::Expr::Num(n) if d.literal_value(d.num(n)) < 1.0)
 }
 
 /// ` instance="x1:r1" parameter="r"`, ` instance="x1:v1" parameter="dc"` (a source's DC value,

@@ -170,6 +170,10 @@ pub(super) fn range(
         return Err(private(code));
     }
     check_arg(l, &[from, to, step, points])?;
+    // Run132: "Number of intervals (specified by points parameter) must be nonnegative."
+    if kind == ir::SweepKind::Lin && step == NONE && negative(l, points) {
+        return Err(BAD);
+    }
     Ok(Spec {
         kind,
         from,
@@ -399,6 +403,18 @@ fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
     }
     let one = l.b.literal(int_one());
     l.b.binary(ir::BinOp::Add, e, one)
+}
+
+/// Whether `node` is a negative literal: `-` over a nonzero number.
+fn negative(l: &Lower<'_, '_, '_>, node: u32) -> bool {
+    let ast = &l.cst.ast;
+    let n = Node(node);
+    node != NONE
+        && ast.tag(n) == Tag::Unary
+        && l.cst.tokens.text(ast.main_token(n)) == "-"
+        && ast.tag(Node(ast.lhs(n))) == Tag::Num
+        && number::lex(l.cst.tokens.text(ast.main_token(Node(ast.lhs(n)))))
+            .is_ok_and(|x| x.literal.mantissa != 0)
 }
 
 /// Whether `node` is the literal `0`.

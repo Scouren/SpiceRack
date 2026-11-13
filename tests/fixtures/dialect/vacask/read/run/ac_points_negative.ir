@@ -1,0 +1,9 @@
+# Oracle: run132 (scratchpad vacask/run132, VACASK of .#testing): `mode="lin" points=0` runs one
+# frequency (1k); `points=-1` and `points=-3` print "Number of intervals (specified by points
+# parameter) must be nonnegative." and run nothing: a negative literal count is refused (P2320).
+# Law L5 seed 3 (the IR round): a count of -424 was written -425 and read back (-425 + 1).
+# codes: P2320 S0004
+file "ac_points_negative.sim" deck
+  title "a negative lin interval count"
+  analysis ac name=a0 (lin start=1k stop=2k points=1i)
+  opaque vacask invalid "analysis a1 ac from=1k to=2k mode=\"lin\" points=-1"
