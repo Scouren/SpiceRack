@@ -1,0 +1,9 @@
+dio_ring: F51 (R84a): dio_recovery with no junction capacitance (cjo=0): after the recovery ngspice-45's trapezoidal rule rings, i(v1) alternating +-1.08 A each step (+-0.27 A with the step at 0.1 ns), accepted by its step control; VACASK reads -7.3e-7 A (ngspice under method=gear 1e-9 A)
+load "spice/diode.osdi"
+model v vsource
+model d sp_diode rs=1.0 is=1e-9 tt=1e-6 cjo=0 bv=5 ibv=1e-6
+v1 (1 0) v type="pulse" val0=1 val1=-1 delay=0.2u rise=1n fall=1n width=1
+d1 (1 0) d
+control
+  analysis tran1 tran step=0.1u stop=1u
+endc

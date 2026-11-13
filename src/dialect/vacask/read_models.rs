@@ -31,31 +31,12 @@ use super::read_structure;
 use crate::ir;
 use crate::syntax::ast::{Node, Tag};
 
-/// What this area's rows use.
-pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
-    .with(ir::Feature::Item(ir::ItemKind::Model))
-    .with(ir::Feature::Family(ir::ModelFamily::SourceV))
-    .with(ir::Feature::Family(ir::ModelFamily::SourceI))
-    .with(ir::Feature::Family(ir::ModelFamily::Vcvs))
-    .with(ir::Feature::Family(ir::ModelFamily::Vccs))
-    .with(ir::Feature::Family(ir::ModelFamily::Ccvs))
-    .with(ir::Feature::Family(ir::ModelFamily::Cccs))
-    .with(ir::Feature::Family(ir::ModelFamily::Mutual))
-    .with(ir::Feature::Family(ir::ModelFamily::TlineIdeal))
-    .with(ir::Feature::Family(ir::ModelFamily::Module))
-    .with(ir::Feature::Family(ir::ModelFamily::Resistor))
-    .with(ir::Feature::Family(ir::ModelFamily::Capacitor))
-    .with(ir::Feature::Family(ir::ModelFamily::Inductor))
-    .with(ir::Feature::Family(ir::ModelFamily::Diode))
-    .with(ir::Feature::Family(ir::ModelFamily::Mos1))
-    .with(ir::Feature::Family(ir::ModelFamily::Mos2))
-    .with(ir::Feature::Family(ir::ModelFamily::Mos3))
-    .with(ir::Feature::Family(ir::ModelFamily::Mos6))
-    .with(ir::Feature::Family(ir::ModelFamily::Mos9))
-    .with(ir::Feature::Family(ir::ModelFamily::Vdmos))
-    .with(ir::Feature::Family(ir::ModelFamily::JfetShichman))
-    .with(ir::Feature::Family(ir::ModelFamily::JfetParkerSkellern))
-    .with(ir::Feature::Family(ir::ModelFamily::Mesfet));
+/// What this area's rows use: a model of a proven module's family or a user module.
+pub(super) const FEATURES: ir::FeatureSet = families::proven_families(
+    ir::FeatureSet::EMPTY
+        .with(ir::Feature::Item(ir::ItemKind::Model))
+        .with(ir::Feature::Family(ir::ModelFamily::Module)),
+);
 
 /// A model of a shipped module whose file no read `load` names, or whose family the read files
 /// load from files of different modules.

@@ -1,0 +1,12 @@
+# codes: R1001 R1001 R1001
+file "dup_def.sp" deck
+  title "dup_def"
+  comment " oracle: settle dup_subckt.sp (ngspice keeps the first .subckt), dup_func.sp (the last .func), dup_section.sp (the first .lib section): each loser changes no number, Inert R1001"
+  subckt cell (1 2)
+    element resistor r1 (1 2) value=1k
+  opaque ngspice inert ".subckt cell 1 2\nr1 1 2 4k\n.ends"
+  opaque ngspice inert ".func f(x) {x*2}"
+  func f(x) = x * 5
+  section s
+    param p = 2
+  opaque ngspice inert ".lib s\n.param p=7\n.endl"

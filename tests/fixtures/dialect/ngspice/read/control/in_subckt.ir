@@ -1,0 +1,10 @@
+# codes: P1413
+file "in_subckt.sp" deck
+  title "in_subckt"
+  comment " oracle: settle control_in_subckt.sp (a block in a .subckt runs once, before the deck's, iff the subckt has an instance; R98: no IR item states it, X0028): its own text, Script"
+  subckt s (a)
+    opaque ngspice script ".control\noption reltol=0.01\n.endc"
+    element resistor r1 (a 0) value=1k
+  element instance x1 (a) model=s
+  element vsource v1 (a 0) dc=1
+  analysis op

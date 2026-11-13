@@ -108,8 +108,10 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::TranUic))
 .with(ir::Feature::Run(ir::RunExtra::TranNoise))
 .with(ir::Feature::Run(ir::RunExtra::DcNested))
-// every level carries (R75; `continuation=0` is Private)
+// each level carries, or starts its steps afresh under `continuation=0` (R75a, latch*.sim)
 .with(ir::Feature::Run(ir::RunExtra::DcOuterCarries))
+.with(ir::Feature::Run(ir::RunExtra::DcOuterAfresh))
+.with(ir::Feature::Run(ir::RunExtra::DcRestart))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisDeviceParam))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisModelParam))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisTemp))
@@ -178,7 +180,8 @@ pub(super) const MC_FIELD: ir::Code = ir::Code::new(b'P', 2309);
 pub(super) const CLEAR_STATE: ir::Code = ir::Code::new(b'P', 2310);
 /// `elaborate` with `topdef` or `topinst`.
 pub(super) const ELABORATE_TOP: ir::Code = ir::Code::new(b'P', 2311);
-/// A sweep form with no field (the principal parameter, `continuation=0`, values by name).
+/// A sweep form with no field (the principal parameter, a `continuation=` other than 0, or
+/// `continuation=0` around an analysis other than `op`, values by name).
 pub(super) const SWEEP_FORM: ir::Code = ir::Code::new(b'P', 2312);
 /// An `alter` of a source's `type` (the fold of R42 is the scaffold's declare step, not yet).
 pub(super) const ALTER_TYPE: ir::Code = ir::Code::new(b'P', 2313);
@@ -296,7 +299,7 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         SWEEP_FORM,
         "a sweep form the IR has no field for, kept as its text",
         "VD cmd-sweep",
-        "A sweep of an instance's principal parameter (only its module knows which), continuation=0, values given by a variable's name: the sweep and its analysis are kept as text.",
+        "A sweep of an instance's principal parameter (only its module knows which), a continuation= other than 0 (or continuation=0 around an analysis other than op), values given by a variable's name: the sweep and its analysis are kept as text.",
         ir::Kind::Note,
     ),
     row(

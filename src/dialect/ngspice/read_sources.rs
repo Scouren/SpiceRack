@@ -200,9 +200,8 @@ struct Read {
 
 /// A `V` or `I` card.
 pub(super) fn source(lw: &mut Lower<'_, '_>, st: Stmt) {
-    let head = lw.toks.text(lw.ast.main_token(st.node)).to_string();
+    let (head, rest) = lw.card_head(st.node);
     let current = head.as_bytes()[0].eq_ignore_ascii_case(&b'i');
-    let rest = lw.rest(st.node);
     let c = match card::card(&rest, current) {
         Ok(c) => c,
         Err(Bad::Invalid) => {

@@ -1,0 +1,7 @@
+* two sections named s
+.lib s
+.param p=2
+.endl
+.lib s
+.param p=7
+.endl

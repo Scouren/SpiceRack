@@ -1,0 +1,5 @@
+# VACASK corpus demo/spice/mes1inv.sim (F11: the shipped SPICE module as its IR family).
+owner = vacask
+proves = families::PROVEN
+# maxstep = the print step: ngspice's default TMAX here (min(TSTEP, span/50)); without it VACASK's
+# step control alone makes step 4 differ (simulator-differs:refinement: both agree at span/2000).

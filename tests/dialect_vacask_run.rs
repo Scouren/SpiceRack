@@ -27,6 +27,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[path = "dialect_vacask_run/currents.rs"]
+mod currents;
 #[path = "dialect_vacask_run/save_plans.rs"]
 mod save_plans;
 #[path = "dialect_vacask_run/settle.rs"]

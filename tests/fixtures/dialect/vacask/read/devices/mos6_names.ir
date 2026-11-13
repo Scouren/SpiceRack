@@ -1,0 +1,10 @@
+# Oracle: spice/mos6.va (VACASK on PATH, dhxz6l3…): the model parameter ps is spelled ps_mod
+# (it shares the instance's ps; params.txt), read as the family's ps (R92; red before: ps_mod
+# reached the IR as written). kf, af and nlev are sp_mos6's own: kept as given, the ngspice
+# writer refuses what its level 6 lacks (R91a).
+# codes:
+file "mos6_names.sim" deck
+  title "sp_mos6 names: ps_mod and the module-only kf af nlev"
+  device_library mos6
+  model m6 mos6 polarity=n params=(vto=0.7 ps=0.1 kf=1e-25 af=1i nlev=2i)
+  element mosfet m1 (d g 0 0) model=m6 params=(w=1u l=1u ps=2u)
