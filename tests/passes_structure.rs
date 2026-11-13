@@ -40,11 +40,8 @@ const PENDING_PAIRS: &[&str] = &[
     "device_libraries",
     "drop_builtin_models",
     "drop_device_libraries",
-    "hoist_nested_subckts",
-    "hoist_enclosing_refs",
     "hoist_nested_subckts_default",
     "hoist_enclosing_refs_default",
-    "formal_defaults_to_instances",
     "formal_defaults_to_instances_default",
     "formal_defaults_to_instances_outer",
     "formal_defaults_to_instances_unbound",
@@ -293,7 +290,7 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
         let refs_before = refs(&design);
         let reads_before = param_reads(&design);
         let mut diags = ir::Diags::new();
-        passes::structure::hoist_nested_subckts::hoist_nested_subckts(&mut design, &mut diags);
+        passes::structure::hoist_nested_subckts::hoist_nested_subckts_default(&mut design, &mut diags);
         let mut found = ir::Diags::new();
         ir::check(&design, &mut found);
         assert!(found.is_empty(), "seed {seed}: {:?}", found.rows());
@@ -349,11 +346,11 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
 #[test]
 fn formal_default_rows_give_the_values_each_simulator_printed() {
     use passes::structure::formal_defaults_to_instances as f;
-    let base: Run = f::formal_defaults_to_instances;
+    let base: Run = f::formal_defaults_to_instances_default;
     let rows: [(&str, Run, &str, &str, f64); 5] = [
-        ("formal_defaults_to_instances/which1", base, "xs", "t", 3e3),
-        ("formal_defaults_to_instances/which2", base, "xs", "t", 3e3),
-        ("formal_defaults_to_instances/which3", base, "xs", "l", 6e3),
+        ("formal_defaults_to_instances_default/which1", base, "xs", "t", 3e3),
+        ("formal_defaults_to_instances_default/which2", base, "xs", "t", 3e3),
+        ("formal_defaults_to_instances_default/which3", base, "xs", "l", 6e3),
         (
             "formal_defaults_to_instances_outer/which1",
             f::formal_defaults_to_instances_outer,
@@ -496,16 +493,16 @@ fn splice_and_constant_params_keep_what_every_read_binds() {
 fn formal_defaults_keep_every_instances_values() {
     use passes::structure::formal_defaults_to_instances as f;
     use r53::Read::{Lexical, Unbound};
-    let base: Run = f::formal_defaults_to_instances;
+    let base: Run = f::formal_defaults_to_instances_default;
     // every seeded default reads unbound (or a sibling), or bound where the definition stands
     for (name, run, read) in [
-        ("formal_defaults_to_instances", base, Unbound),
+        ("formal_defaults_to_instances_default", base, Unbound),
         (
             "formal_defaults_to_instances_unbound",
             f::formal_defaults_to_instances_unbound,
             Unbound,
         ),
-        ("formal_defaults_to_instances", base, Lexical),
+        ("formal_defaults_to_instances_default", base, Lexical),
         (
             "formal_defaults_to_instances_outer",
             f::formal_defaults_to_instances_outer,

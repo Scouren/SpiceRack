@@ -542,18 +542,18 @@ fn transpile_with(
     Ok(Written { text, notes: diags })
 }
 
-/// The design's laws restated as the target's (R90a): per law point (two variants, adjacent in
-/// `Law::ALL`), the one variant `features` holds replaces the stated one; a point whose
-/// variants `features` holds both or neither of is left. Meaning-neutral after a legalize with
+/// The design's laws restated as the target's (R90a): per law point (its variants share
+/// `Law::point`; two, F43 three), the one variant `features` holds replaces the stated one; a
+/// point whose variants `features` holds two or more or none of is left. Meaning-neutral after a legalize with
 /// no refusal: nothing then carries a variant the target lacks, and a point's carriers do not
 /// depend on its variant.
 fn restate_laws(design: &mut ir::Design, features: &ir::FeatureSet) {
-    const _: () = assert!(
-        ir::Law::ALL.len().is_multiple_of(2),
-        "two variants per law point"
-    );
     let mut laws = design.laws();
-    for point in ir::Law::ALL.chunks(2) {
+    let mut points: Vec<u32> = ir::Law::ALL.iter().map(|l| l.point()).collect();
+    points.sort_unstable();
+    points.dedup();
+    for p in points {
+        let point: Vec<ir::Law> = ir::Law::ALL.into_iter().filter(|l| l.point() == p).collect();
         let held: Vec<ir::Law> = point
             .iter()
             .copied()

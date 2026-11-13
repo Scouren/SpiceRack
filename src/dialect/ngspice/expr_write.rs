@@ -26,9 +26,9 @@ use crate::ir::{self, BinOp, Dist, DrawPer, DrawWhen, ExprTag, Feature, Func, Un
 
 /// The expression nodes ngspice spells: in numparam (plain features) and in the B-source parser
 /// (the `*Dyn` features), each the image of `tables.rs`'s rows. Not: strings, lists, the
-/// `TStep`/`TStop`/`Tnom` leaves (a pass substitutes them), `IntDiv` (numparam's `\` is
-/// `trunc(|a/b|)`), bitwise operators, and the members no ngspice name means (`Pow` in a B
-/// source is `PowAbs`; `LnAbs`, `SqrtAbs`, `ExpLin14` are not ngspice-45's, `ptfuncs.c`).
+/// `TStep`/`TStop`/`Tnom` leaves (a pass substitutes them), bitwise operators, and the members
+/// no ngspice name means (`Pow` in a B source is `PowAbs`; `ExpLin14` is not ngspice-45's,
+/// `ptfuncs.c`).
 pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Expr(ExprTag::Num),
     // A18, R37: ngspice reads a long number's digits as written (`number::spell` spells them)
@@ -452,7 +452,7 @@ fn binary_text(op: ir::BinOp) -> &'static str {
         B::Ge => " >= ",
         B::And => " && ",
         B::Or => " || ",
-        B::IntDiv | B::DivTyped | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
+        B::DivTyped | B::Xor | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
             panic!("ngspice has no {op:?} (FEATURES lacks it)")
         }
     }

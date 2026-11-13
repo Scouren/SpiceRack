@@ -3,7 +3,7 @@ file "a.sp" deck
   param t = 1k
   subckt w (a b)
     param t = 3k
-    subckt s (a b) t l
+    subckt s (a b) t=0 l=0
       element resistor r1 (a b) value=l
     element instance xs (a b) model=s params=(t=t l=(t * 2))
   element instance xw (n1 0) model=w

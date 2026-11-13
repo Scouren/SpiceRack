@@ -134,7 +134,6 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
             ir::Feature::Circuit(ir::CircuitExtra::SffmNgspice),
         ),
     ),
-    ("hoist_enclosing_refs", HOIST_SET),
     ("hoist_enclosing_refs_default", HOIST_SET),
     (
         "tran_print_step_to_simulator",
@@ -186,7 +185,7 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ),
 ];
 
-/// `hoist_enclosing_refs`' set (both rows): a subcircuit in a subcircuit reading its parent.
+/// `hoist_enclosing_refs_default`'s set: a subcircuit in a subcircuit reading its parent.
 const HOIST_SET: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Item(ir::ItemKind::Title))
     .with(ir::Feature::Item(ir::ItemKind::Subckt))

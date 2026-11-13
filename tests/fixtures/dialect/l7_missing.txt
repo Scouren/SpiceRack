@@ -38,15 +38,11 @@ ngspice FuncDyn(Atan2) owed from=vacask
 ngspice FuncDyn(Hypot) owed from=vacask
 ngspice FuncDyn(Fmod) unspoken
 ngspice FuncDyn(Idt) owed from=vacask
-ngspice Binary(IntDiv) unspoken
-ngspice BinaryDyn(IntDiv) unspoken
 ngspice DrawPer(CallSite) owed from=vacask
 ngspice DrawPer(Instance) unspoken
 ngspice DrawPer(Run) unspoken
 ngspice Extra(SectionLibrary) unspoken
 ngspice Extra(CaseSensitiveNames) owed from=vacask
-ngspice Extra(FormalWithoutDefault) unspoken
-ngspice Extra(IfConditionDynamic) unspoken
 ngspice Extra(StringValue) owed from=vacask
 ngspice Extra(ListValue) unspoken
 ngspice Extra(FormalOuterRead) unspoken
@@ -66,10 +62,7 @@ ngspice Circuit(SourceNoisePsd) unspoken
 ngspice Circuit(PortNoiseTemp) unspoken
 ngspice Circuit(PortPower) unspoken
 ngspice Circuit(SinCycles) unspoken
-ngspice Circuit(SinPreOffset) unspoken
-ngspice Circuit(SinPreZero) unspoken
 ngspice Circuit(SinSecondTone) unspoken
-ngspice Circuit(AmPreOffset) unspoken
 ngspice Circuit(AmModCarrierPhase) unspoken
 ngspice Circuit(PwlRepeatPeriod) owed from=vacask
 ngspice Circuit(PwlRepeatCount) unspoken
@@ -95,7 +88,6 @@ ngspice Circuit(SemiInitialOn) unspoken
 ngspice Circuit(SwitchControlExpr) unspoken
 ngspice Circuit(LineLengthVel) unspoken
 ngspice Circuit(ModelAko) unspoken
-ngspice Circuit(SffmPreOffset) owed from=hspice
 ngspice Circuit(DcAtZeroPattern) unspoken
 ngspice Circuit(TcBaseTnom) unspoken
 ngspice Circuit(BjtBcSatAreabOnly) owed from=vacask
@@ -154,7 +146,6 @@ ngspice Run(PeriodicRelative) unspoken
 ngspice Run(LoopTable) owed from=hspice
 ngspice Run(LoopMonteCarlo) owed from=vacask
 ngspice Run(LoopTemp) owed from=vacask,hspice
-ngspice Run(LoopSubcktParam) unspoken
 ngspice Run(LoopOption) owed from=vacask
 ngspice Run(AlterSubcktParam) unspoken
 ngspice Run(AlterString) unspoken
@@ -185,7 +176,6 @@ ngspice Run(StatsCorrelation) unspoken
 ngspice Run(StatsTruncate) unspoken
 ngspice Run(VaryLogNormal) unspoken
 ngspice Run(VaryPercent) unspoken
-ngspice Run(VaryMean) unspoken
 ngspice Run(NodeSetMidRun) owed from=vacask
 ngspice Run(NodeSetFromHere) owed from=vacask
 ngspice Run(PssOscDiff) unspoken
@@ -348,14 +338,10 @@ vacask Func(Atan2) unspoken
 vacask Func(Ddt) unspoken
 vacask Func(Idt) unspoken
 vacask FuncDyn(Fmod) unspoken
-vacask Binary(IntDiv) unspoken
-vacask BinaryDyn(IntDiv) unspoken
 vacask Dist(Limit) owed from=ngspice,hspice
 vacask DrawPer(Instance) unspoken
 vacask DrawPer(Run) unspoken
 vacask Extra(SectionLibrary) unspoken
-vacask Extra(FormalWithoutDefault) unspoken
-vacask Extra(IfConditionDynamic) unspoken
 vacask Extra(ListValue) unspoken
 vacask Extra(FormalOuterRead) unspoken
 vacask Extra(FormalUnboundRead) owed from=ngspice,hspice
@@ -378,10 +364,7 @@ vacask Circuit(PortNoiseTemp) unspoken
 vacask Circuit(PortPower) unspoken
 vacask Circuit(PulseCycles) owed from=ngspice,hspice
 vacask Circuit(SinCycles) unspoken
-vacask Circuit(SinPreOffset) unspoken
-vacask Circuit(SinPreZero) unspoken
 vacask Circuit(SinSecondTone) unspoken
-vacask Circuit(AmPreOffset) unspoken
 vacask Circuit(AmPreZero) owed from=ngspice,hspice
 vacask Circuit(AmModCarrierPhase) unspoken
 vacask Circuit(AmModOffset) owed from=ngspice
@@ -414,7 +397,6 @@ vacask Circuit(LineLengthVel) unspoken
 vacask Circuit(LineLumps) owed from=ngspice,hspice
 vacask Circuit(ModelBin) owed from=ngspice,hspice
 vacask Circuit(ModelAko) unspoken
-vacask Circuit(SffmPreOffset) owed from=hspice
 vacask Circuit(SffmPreZero) owed from=ngspice
 vacask Circuit(DcAtZeroTrNoise) owed from=ngspice,hspice
 vacask Circuit(DcAtZeroTrRandom) owed from=ngspice,hspice
@@ -470,7 +452,6 @@ vacask Run(PssDriven) unspoken
 vacask Run(PssUic) owed from=ngspice,hspice
 vacask Run(PeriodicRelative) unspoken
 vacask Run(LoopTable) owed from=hspice
-vacask Run(LoopSubcktParam) unspoken
 vacask Run(AlterSubcktParam) unspoken
 vacask Run(AlterString) unspoken
 vacask Run(McSampleList) unspoken
@@ -509,7 +490,6 @@ vacask Run(StatsCorrelation) unspoken
 vacask Run(StatsTruncate) unspoken
 vacask Run(VaryLogNormal) unspoken
 vacask Run(VaryPercent) unspoken
-vacask Run(VaryMean) unspoken
 vacask Run(LoopOverOp) owed from=ngspice,hspice
 vacask Run(MeasStatAt) owed from=ngspice,hspice
 vacask Run(MeasUntil) owed from=ngspice,hspice
@@ -715,8 +695,6 @@ hspice FuncDyn(Hypot) owed from=vacask
 hspice FuncDyn(Fmod) unspoken
 hspice FuncDyn(Ddt) owed from=ngspice,vacask
 hspice FuncDyn(Idt) owed from=vacask
-hspice Binary(IntDiv) unspoken
-hspice BinaryDyn(IntDiv) unspoken
 hspice Unary(Not) owed from=ngspice,vacask
 hspice UnaryDyn(Not) owed from=ngspice,vacask
 hspice DrawPer(CallSite) owed from=vacask
@@ -724,8 +702,6 @@ hspice DrawPer(Instance) unspoken
 hspice DrawPer(Run) unspoken
 hspice Extra(SectionLibrary) unspoken
 hspice Extra(CaseSensitiveNames) owed from=vacask
-hspice Extra(FormalWithoutDefault) unspoken
-hspice Extra(IfConditionDynamic) unspoken
 hspice Extra(StringValue) owed from=vacask
 hspice Extra(ListValue) unspoken
 hspice Extra(FormalOuterRead) unspoken
@@ -745,10 +721,7 @@ hspice Circuit(SourceNoisePsd) unspoken
 hspice Circuit(PortNoiseTemp) unspoken
 hspice Circuit(PortPower) unspoken
 hspice Circuit(SinCycles) unspoken
-hspice Circuit(SinPreOffset) unspoken
-hspice Circuit(SinPreZero) unspoken
 hspice Circuit(SinSecondTone) unspoken
-hspice Circuit(AmPreOffset) unspoken
 hspice Circuit(AmModCarrierPhase) unspoken
 hspice Circuit(AmModOffset) owed from=ngspice
 hspice Circuit(PwlRepeatPeriod) owed from=vacask
@@ -777,7 +750,6 @@ hspice Circuit(SwitchInitial) owed from=ngspice
 hspice Circuit(SwitchControlExpr) unspoken
 hspice Circuit(LineLengthVel) unspoken
 hspice Circuit(ModelAko) unspoken
-hspice Circuit(SffmPreHold) owed from=ngspice,vacask
 hspice Circuit(SffmPreZero) owed from=ngspice
 hspice Circuit(DcAtZeroPattern) unspoken
 hspice Circuit(TcBaseTnom) unspoken
@@ -854,7 +826,6 @@ hspice Run(PeriodicRelative) unspoken
 hspice Run(LoopMonteCarlo) owed from=vacask
 hspice Run(LoopKeepLast) owed from=ngspice
 hspice Run(LoopScoped) owed from=ngspice,vacask
-hspice Run(LoopSubcktParam) unspoken
 hspice Run(LoopSourceDc) owed from=ngspice,vacask
 hspice Run(LoopElementValue) owed from=ngspice,vacask
 hspice Run(LoopDeviceParam) owed from=ngspice,vacask
@@ -895,7 +866,6 @@ hspice Run(StatsCorrelation) unspoken
 hspice Run(StatsTruncate) unspoken
 hspice Run(VaryLogNormal) unspoken
 hspice Run(VaryPercent) unspoken
-hspice Run(VaryMean) unspoken
 hspice Run(EnvMidRun) owed from=ngspice,vacask
 hspice Run(NodeSetMidRun) owed from=vacask
 hspice Run(OptionFromHere) owed from=ngspice,vacask

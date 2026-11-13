@@ -85,8 +85,9 @@ pub static NGSPICE: Ngspice = Ngspice {
 };
 
 /// The laws ngspice-45 computes by: one variant of each of the IR's law points (devices
-/// R90–R96, functions R93a), the first of each pair in `crates/ir/src/laws.rs` (each variant's
-/// doc names the run). Every read states them (`Builder::set_laws`), so [`FEATURES`] holds
+/// R90–R96, functions R93a, defaults R102), each variant's doc in `crates/ir/src/laws.rs`
+/// naming the run; R102's 27 °C and BSIM4 4.5's hand small-signal (F86) by
+/// `crates/ir/tests/fixtures/default_temp/` and `families/gf180_n1/`. Every read states them (`Builder::set_laws`), so [`FEATURES`] holds
 /// their members.
 pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::BcSatAreaTimesAreab,
@@ -109,6 +110,9 @@ pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::LogZeroMinus1e99,
     ir::Law::DivGminGuard,
     ir::Law::AsinEdgeZero,
+    ir::Law::DefaultTemp27,
+    ir::Law::DefaultTnom27,
+    ir::Law::Bsim4v45SmallSignalHand,
 ]);
 
 /// What ngspice-45 spells natively: the union of the areas' sets, each the image of its reader

@@ -317,7 +317,7 @@ fn binary(op: ir::BinOp) -> (u8, &'static str) {
         B::Sub => (10, " - "),
         B::Mul => (11, " * "),
         B::DivTyped => (11, " / "),
-        B::Div | B::IntDiv => unreachable!("FEATURES lacks {op:?}: a pass converts it"),
+        B::Div | B::Xor => unreachable!("FEATURES lacks {op:?}"),
     }
 }
 

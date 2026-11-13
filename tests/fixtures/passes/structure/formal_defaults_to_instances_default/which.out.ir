@@ -1,6 +1,6 @@
 file "a.sp" deck
   param u = 2k
-  subckt s (a b) w=1 t
+  subckt s (a b) w=1 t=0
     element resistor r1 (a b) value=t
   subckt wrap (a b)
     param u = 8k

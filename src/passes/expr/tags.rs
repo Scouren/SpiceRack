@@ -171,7 +171,7 @@ impl Tags {
                 ir::BinOp::Add | ir::BinOp::Sub | ir::BinOp::Mul | ir::BinOp::DivTyped => {
                     arith(get(a), get(b))
                 }
-                ir::BinOp::Div | ir::BinOp::IntDiv => REAL,
+                ir::BinOp::Div => REAL,
                 ir::BinOp::Eq
                 | ir::BinOp::Ne
                 | ir::BinOp::Lt
@@ -180,6 +180,7 @@ impl Tags {
                 | ir::BinOp::Ge
                 | ir::BinOp::And
                 | ir::BinOp::Or
+                | ir::BinOp::Xor
                 | ir::BinOp::BitAnd
                 | ir::BinOp::BitOr
                 | ir::BinOp::BitXor

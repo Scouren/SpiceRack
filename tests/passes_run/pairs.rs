@@ -56,7 +56,6 @@ pub const PENDING_PAIRS: &[&str] = &[
     "tran_cap_ngspice_to_given",
     "tran_cap_span50_to_given",
     "tran_cap_span10_to_given",
-    "tran_cap_none_to_given",
     "ic_beyond_next_to_next_only",
     "ic_next_only_to_beyond",
     "analysis_name_dropped",

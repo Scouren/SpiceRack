@@ -3,11 +3,10 @@
 //! its actual. It removes `Extra::FormalNotConstant` (VACASK lets an instance override only a
 //! formal whose default folds to a constant; A12 K2, A25).
 //!
-//! The formal's own default then (R13: no invented value): the row
-//! `formal_defaults_to_instances` drops it and requires `Extra(FormalWithoutDefault)`, the exact
-//! statement that every instance passes it; its twin `formal_defaults_to_instances_default`,
-//! for a target without that feature, makes it the literal `0` and puts a `PASS_DEFAULT` note
-//! at the subcircuit saying the default is the pass's and no instance reads it.
+//! The formal's own default then (R13: no invented value): the literal `0`, with a
+//! `PASS_DEFAULT` note at the subcircuit saying the default is the pass's and no instance reads
+//! it. (The row that dropped it went with `Extra(FormalWithoutDefault)`, a violation now:
+//! `rewrite/IR-PRUNE.md` group 3.)
 //!
 //! ngspice's rule exactly (R53, A29 and its addendum): in the copy each instance gets, an
 //! unbound parameter read is looked up from the instance's scope, a read of a sibling formal is
@@ -19,7 +18,7 @@
 //! `Extra(FormalOuterRead)` (a read bound outside the body stays bound in the copy, VACASK run
 //! which1), `formal_defaults_to_instances_unbound` removes `Extra(FormalUnboundRead)` (the read
 //! is bound in each instance's scope, ngspice runs which–which3). Each requires what the
-//! written actual may use: `FormalWithoutDefault` and a reference into an enclosing body.
+//! written actual may use: a reference into an enclosing body.
 //!
 //! Left with a note: a default holding a draw (`DRAW_IN_DEFAULT`: one draw per copy would not
 //! be the draw the default made), and a subcircuit an element names that no definition binds
@@ -27,8 +26,7 @@
 //!
 //! Cites: R53, R62; `rewrite/AMEND-A12.md` A29, A37, K2, A25; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub fn formal_defaults_to_instances(design: &mut ir::Design, diags: &mut ir::Diags)`,
-//! `pub fn formal_defaults_to_instances_default(design: &mut ir::Design, diags: &mut ir::Diags)`,
+//! Contents: `pub fn formal_defaults_to_instances_default(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub fn formal_defaults_to_instances_outer(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub fn formal_defaults_to_instances_unbound(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub const DRAW_IN_DEFAULT: ir::Code`, `pub const UNKNOWN_INSTANCES: ir::Code`,
@@ -48,27 +46,22 @@ pub const PASS_DEFAULT: ir::Code = ir::Code::new(b'U', 308);
 /// One formal: its name, its default, its definition.
 type Formal = (ir::NameId, ir::ExprId, ir::DefId);
 
-/// Passes every non-constant default at each instance that omits it; the default goes.
-pub fn formal_defaults_to_instances(design: &mut ir::Design, diags: &mut ir::Diags) {
-    defaults(design, diags, ir::Extra::FormalNotConstant, false);
-}
-
-/// As [`formal_defaults_to_instances`], the replaced defaults the literal `0`, with a
-/// `PASS_DEFAULT` note.
+/// Passes every non-constant default at each instance that omits it; the replaced defaults
+/// the literal `0`, with a `PASS_DEFAULT` note.
 pub fn formal_defaults_to_instances_default(design: &mut ir::Design, diags: &mut ir::Diags) {
     defaults(design, diags, ir::Extra::FormalNotConstant, true);
 }
 
-/// As [`formal_defaults_to_instances`], over the subcircuits whose default holds a read bound
-/// outside the body (`FormalOuterRead`): the copy keeps it bound to that definition.
+/// As [`formal_defaults_to_instances_default`], over the subcircuits whose default holds a
+/// read bound outside the body (`FormalOuterRead`): the copy keeps it bound to that definition.
 pub fn formal_defaults_to_instances_outer(design: &mut ir::Design, diags: &mut ir::Diags) {
-    defaults(design, diags, ir::Extra::FormalOuterRead, false);
+    defaults(design, diags, ir::Extra::FormalOuterRead, true);
 }
 
-/// As [`formal_defaults_to_instances`], over the subcircuits whose default holds an unbound
-/// read (`FormalUnboundRead`): the copy binds it in each instance's scope.
+/// As [`formal_defaults_to_instances_default`], over the subcircuits whose default holds an
+/// unbound read (`FormalUnboundRead`): the copy binds it in each instance's scope.
 pub fn formal_defaults_to_instances_unbound(design: &mut ir::Design, diags: &mut ir::Diags) {
-    defaults(design, diags, ir::Extra::FormalUnboundRead, false);
+    defaults(design, diags, ir::Extra::FormalUnboundRead, true);
 }
 
 // ---- private ----

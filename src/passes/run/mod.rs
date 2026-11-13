@@ -134,13 +134,6 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[],
         run: tc::tran_cap_span10_to_given,
     },
-    Pass {
-        name: "tran_cap_none_to_given",
-        removes: ir::Feature::Run(ir::RunExtra::TranCapNone),
-        requires: ceiling(&[ir::BinOp::Sub], false),
-        notes: &[],
-        run: tc::tran_cap_none_to_given,
-    },
     // after the ceiling rows: ngspice's rule reads the print step
     Pass {
         name: "tran_print_step_to_simulator",

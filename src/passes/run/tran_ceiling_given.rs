@@ -6,8 +6,10 @@
 //! - `tran_cap_ngspice_to_given` (`TranCapNgspice`): `min(print_step, span / 50)`; a transient
 //!   with no print step keeps the rule with `NO_PRINT_STEP` (the rule reads it);
 //! - `tran_cap_span50_to_given` (`TranCapSpan50`): `span / 50`;
-//! - `tran_cap_span10_to_given` (`TranCapSpan10`): `span / 10`;
-//! - `tran_cap_none_to_given` (`TranCapNone`): `span` (no ceiling beyond the span).
+//! - `tran_cap_span10_to_given` (`TranCapSpan10`): `span / 10`.
+//!
+//! VACASK's rule (`StepCap::VacaskRule`, which also reads the sources' frequencies) has no row;
+//! `TranCapNone` went with `StepCap::None` (`rewrite/IR-PRUNE.md` group 4).
 //!
 //! Exact: the simulator evaluates the same operations on the same doubles its default rule
 //! does (ngspice `traninit.c`: `MIN(tstep, (tstop − tstart) / 50)`), and a given ceiling is
@@ -16,7 +18,7 @@
 //! Cites: `rewrite/AMEND-A12.md` A24; R47; `crates/ir/src/tran.rs` (`StepCeiling`, `StepCap`).
 //!
 //! Contents: `pub fn tran_cap_ngspice_to_given`, `pub fn tran_cap_span50_to_given`,
-//! `pub fn tran_cap_span10_to_given`, `pub fn tran_cap_none_to_given` (each
+//! `pub fn tran_cap_span10_to_given` (each
 //! `(&mut ir::Design, &mut ir::Diags)`), `pub const NO_PRINT_STEP: ir::Code`
 
 use crate::ir;
@@ -38,11 +40,6 @@ pub fn tran_cap_span50_to_given(design: &mut ir::Design, diags: &mut ir::Diags) 
 /// `span / 10` for Xyce's rule.
 pub fn tran_cap_span10_to_given(design: &mut ir::Design, diags: &mut ir::Diags) {
     given(design, diags, StepCap::SpanOver10);
-}
-
-/// `span` for no ceiling beyond the span.
-pub fn tran_cap_none_to_given(design: &mut ir::Design, diags: &mut ir::Diags) {
-    given(design, diags, StepCap::None);
 }
 
 // ---- private ----
@@ -76,7 +73,7 @@ fn given(design: &mut ir::Design, diags: &mut ir::Diags, cap: StepCap) {
             [Some(stop), start, print] if t.record_start.is_none() || start.is_some() => {
                 let span = start.map_or(stop, |s| stop - s);
                 match cap {
-                    StepCap::None => Some(span),
+                    StepCap::VacaskRule => unreachable!("no row converts VACASK's rule"),
                     StepCap::SpanOver10 => Some(span / 10.0),
                     StepCap::SpanOver50 => Some(span / 50.0),
                     StepCap::NgspiceRule => print.map(|p| p.min(span / 50.0)),
@@ -101,7 +98,7 @@ fn expression(b: &mut ir::Builder<'_>, t: &Tran, cap: StepCap) -> ir::ExprId {
         false => b.binary(ir::BinOp::Sub, t.stop, t.record_start),
     };
     match cap {
-        StepCap::None => span,
+        StepCap::VacaskRule => unreachable!("no row converts VACASK's rule"),
         StepCap::SpanOver10 => {
             let ten = b.num(10.0);
             b.binary(ir::BinOp::Div, span, ten)

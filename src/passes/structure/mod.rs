@@ -50,16 +50,6 @@ pub(super) const PASSES: &[Pass] = &[
     },
     // first: the passes after it place models and libraries by the scopes it settles
     Pass {
-        name: "hoist_nested_subckts",
-        removes: ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
-        notes: &[
-            hoist_nested_subckts::READS_ENCLOSING,
-            hoist_nested_subckts::NOT_IN_BODY,
-        ],
-        run: hoist_nested_subckts::hoist_nested_subckts,
-    },
-    Pass {
         name: "hoist_nested_subckts_default",
         removes: ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt),
         requires: ir::FeatureSet::EMPTY,
@@ -69,16 +59,6 @@ pub(super) const PASSES: &[Pass] = &[
             hoist_nested_subckts::HOIST_DEFAULT,
         ],
         run: hoist_nested_subckts::hoist_nested_subckts_default,
-    },
-    Pass {
-        name: "hoist_enclosing_refs",
-        removes: ir::Feature::Extra(ir::Extra::EnclosingRef),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
-        notes: &[
-            hoist_nested_subckts::READS_ENCLOSING,
-            hoist_nested_subckts::NOT_IN_BODY,
-        ],
-        run: hoist_nested_subckts::hoist_enclosing_refs,
     },
     Pass {
         name: "hoist_enclosing_refs_default",
@@ -106,18 +86,6 @@ pub(super) const PASSES: &[Pass] = &[
         run: splice_elaborate::splice_elaborate,
     },
     Pass {
-        name: "formal_defaults_to_instances",
-        removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
-        requires: ir::FeatureSet::EMPTY
-            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
-        notes: &[
-            formal_defaults_to_instances::DRAW_IN_DEFAULT,
-            formal_defaults_to_instances::UNKNOWN_INSTANCES,
-        ],
-        run: formal_defaults_to_instances::formal_defaults_to_instances,
-    },
-    Pass {
         name: "formal_defaults_to_instances_default",
         removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
@@ -131,24 +99,22 @@ pub(super) const PASSES: &[Pass] = &[
     Pass {
         name: "formal_defaults_to_instances_outer",
         removes: ir::Feature::Extra(ir::Extra::FormalOuterRead),
-        requires: ir::FeatureSet::EMPTY
-            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
         notes: &[
             formal_defaults_to_instances::DRAW_IN_DEFAULT,
             formal_defaults_to_instances::UNKNOWN_INSTANCES,
+            formal_defaults_to_instances::PASS_DEFAULT,
         ],
         run: formal_defaults_to_instances::formal_defaults_to_instances_outer,
     },
     Pass {
         name: "formal_defaults_to_instances_unbound",
         removes: ir::Feature::Extra(ir::Extra::FormalUnboundRead),
-        requires: ir::FeatureSet::EMPTY
-            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
         notes: &[
             formal_defaults_to_instances::DRAW_IN_DEFAULT,
             formal_defaults_to_instances::UNKNOWN_INSTANCES,
+            formal_defaults_to_instances::PASS_DEFAULT,
         ],
         run: formal_defaults_to_instances::formal_defaults_to_instances_unbound,
     },

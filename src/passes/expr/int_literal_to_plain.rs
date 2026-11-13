@@ -4,7 +4,7 @@
 //! tag of every node the literal's tag flows into.
 //!
 //! A tag is read by: the typed division `DivTyped` (Int operands truncate), and the rules that
-//! judge their operands by the tag table: `IntDiv`, the bit operators, `ToInt`, `ToReal`,
+//! judge their operands by the tag table: the bit operators, `ToInt`, `ToReal`,
 //! `SgnZeroPos` (A21, A25; their own rules run first, and `legalize`'s fixed point comes back
 //! here once they are gone). A literal is left when its tag can reach an operand of one of
 //! them, following the tag table's flow backwards: through `+ - *`, `/:`, `-x`, both branches
@@ -80,7 +80,6 @@ fn reads_tag(e: ir::Expr) -> bool {
         e,
         ir::Expr::Binary(
             ir::BinOp::DivTyped
-                | ir::BinOp::IntDiv
                 | ir::BinOp::BitAnd
                 | ir::BinOp::BitOr
                 | ir::BinOp::BitXor

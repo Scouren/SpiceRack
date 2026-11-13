@@ -74,7 +74,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     F::Circuit(X::SinPreHold),
     F::Circuit(X::ExpTd2FromZero),
     F::Circuit(X::SffmSpice3),
-    F::Circuit(X::SffmPreOffset),
+    F::Circuit(X::SffmPreHold),
     F::Circuit(X::AmPreZero),
     F::Circuit(X::PwlDelay),
     F::Circuit(X::PwlRepeatFrom),

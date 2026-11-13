@@ -1,0 +1,10 @@
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+ngspice none v(a) = 6.551180e-01
+vacask  none v(a) = 0.6551178956617113
+ngspice temp27 v(a) = 6.551180e-01
+vacask  temp27 v(a) = 0.6551178956617113
+ngspice tnom27 v(a) = 6.551180e-01
+vacask  tnom27 v(a) = 0.6551178956617113
+ngspice temp25 v(a) = 6.586644e-01
+vacask  temp25 v(a) = 0.6586642408611864
+rc=0

@@ -27,7 +27,7 @@
 //!
 //! Contents:
 //! - `pub enum Law` (`ALL`, `COUNT`), `pub const LTSPICE_EXP_KNEE`, `Law::member(self) -> CircuitExtra`,
-//!   `Law::word(self) -> &'static str`, `Law::rewrite(self) -> Rewrite`
+//!   `Law::word(self) -> &'static str`, `Law::rewrite(self) -> Rewrite`, `Law::point(self) -> u32`
 //! - `pub enum Rewrite`, `pub struct Stated`
 //! - `pub struct Laws`, `Laws::EMPTY`, `Laws::of(&[Law]) -> Laws`, `Laws::with(self, Law) -> Laws`,
 //!   `Laws::contains(self, Law) -> bool`, `Laws::is_empty(self) -> bool`,
@@ -434,6 +434,12 @@ impl Law {
     /// Its point's exact rewriting under this variant (R92).
     pub const fn rewrite(self) -> Rewrite {
         self.row().rewrite
+    }
+
+    /// Its point's index (`LawConflict`'s `arg`): variants of one point share it, and a point
+    /// has two or more (F43 three).
+    pub const fn point(self) -> u32 {
+        self.row().point as u32
     }
 }
 

@@ -395,7 +395,6 @@ fn tran_ceilings_are_the_rules_arithmetic() {
             StepCap::SpanOver10,
             "span_over10",
         ),
-        ("tran_cap_none_to_given", StepCap::None, "none"),
     ];
     let stops = ["1u", "3.3e-6", "1", "7.31e-9", "1e3", "0.1"];
     let starts = ["", "1n", "1.1e-7", "0.05"];
@@ -437,7 +436,7 @@ fn tran_ceilings_are_the_rules_arithmetic() {
                         value(t.stop) - value(t.record_start)
                     };
                     let want = match cap {
-                        StepCap::None => span,
+                        StepCap::VacaskRule => unreachable!("no row"),
                         StepCap::SpanOver10 => span / 10.0,
                         StepCap::SpanOver50 => span / 50.0,
                         StepCap::NgspiceRule => value(t.print_step).min(span / 50.0),

@@ -358,7 +358,7 @@ fn binary_text(op: ir::BinOp) -> &'static str {
         B::Ge => " >= ",
         B::And => " && ",
         B::Or => " || ",
-        B::IntDiv | B::DivTyped | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
+        B::DivTyped | B::Xor | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
             panic!("HSPICE has no {op:?} (FEATURES lacks it)")
         }
     }

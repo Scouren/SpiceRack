@@ -1,0 +1,10 @@
+default temp: tnom27, 1 mA into a diode
+i1 0 a dc 1m
+d1 a 0 dm
+.model dm d is=1e-14
+.options tnom=27
+.control
+op
+print v(a)
+.endc
+.end

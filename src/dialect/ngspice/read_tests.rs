@@ -362,8 +362,8 @@ fn any_bytes_read_returns_and_checks_clean() {
 
 #[test]
 fn what_ngspice_cannot_spell_is_refused_by_a_feature() {
-    // A15: a head parameter with no default is `FormalWithoutDefault`, an `.if` reading the
-    // temperature `IfConditionDynamic`, both outside FEATURES (U0001 at legalize); R28: literals
+    // (a head parameter with no default and an `.if` reading the temperature are violations
+    // now, `rewrite/IR-PRUNE.md` group 3, so not here); R28: literals
     // in a form ngspice has no letter for are respelled, never refused; A25 item 4: a string
     // `.param` value is `StringValue`, outside FEATURES (numparam has no string values), so no
     // writer note (W1006 went with it).
@@ -378,9 +378,6 @@ fn what_ngspice_cannot_spell_is_refused_by_a_feature() {
             form: ir::NumForm::Scale,
         });
         b.param(top, "a", centi, ir::Span::NONE);
-        b.subckt(top, "s", &["p"], &[("w", ir::ExprId::NONE)], ir::Span::NONE);
-        let t = b.temp();
-        b.if_(top, &[t], ir::Span::NONE);
         let text = b.string("4.8.3");
         b.param(top, "v", text, ir::Span::NONE);
     }
@@ -393,8 +390,6 @@ fn what_ngspice_cannot_spell_is_refused_by_a_feature() {
             .iter()
             .any(|r| r.code == ir::diag::UNSUPPORTED && r.arg == u32::from(f.index()))
     };
-    assert!(feature(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)));
-    assert!(feature(ir::Feature::Extra(ir::Extra::IfConditionDynamic)));
     assert!(feature(ir::Feature::Extra(ir::Extra::StringValue)));
     let w: Vec<ir::Code> = codes_of(&diags)
         .into_iter()

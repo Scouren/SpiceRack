@@ -54,7 +54,7 @@ fn tran_first_step_to_print_moves_exactly_the_unread_first_steps() {
     let free = tran
         .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranPrintStep)))
         .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranCapSpan50)))
-        .with(ir::Feature::Run(ir::RunExtra::TranCapNone));
+        .with(ir::Feature::Run(ir::RunExtra::TranCapSpan10));
     let (mut moved, mut kept, mut none) = (0, 0, 0);
     // the free set over four times the seeds: a move takes a first step (one in three) and a
     // given ceiling (one in three)

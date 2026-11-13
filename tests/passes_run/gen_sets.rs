@@ -18,7 +18,7 @@ pub const PARAM_ARGS: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Expr(ir::ExprTag::Num))
     .with(ir::Feature::Expr(ir::ExprTag::Param))
     .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
-    .with(ir::Feature::Run(ir::RunExtra::TranCapNone))
+    .with(ir::Feature::Run(ir::RunExtra::TranCapSpan10))
     .with(ir::Feature::Run(ir::RunExtra::TranPrintStep))
     .with(ir::Feature::Run(ir::RunExtra::AnalysisUnnamed))
     .with(ir::Feature::Run(ir::RunExtra::AnalysisParamArgument));

@@ -53,8 +53,10 @@ pub struct Vacask;
 pub static VACASK: Vacask = Vacask;
 
 /// The laws the VACASK modules the flake pins compute by: one variant of each of the IR's law
-/// points (devices R90–R96, functions R93a), the second of each pair in `crates/ir/src/laws.rs`
-/// (each variant's doc names the run). Every read states them (`Builder::set_laws`), so
+/// points (devices R90–R96, functions R93a, defaults R102), each variant's doc in
+/// `crates/ir/src/laws.rs` naming the run; R102's 27 °C by
+/// `crates/ir/tests/fixtures/default_temp/`, BSIM4 4.5's exact small-signal (VACASK runs 4.8, F85)
+/// by `families/gf180_n1/`. Every read states them (`Builder::set_laws`), so
 /// [`FEATURES`] holds their members.
 pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::BcSatAreabOnly,
@@ -77,6 +79,9 @@ pub const LAWS: ir::Laws = ir::Laws::of(&[
     ir::Law::LogZeroError,
     ir::Law::DivExact,
     ir::Law::AsinEdgeFails,
+    ir::Law::DefaultTemp27,
+    ir::Law::DefaultTnom27,
+    ir::Law::Bsim4v45SmallSignalExact,
 ]);
 
 /// What VACASK spells: the union of every area's part, and exactly the reader's image (law L5).

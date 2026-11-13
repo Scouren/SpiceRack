@@ -96,9 +96,6 @@ const RULES: &[Rule] = &[
         &["trunc(x)", "trunc(x / y)", "trunc(x - y)"],
         |e| matches!(e, ir::Expr::Call(ir::Func::Trunc, _)),
     ),
-    ("step_to_ternary", &["step(x)", "step(x * y)"], |e| {
-        matches!(e, ir::Expr::Call(ir::Func::Step, _))
-    }),
     (
         "step_half_to_ternary",
         &["step_half(x)", "step_half(x + y)"],
@@ -116,14 +113,6 @@ const RULES: &[Rule] = &[
         ],
         |e| matches!(e, ir::Expr::Call(ir::Func::PowSigned, _)),
     ),
-    (
-        "sqrt_abs_to_sqrt",
-        &["sqrt_abs(x)", "sqrt_abs(x - y)"],
-        |e| matches!(e, ir::Expr::Call(ir::Func::SqrtAbs, _)),
-    ),
-    ("ln_abs_to_ln", &["ln_abs(x)", "ln_abs(x * y)"], |e| {
-        matches!(e, ir::Expr::Call(ir::Func::LnAbs, _))
-    }),
     (
         "explin14_to_ternary",
         &["exp_lin14(x)", "exp_lin14(x * 14 + y)", "exp_lin14(x + 14)"],

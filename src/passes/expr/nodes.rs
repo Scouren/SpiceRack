@@ -375,7 +375,7 @@ pub(super) fn never_negative(d: &ir::Design, x: ir::ExprId) -> bool {
         ir::Expr::Num(n) => d.literal_value(d.num(n)).is_sign_positive(),
         ir::Expr::Call(f, _) => matches!(
             f,
-            ir::Func::Abs | ir::Func::SqrtAbs | ir::Func::Exp | ir::Func::Sqr | ir::Func::PowAbs
+            ir::Func::Abs | ir::Func::Exp | ir::Func::Sqr | ir::Func::PowAbs
         ),
         _ => false,
     }
