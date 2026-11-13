@@ -34,7 +34,6 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Family(CodeModel)", "code_models_of_the_build_round_trip_by_meaning", CODE_MODELS),
     ("vacask", "Item(Save)", "generated_save_plans_read_back_to_their_meaning", "W2303: VACASK spells two save shapes only (R29/S12)"),
     ("vacask", "Elem(Coupling)", "property_am_and_mutual_round_trip", "the generator makes no coupling over seeds 0..512 (it needs two inductor names and a Mutual model), so none is generated, let alone refused"),
-    ("vacask", "Elem(Vccs)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Elem(Mesfet)", "proven_device_kinds_round_trip", VC_DRAWS),
     ("vacask", "Wave(Pulse)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Sin)", VC_FIXPOINT, VC_SOURCES_INTERIM),

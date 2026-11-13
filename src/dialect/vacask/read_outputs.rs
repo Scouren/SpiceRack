@@ -6,6 +6,10 @@
 //!   node voltage and every branch current (run e5: an inductor's flow is in the default set),
 //!   `v(node)`, `i(instance)`, `p(instance, quantity)` (the quantity as spelled, G-OPQUANT);
 //!   hierarchical names are quoted `'x1:n'` and split at `:` (VD cmd-save);
+//! - `p(x, i)` of an isource, a resistor, a vccs or a cccs named before the line is its branch
+//!   current (`I`): they have no `i(x)` (run F13, settle run/save_current); a vsource's, an
+//!   inductor's, a vcvs's and a ccvs's current is `i(x)`, so their `p(x, i)` stays `Param` (its
+//!   vector is `x.i`, not `x:flow(br)`), as do a path and a name no earlier element has;
 //! - `full` (every unknown, collapsed device-internal nodes included) and the analysis-own
 //!   directives (`dv`, `di`, `tf`, `zin`, `yin`, `n`, `nc`, `opdefault`, `opfull`) have no
 //!   probe kind: the line is Private (P2308, R43);
@@ -19,7 +23,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.4 (save, ic, nodeset); VD cmd-save, cmd-analysis-op.
 //!
-//! Contents: `FEATURES`, `CODES`, `SAVE_FORM`, `SAVE_PART`, `NodeEntry`, `save`, `node_list`, `node_sets`
+//! Contents: `FEATURES`, `CODES`, `SAVE_FORM`, `SAVE_PART`, `ELEMENT_CURRENT`, `P_CURRENT`, `I_CURRENT`, `NodeEntry`, `save`, `node_list`, `node_sets`
 //! (crate-private)
 
 use super::read::{self, Lower};
@@ -45,6 +49,26 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Run(ir::RunExtra::IcDifferential))
     .with(ir::Feature::Run(ir::RunExtra::NodeSetHierarchical));
 
+/// A branch current of an element VACASK saves none for (a capacitor, a semiconductor, …), or
+/// one only `p(x, i)` saves of an element written after the `save` line (refused by
+/// `write_outputs::admit`).
+pub(super) const ELEMENT_CURRENT: ir::Code = ir::Code::new(b'W', 2314);
+
+/// The kinds whose branch current is `p(x, i)` (no `i(x)`: run F13, settle run/save_current).
+pub(super) const P_CURRENT: &[ir::ElemKind] = &[
+    ir::ElemKind::ISource,
+    ir::ElemKind::Resistor,
+    ir::ElemKind::Vccs,
+    ir::ElemKind::Cccs,
+];
+/// The kinds whose branch current is `i(x)`, `x:flow(br)` (run F13).
+pub(super) const I_CURRENT: &[ir::ElemKind] = &[
+    ir::ElemKind::VSource,
+    ir::ElemKind::Inductor,
+    ir::ElemKind::Vcvs,
+    ir::ElemKind::Ccvs,
+];
+
 /// A save directive no probe kind states (`full`, an analysis's own directive).
 pub(super) const SAVE_FORM: ir::Code = ir::Code::new(b'P', 2308);
 /// A `save` of parts only (`vdb(n)`, `vr(n)`, `vm(n)`), which VACASK takes and ignores.
@@ -52,6 +76,15 @@ pub(super) const SAVE_PART: ir::Code = ir::Code::new(b'P', 2317);
 
 /// This area's rows.
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
+    (
+        ELEMENT_CURRENT,
+        ir::Info {
+            title: "an element current VACASK cannot save",
+            cite: "run F13 (settle run/save_current)",
+            explain: "VACASK saves the current of a vsource, an inductor, a vcvs or a ccvs as `i(x)` and of an isource, a resistor, a vccs or a cccs as `p(x, i)`; a capacitor has neither (\"Output variable 'i' of instance 'c1' not found.\"), and `p(x, i)` reads as a current only after the element's line.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
     (
         SAVE_FORM,
         ir::Info {
@@ -115,6 +148,7 @@ pub(super) fn save(l: &mut Lower<'_, '_, '_>, n: Node) {
             ("default", []) => probes.extend([Probe::AllV, Probe::AllBranchI]),
             ("v", [a]) if plain => probes.push(Probe::V(path(a))),
             ("i", [a]) if plain => probes.push(Probe::I(path(a))),
+            ("p", [a, q]) if plain && q == "i" && p_current(l, a) => probes.push(Probe::I(path(a))),
             ("p", [a, q]) if plain => probes.push(Probe::Param(path(a), q.clone())),
             _ => return read::opaque(l, n, ir::OpaqueClass::Private, Some(SAVE_FORM)),
         }
@@ -223,6 +257,19 @@ pub(super) fn node_sets(l: &mut Lower<'_, '_, '_>, entries: &[NodeEntry]) {
 }
 
 // ---- private ----
+
+/// Whether `name` is a whole name of an element read before in the line's scope whose current
+/// only `p(name, i)` saves.
+fn p_current(l: &mut Lower<'_, '_, '_>, name: &str) -> bool {
+    let id = l.b.design().find_name(name);
+    if id.is_none() || name.contains(':') {
+        return false;
+    }
+    l.b.element_named(l.scope, id).is_some_and(|at| {
+        let e: ir::Element = l.b.design().row(at.index);
+        P_CURRENT.contains(&e.kind)
+    })
+}
 
 /// The directives of `save` statement `n` from its tokens: `word` or `word(arg[, arg])`, each
 /// argument one name token (quotes off); `None` when malformed or empty.
