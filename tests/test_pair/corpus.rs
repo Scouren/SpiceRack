@@ -4,7 +4,8 @@
 //! `PAIR_JOBS` workers (6), step 6 the bytes of one job against theirs (by hash) on every tenth written deck. A deck the
 //! corpus's cross-sim source list quarantines as `slow` is neither converted nor simulated (step 1
 //! `quarantined`). Each deck's line is also appended to `pair-<cell>-census.partial.txt` as it
-//! finishes, so a census cut short keeps what ran.
+//! finishes, so a census cut short keeps what ran. Triage: `PAIR_ONLY=<a|b|…>` (the decks whose
+//! path holds one, quarantine lifted), `PAIR_NOSIM=1` (no simulator).
 //!
 //! In: the corpus root (an environment variable `.#testing` sets). Out: the census, one line a
 //! deck (`<path> <step>:<class> …`) in `$CARGO_TARGET_TMPDIR/pair-<cell>-census.txt`, and its
@@ -52,6 +53,12 @@ const STRIDE_SIX: usize = 10;
 /// never a pass or a skip; the class must be empty before a release).
 const BUDGET: u64 = 120;
 
+/// Bytes free under the temp dir (where every simulator run's directory goes) below which no
+/// deck starts: it is `environment` at step 1, named. The peak a census adds is its workers
+/// times the files one run writes times `sim`'s 512 MiB cap per file, each run's directory
+/// removed when the run returns.
+const DISK_MIN: u64 = 20 << 30;
+
 /// A deck still running after this many seconds is named on stderr while it runs.
 const SLOW: u64 = 120;
 
@@ -71,6 +78,13 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
             .into_owned()
     };
     paths.retain(|p| (corpus.keep)(&p.to_string_lossy()));
+    // Triage: `PAIR_ONLY=<a|b|…>` keeps the decks whose path holds one and converts them even
+    // when quarantined; `PAIR_NOSIM=1` runs no simulator (step 4 `slow`).
+    let only = std::env::var("PAIR_ONLY").ok();
+    if let Some(o) = &only {
+        paths.retain(|p| o.split('|').any(|w| p.to_string_lossy().contains(w)));
+    }
+    let nosim = std::env::var_os("PAIR_NOSIM").is_some();
     paths.sort();
     assert!(
         !paths.is_empty(),
@@ -100,7 +114,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
             path: p.to_path_buf(),
             src,
             policy: Policy::Lenient,
-            simulate: !slow.contains(&rel(p)),
+            simulate: !nosim && !slow.contains(&rel(p)),
             missing,
         }
     };
@@ -125,7 +139,8 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
     std::thread::scope(|s| {
         for w in 0..jobs.max(1) {
             let (running, workers_left, next, done) = (&running, &workers_left, &next, &done);
-            let (load, none, paths, slow, partial) = (&load, &none, &paths, &slow, &partial);
+            let (load, none, paths, slow, partial, only) =
+                (&load, &none, &paths, &slow, &partial, &only);
             s.spawn(move || {
                 // Bounded: each index is taken once.
                 loop {
@@ -133,7 +148,21 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
                     let Some(p) = paths.get(k) else { break };
                     running.lock().expect("no worker panicked")[w] =
                         Some((k, std::time::Instant::now()));
-                    let mut v = match slow.contains(&rel(p)) {
+                    let free = free_bytes(&std::env::temp_dir());
+                    let mut v = match only.is_none() && slow.contains(&rel(p)) {
+                        // The disk guard: no deck starts under DISK_MIN free.
+                        _ if free < DISK_MIN => Done {
+                            fails: [(
+                                1,
+                                run::fail(
+                                    "environment",
+                                    format!("{} GB free under the temp dir, 20 needed", free >> 30),
+                                ),
+                            )]
+                            .into(),
+                            last: 1,
+                            written: None,
+                        },
                         // Quarantined: its conversion alone can run for hours (the
                         // powergrid decks), so it is named, not run.
                         true => Done {
@@ -207,7 +236,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
         "{}: census of {} decks in {file}\n{}",
         c.name,
         paths.len(),
-        table(&seen, paths.len())
+        table(&seen, &paths.iter().map(|p| rel(p)).collect::<Vec<_>>())
     );
     crate::judge(&format!("{}-corpus", c.name), &seen)
 }
@@ -250,6 +279,20 @@ fn budgeted(
     }
 }
 
+/// Bytes free on the file system that holds `dir` (`df`'s avail column).
+fn free_bytes(dir: &Path) -> u64 {
+    let out = std::process::Command::new("df")
+        .args(["--output=avail", "-B1"])
+        .arg(dir)
+        .output()
+        .expect("df on PATH");
+    let text = String::from_utf8_lossy(&out.stdout);
+    text.lines()
+        .nth(1)
+        .and_then(|l| l.trim().parse().ok())
+        .expect("df's avail column")
+}
+
 /// A hash of a deck's written files, paths and bytes.
 fn hash(w: &run::Written) -> u64 {
     use std::hash::{Hash, Hasher};
@@ -276,9 +319,11 @@ fn quarantined(list: &str) -> Vec<String> {
         .collect()
 }
 
-/// The census table: decks by their first failing step and its class (`6:pass` for none), and
-/// the step-2 refusals by feature.
-fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
+/// The census table: decks by their first failing step and its class (`6:pass` for none), the
+/// step-2 refusals by feature, and each kit family (`cmcqa/<kit>/`) once: its decks, how many
+/// pass, and its top three step-2 features (thousands of near-identical decks are one fact).
+fn table(seen: &BTreeMap<(String, u8), Fail>, names: &[String]) -> String {
+    let decks = names.len();
     let mut first: BTreeMap<String, &Fail> = BTreeMap::new();
     for ((deck, _), f) in seen {
         first.entry(deck.clone()).or_insert(f);
@@ -329,6 +374,44 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, decks: usize) -> String {
     ops.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     for (o, n) in ops {
         out += &format!("  {n:5} {o}\n");
+    }
+    // Kit families: one line each.
+    let kit = |d: &str| {
+        let w: Vec<&str> = d.split('/').collect();
+        (w.len() > 2 && w[0] == "cmcqa").then(|| format!("{}/{}", w[0], w[1]))
+    };
+    let mut kits: BTreeMap<String, (usize, usize, BTreeMap<String, usize>)> = BTreeMap::new();
+    for d in names {
+        if let Some(k) = kit(d) {
+            let e = kits.entry(k).or_default();
+            e.0 += 1;
+            e.1 += usize::from(!first.contains_key(d));
+        }
+    }
+    for ((deck, step), f) in seen {
+        if let (Some(k), 2) = (kit(deck), *step) {
+            let e = kits.get_mut(&k).expect("a kit of a listed deck");
+            for feature in f
+                .class
+                .split(':')
+                .nth(2)
+                .into_iter()
+                .flat_map(|x| x.split('+'))
+            {
+                *e.2.entry(feature.to_string()).or_default() += 1;
+            }
+        }
+    }
+    out += "kit families (decks, pass all six, top three step-2 features by decks):\n";
+    for (k, (n, pass, feats)) in &kits {
+        let mut top: Vec<(&String, &usize)> = feats.iter().collect();
+        top.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        let top: Vec<String> = top
+            .iter()
+            .take(3)
+            .map(|(f, c)| format!("{f} {c}"))
+            .collect();
+        out += &format!("  {k}: {n} decks, {pass} pass; {}\n", top.join(", "));
     }
     out
 }

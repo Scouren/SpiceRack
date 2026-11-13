@@ -1,0 +1,4 @@
+file "d.sp" deck
+  param s = 5m
+  element vsource v1 (a 0) dc=0 wave=pulse(v1=1 v2=3 delay=1m rise=1u fall=8m width=8m period=24.001m)
+  analysis tran stop=s max_step=10u

@@ -45,7 +45,8 @@ pub(in crate::dialect::vacask) struct Declared {
 /// What a run statement's instance parameter aims at ([`Declared::aim`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::dialect::vacask) enum Aimed {
-    /// No file declares the instance (settle run/nosuch_alter: "Instance not found.").
+    /// No file declares the instance (settle run/nosuch_alter: "Instance not found."), or a
+    /// shipped module's instance has no such parameter (dev_nosuch).
     Missing,
     /// The `dc` of a source of type dc: its DC value (R64; settle run/sweep_source).
     SourceDc,
@@ -237,6 +238,17 @@ impl Declared {
         };
         let value =
             super::super::families::module(word).map(|m| super::super::families::kind(m.family));
+        // A value parameter by any of its names (`sp_resistor`'s `r` is its `resistance`).
+        let same = |a: &str| {
+            super::super::families::canonical(word, param)
+                == super::super::families::canonical(word, a)
+        };
+        let param = match () {
+            _ if same("r") => "r",
+            _ if same("c") => "c",
+            _ if same("l") => "l",
+            _ => param,
+        };
         match (word, param, value) {
             ("vsource" | "isource", "dc", _) => match wave.as_deref() {
                 None | Some("dc") => Aimed::SourceDc,
@@ -245,6 +257,16 @@ impl Declared {
             (_, "r", Some(ir::ElemKind::Resistor))
             | (_, "c", Some(ir::ElemKind::Capacitor))
             | (_, "l", Some(ir::ElemKind::Inductor)) => Aimed::ElementValue,
+            // A shipped module's instance parameters are known (`families/params.txt`): another
+            // name is VACASK's error (settle run/dev_nosuch: "Parameter 'zz' not found."). A
+            // loaded module's are not, so its names pass.
+            _ if !matches!(
+                super::super::families::instance_name_in(word, param),
+                super::super::families::Name::Ir(_)
+            ) =>
+            {
+                Aimed::Missing
+            }
             _ => Aimed::Device,
         }
     }

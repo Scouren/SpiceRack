@@ -17,6 +17,8 @@ mod bindings;
 mod continuation;
 #[path = "passes_run/dc_loops.rs"]
 mod dc_loops;
+#[path = "passes_run/device_ic.rs"]
+mod device_ic;
 #[path = "passes_run/first_step.rs"]
 mod first_step;
 #[allow(dead_code)] // `sources_only` is the laws'
@@ -26,6 +28,8 @@ mod gen_sets;
 mod loops;
 #[path = "passes_run/names.rs"]
 mod names;
+#[path = "passes_run/options.rs"]
+mod options;
 #[path = "passes_run/pairs.rs"]
 mod pairs;
 #[path = "passes_run/params.rs"]
@@ -105,6 +109,26 @@ fn dc_axes_to_loops_convert_generated_designs() {
 #[test]
 fn continuation_is_a_fact_of_each_sweep_level() {
     continuation::continuation_is_a_fact_of_each_sweep_level();
+}
+
+#[test]
+fn inert_options_leave_the_raw_file_alone() {
+    options::inert_options_leave_the_raw_file_alone();
+}
+
+#[test]
+fn inert_options_keep_what_an_ir_row_reads() {
+    options::inert_options_keep_what_an_ir_row_reads();
+}
+
+#[test]
+fn klu_within_its_rounding() {
+    options::klu_within_its_rounding();
+}
+
+#[test]
+fn prints_leave_the_raw_file_alone() {
+    options::prints_leave_the_raw_file_alone();
 }
 
 #[test]
@@ -320,7 +344,9 @@ fn run_items_together_keeps_the_state_at_every_analysis() {
 
 /// The ceiling rows against `StepCap`'s docs: for a grid of transients (stops, record starts
 /// and print steps of several magnitudes, record start absent or set), the given ceiling
-/// evaluates (reference evaluator) to the doc's arithmetic on the fields' values, bit for bit.
+/// evaluates (reference evaluator) to the doc's arithmetic on the fields' values, bit for bit;
+/// with literal fields it is a literal (R77), and equal bit for bit to the expression the rule
+/// writes for the same deck with its stop a parameter.
 #[test]
 fn tran_ceilings_are_the_rules_arithmetic() {
     use spicerack::ir::tran::{StepCap, StepCeiling, Tran};
@@ -388,6 +414,29 @@ fn tran_ceilings_are_the_rules_arithmetic() {
                         StepCap::NgspiceRule => value(t.print_step).min(span / 50.0),
                     };
                     assert_eq!(value(g).to_bits(), want.to_bits(), "{name}: {text}");
+                    // R77: literal fields give a literal ceiling, bit for bit the value of the
+                    // expression the rule writes when the stop is a parameter of that value
+                    assert!(matches!(design.expr(g), ir::Expr::Num(_)), "{name}: {text}");
+                    let twin = format!(
+                        "file \"a.sp\" deck\n  param s = {stop}\n  analysis tran stop=s{rs} print_step={step} cap={word}\n"
+                    );
+                    let mut d2 = ir::Design::new();
+                    ir::parse(&twin, &mut d2.builder(), &mut diags);
+                    (pass.run)(&mut d2, &mut diags);
+                    let a2 = d2.row::<ir::Analysis>(d2.items(d2.file(d2.entry()).top)[1].index);
+                    let StepCeiling::Given(g2) = d2.detail::<Tran>(a2.detail).ceiling else {
+                        panic!("{name}: {twin} keeps its rule");
+                    };
+                    assert!(
+                        !matches!(d2.expr(g2), ir::Expr::Num(_)),
+                        "{name}: an expression"
+                    );
+                    let v2 = ir::eval(&d2, g2, &bindings::ByDefinition(&d2)).expect("a value");
+                    assert_eq!(
+                        value(g).to_bits(),
+                        v2.to_bits(),
+                        "{name}: {text} against {twin}"
+                    );
                     points += 1;
                 }
             }

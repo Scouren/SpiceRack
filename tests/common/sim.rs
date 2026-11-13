@@ -67,6 +67,11 @@ pub enum Ran {
 /// file dies at the cap (SIGXFSZ) instead of filling the disk.
 const FSIZE: u64 = 2 << 30;
 
+/// The same for a checked run (`run_checked`, the pair test's): 512 MiB a file, so a census's
+/// disk peak is bounded by its workers times the files a run writes times this, whatever the
+/// deck; a run past it is [`Ran::Timeout`] (a resource limit, named, never a result).
+const CHECKED_FSIZE: u64 = 512 << 20;
+
 /// The deck's own name inside the run directory: hidden, so it never shadows
 /// a file of the corpus beside it.
 const DECK: &str = ".cross_sim_deck";
@@ -214,7 +219,10 @@ fn run_in(
     c.arg((10 * secs).to_string())
         .arg("prlimit")
         .arg(format!("--cpu={secs}"))
-        .arg(format!("--fsize={FSIZE}"))
+        .arg(format!(
+            "--fsize={}",
+            if checked { CHECKED_FSIZE } else { FSIZE }
+        ))
         .env("OMP_NUM_THREADS", "1")
         .current_dir(dir);
     match sim {

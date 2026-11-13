@@ -85,10 +85,16 @@ struct Spine {
     renames: HashMap<String, String>,
     devices: BTreeSet<String>,
     axes: BTreeSet<String>,
+    /// A transient has `uic` in the legalized design: its t = 0 point is not compared
+    /// (`cmp::without_start`).
+    uic: bool,
 }
 
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
+
+/// The refinement oracle's step cap: a transient's span over this.
+const REFINE: f64 = 2000.0;
 
 /// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
 /// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
@@ -178,10 +184,19 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         (a, b)
     });
     let (a, b) = match ran {
-        Ok((Ran::Plots(a), Ran::Plots(b))) => (
-            plots::only(a, pair.vectors.as_ref()),
-            plots::only(plots::renamed(b, &spine.renames), pair.vectors.as_ref()),
-        ),
+        Ok((Ran::Plots(mut a), Ran::Plots(mut b))) => {
+            if spine.uic {
+                cmp::without_start(&mut a);
+                cmp::without_start(&mut b);
+            }
+            (
+                plots::only(plots::hierarchical(a), pair.vectors.as_ref()),
+                plots::only(
+                    plots::renamed(plots::hierarchical(b), &spine.renames),
+                    pair.vectors.as_ref(),
+                ),
+            )
+        }
         Ok((a, b)) => return stop(fails, 4, ran_fail(a, b), written),
         Err((_, f)) => return stop(fails, 4, f, written),
     };
@@ -191,7 +206,47 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     }
     match cmp::compare(&a, &b, tol) {
         Err(why) => {
-            fails.insert(4, fail("mismatch", why));
+            // The refinement oracle (cross-sim's `simulator-differs:refinement`): both decks
+            // with every transient's step capped at span/REFINE; agreeing there, the two
+            // simulators' step control made the difference, not the conversion.
+            let refined = sim::refined(c.from_sim, text, REFINE)
+                .zip(sim::refined(c.to_sim, &entry.1, REFINE))
+                .and_then(|(ra, rb)| {
+                    let a2 = sim::run_checked(c.from_sim, &deck.path, &ra, &[], SECS);
+                    let b2 = sim::run_checked(
+                        c.to_sim,
+                        &deck.path.with_extension(c.to_ext),
+                        &rb,
+                        rest,
+                        SECS,
+                    );
+                    match (a2, b2) {
+                        (Ran::Plots(mut x), Ran::Plots(mut y)) => Some({
+                            if spine.uic {
+                                cmp::without_start(&mut x);
+                                cmp::without_start(&mut y);
+                            }
+                            cmp::compare(
+                                &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
+                                &plots::only(
+                                    plots::renamed(plots::hierarchical(y), &spine.renames),
+                                    pair.vectors.as_ref(),
+                                ),
+                                tol,
+                            )
+                            .is_ok()
+                        }),
+                        _ => None,
+                    }
+                });
+            let f = match refined {
+                Some(true) => fail(
+                    "simulator-differs:refinement",
+                    format!("{why}; both agree with every step capped at span/{REFINE}"),
+                ),
+                _ => fail("mismatch", why),
+            };
+            fails.insert(4, f);
         }
         Ok(()) if std::env::var_os("PAIR_MARGINS").is_some() => {
             eprintln!("margin {}: {}", deck.name, margin(&a, &b, text, &entry.1));
@@ -351,12 +406,14 @@ fn spine(
             devices.insert(name);
         }
     }
+    let uic = ir::features_used(&design).contains(ir::Feature::Run(ir::RunExtra::TranUic));
     Ok(Spine {
         legal: design,
         files,
         renames,
         devices,
         axes,
+        uic,
     })
 }
 
@@ -384,18 +441,30 @@ fn read_back(to: &DialectRow, spine: &Spine) -> Result<(), Fail> {
     let normal =
         |d: &ir::Design| laws::canonical(&laws::read_all(ir_row, &laws::write_all(d, ir_row)));
     let (want, got) = (normal(&spine.legal), normal(&back));
-    // Every differing line, the first four: a known difference must not hide another.
-    let pairs = want.lines().zip(got.lines()).filter(|(w, g)| w != g);
-    let lines: Vec<String> = pairs
-        .take(4)
-        .map(|(w, g)| format!("legalized `{}`, read back `{}`", w.trim(), g.trim()))
-        .collect();
-    let said = match lines.is_empty() {
-        false => lines.join(" | "),
-        true => format!(
-            "{} lines legalized, {} read back",
-            want.lines().count(),
-            got.lines().count()
+    // The items each side holds that the other does not (lines of the normal form, counted, so
+    // an inserted or moved item does not shift every line after it), the first four of each.
+    let count = |t: &str| {
+        let mut m: BTreeMap<String, i64> = BTreeMap::new();
+        for l in t.lines() {
+            *m.entry(l.trim().to_string()).or_default() += 1;
+        }
+        m
+    };
+    let (cw, cg) = (count(&want), count(&got));
+    let only = |a: &BTreeMap<String, i64>, b: &BTreeMap<String, i64>| -> Vec<String> {
+        a.iter()
+            .filter(|(l, n)| **n > b.get(*l).copied().unwrap_or(0))
+            .map(|(l, _)| format!("`{l}`"))
+            .take(4)
+            .collect()
+    };
+    let (lost, gained) = (only(&cw, &cg), only(&cg, &cw));
+    let said = match (lost.is_empty(), gained.is_empty()) {
+        (true, true) => "the same items in another order".to_string(),
+        _ => format!(
+            "legalized only: {} | read back only: {}",
+            lost.join(", "),
+            gained.join(", ")
         ),
     };
     Err(fail("differs", said))
@@ -494,7 +563,9 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
         .collect()
 }
 
-/// How much of step 4's tolerance a passing pair uses (`PAIR_MARGINS=1`, triage): the smallest
+/// How much of step 4's value tolerance a passing pair uses (`PAIR_MARGINS=1`, triage). It
+/// measures the value band only: on a smooth transient the 1 % time tube covers the difference,
+/// so "passes at 0" there means not measured by this probe, never 0 %. Reports the smallest
 /// fraction `f` of RELTOL, VNTOL and ABSTOL (the transient's band scales with them) at which
 /// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
 /// below it (the worst vector, its value and the tolerance there).
@@ -516,7 +587,9 @@ fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
             Err(_) => lo = mid,
         }
     }
-    let below = at(lo).err().unwrap_or_else(|| "passes at 0: exact".into());
+    let below = at(lo).err().unwrap_or_else(|| {
+        "passes at 0: not measured by this probe (exact, or inside the time tube)".into()
+    });
     format!(
         "uses {:.0} % of the tolerance; below it: {below}",
         hi * 100.0
@@ -526,7 +599,10 @@ fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
 /// Step 4's verdict when a run gave no plots: whose run, and why.
 fn ran_fail(a: Ran, b: Ran) -> Fail {
     match (a, b) {
-        (Ran::Timeout, _) | (_, Ran::Timeout) => fail("slow", "past the CPU budget".into()),
+        (Ran::Timeout, _) | (_, Ran::Timeout) => fail(
+            "slow",
+            "past the CPU budget or the output cap (512 MiB a file)".into(),
+        ),
         (Ran::Failed(why), _) => fail("source-fails", why),
         (_, Ran::Failed(why)) => fail("target-fails", why),
         (Ran::Plots(_), Ran::Plots(_)) => unreachable!("a run without plots"),

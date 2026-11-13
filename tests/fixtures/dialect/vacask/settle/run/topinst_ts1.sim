@@ -1,0 +1,11 @@
+save of the top instance current
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1 mag=1
+r1 (a b) res r=1k
+r2 (b 0) res r=1k
+control
+  save i(__topinst__)
+  analysis op1 op
+endc

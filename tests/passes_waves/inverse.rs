@@ -149,6 +149,7 @@ fn pulse_vacask_to_spice_writes_a_single_pulse_and_a_step_up_to_the_stop() {
             &mut tally,
             Some(pulse_slope),
             until,
+            false,
         );
         assert_eq!(tally.sources, before + 1, "{fields}: written");
         // the law changed: the design holds no VACASK pulse

@@ -29,6 +29,26 @@
 //! Shared by `test_cross_sim` and `test_pair` (`#[path]`; each crate root
 //! also holds `tube` and `vacask`).
 //!
+//! Under `uic` the point at t = 0 is compared by neither harness: it is each simulator's unsolved
+//! start (VACASK stores the stated initial conditions as they stand, a floating capacitor's
+//! a = 2, b = 0; ngspice stores its first consistent solve, a = 0.667, b = -1.333), a solution of
+//! the circuit on neither side (`without_start`, called by the cross-sim `uic_start` and by the
+//! pair test when the legalized design's transient has `uic`: a fact of the run, never a deck
+//! key). Every point from the first step on is compared, so a wrong initial condition still
+//! shows. It is the cross-sim harness's existing rule given one home, a guard for a simulator
+//! that stores its unsolved start: neither pair cell needs it today, since ngspice-45 stores no
+//! row at t = 0 and the comparison covers only the time both runs hold (it was not shown red).
+//!
+//! The pair test's refinement class (`simulator-differs:refinement`, rulings R84) is not a pass
+//! and not a conversion finding: a transient that leaves the tube is run again with both decks'
+//! step capped at span/2000 (`sim::refined`), and agreeing there, its difference is the two
+//! simulators' step control. span/2000 because span/200 is not fine enough: dio.sim (a diode's
+//! reverse recovery) and resonator.sim (a lossless LC) still differ at span/200 and agree at
+//! span/2000, as at span/20000. A factor on the truncation-error test (`trtol`,
+//! `tran_lteratio`) is a hint and never mapped (R84): giving both the same factor does not give
+//! them the same steps (resonator with `trtol=3.5` still left the tube). It covers transients
+//! only: a DC or AC difference has no step to refine and stays `mismatch`.
+//!
 //! Cites: ngspice manual §11.1.1 (`.options` RELTOL, VNTOL, ABSTOL, TRTOL
 //! defaults); Xyce Reference Guide 7.10 §2.1.20 (`.options device`/`timeint`
 //! RELTOL, ABSTOL defaults).
@@ -38,6 +58,7 @@
 //!   and peak-to-peak), `Tol::tighten(&mut self, key: &str, value: f64) -> Result<(), String>`
 //! - `pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String>`
 //! - `pub fn kind(p: &RawData) -> &'static str`, `pub fn normal(name: &str) -> String`
+//! - `pub fn without_start(plots: &mut [RawData])` (the `uic` rule)
 
 use std::collections::HashMap;
 
@@ -256,6 +277,31 @@ pub fn normal(name: &str) -> String {
         return format!("{inner}#branch");
     }
     n
+}
+
+/// Each transient plot of `plots` without its point at t = 0 (the `uic` rule: module doc).
+pub fn without_start(plots: &mut [RawData]) {
+    for p in plots {
+        let timed = kind(p) == "tran";
+        let at0 = p
+            .real_data
+            .first()
+            .is_some_and(|t| t.first() == Some(&0.0) && t.len() > 1);
+        if timed && at0 {
+            p.real_data
+                .iter_mut()
+                .filter(|c| !c.is_empty())
+                .for_each(|c| {
+                    c.remove(0);
+                });
+            p.complex_data
+                .iter_mut()
+                .filter(|c| !c.is_empty())
+                .for_each(|c| {
+                    c.remove(0);
+                });
+        }
+    }
 }
 
 // ---- private ----
