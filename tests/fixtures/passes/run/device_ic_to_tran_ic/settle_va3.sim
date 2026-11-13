@@ -1,0 +1,13 @@
+cap ic under icmode uic, ic list
+// settle (device_ic_to_tran_ic): VACASK: a/b 2/0 at 0 (lone differential: a = v, b = 0), 0.663895/-1.327791 at 12.5u, 0.245253/-0.490506 at 3m
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model res sp_resistor
+model cap sp_capacitor
+r1 (a 0) res r=1k
+r2 (b 0) res r=2k
+c1 (a b) cap c=1u
+control
+  options rawfile="ascii"
+  analysis tr tran stop=3m step=10u maxstep=10u icmode="uic" ic={"a", "b", 2.0}
+endc

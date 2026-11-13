@@ -17,6 +17,8 @@ mod bindings;
 mod continuation;
 #[path = "passes_run/dc_loops.rs"]
 mod dc_loops;
+#[path = "passes_run/device_ic.rs"]
+mod device_ic;
 #[path = "passes_run/first_step.rs"]
 mod first_step;
 #[allow(dead_code)] // `sources_only` is the laws'
@@ -26,6 +28,8 @@ mod gen_sets;
 mod loops;
 #[path = "passes_run/names.rs"]
 mod names;
+#[path = "passes_run/options.rs"]
+mod options;
 #[path = "passes_run/pairs.rs"]
 mod pairs;
 #[path = "passes_run/params.rs"]
@@ -105,6 +109,26 @@ fn dc_axes_to_loops_convert_generated_designs() {
 #[test]
 fn continuation_is_a_fact_of_each_sweep_level() {
     continuation::continuation_is_a_fact_of_each_sweep_level();
+}
+
+#[test]
+fn inert_options_leave_the_raw_file_alone() {
+    options::inert_options_leave_the_raw_file_alone();
+}
+
+#[test]
+fn inert_options_keep_what_an_ir_row_reads() {
+    options::inert_options_keep_what_an_ir_row_reads();
+}
+
+#[test]
+fn klu_within_its_rounding() {
+    options::klu_within_its_rounding();
+}
+
+#[test]
+fn prints_leave_the_raw_file_alone() {
+    options::prints_leave_the_raw_file_alone();
 }
 
 #[test]

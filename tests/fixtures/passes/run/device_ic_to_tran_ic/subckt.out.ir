@@ -1,0 +1,6 @@
+file "a.sp" deck
+  subckt s (p)
+    element capacitor c1 (p 0) value=1u ic=2 ic_mode=uic_only
+  element instance x1 (a) model=s
+  element resistor r1 (a 0) value=1k
+  analysis tran stop=1m print_step=10u max_step=10u uic

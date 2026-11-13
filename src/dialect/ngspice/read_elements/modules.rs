@@ -16,7 +16,9 @@
 //! `(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[Item])`)
 
 use super::super::read::{Lower, Stmt};
-use super::{Card, Item, Kind, MALFORMED, PORT_COUNT, PRIVATE_FORM, head, push_done, val};
+use super::{
+    Card, INSTANCE_CYCLE, Item, Kind, MALFORMED, PORT_COUNT, PRIVATE_FORM, head, push_done, val,
+};
 use crate::ir::{self, ElemKind as K};
 
 /// An X card.
@@ -41,6 +43,10 @@ pub(super) fn x(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
     {
         // R61/A36: ngspice rejects the deck (settle instance_ports_short.sp, _long.sp)
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, PORT_COUNT);
+    }
+    if lw.subckt_cycle(st, &sub) {
+        // X0024: settle instance_self.sp, instance_cycle.sp ("unknown subckt: x1.xw.xw…")
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, INSTANCE_CYCLE);
     }
     let declares_m = sub_head.is_some_and(|(_, f)| f.iter().any(|p| p.eq_ignore_ascii_case("m")));
     card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();

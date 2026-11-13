@@ -1,0 +1,3 @@
+file "a.sp" deck
+  loop sweep keep_last (model_param g0 g1) (list values=[0])
+    analysis op

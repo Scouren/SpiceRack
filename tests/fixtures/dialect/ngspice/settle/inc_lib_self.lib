@@ -1,0 +1,10 @@
+* the kit of inc_lib_self.sp: a corner section calls the cap section of this same file
+.LIB corner
+.param scale=2
+.lib 'inc_lib_self.lib' cap
+.ENDL
+.LIB cap
+.subckt mim a b
+R1 a b {1k*scale}
+.ends
+.ENDL cap
