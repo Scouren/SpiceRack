@@ -1,4 +1,5 @@
 # codes:
+laws diode_wl_mult_once vdmos_tcvth_lowers mos_small_signal_exact mos6_small_signal_exact diode_isr_reverse_none diode_isr_small_signal_exact trig_exact log_zero_error div_exact default_temp_25 default_tnom_25
 file "func_card.sp" deck
   title "func_card"
   comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): g(2,3) = 23: .func g(x,y) 'x*10+y' is accepted too"

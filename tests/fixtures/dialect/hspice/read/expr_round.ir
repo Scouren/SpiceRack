@@ -1,4 +1,5 @@
 # codes:
+laws diode_wl_mult_once vdmos_tcvth_lowers mos_small_signal_exact mos6_small_signal_exact diode_isr_reverse_none diode_isr_small_signal_exact trig_exact log_zero_error div_exact default_temp_25 default_tnom_25
 file "expr_round.sp" deck
   title "expr_round"
   comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): nint(2.5) = 2, nint(-2.5) = -2, nint(-0.5) = 0 (half to even; recorded HSPICE: 3, -3, -1: F68), int(-2.5) = -2, floor(-2.5) = -3, ceil(-2.5) = -2"

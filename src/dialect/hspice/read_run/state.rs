@@ -20,7 +20,8 @@ use super::words;
 use super::{OPTION_FORM, PRIVATE_OPTION, RUN_INVALID, TEMP_BEATEN};
 use crate::ir::{self, OptionKey};
 
-/// ngspice's spelling of each option the IR has a key for. `srcsteps` and `itl6` are one option
+/// HSPICE's spelling of each option the IR has a key for (the ngspice dialect's list, a lead, but
+/// `gmin`, `gmindc`, `delmax`, `search`). `srcsteps` and `itl6` are one option
 /// (`cktsopt.c:275-276`); `method=` is read by [`method`].
 pub(in super::super) const KEYS: &[(&str, OptionKey)] = &[
     ("reltol", OptionKey::RelTol),
@@ -38,7 +39,12 @@ pub(in super::super) const KEYS: &[(&str, OptionKey)] = &[
     ("srcsteps", OptionKey::SrcSteps),
     ("itl6", OptionKey::SrcSteps),
     ("noopiter", OptionKey::NoOpIter),
-    ("gmin", OptionKey::Gmin),
+    // HSPICE's `gmin` is the transient's, `gmindc` the DC analyses' (IR `option_key.rs`; the
+    // VAMS conformance suite's gmindc.sp, cshunt_delmax.sp, search_lib.sp run on ESPice)
+    ("gmin", OptionKey::GminTran),
+    ("gmindc", OptionKey::GminDc),
+    ("delmax", OptionKey::MaxStep),
+    ("search", OptionKey::Search),
     ("rshunt", OptionKey::Rshunt),
     ("gshunt", OptionKey::Gshunt),
     ("cshunt", OptionKey::Cshunt),
@@ -157,6 +163,10 @@ pub(super) fn options(lw: &mut Lower<'_, '_>, st: Stmt) {
                 Part::Env(None, None)
             }
             (_, Some(o), None) if o.is_flag() => Part::Typed(o, None),
+            // a directory, a string (`search='dir'`)
+            (_, Some(OptionKey::Search), Some(v)) => {
+                Part::Typed(OptionKey::Search, Some(Val::Str(v.trim_matches(['\'', '"']).to_string())))
+            }
             (_, Some(o), Some(v)) if !o.is_flag() => match words::value(lw, st, v) {
                 Ok(v) => Part::Typed(o, Some(v)),
                 Err(f) => return lw.opaque(st, f.class, f.code),

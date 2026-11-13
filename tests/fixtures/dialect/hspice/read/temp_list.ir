@@ -1,4 +1,5 @@
 # codes:
+laws diode_wl_mult_once vdmos_tcvth_lowers mos_small_signal_exact mos6_small_signal_exact diode_isr_reverse_none diode_isr_small_signal_exact trig_exact log_zero_error div_exact default_temp_25 default_tnom_25
 file "temp_list.sp" deck
   title "temp_list"
   comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): two plots (temp=27: -5.67034677e-03, temp=50: -2.18670282e-02): '.temp 27 50' runs the analysis at each"

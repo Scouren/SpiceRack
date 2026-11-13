@@ -1,4 +1,5 @@
 # codes:
+laws diode_wl_mult_once vdmos_tcvth_lowers mos_small_signal_exact mos6_small_signal_exact diode_isr_reverse_none diode_isr_small_signal_exact trig_exact log_zero_error div_exact default_temp_25 default_tnom_25
 file "num_scale.sp" deck
   title "num_scale"
   comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): 1M = 1e-3, 1MEG = 1X = 1e6, 1MIL = 2.54e-5, 1A = 1e-18, 1G, 1T, 1F, 10pf = 1e-11, 1d3 = 1000, 2.5D-3 = 2.5e-3, 1k5 = 1000, 1kHz = 1000"

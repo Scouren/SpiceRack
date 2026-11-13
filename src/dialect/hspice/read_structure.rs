@@ -16,7 +16,7 @@
 //!
 //! Contents: `pub(super) fn title`, `end`, `subckt`, `section`, `if_chain`, `param`,
 //! `func`, `global`, `card` (each `(lw: &mut Lower<'_, '_>, st: Stmt)`);
-//! `pub(super) fn def_name`, `func_parts` (the declare step's readers); `pub(super) fn
+//! `pub(super) fn def_name`, `func_parts`, `param_is_func` (the declare step's readers); `pub(super) fn
 //! in_branch`, `malformed` (shared with `read_include.rs`)
 
 use super::codes;
@@ -204,6 +204,10 @@ pub(super) fn if_chain(lw: &mut Lower<'_, '_>, st: Stmt) {
 /// assignment loses is one `Inert` opaque. A `.param` in an `.if` branch is the branch's (settle
 /// `if_param.sp`, ESPice only).
 pub(super) fn param(lw: &mut Lower<'_, '_>, st: Stmt) {
+    // `.param f(x,y)='x*10+y'` is a function, as `.func` (settle param_func.sp: f(2,3) = 23)
+    if param_is_func(&lw.rest(st.node)) {
+        return func(lw, st);
+    }
     let Some(pairs) = assignments(lw, st.node) else {
         return malformed(lw, st);
     };
@@ -363,6 +367,15 @@ pub(super) fn func_parts(text: &str) -> Option<(String, Vec<String>, &str)> {
         Wrap::Bare(_) | Wrap::Parts => body.trim(),
     };
     (!body.trim().is_empty()).then(|| (name.to_string(), args, body))
+}
+
+/// Whether a `.param` card's text defines a function: its first name is followed by `(`.
+pub(super) fn param_is_func(rest: &str) -> bool {
+    let t = rest.trim_start();
+    let name = t
+        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .unwrap_or(t.len());
+    name > 0 && t[name..].trim_start().starts_with('(')
 }
 
 /// Whether the statement stands in an `.if` branch.

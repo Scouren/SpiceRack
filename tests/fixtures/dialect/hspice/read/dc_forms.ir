@@ -1,4 +1,5 @@
 # codes:
+laws diode_wl_mult_once vdmos_tcvth_lowers mos_small_signal_exact mos6_small_signal_exact diode_isr_reverse_none diode_isr_small_signal_exact trig_exact log_zero_error div_exact default_temp_25 default_tnom_25
 file "dc_forms.sp" deck
   title "dc_forms"
   comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): 1, 2, 3: '.dc v1 start=1 stop=3 step=1'"

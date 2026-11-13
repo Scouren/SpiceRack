@@ -104,6 +104,15 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
                 }
             };
             match ast.tag(s) {
+                // `.param f(x)='…'` defines a function (settle param_func.sp)
+                Tag::Param if read_structure::param_is_func(&rest(toks, ast, s)) => {
+                    let line = rest(toks, ast, s);
+                    if let Some((name, formals, body)) = read_structure::func_parts(&line) {
+                        put(Def::Func, &name, 0, true);
+                        d.arity.insert((block, name::key(&name)), formals.len());
+                        texts.push(text(block, Def::Func, &name, body.to_string(), formals));
+                    }
+                }
                 Tag::Param => {
                     for (k, (name, value)) in assigns(ast, toks, s).into_iter().enumerate() {
                         let clash = head.iter().any(|h| name::key(h) == name::key(&name));

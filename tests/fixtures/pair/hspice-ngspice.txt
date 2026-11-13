@@ -1,0 +1,17 @@
+# The hspice-ngspice cell's failing steps (`tests/test_pair.rs`): `<deck> <step 1..6> <class> <proof>`, compared by
+# (deck, step) both ways. HSPICE runs on ESPice in HSPICE mode, which is not HSPICE.
+ac_lin2 4 mismatch finding=F32 # ESPice runs `.ac lin 2 1k 2k` as both points, ngspice-45 as 1 kHz alone (R97)
+ac_poi_sorted 2 refused:U0001:Run(SweepFreqList) owed=ngspice # ngspice has no form for it (no pass yet)
+alter 2 refused:U0001,W1402:Run(LoopTable) owed=ngspice # ngspice has no form for it (no pass yet)
+am_form 2 refused:W1150 owed=ngspice # ngspice has no form for it (no pass yet)
+data_sweep 2 refused:U0001,W1402:Run(LoopTable) owed=ngspice # ngspice has no form for it (no pass yet)
+dc_dec 2 refused:U0001:Run(SweepDcDec) owed=ngspice # ngspice has no form for it (no pass yet)
+dc_poi 2 refused:U0001:Run(SweepDcList) owed=ngspice # ngspice has no form for it (no pass yet)
+dc_sweep_param 2 refused:U0001,W1402:Run(SweepLoopLinStep) owed=ngspice # ngspice has no form for it (no pass yet)
+e_poly 5 missing-vector gap=pending # ESPice reports the POLY E's branch current i(e1), ngspice-45's XSPICE poly has no branch
+expr_round 4 mismatch finding=F68 # nint(2.5): the IR states HSPICE's half away from zero (recorded HSPICE pin); ESPice rounds half to even (2), ngspice-45 runs the written guard (3)
+expr_sqrt_neg 4 target-fails gap=pending # sqrt(-4): ESPice keeps the sign (-2, ESPice only), ngspice-45 stops on the domain error
+if_param 1 refused:S0104 question=lead # a .param in an .if branch binds no read outside it: the IR's lookup does not see a branch scope's definitions (HSPICE does: settle if_param.sp)
+sffm_order 2 refused:U0001,W1150:Circuit(SffmSpice3) owed=ngspice # ngspice has no form for it (no pass yet)
+temp_list 2 refused:U0001,W1402:Run(LoopRestore)+Run(LoopTemp) owed=ngspice # ngspice has no form for it (no pass yet)
+timed_op 2 refused:U0001:Analysis(TimedOp) owed=ngspice # ngspice has no form for it (no pass yet)

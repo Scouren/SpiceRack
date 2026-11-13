@@ -1,0 +1,3 @@
+# The hspice-hspice cell's failing steps (`tests/test_pair.rs`): `<deck> <step 1..6> <class> <proof>`, compared by
+# (deck, step) both ways. HSPICE runs on ESPice in HSPICE mode, which is not HSPICE.
+if_param 1 refused:S0104 question=lead # a .param in an .if branch binds no read outside it: the IR's lookup does not see a branch scope's definitions (HSPICE does: settle if_param.sp)

@@ -1,4 +1,5 @@
 # codes:
+laws diode_wl_mult_once vdmos_tcvth_lowers mos_small_signal_exact mos6_small_signal_exact diode_isr_reverse_none diode_isr_small_signal_exact trig_exact log_zero_error div_exact default_temp_25 default_tnom_25
 file "timed_op.sp" deck
   title "timed_op"
   comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): a transient plot and two operating-point plots at time=1e-9 and 5e-9: '.op 1n 5n' is a timed report"

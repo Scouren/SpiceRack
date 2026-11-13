@@ -8,6 +8,9 @@
 //! | `vacask-ngspice` | VACASK | ngspice-45 |
 //! | `ngspice-ngspice` | ngspice-45 | ngspice-45 (step 4 bit for bit: `test_pair/same.rs`) |
 //! | `vacask-vacask` | VACASK | VACASK (the same) |
+//! | `hspice-ngspice` | ESPice in HSPICE mode (not HSPICE) | ngspice-45 |
+//! | `ngspice-hspice` | ngspice-45 | ESPice in HSPICE mode |
+//! | `hspice-hspice` | ESPice in HSPICE mode | the same (`test_pair/same.rs`) |
 //!
 //! Oracles per deck, in this order; the first that fails names the component (REWRITE-PLAN
 //! §7.4): 1 read, strict (no refusal, `ir::check` clean, no `Unread`) → the source reader;
@@ -152,6 +155,39 @@ const CELLS: &[Cell] = &[
         from_ext: "sim",
         to_ext: "sim",
     },
+    // HSPICE runs on ESPice in HSPICE mode (`espice-hspice --tokenizer=hspice`), which is not
+    // HSPICE: a difference these cells find is ESPice's against ngspice-45 unless the
+    // recorded HSPICE pins say otherwise (rewrite/DIALECT-HSPICE.md).
+    Cell {
+        name: "hspice-ngspice",
+        dir: "hspice-ngspice",
+        from: "hspice",
+        to: "ngspice",
+        from_sim: Sim::EspiceHspice,
+        to_sim: Sim::Ngspice,
+        from_ext: "sp",
+        to_ext: "sp",
+    },
+    Cell {
+        name: "ngspice-hspice",
+        dir: "ngspice-vacask",
+        from: "ngspice",
+        to: "hspice",
+        from_sim: Sim::Ngspice,
+        to_sim: Sim::EspiceHspice,
+        from_ext: "sp",
+        to_ext: "sp",
+    },
+    Cell {
+        name: "hspice-hspice",
+        dir: "hspice-ngspice",
+        from: "hspice",
+        to: "hspice",
+        from_sim: Sim::EspiceHspice,
+        to_sim: Sim::EspiceHspice,
+        from_ext: "sp",
+        to_ext: "sp",
+    },
 ];
 
 // ---- private ----
@@ -283,6 +319,21 @@ fn ngspice_to_ngspice() {
 #[test]
 fn vacask_to_vacask() {
     cell(&CELLS[3]);
+}
+
+#[test]
+fn hspice_to_ngspice() {
+    cell(&CELLS[4]);
+}
+
+#[test]
+fn ngspice_to_hspice() {
+    cell(&CELLS[5]);
+}
+
+#[test]
+fn hspice_to_hspice() {
+    cell(&CELLS[6]);
 }
 
 #[test]

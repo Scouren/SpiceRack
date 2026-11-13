@@ -74,10 +74,31 @@ pub struct Hspice;
 /// The `hspice` row of `dialect::BUILTIN`.
 pub static HSPICE: Hspice = Hspice;
 
-/// The laws HSPICE computes by (R90): none stated yet. HSPICE's device laws are not settled
-/// (ESPice is the only oracle here); hspice-2 settles them. A design read here states no law
-/// and goes to any target under the target's law.
-pub const LAWS: ir::Laws = ir::Laws::EMPTY;
+/// The laws HSPICE computes by (R90), each settled on ESPice 0.3.0 in HSPICE mode (ESPice is not
+/// HSPICE: every one is ESPice only) by the IR's law decks rewritten as HSPICE text and run at
+/// 27 °C (`tests/fixtures/dialect/hspice/laws/`, `runs.out`): the default temperatures 25 °C
+/// (R102, `tnom_default.sp`; the manual lead agrees); a level-3 diode's area under `m` once
+/// (F20, `l1_m2`); an n-channel VDMOS threshold lowered by `tcvth` (F25, `v2_n_tcvth_0.005`);
+/// MOS 2, 3, 9 and 6 linearised by the DC law's own derivatives (F27, F28: VACASK's readings to
+/// 1e-6); a diode's `isr` absent under reverse bias and its slope exact (F31, R96: `diode_load`);
+/// `sin` of a large argument exact (F42); `ln(0)` and a division by zero fail (F44, F45: no
+/// operating point). The other points are not settled: ESPice's readings match neither variant
+/// or its control differs (BJT under `area`, VDMOS `kp`, the diode's `xom`, `fcs`, `ttt1`, the
+/// substrate `nr`, `exp` past 228, `asin`, which ESPice's B source lacks): a design read here
+/// states none of them.
+pub const LAWS: ir::Laws = ir::Laws::of(&[
+    ir::Law::DefaultTemp25,
+    ir::Law::DefaultTnom25,
+    ir::Law::DiodeWlMultOnce,
+    ir::Law::VdmosTcvthLowers,
+    ir::Law::MosSmallSignalExact,
+    ir::Law::Mos6SmallSignalExact,
+    ir::Law::DiodeIsrReverseNone,
+    ir::Law::DiodeIsrSmallSignalExact,
+    ir::Law::TrigExact,
+    ir::Law::LogZeroError,
+    ir::Law::DivExact,
+]);
 
 /// What HSPICE spells natively: the union of the areas' sets, each the image of its reader
 /// (law L5) and nothing more.

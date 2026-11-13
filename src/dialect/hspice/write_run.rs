@@ -437,6 +437,13 @@ pub(super) fn card(d: &ir::Design, item: ir::ItemRef) -> String {
 /// ` v`: a literal bare, any other expression in `'…'`.
 pub(super) fn value(d: &ir::Design, e: ir::ExprId, out: &mut String) {
     out.push(' ');
+    if let ir::Expr::Str(t) = d.expr(e) {
+        // a string option (`search='dir'`)
+        out.push('\'');
+        out.push_str(d.str(t));
+        out.push('\'');
+        return;
+    }
     if let ir::Expr::Num(n) = d.expr(e) {
         number::spell(d, d.num(n), out);
         return;
