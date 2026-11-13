@@ -1,9 +1,11 @@
 //! `Policy::Strict` (the spine's `read`): an `Unread` statement refused (`S0101`), an unresolved
-//! parameter read refused at its item (`S0104`, R63, A38), a formal default's held read passed,
-//! a run item whose target nothing defines refused at its item (`S0105`, R70, A43);
-//! `Lenient` keeps them all.
+//! parameter read refused at its item (`S0104`, R63, A38) unless it stands in a library section
+//! the program never selects (R63a, on the VACASK and ngspice readers), a formal default's held
+//! read passed, a run item whose target nothing defines refused at its item (`S0105`, R70,
+//! A43); `Lenient` keeps them all.
 //!
-//! Oracles: hand-written IR text; the refusal's code, item and name stated by hand.
+//! Oracles: hand-written IR text; the refusal's code, item and name stated by hand; for R63a the
+//! simulators' runs of the same decks (VACASK settle `b_strict_sel_*`, ngspice-45 run here).
 //!
 //! Contents: tests only.
 
@@ -13,6 +15,25 @@ use spicerack::dialect::{
 use spicerack::ir;
 
 use super::ir_row;
+
+/// The R63a decks: (dialect, directory, the decks' extension, the library's file name as
+/// the deck spells it, the library's fixture file).
+const SELECT_DECKS: [(&str, &str, &str, &str, &str); 2] = [
+    (
+        "vacask",
+        "tests/fixtures/dialect/vacask/settle/",
+        ".sim",
+        "sel.lib",
+        "{stem}--sel.lib",
+    ),
+    (
+        "ngspice",
+        "tests/fixtures/spine/strict_sel/",
+        ".sp",
+        "sel.lib.sp",
+        "sel.lib.sp",
+    ),
+];
 
 // ---- private ----
 
@@ -145,6 +166,68 @@ fn strict_passes_an_alter_through_an_instance_whose_master_is_unresolved() {
         "{:?}",
         diags.rows()
     );
+}
+
+#[test]
+fn strict_refuses_an_unbound_read_only_in_a_selected_section() {
+    // R63a: the library's section b reads an undefined `zz`, so does c, and d includes c. Both
+    // simulators run the deck selecting a and reject b and d (VACASK settle b_strict_sel_*,
+    // ngspice-45 its twins: DIALECT-VACASK Appendix A; the ngspice runs are repeated below).
+    for (name, dir, ext, lib, lib_file) in SELECT_DECKS {
+        let row = dialect::by_name(name).expect("a built-in row");
+        for (stem, want) in [
+            ("b_strict_sel_a", &[][..]),
+            ("b_strict_sel_b", &["pb"][..]),
+            ("b_strict_sel_d", &["pc"][..]),
+        ] {
+            let read = |file: &str| {
+                std::fs::read_to_string(format!("{dir}{file}")).expect("a fixture file")
+            };
+            let mut src = Sources::new();
+            src.add(&format!("{stem}{ext}"), &read(&format!("{stem}{ext}")));
+            src.add(lib, &read(&lib_file.replace("{stem}", stem)));
+            let mut design = ir::Design::new();
+            let mut diags = ir::Diags::new();
+            dialect::read(&src, row, Policy::Strict, &mut design, &mut diags);
+            let got: Vec<(&str, &str)> = diags
+                .rows()
+                .iter()
+                .filter(|d| d.code == STRICT_UNBOUND)
+                .map(|d| {
+                    assert_eq!(d.item.kind, ir::ItemKind::Param, "{name} {stem}");
+                    let p: ir::item::Param = design.row(d.item.index);
+                    (design.str(p.name), design.str(ir::NameId(d.arg)))
+                })
+                .collect();
+            let want: Vec<(&str, &str)> = want.iter().map(|p| (*p, "zz")).collect();
+            assert_eq!(got, want, "{name} {stem}: {:?}", diags.rows());
+        }
+    }
+}
+
+#[test]
+fn ngspice_rejects_an_undefined_read_only_in_a_selected_section() {
+    // The oracle of the ngspice half above: ngspice-45 runs the twins.
+    let dir = SELECT_DECKS[1].1;
+    for (stem, rejected) in [
+        ("b_strict_sel_a", false),
+        ("b_strict_sel_b", true),
+        ("b_strict_sel_d", true),
+    ] {
+        let done = std::process::Command::new("ngspice")
+            .args(["-b", &format!("{stem}.sp")])
+            .current_dir(dir)
+            .output()
+            .expect("ngspice not runnable: run in `nix develop .#testing`");
+        let out = String::from_utf8_lossy(&done.stdout).into_owned()
+            + &String::from_utf8_lossy(&done.stderr);
+        assert_eq!(done.status.success(), !rejected, "{stem}: {out}");
+        assert_eq!(
+            out.contains("Undefined parameter [zz]"),
+            rejected,
+            "{stem}: {out}"
+        );
+    }
 }
 
 /// `text` (IR text) read strictly through the `ir` row.

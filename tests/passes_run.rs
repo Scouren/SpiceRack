@@ -142,6 +142,11 @@ fn dc_loops_give_the_points_vacask_gives() {
 }
 
 #[test]
+fn the_vacask_reader_states_continuation_per_level() {
+    dc_loops::the_vacask_reader_states_continuation_per_level();
+}
+
+#[test]
 fn ic_beyond_next_to_next_only_keeps_the_state_at_every_analysis() {
     keeps_state("ic_beyond_next_to_next_only", ir::RunExtra::IcBeyondNext);
 }

@@ -1,0 +1,13 @@
+section a
+  parameters pa=1
+endsection
+section b
+  parameters pb=zz*2
+endsection
+section c
+  parameters pc=zz*3
+endsection
+section d
+  include "sel.lib" section=c
+  parameters pd=1
+endsection

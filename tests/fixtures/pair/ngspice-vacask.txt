@@ -9,5 +9,3 @@
 # (tran_print_step_to_simulator, R67) the eight transients pass all six steps.
 dc_sweep_pulse 2 refused:W2007 ruling=R64 # R64a: a .dc over a source with a PULSE is refused, not swept (VACASK ignores a waveform source's dc)
 unresolved_param 1 refused:S0104 ruling=A38 # the strict read refuses a parameter read no definition binds (R63); ngspice rejects the deck too
-latch 2 refused:U0001:Run(DcOuterAfresh) finding=F8 # R75: ngspice restarts each outer step afresh, which VACASK's reader does not state yet; passes when vacask reads and writes continuation= per sweep level
-latch_vdd 2 refused:U0001:Run(DcOuterAfresh) finding=F8 # as latch
