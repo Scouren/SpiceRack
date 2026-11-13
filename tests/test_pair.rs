@@ -319,9 +319,8 @@ fn an_include_is_named_from_the_decks_folder() {
     );
     assert_eq!(named("lib/a/b.lib").as_deref(), Some("../../lib/a/b.lib"));
     assert_eq!(
-        named("demo/bsim3-ptm/sub/y.inc"),
-        None,
-        "a subfolder is not placed"
+        named("demo/bsim3-ptm/sub/y.inc").as_deref(),
+        Some("sub/y.inc")
     );
 }
 

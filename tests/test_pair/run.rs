@@ -159,9 +159,8 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     // spice-bench decks name their kits in the store, read-only) is placed under `abs/` at that
     // path, and every written file's text names it there: only the path's spelling changes, so
     // the run reads the written include and not the original.
-    // An include above the deck's folder is placed there (`../x`, `sim` nests the run); one in
-    // a subfolder is not run.
-    // ponytail: the linked subfolder is the read-only original; place it when a deck needs it.
+    // An include above the deck's folder is placed there (`../x`, `sim` nests the run), one in a
+    // subfolder in it (`sim` makes the linked subfolder a folder of links first).
     let base = std::path::Path::new(&entry.0)
         .parent()
         .unwrap_or(std::path::Path::new(""));
@@ -177,7 +176,7 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
             (false, None) => {
                 let f = fail(
                     "harness-path",
-                    format!("written include {p} in a subfolder of the deck's"),
+                    format!("written include {p} is the deck's own folder"),
                 );
                 return stop(fails, 4, f, written);
             }
@@ -214,6 +213,14 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     let entry = &(entry.0.clone(), entry_text);
     let rest = &placed[..];
     let text = &deck.src.files()[0].1;
+    let folder = deck.path.parent().unwrap_or(std::path::Path::new(""));
+    if let Some(n) = crate::files::absent_osdi(folder, text) {
+        let f = fail(
+            "source-environment",
+            format!("pre_osdi {n}: not in the corpus"),
+        );
+        return stop(fails, 4, f, written);
+    }
     let ran = guard(4, || {
         let a = sim::run_checked(c.from_sim, &deck.path, text, &above, SECS);
         let b = sim::run_checked(
