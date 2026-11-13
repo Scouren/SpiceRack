@@ -6,15 +6,18 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9, C5; `rewrite/AMEND-A12.md` A28.
 //!
 //! Contents: crate: `pub(crate) fn files_and_scopes(&mut Out<'_>)`,
-//! `pub(crate) fn live_scopes(&Design) -> Vec<bool>`, `pub(crate) fn stale_definitions(&mut Out<'_>)`
+//! `pub(crate) fn live_scopes(&Design) -> Vec<bool>`, `pub(crate) fn stale_definitions(&mut Out<'_>)`,
+//! `pub(crate) fn reference_scopes(&mut Out<'_>)` (F34)
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::check::{Out, Violation, table_len};
 use crate::design::Design;
+use crate::expr::Expr;
 use crate::facts::{Handle, RowFacts};
-use crate::id::{ItemRef, ScopeId};
-use crate::item::{ItemKind, ScopeKind};
+use crate::feature::{ExprWalk, expr_roots};
+use crate::id::{ItemRef, Ref, ScopeId};
+use crate::item::{DefKind, Include, ItemKind, ScopeKind, Section};
 
 /// Files, scopes and item lists: handle ranges, the tree's shape, each scope's owner.
 pub(crate) fn files_and_scopes(out: &mut Out<'_>) {
@@ -136,7 +139,130 @@ pub(crate) fn stale_definitions(out: &mut Out<'_>) {
     }
 }
 
+/// `RefScope` (F34): every resolved reference of every reachable item, a row's own `Ref` or a
+/// read or call in its expressions, bound to a definition inside a subcircuit's body stands
+/// inside that body (`reaches`) or is the subcircuit's own head; a read bound to a function's
+/// formal stands in that function. Run on a design whose handles hold. O(references × scope
+/// depth), more only through includes.
+pub(crate) fn reference_scopes(out: &mut Out<'_>) {
+    let d = out.design;
+    let includers = includers(d);
+    let mut walk = ExprWalk::new(d);
+    let mut handles = Vec::new();
+    let mut refs: Vec<(Ref, bool)> = Vec::new();
+    for (item, scope) in d.reachable() {
+        handles.clear();
+        refs.clear();
+        for_kind!(item.kind, R => d.row::<R>(item.index).handles(d, &mut handles));
+        for h in &handles {
+            if let Handle::Ref(r, _) = *h {
+                refs.push((r, false));
+            }
+        }
+        for root in expr_roots(d, &handles) {
+            for &node in walk.tree(d, root) {
+                match d.expr(node) {
+                    Expr::Param(r) => refs.push((r, true)),
+                    Expr::UserCall(r, _) => refs.push((r, false)),
+                    _ => {}
+                }
+            }
+        }
+        for &(r, read) in &refs {
+            if !r.is_resolved() {
+                continue;
+            }
+            let def = d.defs[r.def.index()];
+            let ok = if read && def.kind == DefKind::Func {
+                def.item == item
+            } else {
+                match enclosing_body(d, def.scope) {
+                    None => true,
+                    Some(body) => {
+                        d.scopes[body.index()].owner == item || reaches(d, &includers, scope, body)
+                    }
+                }
+            };
+            if !ok {
+                out.report(Violation::RefScope, item, r.def.0);
+            }
+        }
+    }
+}
+
 // ---- private ----
+
+/// The nearest subcircuit body at or above `scope`, `None` outside every subcircuit.
+fn enclosing_body(d: &Design, scope: ScopeId) -> Option<ScopeId> {
+    let mut at = scope;
+    // bounded by the scope count: each step moves to a parent
+    for _ in 0..=d.scopes.len() {
+        if at.is_none() {
+            return None;
+        }
+        let s = d.scopes[at.index()];
+        if s.kind == ScopeKind::Subckt {
+            return Some(at);
+        }
+        at = s.parent;
+    }
+    unreachable!("the scope tree is acyclic")
+}
+
+/// Each included scope (a file's top, a called section's body) → the scopes of the includes
+/// that read it.
+fn includers(d: &Design) -> HashMap<ScopeId, Vec<ScopeId>> {
+    let mut out: HashMap<ScopeId, Vec<ScopeId>> = HashMap::new();
+    for (item, scope) in d.reachable() {
+        if item.kind != ItemKind::Include {
+            continue;
+        }
+        let inc: Include = d.row(item.index);
+        let file = d.find_file(d.str(inc.path));
+        if file.is_none() {
+            continue;
+        }
+        let top = d.file(file).top;
+        let target = if inc.section.is_none() {
+            top
+        } else {
+            let def = d.lookup(top, DefKind::Section, inc.section);
+            if def.is_none() {
+                continue;
+            }
+            d.row::<Section>(d.defs[def.index()].item.index).body
+        };
+        out.entry(target).or_default().push(scope);
+    }
+    out
+}
+
+/// Whether `body` encloses `from`: on its parent chain, or on the chain of an include that
+/// reads a scope of that chain (ngspice reads an included text where the include stands). A
+/// worklist over scopes, each visited once.
+fn reaches(
+    d: &Design,
+    includers: &HashMap<ScopeId, Vec<ScopeId>>,
+    from: ScopeId,
+    body: ScopeId,
+) -> bool {
+    let mut seen: HashSet<ScopeId> = HashSet::new();
+    let mut work = vec![from];
+    // bounded: each scope enters the worklist once
+    while let Some(at) = work.pop() {
+        if at.is_none() || !seen.insert(at) {
+            continue;
+        }
+        if at == body {
+            return true;
+        }
+        work.push(d.scopes[at.index()].parent);
+        if let Some(by) = includers.get(&at) {
+            work.extend_from_slice(by);
+        }
+    }
+    false
+}
 
 /// Whether the parent chain of a valid-ranged scope ends at a file scope with no parent, owner
 /// `NONE` and its file's top, without a cycle.

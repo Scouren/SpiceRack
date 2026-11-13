@@ -311,6 +311,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "two laws of one point stated",
             "a design states the laws of the one simulator build it was written for, so one variant per point (R90); two say the numbers follow both.",
         ),
+        Violation::RefScope => (
+            "a reference bound to a definition outside its reach",
+            "a name read inside one subcircuit (or a file it includes) binds to its own definitions and its enclosing scopes' only, never to a sibling subcircuit's formal, parameter, function, model or subcircuit; a function's formal is read only in that function's body.",
+        ),
         Violation::TargetAlias => (
             "a device-parameter target that names an element's value or a source's dc",
             "a resistor's r, a capacitor's c, an inductor's l is an element-value target and an independent source's dc a source-dc target: one meaning has one form, so the text reads back as what was written.",

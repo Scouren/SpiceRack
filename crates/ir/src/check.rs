@@ -128,6 +128,13 @@ pub enum Violation {
     /// Two variants of one law point stated (R90: a point's variants exclude each other;
     /// `laws.rs`). The circuit owner's. `arg`: the point's index.
     LawConflict,
+    /// A reference bound to a definition that lives in a subcircuit's body (a formal, a body
+    /// parameter, function, model or subcircuit) from outside that body: neither from a scope
+    /// inside it (an included file or a called section counts as inside its includer) nor from
+    /// the subcircuit's own head; or a read of a function's formal outside that function (F34:
+    /// a reader bound a read of one subcircuit's `w` to another's `w`; no simulator lets a body
+    /// see a sibling's names). `arg`: the definition.
+    RefScope,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -138,7 +145,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::LawConflict as usize + 1] = [
+    pub const ALL: [Violation; Violation::RefScope as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -165,6 +172,7 @@ impl Violation {
         Violation::InstanceCycle,
         Violation::TargetAlias,
         Violation::LawConflict,
+        Violation::RefScope,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -199,6 +207,7 @@ pub fn check(design: &Design, diags: &mut Diags) {
         for at in crate::hierarchy::cycle_instances(design) {
             out.report(Violation::InstanceCycle, at, at.index);
         }
+        crate::check_scopes::reference_scopes(&mut out);
         for (at, element) in crate::link::target_aliases(design) {
             out.report(Violation::TargetAlias, at, element.0);
         }
