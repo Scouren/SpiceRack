@@ -194,6 +194,10 @@ fn run(row: &DialectRow, deck: &Path) -> Result<(), (&'static str, String)> {
             written.add(legal.str(legal.file(f).path), &text);
         }
         written.set_form(ir::Role::Deck);
+        // the deck runs beside its start-up file, written or not (R87)
+        if let Some((p, t)) = src.environment() {
+            written.set_environment(p, t);
+        }
         let mut back = ir::Design::new();
         let mut bd = ir::Diags::new();
         reader.read(&written, &mut back.builder(), &mut bd);
