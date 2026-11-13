@@ -1,0 +1,3 @@
+file "a.sp" deck
+  analysis ac (dec stretch start=1k stop=5k points=2)
+  analysis noise (v (out)) source=v1 (oct stretch start=1k stop=5k points=1)
