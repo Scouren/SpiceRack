@@ -10,41 +10,36 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §5, §7.2 (A2, A4, A5), §9.
 //!
-//! Contents: `RowFacts` for `Title`, `Comment`, `Include`, `Global`, `Load`, `Opaque`, `Subckt`,
-//! `Section`, `If` (`Param` and `Func`: `item_facts_defs.rs`); crate:
+//! Contents: `RowFacts` for `Title`, `Comment`, `Include`, `Global`, `Load`, `Opaque` (`Subckt`,
+//! `Section`, `If`: `item_facts_scopes.rs`; `Param`, `Func`: `item_facts_defs.rs`); crate:
 //! `pub(crate) fn field_domain(&Design, ItemRef, &mut Diags)`,
 //! `pub(crate) fn distinct(&[NameId]) -> bool`, `pub(crate) fn reads_dependent(&Design, ExprId) -> bool`,
-//! `pub(crate) fn value_type(&Design, ExprId, &mut FeatureSet)`
+//! `pub(crate) fn value_type(&Design, ExprId, &mut FeatureSet)`,
+//! `pub(crate) fn value_roots(&mut Gen, &FeatureSet, bool)` (gen)
+
+use std::borrow::Cow;
 
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 use crate::diag::{Diags, violation_code};
-use crate::facts::{ExprUse, Handle, RowFacts};
+use crate::facts::{Handle, RowFacts};
 use crate::feature::{Extra, Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
-use crate::item::{Comment, DefKind, Global, If, Include, Load, Opaque, Section, Subckt, Title};
-use crate::item_text;
+use crate::id::{ExprId, ItemRef, NameId, ScopeId};
+use crate::item::{
+    Comment, DefKind, Global, Include, Load, LoadKind, Opaque, OpaqueClass, Role, ScopeKind, Title,
+};
+use crate::item_text::{class_word, defined, distinct_text, dump_load, modules_of, names};
+#[cfg(any(test, feature = "gen"))]
+use crate::span::Span;
 use crate::text::Words;
-use crate::text_expr::Ctx;
+use crate::text_expr::{Ctx, write_name, write_string};
 
 impl RowFacts for Title {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Text(self.text));
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags) {
@@ -57,8 +52,9 @@ impl RowFacts for Title {
         }
     }
 
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_title(self, design, ctx.item, ctx, out);
+    fn dump(&self, design: &Design, _ctx: &Ctx, out: &mut String) {
+        let (row, d) = (self, design);
+        write_string(d.text(row.text), out);
     }
 
     fn parse(
@@ -67,7 +63,17 @@ impl RowFacts for Title {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        item_text::parse_title(words, scope, b, diags)
+        let w = words;
+        let s = b.design().scope(scope);
+        let deck = s.kind == ScopeKind::File && b.design().file(s.file).role == Role::Deck;
+        let Some(text) = w.string(diags) else {
+            return ItemRef::NONE;
+        };
+        if !deck {
+            w.error(diags);
+            return ItemRef::NONE;
+        }
+        b.title(scope, &text, w.line_span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -75,27 +81,16 @@ impl RowFacts for Title {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        features: &FeatureSet,
+        _features: &FeatureSet,
     ) -> ItemRef {
-        crate::gen_rows::gen_title(g, scope, b, features)
+        let text = g.line_word();
+        b.title(scope, text, Span::NONE)
     }
 }
 
 impl RowFacts for Comment {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Text(self.text));
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -105,8 +100,9 @@ impl RowFacts for Comment {
         }
     }
 
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_comment(self, design, ctx.item, ctx, out);
+    fn dump(&self, design: &Design, _ctx: &Ctx, out: &mut String) {
+        let (row, d) = (self, design);
+        write_string(d.text(row.text), out);
     }
 
     fn parse(
@@ -115,7 +111,11 @@ impl RowFacts for Comment {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        item_text::parse_comment(words, scope, b, diags)
+        let w = words;
+        let Some(text) = w.string(diags) else {
+            return ItemRef::NONE;
+        };
+        b.comment(scope, &text, w.line_span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -123,23 +123,16 @@ impl RowFacts for Comment {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        features: &FeatureSet,
+        _features: &FeatureSet,
     ) -> ItemRef {
-        crate::gen_rows::gen_comment(g, scope, b, features)
+        let text = g.line_word();
+        b.comment(scope, text, Span::NONE)
     }
 }
 
 impl RowFacts for Include {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.path), Handle::Name(self.section)]);
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
     }
 
     fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
@@ -154,8 +147,13 @@ impl RowFacts for Include {
         }
     }
 
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_include(self, design, ctx.item, ctx, out);
+    fn dump(&self, design: &Design, _ctx: &Ctx, out: &mut String) {
+        let (row, d) = (self, design);
+        write_string(d.str(row.path), out);
+        if !row.section.is_none() {
+            out.push_str(" section=");
+            write_name(d.str(row.section), out);
+        }
     }
 
     fn parse(
@@ -164,7 +162,19 @@ impl RowFacts for Include {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        item_text::parse_include(words, scope, b, diags)
+        let w = words;
+        let Some(path) = w.path(diags) else {
+            return ItemRef::NONE;
+        };
+        let section = if w.key() == Some("section") {
+            let Some(s) = w.name_text(diags) else {
+                return ItemRef::NONE;
+            };
+            Some(s)
+        } else {
+            None
+        };
+        b.include(scope, &path, section.as_deref(), w.line_span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -174,25 +184,17 @@ impl RowFacts for Include {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> ItemRef {
-        crate::gen_rows::gen_include(g, scope, b, features)
+        let f = features;
+        let path = format!("{}.lib", g.fresh());
+        let section =
+            (f.contains(Feature::Extra(Extra::IncludeSection)) && g.chance(2)).then(|| g.fresh());
+        b.include(scope, &path, section.as_deref(), Span::NONE)
     }
 }
 
 impl RowFacts for Global {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Names(self.nets));
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -202,8 +204,9 @@ impl RowFacts for Global {
         }
     }
 
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_global(self, design, ctx.item, ctx, out);
+    fn dump(&self, design: &Design, _ctx: &Ctx, out: &mut String) {
+        let (row, d) = (self, design);
+        names(d, d.names(row.nets), " ", out);
     }
 
     fn parse(
@@ -212,7 +215,20 @@ impl RowFacts for Global {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        item_text::parse_global(words, scope, b, diags)
+        let w = words;
+        let mut nets: Vec<Cow<'_, str>> = Vec::new();
+        while !w.at_end() {
+            let Some(n) = w.name_text(diags) else {
+                return ItemRef::NONE;
+            };
+            nets.push(n);
+        }
+        if nets.is_empty() || nets.iter().any(|n| n == "0") || !distinct_text(&nets) {
+            w.error(diags);
+            return ItemRef::NONE;
+        }
+        let refs: Vec<&str> = nets.iter().map(|n| n.as_ref()).collect();
+        b.global(scope, &refs, w.line_span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -220,27 +236,17 @@ impl RowFacts for Global {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        features: &FeatureSet,
+        _features: &FeatureSet,
     ) -> ItemRef {
-        crate::gen_rows::gen_global(g, scope, b, features)
+        let nets: Vec<String> = (0..1 + g.below(3)).map(|_| g.fresh()).collect();
+        let refs: Vec<&str> = nets.iter().map(String::as_str).collect();
+        b.global(scope, &refs, Span::NONE)
     }
 }
 
 impl RowFacts for Load {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.push(Handle::Name(self.path));
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -250,7 +256,7 @@ impl RowFacts for Load {
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_load(self, design, &item_text::modules_of(design, ctx.item), out);
+        dump_load(self, design, &modules_of(design, ctx.item), out);
     }
 
     fn parse(
@@ -259,7 +265,36 @@ impl RowFacts for Load {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        item_text::parse_load(words, scope, b, diags)
+        let w = words;
+        let kind = match w.next() {
+            Some("veriloga") => LoadKind::VerilogA,
+            Some("osdi") => LoadKind::Osdi,
+            _ => {
+                w.error(diags);
+                return ItemRef::NONE;
+            }
+        };
+        let Some(path) = w.path(diags) else {
+            return ItemRef::NONE;
+        };
+        let mut modules = Vec::new();
+        if w.key() == Some("modules") {
+            let Some(m) = w.names_text(diags) else {
+                return ItemRef::NONE;
+            };
+            modules = m;
+        }
+        let taken = |b: &Builder<'_>, n: &str| defined(b, scope, DefKind::Module, n);
+        if !distinct_text(&modules) || modules.iter().any(|m| taken(b, m)) {
+            w.error(diags);
+            return ItemRef::NONE;
+        }
+        let item = b.load(scope, kind, &path, w.line_span());
+        for m in &modules {
+            let name = b.name(m);
+            b.define(DefKind::Module, name, scope, item);
+        }
+        item
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -267,27 +302,31 @@ impl RowFacts for Load {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        features: &FeatureSet,
+        _features: &FeatureSet,
     ) -> ItemRef {
-        crate::gen_rows::gen_load(g, scope, b, features)
+        let kind = if g.chance(2) {
+            LoadKind::VerilogA
+        } else {
+            LoadKind::Osdi
+        };
+        // A25: the extension a simulator decides the kind by
+        let extension = match kind {
+            LoadKind::VerilogA => "va",
+            LoadKind::Osdi => "osdi",
+        };
+        let path = format!("{}.{extension}", g.fresh());
+        let item = b.load(scope, kind, &path, Span::NONE);
+        for _ in 0..g.below(3) {
+            let module = g.fresh_name(b);
+            b.define(DefKind::Module, module, scope, item);
+        }
+        item
     }
 }
 
 impl RowFacts for Opaque {
     fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
         out.extend([Handle::Name(self.dialect), Handle::Text(self.text)]);
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {
-        // no feature beyond the kind
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
@@ -297,8 +336,13 @@ impl RowFacts for Opaque {
         }
     }
 
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_opaque(self, design, ctx.item, ctx, out);
+    fn dump(&self, design: &Design, _ctx: &Ctx, out: &mut String) {
+        let (row, d) = (self, design);
+        write_name(d.str(row.dialect), out);
+        out.push(' ');
+        out.push_str(class_word(row.class));
+        out.push(' ');
+        write_string(d.text(row.text), out);
     }
 
     fn parse(
@@ -307,113 +351,26 @@ impl RowFacts for Opaque {
         b: &mut Builder<'_>,
         diags: &mut Diags,
     ) -> ItemRef {
-        item_text::parse_opaque(words, scope, b, diags)
-    }
-
-    #[cfg(any(test, feature = "gen"))]
-    fn generate(
-        g: &mut Gen,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-    ) -> ItemRef {
-        crate::gen_rows::gen_opaque(g, scope, b, features)
-    }
-}
-
-impl RowFacts for Subckt {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        out.extend([
-            Handle::Name(self.name),
-            Handle::Names(self.ports),
-            Handle::Params(self.params),
-            Handle::Scope(self.body),
-        ]);
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
-        // the head defaults, in list order
-        let row: Subckt = design.row(at.index);
-        let start = row.params.start as usize;
-        let end = (start + row.params.len as usize).min(design.param_pool.len());
-        for p in &mut design.param_pool[start.min(end)..end] {
-            f(&mut p.1, ExprUse::Constant);
-        }
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        // A12 K2, widened by A15: a head default that is not a constant
-        let table = crate::class::def_classes(design);
-        let not_constant = design.params(self.params).iter().any(|p| {
-            !p.1.is_none()
-                && (reads_dependent(design, p.1)
-                    || crate::class::tree_class(design, p.1, table)
-                        >= crate::class::ExprClass::Temp)
-        });
-        if not_constant {
-            *set = set.with(Feature::Extra(Extra::FormalNotConstant));
-        }
-        // A15 K2: a formal an instance must pass
-        if design.params(self.params).iter().any(|p| p.1.is_none()) {
-            *set = set.with(Feature::Extra(Extra::FormalWithoutDefault));
-        }
-        // A25 item 4: a default by type
-        for p in design.params(self.params) {
-            value_type(design, p.1, set);
-        }
-        // R62/A37: a default's reads by rule, a sibling formal's aside
-        let formals: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
-        let mut nodes = Vec::new();
-        for p in design.params(self.params) {
-            nodes.clear();
-            crate::class::tree_nodes(design, p.1, &mut nodes);
-            for &e in &nodes {
-                let crate::expr::Expr::Param(r) = design.expr(e) else {
-                    continue;
-                };
-                let rule = if !r.is_resolved() {
-                    (!formals.contains(&r.name)).then_some(Extra::FormalUnboundRead)
-                } else {
-                    let outside = r
-                        .def
-                        .index_checked(design.defs.len())
-                        .is_some_and(|k| design.defs[k].scope != self.body);
-                    outside.then_some(Extra::FormalOuterRead)
-                };
-                if let Some(x) = rule {
-                    *set = set.with(Feature::Extra(x));
-                }
+        let w = words;
+        let Some(dialect) = w.name_text(diags) else {
+            return ItemRef::NONE;
+        };
+        let class = match w.next() {
+            Some("unread") => OpaqueClass::Unread,
+            Some("private") => OpaqueClass::Private,
+            Some("inert") => OpaqueClass::Inert,
+            Some("invalid") => OpaqueClass::InvalidInSource,
+            Some("script") => OpaqueClass::Script,
+            Some("hint") => OpaqueClass::Hint,
+            _ => {
+                w.error(diags);
+                return ItemRef::NONE;
             }
-        }
-    }
-
-    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
-        let ports = design.names(self.ports);
-        let params: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
-        if self.name.is_none() || !distinct(ports) || !distinct(&params) {
-            field_domain(design, at, out);
-        }
-    }
-
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_subckt(self, design, ctx.item, ctx, out);
-    }
-
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> ItemRef {
-        item_text::parse_subckt(words, scope, b, diags)
+        };
+        let Some(text) = w.string(diags) else {
+            return ItemRef::NONE;
+        };
+        b.opaque(scope, &dialect, class, &text, w.line_span())
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -421,136 +378,13 @@ impl RowFacts for Subckt {
         g: &mut Gen,
         scope: ScopeId,
         b: &mut Builder<'_>,
-        features: &FeatureSet,
+        _features: &FeatureSet,
     ) -> ItemRef {
-        crate::gen_rows::gen_subckt(g, scope, b, features)
-    }
-}
-
-impl RowFacts for Section {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        out.extend([
-            Handle::Name(self.name),
-            Handle::Name(self.library),
-            Handle::Scope(self.body),
-        ]);
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        if !self.library.is_none() {
-            *set = set.with(Feature::Extra(Extra::SectionLibrary));
-        }
-    }
-
-    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
-        if self.name.is_none() {
-            field_domain(design, at, out);
-        }
-    }
-
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_section(self, design, ctx.item, ctx, out);
-    }
-
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> ItemRef {
-        item_text::parse_section(words, scope, b, diags)
-    }
-
-    #[cfg(any(test, feature = "gen"))]
-    fn generate(
-        g: &mut Gen,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-    ) -> ItemRef {
-        crate::gen_rows::gen_section(g, scope, b, features)
-    }
-}
-
-impl RowFacts for If {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
-        out.push(Handle::Branches(self.branches));
-        for branch in design.branches(self.branches) {
-            out.push(Handle::Scope(branch.body));
-            if !branch.cond.is_none() {
-                out.push(Handle::Expr(branch.cond));
-            }
-        }
-    }
-
-    fn map_refs(_design: &mut Design, _at: ItemRef, _f: &mut dyn FnMut(&mut Ref, DefKind)) {
-        // no reference field
-    }
-
-    fn map_exprs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut ExprId, ExprUse)) {
-        // each branch's condition, the `else` (`NONE`) not listed, as `handles`
-        let row: If = design.row(at.index);
-        let start = row.branches.start as usize;
-        let end = (start + row.branches.len as usize).min(design.branch_pool.len());
-        for branch in &mut design.branch_pool[start.min(end)..end] {
-            if !branch.cond.is_none() {
-                f(&mut branch.cond, ExprUse::Constant);
-            }
-        }
-    }
-
-    fn refs(&self, _design: &Design, _at: ItemRef, _out: &mut Vec<(Ref, DefKind)>) {
-        // no reference field
-    }
-
-    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        // A15 K2: a condition no constant fold decides
-        let table = crate::class::def_classes(design);
-        let dynamic = design.branches(self.branches).iter().any(|br| {
-            crate::class::tree_class(design, br.cond, table) >= crate::class::ExprClass::Temp
-        });
-        if dynamic {
-            *set = set.with(Feature::Extra(Extra::IfConditionDynamic));
-        }
-    }
-
-    fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
-        let branches = design.branches(self.branches);
-        let else_early = branches.iter().rev().skip(1).any(|b| b.cond.is_none());
-        if branches.is_empty() || else_early {
-            field_domain(design, at, out);
-        }
-    }
-
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        item_text::dump_if(self, design, ctx.item, ctx, out);
-    }
-
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> ItemRef {
-        item_text::parse_if(words, scope, b, diags)
-    }
-
-    #[cfg(any(test, feature = "gen"))]
-    fn generate(
-        g: &mut Gen,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        features: &FeatureSet,
-    ) -> ItemRef {
-        crate::gen_rows::gen_if(g, scope, b, features)
+        const DIALECTS: [&str; 4] = ["ngspice", "xyce", "spectre", "hspice"];
+        let dialect = DIALECTS[g.below(4) as usize];
+        let class = OpaqueClass::ALL[g.below(OpaqueClass::COUNT as u32) as usize];
+        let text = format!(".{} {}", g.fresh(), g.word());
+        b.opaque(scope, dialect, class, &text, Span::NONE)
     }
 }
 
@@ -598,6 +432,14 @@ pub(crate) fn value_type(design: &Design, e: ExprId, set: &mut FeatureSet) {
         crate::expr::Expr::List(_) => *set = set.with(Feature::Extra(Extra::ListValue)),
         _ => {}
     }
+}
+
+/// Lets the next expression be a string or a list at its root as the set allows (A25 item 4:
+/// a parameter's value, a formal's default), or takes that back.
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn value_roots(g: &mut Gen, f: &FeatureSet, on: bool) {
+    g.root_str = on && f.contains(Feature::Extra(Extra::StringValue));
+    g.root_list = on && f.contains(Feature::Extra(Extra::ListValue));
 }
 
 // ---- private ----

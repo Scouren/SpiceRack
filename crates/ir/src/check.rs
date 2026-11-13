@@ -9,21 +9,22 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9, C1–C12; `REWRITE-PLAN.md` §2.2 rule 4.
 //!
 //! Contents: `pub enum Violation`, `Violation::ALL`, `Violation::COUNT`,
-//! `pub fn check(&Design, &mut Diags)`, `pub fn check_legal(&Design, &FeatureSet, &mut Diags)`; crate:
+//! `pub fn check(&Design, &mut Diags)`, re-exported `check_legal` (`check_legal.rs`); crate:
 //! `pub(crate) struct Out` (`Out::report`), `pub(crate) fn table_len(&Design, ItemKind) -> usize`
 
 use std::collections::HashSet;
 
 use crate::class::ExprClass;
 use crate::design::{Design, ItemRow};
-use crate::diag::{Diags, UNSUPPORTED, violation_code};
+use crate::diag::{Diags, violation_code};
 use crate::expr::{BinOp, Dist, Expr, ExprTag, Func, NumForm, UnOp};
 use crate::facts::{Handle, RowFacts};
-use crate::feature::{ExprWalk, FeatureSet, item_features, unplaced_level};
+use crate::feature::ExprWalk;
 use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::item::{DefKind, ItemKind};
 use crate::literal;
-use crate::span::Span;
+
+pub use crate::check_legal::check_legal;
 
 /// One invariant of a well-formed design. Each has its `X` code (`diag::violation_code`); the
 /// item is the offending one (its span the item's; `ItemRef::NONE` and `Span::NONE` for a non-item
@@ -112,6 +113,14 @@ pub enum Violation {
     /// refuse the deck, VACASK gives missing trailing terminals internal nodes). The circuit
     /// owner's row check. `arg`: the terminal count.
     InstancePortCount,
+    /// An analysis's own argument (an expression field of its row, a DC axis's sweep range
+    /// included) or a sweep loop's range whose class is `Temp` or above (R68/A42: ngspice
+    /// evaluates the card once before the run, VACASK rejects `$temp` there). The run owner's
+    /// row check. `arg`: the root.
+    RunArgumentClass,
+    /// An instance on a cycle of subcircuits (no finite elaboration; ngspice-45 and VACASK
+    /// refuse it: `hierarchy.rs`). The circuit owner's. `arg`: the instance's row.
+    InstanceCycle,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -122,7 +131,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::InstancePortCount as usize + 1] = [
+    pub const ALL: [Violation; Violation::InstanceCycle as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -145,6 +154,8 @@ impl Violation {
         Violation::StringOrListBody,
         Violation::StringOrListField,
         Violation::InstancePortCount,
+        Violation::RunArgumentClass,
+        Violation::InstanceCycle,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -173,43 +184,10 @@ pub fn check(design: &Design, diags: &mut Diags) {
         for k in crate::class::cycle_defs(design) {
             out.report(Violation::DefinitionCycle, design.defs[k].item, k as u32);
         }
+        for at in crate::hierarchy::cycle_instances(design) {
+            out.report(Violation::InstanceCycle, at, at.index);
+        }
         probe_classes(&mut out);
-    }
-}
-
-/// Appends one `UNSUPPORTED` row per (item, feature) for each feature an item uses outside
-/// `legal` (span: the item; `arg`: `Feature::index`), and one at `Span::NONE` per feature of the
-/// whole design outside it (the owners' `design_features`); a case clash at the item that brings
-/// the second spelling. It appends nothing
-/// exactly when `features_used(design).minus(legal)` is empty: these rows are `legalize`'s
-/// leftovers (R10). Assumes `check` passed. O(rows).
-pub fn check_legal(design: &Design, legal: &FeatureSet, diags: &mut Diags) {
-    let mut walk = ExprWalk::new(design);
-    let clashes = crate::case::case_clashes(design);
-    for (item, scope) in design.reachable() {
-        let mut used = FeatureSet::EMPTY;
-        item_features(design, item, scope, &mut walk, &mut used);
-        if clashes.contains(&item) {
-            used = used.with(crate::feature::Feature::Extra(
-                crate::feature::Extra::CaseSensitiveNames,
-            ));
-        }
-        for f in used.minus(*legal).iter() {
-            diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
-        }
-    }
-    // the run owner's design-level features name their item (`analysis::feature_items`)
-    let mut placed = Vec::new();
-    crate::analysis::feature_items(design, &mut placed);
-    for (f, item) in placed {
-        if !legal.contains(f) {
-            diags.push_at(UNSUPPORTED, design, item, f.index() as u32);
-        }
-    }
-    let mut whole = FeatureSet::EMPTY;
-    unplaced_level(design, &mut whole);
-    for f in whole.minus(*legal).iter() {
-        diags.push(UNSUPPORTED, Span::NONE, f.index() as u32);
     }
 }
 
@@ -264,7 +242,7 @@ fn probe_classes(out: &mut Out<'_>) {
                 Handle::Exprs(l) => roots.extend_from_slice(d.exprs(l)),
                 Handle::ExprDyn(_)
                 | Handle::Name(_)
-                | Handle::Ref(_)
+                | Handle::Ref(..)
                 | Handle::Names(_)
                 | Handle::Scope(_)
                 | Handle::Text(_)
@@ -407,14 +385,20 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
         }
         handles.clear();
         strings.clear();
-        let mut refs: Vec<(crate::Ref, DefKind)> = Vec::new();
         for_kind!(item.kind, R => {
             let row: R = d.row(item.index);
             row.handles(d, &mut handles);
             row.string_roots(d, &mut strings);
-            row.refs(d, item, &mut refs); // the read-only twin (M5): no copy of the design
             row.check(d, item, scope, out.diags);
         });
+        // the references `map_refs` visits, read off the handles (M5: no copy of the design)
+        let refs: Vec<(crate::Ref, DefKind)> = handles
+            .iter()
+            .filter_map(|h| match *h {
+                Handle::Ref(r, kind) => Some((r, kind)),
+                _ => None,
+            })
+            .collect();
         for (r, kind) in refs {
             if !r.is_resolved() {
                 continue;
@@ -470,7 +454,7 @@ fn handle(out: &mut Out<'_>, item: ItemRef, h: Handle, bad: &[bool], walk: &mut 
         }
         Handle::Expr(e) => expression(out, item, e, false, bad, walk),
         Handle::ExprDyn(e) => expression(out, item, e, true, bad, walk),
-        Handle::Ref(_) => {} // references are reached through `map_refs`
+        Handle::Ref(..) => {} // references are reached through `map_refs`
         Handle::Scope(s) => {
             if !s.is_none() && s.index() >= d.scopes.len() {
                 out.report(Violation::HandleRange, item, s.0);

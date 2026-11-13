@@ -13,31 +13,33 @@
 //!
 //! Contents (crate-private): `pub(crate) fn generate_element`, `pub(crate) fn generate_model`,
 //! `pub(crate) fn generate_library`;
-//! the row bodies of `R` are in `circuit_gen_rows.rs` (a child module: it reads `R`'s private
-//! helpers).
+//! the row bodies of `R` are in `circuit_gen_rows.rs`, the models in `circuit_gen_model.rs`
+//! (child modules: they read `R`'s private helpers).
 
 use crate::build::Builder;
 use crate::build_circuit::ElemHead;
-use crate::circuit_check::{builtin_kind, has_polarity, master_ports, versioned};
+use crate::circuit_check::{builtin_kind, master_ports};
 use crate::circuit_extra::CircuitExtra as X;
-use crate::circuit_tables::{VERSIONS, needs_version};
 use crate::controlled::{
     Controlled, Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, Poly,
     Quantity, TableLaw, TableSource,
 };
 use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
-use crate::r#gen::{Gen, Params, Reads};
+use crate::r#gen::placeable;
+use crate::r#gen::{Gen, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, Ref, ScopeId};
-use crate::item::DefKind;
+use crate::item::{DefKind, ItemKind};
 use crate::letter::letter_of;
-use crate::model::{Model, ModelFamily, Polarity};
+use crate::model::ModelFamily;
 use crate::passive::{Coupling, IcMode};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::span::Span;
 
 #[path = "circuit_gen_head.rs"]
 mod head;
+#[path = "circuit_gen_model.rs"]
+mod model;
 #[path = "circuit_gen_rows.rs"]
 mod rows;
 #[path = "circuit_gen_waves.rs"]
@@ -68,6 +70,12 @@ struct R<'r, 'b> {
     b: &'r mut Builder<'b>,
     f: &'r FeatureSet,
     scope: ScopeId,
+    /// The model drawn first for this element (R48 d), named by `fitting_model` before any
+    /// other: a draw among every generated model could miss it.
+    drawn: Option<Ref>,
+    /// A behavioural source's output, drawn with its header (it fixes the multiplier's
+    /// member, R58) and read by `behav`.
+    behav_out: Option<crate::controlled::OutKind>,
 }
 
 /// Pushes one random element into `scope`, or returns `ItemRef::NONE` when the set allows no
@@ -83,12 +91,34 @@ pub(crate) fn generate_element(
         b,
         f: features,
         scope,
+        drawn: None,
+        behav_out: None,
     };
     let kinds: Vec<ElemKind> = ElemKind::ALL.into_iter().filter(|&k| r.can(k)).collect();
     if kinds.is_empty() {
         return ItemRef::NONE;
     }
     let kind = kinds[r.g.below(kinds.len() as u32) as usize];
+    // R48 (d): an element that names a model mostly names one the design defines, so a model
+    // of a family the kind takes is drawn first when none is visible (before the element
+    // interns a name: `dump` writes the model's line first)
+    if kind.master_kind() == Some(DefKind::Model)
+        && r.f.contains(Feature::Item(ItemKind::Model))
+        && placeable(r.b.design(), scope, ItemKind::Model, r.f)
+        && r.fitting_model(kind).is_none()
+    {
+        let builtin_ok = r.has(X::BuiltinMaster);
+        let fits: Vec<ModelFamily> = (r.model_families().into_iter())
+            .filter(|&f| head::takes(kind, f) && (builtin_kind(f).is_none() || builtin_ok))
+            .collect();
+        // ponytail: the model does not count against the item budget (as a required title)
+        if !fits.is_empty() && r.g.below(8) != 0 {
+            let item = r.push_model(&fits);
+            let name = r.b.design().row::<crate::model::Model>(item.index).name;
+            let def = r.b.design().lookup(scope, DefKind::Model, name);
+            r.drawn = Some(Ref { name, def });
+        }
+    }
     // decisions that fix the terminal count, before anything is created
     let two_terminal = match kind {
         ElemKind::Laplace | ElemKind::FreqTable => r.maybe(X::LaplaceExprInput),
@@ -120,8 +150,11 @@ pub(crate) fn generate_element(
         .flatten();
     let ports = bound.and_then(|m| master_ports(r.b.design(), m));
     let terminals = r.terminals(kind, two_terminal, ports);
+    // an instance whose master was not drawn first stays unresolved: its terminals were drawn
+    // without ports (a later draw could bind another subcircuit, R61/A36)
     let model = match bound {
         Some(m) => m,
+        None if kind == ElemKind::Instance => Ref::unresolved(r.g.fresh_name(r.b)),
         None => r.master(kind),
     };
     // an instance's multiplier comes with its law (A15 C1)
@@ -131,9 +164,21 @@ pub(crate) fn generate_element(
         } else {
             MultLaw::Parallel
         };
+    // a controlled source's multiplier member follows its output (R58)
+    if kind == ElemKind::Behav {
+        r.behav_out = Some(r.behav_output());
+    }
+    let voltage = match kind {
+        ElemKind::Vcvs | ElemKind::Ccvs | ElemKind::Delay => true,
+        ElemKind::Poly | ElemKind::Table | ElemKind::Laplace | ElemKind::FreqTable => {
+            out == Quantity::Voltage
+        }
+        ElemKind::Behav => r.behav_out == Some(crate::controlled::OutKind::Voltage),
+        _ => false,
+    };
     let mult_feature = match mult_law {
         MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
-        MultLaw::Parallel => crate::circuit_features::mult_class(kind),
+        MultLaw::Parallel => crate::circuit_tables::mult_class(kind, voltage),
     };
     let mult = if mult_law == MultLaw::NgspiceAppend || r.maybe(mult_feature) {
         r.ex()
@@ -164,124 +209,14 @@ pub(crate) fn generate_model(
         b,
         f: features,
         scope,
+        drawn: None,
+        behav_out: None,
     };
-    // without `ModelWithoutLibrary`, only a family some library of the design implements;
-    // decided before anything is interned, so a refusal leaves no orphan name
-    let families: Vec<ModelFamily> = if r.has(X::ModelWithoutLibrary) {
-        ModelFamily::ALL.to_vec()
-    } else {
-        r.b.design()
-            .device_libraries
-            .rows
-            .iter()
-            .map(|l| l.family)
-            .collect()
-    };
-    // and only a family the set has (A15 K5)
-    let families: Vec<ModelFamily> = families
-        .into_iter()
-        .filter(|&f| r.f.contains(Feature::Family(f)))
-        .collect();
+    let families = r.model_families();
     if families.is_empty() {
         return ItemRef::NONE;
     }
-    let family = families[r.g.below(families.len() as u32) as usize];
-    // a bin is `<group>.<n>` of a fresh group (A15 C4): the name is interned first, the group
-    // where `dump` writes `bin_of`
-    let group = r.maybe(X::ModelBin).then(|| r.g.fresh());
-    let name = match &group {
-        Some(base) => {
-            let text = format!("{base}.1");
-            r.b.name(&text)
-        }
-        None => r.g.fresh_name(r.b),
-    };
-    let polarity = if has_polarity(family) {
-        if r.g.chance(2) {
-            Polarity::N
-        } else {
-            Polarity::P
-        }
-    } else if family == ModelFamily::Other {
-        Polarity::ALL[r.g.below(3) as usize]
-    } else {
-        Polarity::None
-    };
-    let mut pairs: Vec<(String, ExprId)> = Vec::new();
-    // values first, then keys: the order `Words::params` creates them in
-    // A28 item 5: `TypedOnly` draws no untyped parameter (elements never draw one)
-    let count = if builtin_kind(family).is_some() || r.g.params == Params::TypedOnly {
-        0
-    } else {
-        r.g.below(3)
-    };
-    // a parameter list's value may be a string or a list (A25 item 4)
-    let values: Vec<ExprId> = (0..count)
-        .map(|_| {
-            (r.g.root_str, r.g.root_list) = (true, true);
-            let value = r.ex();
-            (r.g.root_str, r.g.root_list) = (false, false);
-            value
-        })
-        .collect();
-    for value in values {
-        let key = r.g.fresh_name(r.b);
-        pairs.push((r.b.design().str(key).to_owned(), value));
-    }
-    let params = if pairs.is_empty() {
-        List::EMPTY
-    } else {
-        let borrowed: Vec<(&str, ExprId)> = pairs.iter().map(|(k, v)| (k.as_str(), *v)).collect();
-        r.b.params(&borrowed)
-    };
-    let bin_of = match &group {
-        Some(base) => r.b.name(base),
-        None => NameId::NONE,
-    };
-    let ako = if r.maybe(X::ModelAko) {
-        r.reference(DefKind::Model)
-    } else {
-        NONE_REF
-    };
-    let module = if family == ModelFamily::Module {
-        r.reference(DefKind::Module)
-    } else {
-        NONE_REF
-    };
-    // a versioned standard states its version, from the vocabulary where one is known
-    let version = if needs_version(family) {
-        match VERSIONS.iter().find(|v| v.0 == family) {
-            Some((_, list)) => {
-                let k = r.g.below(list.len() as u32) as usize;
-                r.b.string(list[k])
-            }
-            None => {
-                let word = r.g.fresh();
-                r.b.string(&word)
-            }
-        }
-    } else if versioned(family) && r.g.chance(4) {
-        r.ex()
-    } else {
-        ExprId::NONE
-    };
-    let word = if matches!(family, ModelFamily::CodeModel | ModelFamily::Other) {
-        r.g.fresh_name(r.b)
-    } else {
-        NameId::NONE
-    };
-    let row = Model {
-        name,
-        params,
-        bin_of,
-        ako,
-        module,
-        version,
-        word,
-        family,
-        polarity,
-    };
-    r.b.model(scope, row, Span::NONE)
+    r.push_model(&families)
 }
 
 // ---- private ----

@@ -364,3 +364,51 @@ fn an_int_literal_is_a_feature() {
         "its neighbour"
     );
 }
+
+#[cfg(feature = "gen")]
+#[test]
+fn typed_operators_meet_integer_literals_in_generated_designs() {
+    // the `passes` agent's finding: a mutant that dropped the reader's integer tags passed the
+    // generated-design property, since an integer literal almost never stood where its type
+    // shows. Oracle: a census over generated designs of the full set, against a floor: a typed
+    // division or integer division with two integer literals, a bit operator or a conversion
+    // with one
+    use spicerack_ir::r#gen::{Size, generate};
+    use spicerack_ir::{Expr, FeatureSet};
+    const FLOOR: f64 = 0.25;
+    let size = Size {
+        items: 40,
+        scope_depth: 3,
+        expr_depth: 4,
+        files: 1,
+    };
+    let (mut typed, mut shows) = (0u32, 0u32);
+    for seed in 0..200u64 {
+        let d = generate(seed, &FeatureSet::ALL, size);
+        let int = |e: ExprId| matches!(d.expr(e), Expr::Num(n) if d.num(n).form == NumForm::Int);
+        for k in 0..d.expr_count() {
+            let (is_typed, show) = match d.expr(ExprId(k as u32)) {
+                Expr::Binary(BinOp::DivTyped | BinOp::IntDiv, a, b) => (true, int(a) && int(b)),
+                Expr::Binary(
+                    BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr,
+                    a,
+                    b,
+                ) => (true, int(a) || int(b)),
+                Expr::Unary(UnOp::BitNot, a) => (true, int(a)),
+                Expr::Call(Func::ToReal | Func::ToInt, l) => {
+                    (true, d.exprs(l).iter().any(|&a| int(a)))
+                }
+                _ => (false, false),
+            };
+            typed += u32::from(is_typed);
+            shows += u32::from(show);
+        }
+    }
+    assert!(typed > 100, "{typed} typed operators");
+    let share = f64::from(shows) / f64::from(typed);
+    println!("{shows} of {typed} typed operators meet integer literals ({share:.2})");
+    assert!(
+        share >= FLOOR,
+        "{shows} of {typed} typed operators meet integer literals ({share:.2})"
+    );
+}

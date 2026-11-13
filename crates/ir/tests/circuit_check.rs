@@ -874,7 +874,7 @@ mod tests {
                 Span::NONE,
             );
         }
-        let cases: [(&str, Case); 9] = [
+        let cases: [(&str, Case); 11] = [
             ("a resistor with no value and no model", |b, top| {
                 let r = b.detail(Passive::PLAIN);
                 push(b, top, ElemKind::Resistor, &["a", "b"], None, r);
@@ -887,6 +887,27 @@ mod tests {
                     ..Passive::PLAIN
                 });
                 push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            }),
+            // R74: tce is a resistor's on every dialect we run (ngspice res.c; VACASK
+            // sp_capacitor and sp_inductor list no tce; Xyce 7.10 "Unrecognized parameter TCE
+            // for device C1" and L1)
+            ("an exponential coefficient on a capacitor", |b, top| {
+                let one = n(b, 1);
+                let c = b.detail(Passive {
+                    value: one,
+                    tce: one,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Capacitor, &["a", "0"], None, c);
+            }),
+            ("an exponential coefficient on an inductor", |b, top| {
+                let one = n(b, 1);
+                let l = b.detail(Passive {
+                    value: one,
+                    tce: one,
+                    ..Passive::PLAIN
+                });
+                push(b, top, ElemKind::Inductor, &["a", "0"], None, l);
             }),
             ("a noiseless constant inductor", |b, top| {
                 let one = n(b, 1);
@@ -1194,5 +1215,50 @@ mod tests {
         );
         assert_eq!(codes_of("n1 n2", "div"), Vec::<Code>::new(), "matching");
         assert_eq!(codes_of("n1", "elsewhere"), Vec::<Code>::new(), "unbound");
+    }
+
+    /// A subcircuit that instantiates itself, directly or through another, has no finite
+    /// elaboration: ngspice-45 stops at "unknown subckt: x0.x1.x1…" and VACASK says
+    /// "Hierarchical recursion detected." (`tests/fixtures/hierarchy/{ngspice,vacask}.out`). Each instance on
+    /// the cycle reports `InstanceCycle`, used or not; neighbours: a chain without a cycle, and
+    /// a top-level instance of a subcircuit (no enclosing subcircuit, no edge).
+    #[test]
+    fn a_subcircuit_never_reaches_itself() {
+        let codes_of = |body: &str| {
+            let text = format!("file \"t.sp\" deck\n{body}");
+            let mut d = Design::new();
+            let mut diags = Diags::new();
+            spicerack_ir::parse_unchecked(&text, &mut d.builder(), &mut diags);
+            assert!(diags.is_empty(), "{:?}", diags.rows());
+            spicerack_ir::link(&mut d, &mut diags);
+            let mut out = Diags::new();
+            check(&d, &mut out);
+            codes(&out)
+        };
+        let sub = |name: &str, inst: &str| {
+            format!(
+                "  subckt {name} (a)\n    element resistor r1 (a 0) value=1\n    element instance x1 (a) model={inst}\n"
+            )
+        };
+        let leaf = "  subckt q (a)\n    element resistor r1 (a 0) value=1\n";
+        let top = "  element instance x0 (n) model=p\n";
+        assert_eq!(
+            codes_of(&sub("p", "p")),
+            only(Violation::InstanceCycle),
+            "self"
+        );
+        let two = codes_of(&format!("{}{}{top}", sub("p", "q"), sub("q", "p")));
+        let cycle = violation_code(Violation::InstanceCycle);
+        assert_eq!(two, vec![cycle, cycle], "a two-cycle: both instances");
+        assert_eq!(
+            codes_of(&format!("{}{leaf}{top}", sub("p", "q"))),
+            Vec::<Code>::new(),
+            "a chain"
+        );
+        assert_eq!(
+            codes_of(&format!("{leaf}  element instance x0 (n) model=q\n")),
+            Vec::<Code>::new(),
+            "top level"
+        );
     }
 }

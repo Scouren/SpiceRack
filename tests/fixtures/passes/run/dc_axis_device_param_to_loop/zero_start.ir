@@ -1,2 +1,2 @@
 file "a.sp" deck
-  analysis dc (device_param g3 g4) (lin start=0 stop=2.0 step=0.5) restart
+  analysis dc (device_param g3 g4) (lin start=0 stop=2.0 step=0.5) afresh

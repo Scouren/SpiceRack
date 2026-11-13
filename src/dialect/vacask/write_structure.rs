@@ -63,17 +63,12 @@ pub(super) fn comment(w: &mut Writer<'_, '_>, row: ir::item::Comment) {
 }
 
 /// An `include` line.
-pub(super) fn include(w: &mut Writer<'_, '_>, row: ir::item::Include) {
+pub(super) fn include(w: &mut Writer<'_, '_>, at: ir::ItemRef, row: ir::item::Include) {
     w.line();
     w.out.push_str("include ");
-    let path = w.design.str(row.path);
-    // The reader resolved the path against the including file; VACASK resolves it again.
-    let prefix = format!("{}/", w.dir);
-    let path = match w.dir.is_empty() {
-        true => path,
-        false => path.strip_prefix(&prefix).unwrap_or(path),
-    };
-    string(path, w.out);
+    // The reader resolved the path against the including file; VACASK resolves it again (R78)
+    let path = w.path(at, w.design.str(row.path));
+    string(&path, w.out);
     if !row.section.is_none() {
         w.out.push_str(" section=");
         name::spell(w.design.str(row.section), Place::Other, w.out);
@@ -101,7 +96,8 @@ pub(super) fn load(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     let row: ir::item::Load = d.row(at.index);
     w.line();
     w.out.push_str("load ");
-    string(d.str(row.path), w.out);
+    let path = w.path(at, d.str(row.path));
+    string(&path, w.out);
     // The load's modules: `map=` loads exactly those, each under its own name (VD cir-loading).
     let modules: Vec<ir::NameId> = d
         .definitions()

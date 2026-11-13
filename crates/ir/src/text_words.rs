@@ -12,7 +12,7 @@
 //! `Words::name(&mut self, &mut Builder<'_>, &mut Diags) -> NameId`,
 //! `Words::names(&mut self, &mut Builder<'_>, &mut Diags) -> NameList`,
 //! `Words::number(&mut self, &mut Diags) -> Option<Literal>`,
-//! `Words::string(&mut self, &mut Diags) -> Option<Cow<'t, str>>`,
+//! `Words::string(&mut self, &mut Diags) -> Option<Cow<'t, str>>`, `Words::path(&mut self, &mut Diags) -> Option<Cow<'t, str>>`,
 //! `Words::reference(&mut self, &mut Builder<'_>, &mut Diags) -> Ref`,
 //! `Words::value(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
 //! `Words::expr(&mut self, ScopeId, &mut Builder<'_>, &mut Diags) -> ExprId`,
@@ -30,7 +30,7 @@ use crate::diag::{Diags, TEXT_SYNTAX};
 use crate::expr::Literal;
 use crate::id::{DefId, ExprId, ExprList, FileId, NameId, NameList, ParamList, Ref, ScopeId};
 use crate::span::Span;
-use crate::text_lex::{Mark, lex_literal, lex_mark, lex_name, name_byte, unquote};
+use crate::text_lex::{RefMark, lex_literal, lex_mark, lex_name, name_byte, unquote};
 use crate::text_parse::parse_expr;
 
 /// The IR text reader's cursor over one statement line (after its indentation). A word is a
@@ -153,6 +153,19 @@ impl<'t> Words<'t> {
         None
     }
 
+    /// A double-quoted string that names something (a file, an include, a load's path): as
+    /// [`Words::string`], and refused when empty, since a name is never empty (the builder
+    /// asserts it; the mutation law found `include ""`).
+    pub fn path(&mut self, diags: &mut Diags) -> Option<Cow<'t, str>> {
+        let at = self.pos;
+        let s = self.string(diags)?;
+        if s.is_empty() {
+            self.error_at(at, diags);
+            return None;
+        }
+        Some(s)
+    }
+
     /// A reference: `name` (unresolved; `link` binds it after the whole text), `name?` (held
     /// unresolved through the link) or `name#k` (bound to definition `k`, checked by `check`).
     /// The row stores the returned `Ref` as it is.
@@ -170,9 +183,9 @@ impl<'t> Words<'t> {
         let (mark, q) = lex_mark(self.text, q, self.end);
         self.pos = q;
         let def = match mark {
-            Mark::Bare => DefId::NONE,
-            Mark::Held => DefId::HELD,
-            Mark::Def(k) => DefId(k),
+            RefMark::Bare => DefId::NONE,
+            RefMark::Held => DefId::HELD,
+            RefMark::Def(k) => DefId(k),
         };
         Ref {
             name: b.name(&name),

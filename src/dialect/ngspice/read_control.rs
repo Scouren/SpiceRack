@@ -63,6 +63,8 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::LoopModelParam),
     Feature::Run(RunExtra::SweepLoopList),
     Feature::Run(RunExtra::AlterParam),
+    // `alterparam` takes effect at the next `reset` (R70/A43)
+    Feature::Run(RunExtra::AlterParamAtReset),
     Feature::Run(RunExtra::AlterSourceDc),
     Feature::Run(RunExtra::AlterElementValue),
     Feature::Run(RunExtra::AlterDeviceParam),

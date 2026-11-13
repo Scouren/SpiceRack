@@ -20,7 +20,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `ARG_READS`, `ARG_READS_PARAM`, `TARGET_UNFOUND`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `ARG_READS`, `TARGET_UNFOUND`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -108,6 +108,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::TranUic))
 .with(ir::Feature::Run(ir::RunExtra::TranNoise))
 .with(ir::Feature::Run(ir::RunExtra::DcNested))
+// every level carries (R75; `continuation=0` is Private)
+.with(ir::Feature::Run(ir::RunExtra::DcOuterCarries))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisDeviceParam))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisModelParam))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisTemp))
@@ -137,6 +139,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::placed(
 .with(ir::Feature::Run(ir::RunExtra::LoopParam))
 .with(ir::Feature::Run(ir::RunExtra::DcAxisParam))
 .with(ir::Feature::Run(ir::RunExtra::AlterParam))
+// an alter applies where it stands (R70/A43)
+.with(ir::Feature::Run(ir::RunExtra::AlterParamAtOnce))
 // R64b: a dc source's `dc`, a passive's value
 .with(ir::Feature::Run(ir::RunExtra::AlterSourceDc))
 .with(ir::Feature::Run(ir::RunExtra::AlterElementValue))
@@ -190,8 +194,6 @@ pub(super) const SOURCE_SWEEP_WAVE: ir::Code = ir::Code::new(b'W', 2307);
 pub(super) const SOURCE_SWEEP_NAME: ir::Code = ir::Code::new(b'W', 2309);
 /// An analysis argument or sweep range that reads `$temp`, `$tnom` or a top-level parameter.
 pub(super) const ARG_READS: ir::Code = ir::Code::new(b'P', 2316);
-/// An analysis argument or sweep range reading a parameter, the temperature or `$tnom`.
-pub(super) const ARG_READS_PARAM: ir::Code = ir::Code::new(b'W', 2313);
 /// A sweep or alter target naming no instance or top-level parameter VACASK finds.
 pub(super) const TARGET_UNFOUND: ir::Code = ir::Code::new(b'W', 2312);
 /// A transfer or noise analysis whose output is no node or node pair.
@@ -337,13 +339,6 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "an analysis argument or sweep range that reads the temperature or a parameter",
         "R68, A42; settle run/temp_tran, temp_ac, temp_dc (and their swept and options forms), param_tran, param_tran_swept",
         "VACASK evaluates an analysis's arguments and a sweep's range with circuit variables and constants only: `$temp`, `$tnom` or a `parameters` name there is \"Variable or constant … not defined.\" and the analysis fails (VACASK still exits 0).",
-        ir::Kind::Refusal,
-    ),
-    row(
-        ARG_READS_PARAM,
-        "an analysis argument or sweep range that reads a parameter or the temperature",
-        "R68, A42 (goes with A42's feature and invariant); settle run/temp_*, param_tran",
-        "VACASK's analysis arguments see no parameter and no temperature, and it fails such an analysis with exit code 0; until A42's parameter-read feature reaches FEATURES (which will lack it) the design has no VACASK spelling.",
         ir::Kind::Refusal,
     ),
     row(

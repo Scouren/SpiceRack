@@ -21,7 +21,7 @@ use crate::expr::{BinOp, Dist, DrawPer, DrawWhen, Func, UnOp};
 use crate::id::ExprId;
 use crate::text_expr::{binary_prec, func_text};
 use crate::text_lex::{
-    Mark, apply_mark, ident_or_quoted, lex_mark, lex_name, name_byte, number_end, number_parts,
+    RefMark, apply_mark, ident_or_quoted, lex_mark, lex_name, name_byte, number_end, number_parts,
     unquote,
 };
 
@@ -43,7 +43,7 @@ enum Op<'t> {
 enum Call<'t> {
     Func(Func),
     Draw(Dist, DrawWhen, DrawPer),
-    User(Cow<'t, str>, Mark),
+    User(Cow<'t, str>, RefMark),
     List,
 }
 

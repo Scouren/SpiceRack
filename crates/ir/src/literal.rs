@@ -10,7 +10,9 @@
 //! `Literal::eq_value(self, Literal) -> bool`, `Literal::is_valid(self) -> bool`; crate:
 //! `Literal::shape_ok(self) -> bool`, `Literal::finite(self) -> bool`; `pub fn significant_digits(&str) -> usize`,
 //! `pub const fn exceeds_mantissa(usize) -> bool`, `pub enum Decimal`,
-//! `pub fn decimal(&str, i32, NumForm) -> Option<Decimal<'_>>`; crate: `long_ok`, `long_violation`,
+//! `pub fn decimal(&str, i32, NumForm) -> Option<Decimal<'_>>`,
+//! `pub fn write_digits(i128, u8, &mut String)`,
+//! `pub fn write_power(i16, NumForm, &[(i16, &str)], &mut String)`; crate: `long_ok`, `long_violation`,
 //! `long_shape_ok`, `long_finite`,
 //! `long_value`, `long_normal`, `short_normal`
 
@@ -288,6 +290,49 @@ pub fn decimal(significand: &str, exp10: i32, form: NumForm) -> Option<Decimal<'
         }
     }
     l.is_valid().then_some(Decimal::Short(l))
+}
+
+/// Appends `mantissa` with `frac` of its digits after the point, its sign first (`5`, 3 →
+/// `0.005`; `-150`, 2 → `-1.50`): a literal's digits as every dialect writes them. `i128` so a
+/// dialect may fold a factor in first (ngspice's `mil` as `× 254`, then `e-7`).
+pub fn write_digits(mantissa: i128, frac: u8, out: &mut String) {
+    if mantissa < 0 {
+        out.push('-');
+    }
+    let digits = mantissa.unsigned_abs().to_string();
+    let frac = usize::from(frac);
+    if frac == 0 {
+        out.push_str(&digits);
+        return;
+    }
+    let padded = format!("{digits:0>width$}", width = frac + 1);
+    let (int, dec) = padded.split_at(padded.len() - frac);
+    out.push_str(int);
+    out.push('.');
+    out.push_str(dec);
+}
+
+/// Appends the power `exp10` written as `form`: nothing for `Plain`, `e<exp10>` for
+/// `Exponent`, and for `Scale` the letter `letters` holds for the power, or `e<exp10>` when it
+/// holds none. `letters` is each dialect's own table, plain data (`meg`, `G`, `t`, …). How a
+/// dialect writes `Mil`, `Int` and a point on a whole number is its own.
+///
+/// # Panics
+/// On `Mil`, `Int` or `Long`, and on a `Plain` power other than 0.
+pub fn write_power(exp10: i16, form: NumForm, letters: &[(i16, &str)], out: &mut String) {
+    match form {
+        NumForm::Plain => assert!(exp10 == 0, "a plain literal has no power"),
+        NumForm::Scale if let Some((_, l)) = letters.iter().find(|(p, _)| *p == exp10) => {
+            out.push_str(l)
+        }
+        NumForm::Scale | NumForm::Exponent => {
+            out.push('e');
+            out.push_str(&exp10.to_string());
+        }
+        NumForm::Mil | NumForm::Int | NumForm::Long => {
+            panic!("write_power: {form:?} is the dialect's own spelling")
+        }
+    }
 }
 
 /// Whether `digits` significant digits exceed what a short literal's mantissa holds (18): the one

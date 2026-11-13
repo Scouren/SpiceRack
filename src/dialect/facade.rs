@@ -20,13 +20,13 @@
 //! - `pub fn route_with(from: &str, to: &str, pipeline: Option<Pipeline>) -> Option<(&'static DialectRow, &'static DialectRow)>`
 //! - `pub fn render_text(text: &str, name: &str, from: &DialectRow, to: &DialectRow) -> Result<render::Written, render::Diags>`
 //! - `pub fn render_kit(kit: &Kit, file: FileId, name: &str, from: &DialectRow, to: &DialectRow) -> Result<render::Written, render::Diags>`
-//! - `pub fn diags(rows: &[ir::Diag], src: &Sources, name: &str, target: &str) -> render::Diags`
+//! - `pub fn diags(rows: &[ir::Diag], src: &Sources, name: &str, target: &str, citations: &[Citation]) -> render::Diags`
 //! - `pub fn old_code(d: &ir::Diag, target: &str) -> Code`
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use super::{DialectRow, Policy, Sources, by_name, transpile};
+use super::{Citation, DialectRow, Policy, Sources, by_name, transpile};
 use crate::ir;
 use crate::syntax::diag::{self, Code};
 use crate::syntax::render;
@@ -160,8 +160,15 @@ pub fn render_kit(
 /// code), messages `name:line:column: CODE title` (for [`IR_REFUSAL`] and [`IR_NOTE`]: `CODE
 /// <new code> <new title>`) with the line and byte column (from 1) computed from the span in
 /// `src`'s file of that position; `0:0` for a row with no span or a file `src` lacks. Today's
-/// `Diag::token` holds the span's first byte.
-pub fn diags(rows: &[ir::Diag], src: &Sources, name: &str, target: &str) -> render::Diags {
+/// `Diag::token` holds the span's first byte. A `U0001` row whose feature `citations` (the
+/// target writer's, `Write::citations`) names ends with `: <evidence>` (A34).
+pub fn diags(
+    rows: &[ir::Diag],
+    src: &Sources,
+    name: &str,
+    target: &str,
+    citations: &[Citation],
+) -> render::Diags {
     let mut sorted = rows.to_vec();
     sorted.sort_by_key(|d| (d.span.file, d.span.start, d.code));
     let mut out = render::Diags {
@@ -175,13 +182,21 @@ pub fn diags(rows: &[ir::Diag], src: &Sources, name: &str, target: &str) -> rend
             .flatten();
         let (line, column) = text.map_or((0, 0), |(_, t)| location(t, d.span.start));
         out.diags.push(diag::Diag::new(old, d.span.start, 0));
-        let title = match old {
+        let mut title = match old {
             IR_REFUSAL | IR_NOTE => {
                 let new = super::info(d.code).map_or("a code no catalogue holds", |i| i.title);
                 format!("{}{:04} {new}", char::from(d.code.letter), d.code.number)
             }
             _ => diag::info(old).title.to_string(),
         };
+        let cited = citations
+            .iter()
+            .find(|c| u32::from(c.feature.index()) == d.arg);
+        if d.code == ir::diag::UNSUPPORTED
+            && let Some(c) = cited
+        {
+            title = format!("{title}: {}", c.evidence);
+        }
         out.messages += &format!("{name}:{line}:{column}: {old:?} {title}\n");
     }
     assert!(out.diags.len() == rows.len(), "one old row per new row");
@@ -229,10 +244,15 @@ fn finish(
     match result {
         Ok(w) => Ok(render::Written {
             text: w.text,
-            notes: diags(w.notes.rows(), src, name, to.name),
+            notes: diags(w.notes.rows(), src, name, to.name, cited(to)),
         }),
-        Err(d) => Err(diags(d.rows(), src, name, to.name)),
+        Err(d) => Err(diags(d.rows(), src, name, to.name, cited(to))),
     }
+}
+
+/// The target writer's citations, none for a row with no writer.
+fn cited(to: &DialectRow) -> &'static [Citation] {
+    to.write.map_or(&[], |w| w.citations())
 }
 
 /// The line and byte column (both from 1) of byte `at` of `text`; past the end, the end's.
