@@ -28,7 +28,8 @@ mod tests {
     };
     use spicerack_ir::{
         Builder, CircuitExtra as X, Design, DeviceLibrary, ElemKind, ExprId, Feature, FeatureSet,
-        ModelFamily, NO_ROW, NameId, Polarity, Ref, ScopeId, Span, WaveKind, features_used,
+        Law, Laws, ModelFamily, NO_ROW, NameId, Polarity, Ref, ScopeId, Span, WaveKind,
+        features_used,
     };
     use spicerack_ir::{DefKind, LoadKind};
 
@@ -1486,50 +1487,163 @@ mod tests {
                 },
             )
         }),
-        // R86: a BJT of area 2 against its neighbour of area 1, on a Gummel-Poon model of
-        // each law (an area of literally 1 is where the two laws agree)
+        // R90: each law's member at a row carrying its point under the stated law; the
+        // neighbour is the row where the two builds agree (`laws.rs`, each variant's doc).
+        // R86: a BJT of area 2 against area 1
         (X::BjtBcSatAreaTimesAreab, |b, t, on| {
-            bjt_law(b, t, on, spicerack_ir::BcSatArea::AreaTimesAreab)
+            bjt_law(b, t, on, Law::BcSatAreaTimesAreab)
         }),
         (X::BjtBcSatAreabOnly, |b, t, on| {
-            bjt_law(b, t, on, spicerack_ir::BcSatArea::AreabOnly)
+            bjt_law(b, t, on, Law::BcSatAreabOnly)
         }),
-        // R88: a Gummel-Poon model giving `iss` with `ns = 2` against its neighbour `ns = 1`
-        // (where the two substrate laws agree), under each law
+        // R88: a Gummel-Poon model giving `iss` with `ns = 2` against `ns = 1`
         (X::ModelSubSatLastFactor, |b, t, on| {
-            substrate_law(b, t, on, spicerack_ir::SubSatTemp::LastFactor)
+            substrate_law(b, t, on, Law::SubSatLastFactor)
         }),
         (X::ModelSubSatEmissionNs, |b, t, on| {
-            substrate_law(b, t, on, spicerack_ir::SubSatTemp::EmissionNs)
+            substrate_law(b, t, on, Law::SubSatEmissionNs)
+        }),
+        // R91 F20: a level-3 diode from `w` and `l` with `m = 2` against `m = 1`
+        (X::DiodeWlMultTwice, |b, t, on| {
+            diode_mult(b, t, on, Law::DiodeWlMultTwice)
+        }),
+        (X::DiodeWlMultOnce, |b, t, on| {
+            diode_mult(b, t, on, Law::DiodeWlMultOnce)
+        }),
+        // R91 F22: a diode of `pj = 1` against `pj = 0` on a model with `cjsw`
+        (X::DiodeSidewallBottomF1, |b, t, on| {
+            diode_sidewall(b, t, on, Law::DiodeSidewallBottomF1)
+        }),
+        (X::DiodeSidewallOwnF1, |b, t, on| {
+            diode_sidewall(b, t, on, Law::DiodeSidewallOwnF1)
         }),
     ];
 
-    fn substrate_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: spicerack_ir::SubSatTemp) {
+    fn substrate_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
         let iss = n(b, 1);
         let ns = n(b, if on { 2 } else { 1 });
         let params = b.params(&[("iss", iss), ("ns", ns)]);
         let name = b.name("m");
         let row = spicerack_ir::Model {
             params,
-            sub_sat_temp: law,
             ..model(name, ModelFamily::GummelPoon, Polarity::N)
         };
         b.model(t, row, Span::NONE);
     }
 
-    fn bjt_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: spicerack_ir::BcSatArea) {
+    fn bjt_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
         let name = b.name("m");
-        let row = spicerack_ir::Model {
-            bc_sat_area: law,
-            ..model(name, ModelFamily::GummelPoon, Polarity::N)
-        };
-        b.model(t, row, Span::NONE);
+        b.model(
+            t,
+            model(name, ModelFamily::GummelPoon, Polarity::N),
+            Span::NONE,
+        );
         let def = b.design().lookup(t, DefKind::Model, name);
         let area = n(b, if on { 2 } else { 1 });
         let mut h = b.head("q1", &["c", "b", "e"], Some("m"), &[], ExprId::NONE);
         h.model = Ref { name, def };
         let row = spicerack_ir::semi::Semi { area, ..semi() };
         b.semi(t, ElemKind::Bjt, h, row, Span::NONE);
+    }
+
+    /// A diode `d1` naming model `m` of `family` (with `model_params`), bound.
+    fn diode(
+        b: &mut Builder<'_>,
+        t: ScopeId,
+        family: ModelFamily,
+        model_params: &[(&str, ExprId)],
+        params: &[(&str, ExprId)],
+        mult: ExprId,
+    ) {
+        let name = b.name("m");
+        let list = if model_params.is_empty() {
+            spicerack_ir::List::EMPTY
+        } else {
+            b.params(model_params)
+        };
+        let row = spicerack_ir::Model {
+            params: list,
+            ..model(name, family, Polarity::None)
+        };
+        b.model(t, row, Span::NONE);
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mut h = b.head("d1", &["a", "c"], Some("m"), params, mult);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Diode, h, semi(), Span::NONE);
+    }
+
+    fn diode_mult(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let (w, l) = (n(b, 1), n(b, 1));
+        let m = n(b, if on { 2 } else { 1 });
+        diode(
+            b,
+            t,
+            ModelFamily::DiodeLevel3,
+            &[],
+            &[("w", w), ("l", l)],
+            m,
+        );
+    }
+
+    fn diode_sidewall(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let cjsw = n(b, 1);
+        let pj = n(b, if on { 1 } else { 0 });
+        diode(
+            b,
+            t,
+            ModelFamily::Diode,
+            &[("cjsw", cjsw)],
+            &[("pj", pj)],
+            ExprId::NONE,
+        );
+    }
+
+    /// R90: a carrier reports nothing while no law is stated (a built design states none), and
+    /// an unresolved model carries the stated law.
+    #[test]
+    fn a_law_is_reported_only_where_stated() {
+        let law = |x: Law| Feature::Circuit(x.member());
+        let laws = CASES
+            .iter()
+            .filter(|c| Law::ALL.iter().any(|l| l.member() == c.0));
+        for &(x, case) in laws {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            case(&mut d.builder(), top, true);
+            assert!(features_used(&d).contains(Feature::Circuit(x)));
+            d.builder().set_laws(Laws::EMPTY);
+            assert!(
+                !features_used(&d).contains(Feature::Circuit(x)),
+                "{x:?} reported unstated"
+            );
+        }
+        let unresolved = used(
+            |b, t, _| {
+                b.set_laws(Laws::of(&[Law::BcSatAreabOnly, Law::DiodeSidewallOwnF1]));
+                let (area, pj) = (n(b, 2), n(b, 1));
+                let h = b.head("q1", &["c", "b", "e"], Some("nomodel"), &[], ExprId::NONE);
+                let row = spicerack_ir::semi::Semi { area, ..semi() };
+                b.semi(t, ElemKind::Bjt, h, row, Span::NONE);
+                let h = b.head(
+                    "d1",
+                    &["a", "c"],
+                    Some("nomodel"),
+                    &[("pj", pj)],
+                    ExprId::NONE,
+                );
+                b.semi(t, ElemKind::Diode, h, semi(), Span::NONE);
+            },
+            true,
+        );
+        let got: Vec<Law> = Law::ALL
+            .into_iter()
+            .filter(|&x| unresolved.contains(law(x)))
+            .collect();
+        assert_eq!(got, [Law::BcSatAreabOnly, Law::DiodeSidewallOwnF1]);
     }
 
     #[test]

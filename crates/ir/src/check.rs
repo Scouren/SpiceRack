@@ -125,6 +125,9 @@ pub enum Violation {
     /// value, which `ElementValue` and `SourceDc` state (one meaning, one form: its text reads
     /// back as the other kind; `link::target_aliases`). The run owner's. `arg`: the element name.
     TargetAlias,
+    /// Two variants of one law point stated (R90: a point's variants exclude each other;
+    /// `laws.rs`). The circuit owner's. `arg`: the point's index.
+    LawConflict,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -135,7 +138,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::TargetAlias as usize + 1] = [
+    pub const ALL: [Violation; Violation::LawConflict as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -161,6 +164,7 @@ impl Violation {
         Violation::RunArgumentClass,
         Violation::InstanceCycle,
         Violation::TargetAlias,
+        Violation::LawConflict,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -180,6 +184,9 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
     // the circuit owner's design-level invariants (A13: element names unique in a scope)
     crate::element::design_check(design, out.diags);
+    for point in crate::laws::conflicts(design.laws()) {
+        out.report(Violation::LawConflict, ItemRef::NONE, point);
+    }
     // the run owner's: a Fourier count's option in force, the node-set mix (A16, A28)
     crate::state_order::design_check(design, out.diags);
     // the class table reads definitions through their rows, so it runs on a design whose

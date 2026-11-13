@@ -1104,53 +1104,24 @@ mod tests {
         assert_eq!(params, only(Violation::FieldDomain));
     }
 
-    /// R86, R88: a base-collector or substrate law of its own (`AreabOnly`, `EmissionNs`) only on
-    /// a Gummel-Poon model; on a diode model it is `FieldDomain`, and either law is legal on
-    /// Gummel-Poon.
+    /// R90: a design states one variant per law point; two of one point is `LawConflict` (once,
+    /// at no item), one of each point is legal.
     #[test]
-    fn only_a_gummel_poon_model_states_a_bjt_law_of_its_own() {
-        let with = |family: ModelFamily, polarity: Polarity, law: spicerack_ir::BcSatArea| {
-            checked(move |b, top| {
-                let name = b.name("m");
-                let row = spicerack_ir::Model {
-                    bc_sat_area: law,
-                    ..model(name, family, polarity)
-                };
-                b.push(top, row, Span::NONE);
-            })
-        };
-        use spicerack_ir::BcSatArea::{AreaTimesAreab, AreabOnly};
-        assert_eq!(
-            with(ModelFamily::GummelPoon, Polarity::N, AreabOnly),
-            Vec::<Code>::new()
-        );
-        assert_eq!(
-            with(ModelFamily::GummelPoon, Polarity::N, AreaTimesAreab),
-            Vec::<Code>::new()
-        );
-        assert_eq!(
-            with(ModelFamily::Diode, Polarity::None, AreabOnly),
-            only(Violation::FieldDomain)
-        );
-        // R88: likewise the substrate temperature law
-        let sub = |family: ModelFamily, polarity: Polarity| {
-            checked(move |b, top| {
-                let name = b.name("m");
-                let row = spicerack_ir::Model {
-                    sub_sat_temp: spicerack_ir::SubSatTemp::EmissionNs,
-                    ..model(name, family, polarity)
-                };
-                b.push(top, row, Span::NONE);
-            })
-        };
-        assert_eq!(
-            sub(ModelFamily::GummelPoon, Polarity::N),
-            Vec::<Code>::new()
-        );
-        assert_eq!(
-            sub(ModelFamily::Diode, Polarity::None),
-            only(Violation::FieldDomain)
-        );
+    fn a_law_point_is_stated_once() {
+        use spicerack_ir::{Law, Laws};
+        let with = |laws: Laws| checked(move |b, _| b.set_laws(laws));
+        let both = Laws::of(&[Law::BcSatAreaTimesAreab, Law::BcSatAreabOnly]);
+        assert_eq!(with(both), only(Violation::LawConflict));
+        let twice = Laws::of(&[Law::DiodeSidewallBottomF1, Law::DiodeSidewallOwnF1])
+            .with(Law::SubSatLastFactor);
+        assert_eq!(with(twice), only(Violation::LawConflict));
+        let each = Laws::of(&[
+            Law::BcSatAreabOnly,
+            Law::SubSatLastFactor,
+            Law::DiodeWlMultOnce,
+            Law::DiodeSidewallBottomF1,
+        ]);
+        assert_eq!(with(each), Vec::<Code>::new());
     }
 
     /// A model of a versioned family states its version (ng-models' L5 finding: "no version"

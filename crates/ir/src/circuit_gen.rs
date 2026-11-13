@@ -27,7 +27,7 @@ use crate::controlled::{
 use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::placeable;
-use crate::r#gen::{Gen, Reads};
+use crate::r#gen::{Gen, Params, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::letter::letter_of;
@@ -76,9 +76,6 @@ struct R<'r, 'b> {
     /// A behavioural source's output, drawn with its header (it fixes the multiplier's
     /// member, R58) and read by `behav`.
     behav_out: Option<crate::controlled::OutKind>,
-    /// Whether a BJT may draw an area (R86: one other than 1 sets its model's base-collector
-    /// member, which the set must hold); true for every other kind.
-    semi_area_ok: bool,
 }
 
 /// Pushes one random element into `scope`, or returns `ItemRef::NONE` when the set allows no
@@ -96,7 +93,6 @@ pub(crate) fn generate_element(
         scope,
         drawn: None,
         behav_out: None,
-        semi_area_ok: true,
     };
     let kinds: Vec<ElemKind> = ElemKind::ALL.into_iter().filter(|&k| r.can(k)).collect();
     if kinds.is_empty() {
@@ -184,7 +180,6 @@ pub(crate) fn generate_element(
         None if kind == ElemKind::Instance => Ref::unresolved(r.g.fresh_name(r.b)),
         None => r.master(kind),
     };
-    r.semi_area_ok = kind != ElemKind::Bjt || bc_member_held(&r, model);
     // an instance's multiplier comes with its law (A15 C1)
     let mult_law =
         if kind == ElemKind::Instance && r.has(X::MultInstanceNgspiceAppend) && r.g.chance(2) {
@@ -208,6 +203,15 @@ pub(crate) fn generate_element(
         MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
         MultLaw::Parallel => crate::circuit_tables::mult_class(kind, voltage),
     };
+    // R91: a diode sometimes gives `w`, `l` and `pj`, where the diode laws' points stand (a
+    // member only under a stated law, drawn from the set); drawn before `mult`, in text order,
+    // values before keys as `Words::params` creates them
+    let params = if kind == ElemKind::Diode && r.g.params != Params::TypedOnly && r.g.chance(2) {
+        let (w, l, pj) = (r.ex(), r.ex(), r.ex());
+        r.b.params(&[("w", w), ("l", l), ("pj", pj)])
+    } else {
+        List::EMPTY
+    };
     let mult = if mult_law == MultLaw::NgspiceAppend || r.maybe(mult_feature) {
         r.ex()
     } else {
@@ -217,7 +221,7 @@ pub(crate) fn generate_element(
         name,
         terminals,
         model,
-        params: List::EMPTY,
+        params,
         mult,
         mult_law,
     };
@@ -245,7 +249,6 @@ pub(crate) fn generate_model(
         scope,
         drawn: None,
         behav_out: None,
-        semi_area_ok: true,
     };
     let families = r.model_families();
     if families.is_empty() {
@@ -457,11 +460,7 @@ impl R<'_, '_> {
                 })
             }
             DetailKind::Semi => {
-                let area = if self.semi_area_ok {
-                    self.opt(X::SemiArea)
-                } else {
-                    N
-                };
+                let area = self.opt(X::SemiArea);
                 let (ic, ic_mode) = self.ic_list();
                 let temp_abs = self.opt(X::InstanceTemp);
                 let dtemp = self.opt(X::InstanceDtemp);
@@ -558,24 +557,4 @@ fn siblings(r: &R<'_, '_>, scope: ScopeId) -> Vec<(NameId, ElemKind)> {
         );
     }
     out
-}
-
-/// R86: whether the set holds the base-collector member a BJT naming `model` gets when its area
-/// is not 1: its model's law for a Gummel-Poon model (a generated one never gives `ibe` and
-/// `ibc`), both for an unresolved model, none needed for another family.
-fn bc_member_held(r: &R<'_, '_>, model: Ref) -> bool {
-    use crate::model::{BcSatArea, Model, ModelFamily};
-    let d = r.b.design();
-    let Some(def) = model.def.index_checked(d.defs.len()).map(|k| d.defs[k]) else {
-        return r.has(X::BjtBcSatAreaTimesAreab) && r.has(X::BjtBcSatAreabOnly);
-    };
-    if def.item.kind != ItemKind::Model {
-        return true;
-    }
-    let m: Model = d.row(def.item.index);
-    match (m.family, m.bc_sat_area) {
-        (ModelFamily::GummelPoon, BcSatArea::AreabOnly) => r.has(X::BjtBcSatAreabOnly),
-        (ModelFamily::GummelPoon, _) => r.has(X::BjtBcSatAreaTimesAreab),
-        _ => true,
-    }
 }

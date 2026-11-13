@@ -307,6 +307,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a subcircuit that instantiates itself",
             "an instance's subcircuit reaches the subcircuit holding the instance, directly or through others, so the hierarchy has no finite elaboration; ngspice and VACASK refuse it.",
         ),
+        Violation::LawConflict => (
+            "two laws of one point stated",
+            "a design states the laws of the one simulator build it was written for, so one variant per point (R90); two say the numbers follow both.",
+        ),
         Violation::TargetAlias => (
             "a device-parameter target that names an element's value or a source's dc",
             "a resistor's r, a capacitor's c, an inductor's l is an element-value target and an independent source's dc a source-dc target: one meaning has one form, so the text reads back as what was written.",

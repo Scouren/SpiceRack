@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! element <kind> <name> (<terminal> …) [model=<ref>] [params=(k=v …)] [mult=<value>] <detail>
-//! model <name> <family> [polarity=n|p] [bc_sat=areab_only] [sub_sat=emission_ns] [params=(k=v …)] [bin_of=<name>] [ako=<ref>]
+//! model <name> <family> [polarity=n|p] [params=(k=v …)] [bin_of=<name>] [ako=<ref>]
 //!       [module=<ref>] [version=<value>] [word=<name>]
 //! ```
 //!
@@ -46,7 +46,7 @@ use crate::id::{ExprId, NameId, Ref};
 use crate::item::DefKind;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
-use crate::model::{BcSatArea, Model, ModelFamily, Polarity, SubSatTemp};
+use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{Coupling, Parasitics, Passive};
 use crate::semi::{Semi, Switch};
 use crate::source::{Distof, PortSpec, Source};
@@ -295,12 +295,6 @@ pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String
         } else {
             " polarity=p"
         });
-    }
-    if m.bc_sat_area == BcSatArea::AreabOnly {
-        out.push_str(" bc_sat=areab_only");
-    }
-    if m.sub_sat_temp == SubSatTemp::EmissionNs {
-        out.push_str(" sub_sat=emission_ns");
     }
     if !m.params.is_empty() {
         out.push_str(" params=");

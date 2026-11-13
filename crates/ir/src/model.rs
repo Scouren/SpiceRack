@@ -14,7 +14,7 @@
 //! `rewrite/INV-semantics.md` 7.01–7.22, 3.09.
 //!
 //! Contents:
-//! - `pub enum ModelFamily`, `pub enum Polarity`, `pub enum BcSatArea`, `pub enum SubSatTemp`; on each: `ALL`, `COUNT`
+//! - `pub enum ModelFamily`, `pub enum Polarity`; on each: `ALL`, `COUNT`
 //! - `ModelFamily::word(self) -> &'static str`, `ModelFamily::library_free(self) -> bool`
 //! - `pub struct Model`
 //! - `RowFacts` for `Model`
@@ -237,53 +237,6 @@ pub enum Polarity {
     P,
 }
 
-/// How a Gummel-Poon model scales its base-collector saturation current by area when it gives
-/// neither `ibe` nor `ibc` (with both given, both laws take `ibc` × areab). Each law is a build's:
-/// ngspice-45 (`bjttemp.c:179, 199`: `BJTBCtSatCur = BJTtSatCur`, then `*= areab`) and the older
-/// VACASK module (/nix/store/g5ial84g…-vacask-unstable-2026, vadng-pre-46, `bjt.va:873, 888`)
-/// take area × areab; the VACASK module the flake pins (/nix/store/dhxz6l3i…-vacask-unstable-2026,
-/// vadng-pre-48, `bjt.va:917, 933`: `BJTtSatCur/area`, then `* BJTareab` at 940) takes areab
-/// alone. R86 (the VACASK owner's run92: a saturated common-emitter stage at area 1.5 reads
-/// 3.854936e-02 there against ngspice-45's 4.812462e-02, equal at area 1; `ibc = is·area` on the
-/// model reproduces 4.812462e-02). The exact rewriting of one law in the other (`ibe = is`,
-/// `ibc = is·area` on the model, when every instance of it has one constant area) is a pass for
-/// later. Every other family states `AreaTimesAreab`.
-/// The proof that a module is this family is the pair test at step 4 on decks that exercise the
-/// law, not a reading of its source: a difference in the load equations (not compared) would show
-/// there or not at all.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[repr(u8)]
-pub enum BcSatArea {
-    /// The base-collector saturation current scales by area × areab (`CircuitExtra::BjtBcSatAreaTimesAreab`).
-    AreaTimesAreab,
-    /// It scales by areab alone (`CircuitExtra::BjtBcSatAreabOnly`).
-    AreabOnly,
-}
-
-/// How a Gummel-Poon model's substrate saturation current `iss` follows the temperature under
-/// `tlev` 0 or 1 (R88, finding F18). ngspice-45 (`bjttemp.c:181-182`) and the older VACASK module
-/// (/nix/store/g5ial84g…-vacask-unstable-2026, vadng-pre-46, `bjt.va:875-877`) multiply by the
-/// factor last set before it: `exp(factlog)`, or `exp(factlog/nr)` when `ibe` and `ibc` are both
-/// given; the VACASK module the flake pins (/nix/store/dhxz6l3i…-vacask-unstable-2026,
-/// vadng-pre-48, `bjt.va:919-922`) by `exp(factlog/ns)`. Runs (`tests/fixtures/bjt_substrate/`,
-/// `runs.out`): equal at the nominal temperature and wherever `ns` equals the exponent ngspice-45
-/// uses; at 100 °C with `ns = 2` ngspice-45 gives -9.58448e-05 A and VACASK -1.039134e-06 A; with
-/// `ns = 1` and `nr = 2` ngspice-45 moves with `nr` (-1.17091e-02 against -1.079991). No
-/// rewriting states one law in the other (`ns` also sets the substrate diode's emission), so a
-/// model on which they differ is refused across the pair. Every other family states
-/// `LastFactor`.
-/// The proof that a module is this family is the pair test at step 4 on decks that exercise the
-/// law, not a reading of its source: a difference in the load equations (not compared) would show
-/// there or not at all.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[repr(u8)]
-pub enum SubSatTemp {
-    /// The factor last set before it (`CircuitExtra::ModelSubSatLastFactor`).
-    LastFactor,
-    /// `exp(factlog/ns)` (`CircuitExtra::ModelSubSatEmissionNs`).
-    EmissionNs,
-}
-
 /// A device model, one row per bin. Defines `DefKind::Model` `name` in its scope.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Model {
@@ -314,12 +267,6 @@ pub struct Model {
     pub family: ModelFamily,
     /// The polarity; `Polarity::None` exactly for families without one.
     pub polarity: Polarity,
-    /// The base-collector saturation current's area law its reader read (`BcSatArea`); not
-    /// `AreaTimesAreab` only on `GummelPoon` (`FieldDomain` elsewhere).
-    pub bc_sat_area: BcSatArea,
-    /// The substrate saturation current's temperature law its reader read (`SubSatTemp`); not
-    /// `LastFactor` only on `GummelPoon` (`FieldDomain` elsewhere).
-    pub sub_sat_temp: SubSatTemp,
 }
 
 const _: () = assert!(size_of::<ModelFamily>() == 1);
@@ -428,20 +375,6 @@ impl ModelFamily {
 impl Polarity {
     /// Every member, in declaration order.
     pub const ALL: [Polarity; 3] = [Polarity::None, Polarity::N, Polarity::P];
-    /// Member count.
-    pub const COUNT: usize = Self::ALL.len();
-}
-
-impl SubSatTemp {
-    /// Every member, in declaration order.
-    pub const ALL: [SubSatTemp; 2] = [SubSatTemp::LastFactor, SubSatTemp::EmissionNs];
-    /// Member count.
-    pub const COUNT: usize = Self::ALL.len();
-}
-
-impl BcSatArea {
-    /// Every member, in declaration order.
-    pub const ALL: [BcSatArea; 2] = [BcSatArea::AreaTimesAreab, BcSatArea::AreabOnly];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
 }

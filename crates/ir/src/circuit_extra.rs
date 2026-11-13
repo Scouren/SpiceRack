@@ -273,26 +273,29 @@ pub enum CircuitExtra {
     /// A pulse, sine, exponential or SFFM under ngspice's zero rule
     /// (`GivenZero::SpiceDefault`).
     GivenZeroSpiceDefault,
-    /// A BJT on which the two base-collector saturation laws differ (its area is not literally
-    /// 1, and its Gummel-Poon model gives neither `ibe` nor `ibc`) under `BcSatArea::AreaTimesAreab`
-    /// (ngspice-45; R86, `BcSatArea`'s doc). An instance whose model is unresolved sets both
-    /// members: its law is unknown, so only a target holding both may take it.
+    // R90: a law's member, set at each row carrying its point when the design states the law
+    // (`laws.rs`: each `Law` variant's doc names its carriers and its runs)
+    /// A BJT carrying R86's point under `Law::BcSatAreaTimesAreab` (ngspice-45).
     BjtBcSatAreaTimesAreab,
-    /// The same under `BcSatArea::AreabOnly` (the VACASK module the flake pins; R86).
+    /// The same under `Law::BcSatAreabOnly` (the VACASK module the flake pins).
     BjtBcSatAreabOnly,
-    /// A Gummel-Poon model on which the two substrate temperature laws differ (it gives `iss`,
-    /// its `tlev` is absent or literally 0 or 1, and its `ns` is not literally the exponent the
-    /// last-set factor uses: 1 without both `ibe` and `ibc`, `nr` with them; an absent `ns` or
-    /// `nr` is literally 1, a parameter read or any other expression is not literal) under
-    /// `SubSatTemp::LastFactor` (ngspice-45; R88, `SubSatTemp`'s doc).
+    /// A Gummel-Poon model carrying R88's point under `Law::SubSatLastFactor` (ngspice-45).
     ModelSubSatLastFactor,
-    /// The same under `SubSatTemp::EmissionNs` (the VACASK module the flake pins; R88).
+    /// The same under `Law::SubSatEmissionNs` (the VACASK module the flake pins).
     ModelSubSatEmissionNs,
+    /// A diode carrying R91 F20's point under `Law::DiodeWlMultTwice` (ngspice-45).
+    DiodeWlMultTwice,
+    /// The same under `Law::DiodeWlMultOnce` (the VACASK module the flake pins).
+    DiodeWlMultOnce,
+    /// A diode carrying R91 F22's point under `Law::DiodeSidewallBottomF1` (ngspice-45).
+    DiodeSidewallBottomF1,
+    /// The same under `Law::DiodeSidewallOwnF1` (the VACASK module the flake pins).
+    DiodeSidewallOwnF1,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 113] = [
+    pub const ALL: [CircuitExtra; 117] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -406,6 +409,10 @@ impl CircuitExtra {
         CircuitExtra::BjtBcSatAreabOnly,
         CircuitExtra::ModelSubSatLastFactor,
         CircuitExtra::ModelSubSatEmissionNs,
+        CircuitExtra::DiodeWlMultTwice,
+        CircuitExtra::DiodeWlMultOnce,
+        CircuitExtra::DiodeSidewallBottomF1,
+        CircuitExtra::DiodeSidewallOwnF1,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

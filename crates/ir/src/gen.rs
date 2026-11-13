@@ -180,6 +180,10 @@ pub fn generate_with(seed: u64, features: &FeatureSet, size: Size, params: Param
     let mut g = Gen::new(seed, features, size);
     g.params = params;
     let mut b = design.builder();
+    // R90: a stated set whose members the set holds, from a stream of its own (the rows' draws
+    // stay as they were, and the set is not correlated with them)
+    let mut law_stream = Gen::new(seed ^ 0x9e37_79b9_7f4a_7c15, features, size);
+    b.set_laws(crate::laws::draw(&mut law_stream, features));
     let files = 1 + g.below(size.files.max(1) as u32);
     for k in 0..files {
         // a deck holds a title unless the set has DeckWithoutTitle (A12 K2 addendum); a set

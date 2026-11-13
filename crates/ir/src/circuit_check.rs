@@ -31,7 +31,7 @@ use crate::element::MultLaw;
 use crate::element::{DetailKind, ElemKind, Element, NO_ROW};
 use crate::expr::Expr;
 use crate::id::{DefId, ExprId, ItemRef, NameId};
-use crate::model::{BcSatArea, Model, ModelFamily, Polarity, SubSatTemp};
+use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{IcMode, TcBase, TcLaw};
 use crate::source::DcRule;
 use crate::wave::{GivenZero, PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
@@ -187,10 +187,6 @@ pub(crate) fn model_ok(design: &Design, m: &Model) -> bool {
         && (m.module.name != NameId::NONE) == wants_module
         && (m.polarity != Polarity::None || !has_polarity(m.family))
         && (m.polarity == Polarity::None || polar)
-        // R86: a law of its own only on a Gummel-Poon model
-        && (m.bc_sat_area == BcSatArea::AreaTimesAreab || m.family == ModelFamily::GummelPoon)
-        // R88: likewise the substrate temperature law
-        && (m.sub_sat_temp == SubSatTemp::LastFactor || m.family == ModelFamily::GummelPoon)
 }
 
 /// The row count of `kind`'s table (0 for `DetailKind::None`).

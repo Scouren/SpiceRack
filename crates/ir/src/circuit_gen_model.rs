@@ -16,7 +16,7 @@ use crate::feature::Feature;
 use crate::r#gen::Params;
 use crate::id::{ExprId, ItemRef, List, NameId};
 use crate::item::DefKind;
-use crate::model::{BcSatArea, Model, ModelFamily, Polarity, SubSatTemp};
+use crate::model::{Model, ModelFamily, Polarity};
 use crate::span::Span;
 
 impl R<'_, '_> {
@@ -79,16 +79,11 @@ impl R<'_, '_> {
                 value
             })
             .collect();
-        // R88: a Gummel-Poon model gives `iss` and `ns = 2`, where the two substrate laws
-        // differ, only when the set holds a member; its law by which (both: a coin)
-        let (last, ns_law) = (
-            r.has(X::ModelSubSatLastFactor),
-            r.has(X::ModelSubSatEmissionNs),
-        );
-        // (A28 item 5: `TypedOnly` draws no parameter list)
+        // R88: a Gummel-Poon model sometimes gives `iss` and `ns = 2`, where the two substrate
+        // laws differ (it reports a member only under a stated law, drawn from the set; A28
+        // item 5: `TypedOnly` draws no parameter list)
         let lists = r.g.params != Params::TypedOnly;
-        let substrate =
-            family == ModelFamily::GummelPoon && lists && (last || ns_law) && r.g.chance(2);
+        let substrate = family == ModelFamily::GummelPoon && lists && r.g.chance(2);
         let mut values = values;
         if substrate {
             values.push(r.ex());
@@ -103,12 +98,6 @@ impl R<'_, '_> {
             pairs.push(("iss".to_owned(), values[fresh]));
             pairs.push(("ns".to_owned(), values[fresh + 1]));
         }
-        let emission_ns = substrate && ns_law && (!last || r.g.chance(2));
-        let sub_sat_temp = if emission_ns {
-            SubSatTemp::EmissionNs
-        } else {
-            SubSatTemp::LastFactor
-        };
         let params = if pairs.is_empty() {
             List::EMPTY
         } else {
@@ -152,15 +141,6 @@ impl R<'_, '_> {
         } else {
             NameId::NONE
         };
-        // R86: a Gummel-Poon model's base-collector law by which member the set holds
-        let areab_only = family == ModelFamily::GummelPoon
-            && r.has(X::BjtBcSatAreabOnly)
-            && (!r.has(X::BjtBcSatAreaTimesAreab) || r.g.chance(2));
-        let bc_sat_area = if areab_only {
-            BcSatArea::AreabOnly
-        } else {
-            BcSatArea::AreaTimesAreab
-        };
         let row = Model {
             name,
             params,
@@ -171,8 +151,6 @@ impl R<'_, '_> {
             word,
             family,
             polarity,
-            bc_sat_area,
-            sub_sat_temp,
         };
         let item = r.b.model(r.scope, row, Span::NONE);
         // R48 (d): the elements that take its family may name it

@@ -167,7 +167,6 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
                 if some(s.area) {
                     add(X::SemiArea);
                 }
-                crate::bjt_laws::bc_sat_area(design, e, s.area, &mut add);
                 match s.initial {
                     InitialState::Unset => {}
                     InitialState::Off => add(X::SemiInitialOff),
@@ -183,6 +182,7 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
             if e.kind == ElemKind::Diode && e.terminals.len() == 3 {
                 add(X::DiodeThermal);
             }
+            crate::laws::carried(design, crate::laws::Carrier::Element(e), &mut add);
         }
         DetailKind::Switch => {
             if let Some(s) = get_row::<Switch>(design, e.detail) {
@@ -217,9 +217,8 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
 
 /// Adds the model's family (`Feature::Family`) and its circuit extras.
 pub(crate) fn model_features(m: &Model, design: &Design, set: &mut FeatureSet) {
-    if let Some(x) = crate::bjt_laws::sub_sat_temp(design, m) {
-        *set = set.with(Feature::Circuit(x));
-    }
+    let mut add = |x: X| *set = set.with(Feature::Circuit(x));
+    crate::laws::carried(design, crate::laws::Carrier::Model(m), &mut add);
     // A15 K5 (R32): every model is a feature of its family
     *set = set.with(Feature::Family(m.family));
     if m.bin_of != NameId::NONE {
