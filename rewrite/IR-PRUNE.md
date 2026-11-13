@@ -122,13 +122,17 @@ member is gone; every wave's IR-text default `pre` is now `hold_delay_value`.
 
 ## Group 5: the census rerun (2026-11-13), what the newer specs and rounds left
 
-Census: `tests/ir_usage.rs` of `differences` (one call adapted to the trunk's `Sources::load`) run on
-`ir-next` c06e5b00, which holds the IR at 85682f7e, in a throwaway clone (nothing pushed). Its
-no-reader list has 251 members: 99 already decided in groups 1–4 (above), 58 placements (an item
-kind in a scope kind, a combination and not a member: listed at the end), and 94 checked here against
-the goal-2 specs `rewrite/DIALECT-{XYCE,HSPICE,LTSPICE,SPECTRE,ESPICE,NGSPICE,VACASK}.md` on
+Census: diffs-2's run of `tests/ir_usage.rs` on `differences` 683297fd (trunk 3c7fdb98 merged, 618
+ngspice and 280 VACASK files), each dead member marked per goal-2 branch (dialect-xyce 8e0e8d38,
+dialect-ltspice 2d2491d1, HSPICE on the trunk): R = its reader names it, w = only its writer. 247
+dead members: 58 placements (combinations, not members: listed at the end); about 130 named by a
+goal-2 reader (live by the lead's rule); 119 with no R. Of those 119, 12 are already deleted on
+`ir-rewrite` (groups 1 and 4), and the other 107 were decided in groups 2–4 or are checked here
+against the goal-2 specs `rewrite/DIALECT-{XYCE,HSPICE,LTSPICE,SPECTRE,ESPICE,NGSPICE,VACASK}.md` on
 `differences` (ba636e25), then, where no spec row names it, against the member's own doc and the
-inventories, as groups 2 and 4 did. **None is deleted**: every one has a goal-2 citation.
+inventories, as groups 2 and 4 did. The law points new on `ir-rewrite` are live by their law tests.
+**None is deleted**: every member still in the IR has a goal-2 citation. `Family(BsimBulk)` and
+`Family(Psp103)`, newly dead in this census: **kept: user decision 3** (the OSDI modules compiled).
 
 **A spec row states it (50):** `BinaryDyn(BitAnd)`, `BinaryDyn(BitOr)`, `BinaryDyn(BitXor)`,
 `UnaryDyn(BitNot)` VACASK:126, :293; `Circuit(ElementParasitics)` LTSPICE:58;
@@ -136,7 +140,7 @@ inventories, as groups 2 and 4 did. **None is deleted**: every one has a goal-2 
 SPECTRE:106; `Circuit(SinCycles)` LTSPICE:60; `Circuit(SinSecondTone)` SPECTRE:103;
 `Circuit(SourceNoisePsd)` SPECTRE:117; `Circuit(SourceParasitics)` LTSPICE:58; `Circuit(SourceTc)`
 SPECTRE:105; `DrawPer(Instance)`, `DrawPer(Run)` SPECTRE:76; `Elem(Delay)` SPECTRE:111; `Expr(List)`
-SPECTRE:45; `Family(BsimBulk)`, `Family(Psp103)` VACASK:101; `Family(BsimSoi)`, `Family(Gaas)`,
+SPECTRE:45; `Family(BsimBulk)`, `Family(Psp103)` VACASK:101 (kept: user decision 3); `Family(BsimSoi)`, `Family(Gaas)`,
 `Family(Hisim1)`, `Family(Mos0)` SPECTRE:92; `Family(CapacitorMultiplier)`,
 `Family(InductorMultiplier)`, `Family(ResistorMultiplier)` XYCE:74; `Family(DiodeLtspice)`
 LTSPICE:62; `Family(DiodePspice)` XYCE:86; `Family(DiodeSpectre)` SPECTRE:93; `Family(Ekv)`,
