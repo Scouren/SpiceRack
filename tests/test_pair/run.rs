@@ -8,7 +8,7 @@
 //! Cites: `rewrite/SPINE.md` §8a; REWRITE-PLAN §7.4 (which component each step names).
 //!
 //! Contents:
-//! - `pub struct Deck`, `pub struct Fail`, `pub struct Done`, `pub type Written`, `pub const JOBS`
+//! - `pub struct Deck`, `pub struct Fail`, `pub struct Done`, `pub type Written`, `pub const JOBS`, `pub const SECS`
 //! - `pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &PairFile) -> Done`
 //! - `pub fn determinism(from: &DialectRow, to: &DialectRow, decks: &[Deck], once: &BTreeMap<String, Written>) -> Vec<(String, String)>`
 //! - `pub fn convert(from: &DialectRow, to: &DialectRow, deck: &Deck) -> Option<Written>`
@@ -20,8 +20,6 @@ use std::path::PathBuf;
 use spicerack::dialect::{self, DialectRow, Policy, Sources};
 use spicerack::ir;
 use spicerack::ir::ItemRow as _;
-
-use spicerack::result::RawData;
 
 use crate::files::PairFile;
 use crate::sim::{self, Ran};
@@ -75,6 +73,9 @@ pub type Written = Vec<(String, String)>;
 /// The jobs step 6 converts the decks on, against one.
 pub const JOBS: usize = 8;
 
+/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
+pub const SECS: u64 = 60;
+
 /// What the spine made of one deck: the legalized design, the written files, the rename map
 /// (new name → source name, lower case), the names of its devices (every element but a
 /// subcircuit instance, under both names, lower case) and the statement names the target cannot
@@ -89,18 +90,6 @@ struct Spine {
     /// (`cmp::without_start`).
     uic: bool,
 }
-
-/// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
-const SECS: u64 = 60;
-
-/// The refinement oracle's step cap: a transient's span over this (a deck's own smaller cap
-/// kept). span/2000 was too coarse once the tube narrowed: the MOS level 3 inverter's gate
-/// current during its input ramp is 1.2 % apart at the deck's own 1 ns cap and 0.25 % at 0.1 ns
-/// (both simulators moving toward each other), so only a finer cap shows its convergence.
-const REFINE: f64 = 20000.0;
-
-/// The refined comparison's time tube, a fraction of the stop time: ten refined steps.
-const FINE_TUBE: f64 = 10.0 / REFINE;
 
 /// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
 /// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
@@ -206,68 +195,16 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         Ok((a, b)) => return stop(fails, 4, ran_fail(a, b), written),
         Err((_, f)) => return stop(fails, 4, f, written),
     };
-    let mut tol = cmp::Tol::of(&[text, &entry.1]);
-    for (k, v) in &pair.tightened {
-        tol.tighten(k, *v).expect("pair_file checked it");
-    }
-    match agree(&a, &b, tol) {
-        Err(why) => {
-            // The refinement oracle (cross-sim's `simulator-differs:refinement`): both decks
-            // with every transient's step capped at span/REFINE; agreeing there, with the time
-            // tube narrowed to FINE_TUBE (rulings R84a: the tube absorbs an edge's placement by
-            // the steps, never a difference the circuit keeps), the two simulators' step
-            // control made the difference, not the conversion. F52 showed the hole: a reverse
-            // recovery 4.8 ns later on VACASK with both steps at 0.5 ns, inside the 1 % tube
-            // (10 ns).
-            let mut fine = tol;
-            fine.tighten("tube", FINE_TUBE)
-                .expect("FINE_TUBE is under the default tube");
-            let refined = sim::refined(c.from_sim, text, REFINE)
-                .zip(sim::refined(c.to_sim, &entry.1, REFINE))
-                .and_then(|(ra, rb)| {
-                    let a2 = sim::run_checked(c.from_sim, &deck.path, &ra, &[], SECS);
-                    let b2 = sim::run_checked(
-                        c.to_sim,
-                        &deck.path.with_extension(c.to_ext),
-                        &rb,
-                        rest,
-                        SECS,
-                    );
-                    match (a2, b2) {
-                        (Ran::Plots(mut x), Ran::Plots(mut y)) => Some({
-                            if spine.uic {
-                                cmp::without_start(&mut x);
-                                cmp::without_start(&mut y);
-                            }
-                            agree(
-                                &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
-                                &plots::only(
-                                    plots::renamed(plots::hierarchical(y), &spine.renames),
-                                    pair.vectors.as_ref(),
-                                ),
-                                fine,
-                            )
-                        }),
-                        _ => None,
-                    }
-                });
-            let f = match refined {
-                Some(Ok(())) => fail(
-                    "simulator-differs:refinement",
-                    format!("{why}; both agree with every step capped at span/{REFINE}"),
-                ),
-                Some(Err(still)) => fail(
-                    "mismatch",
-                    format!("{why}; with every step capped at span/{REFINE}: {still}"),
-                ),
-                None => fail("mismatch", why),
-            };
+    if c.from == c.to {
+        if let Err(why) = crate::same::identical(&a, &b) {
+            fails.insert(4, fail("differs", why));
+        }
+    } else {
+        let texts = (text.as_str(), entry.1.as_str(), rest);
+        let names = (spine.uic, &spine.renames);
+        if let Some(f) = crate::numbers::step(c, deck, pair, names, texts, (&a, &b)) {
             fails.insert(4, f);
         }
-        Ok(()) if std::env::var_os("PAIR_MARGINS").is_some() => {
-            eprintln!("margin {}: {}", deck.name, margin(&a, &b, text, &entry.1));
-        }
-        Ok(()) => {}
     }
     if let Err(why) = plots::names(&a, &b, &spine.devices, &spine.axes) {
         fails.insert(5, fail("missing-vector", why));
@@ -577,40 +514,6 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
             format!("{}/{:?}/{note}/{word}", design.str(o.dialect), o.class)
         })
         .collect()
-}
-
-/// Whether the two runs agree each way: `cmp::compare` holds the first run in the second's
-/// time tube only, so a target that rings about the source's value passed it (F51: ngspice's
-/// ±1 A trapezoidal ringing about VACASK's -1e-7 A held VACASK's run inside its band).
-fn agree(a: &[RawData], b: &[RawData], tol: cmp::Tol) -> Result<(), String> {
-    cmp::compare(a, b, tol)?;
-    cmp::compare(b, a, tol).map_err(|why| format!("the target's run in the source's tube: {why}"))
-}
-
-/// How much of step 4's value tolerance a passing pair uses (`PAIR_MARGINS=1`, triage). It
-/// measures the value band only: on a smooth transient the 1 % time tube covers the difference,
-/// so "passes at 0" there means not measured by this probe, never 0 %. Reports the smallest
-/// fraction `f` of RELTOL, VNTOL and ABSTOL (the transient's band scales with them) at which
-/// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
-/// below it (the worst vector, its value and the tolerance there).
-fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
-    let at = |f: f64| cmp::compare(a, b, cmp::Tol::of(&[src, written]).scaled(f));
-    let (mut lo, mut hi) = (0.0f64, 1.0f64);
-    // Bounded: seven halvings take the bracket under 1 %.
-    for _ in 0..7 {
-        let mid = (lo + hi) / 2.0;
-        match at(mid) {
-            Ok(()) => hi = mid,
-            Err(_) => lo = mid,
-        }
-    }
-    let below = at(lo).err().unwrap_or_else(|| {
-        "passes at 0: not measured by this probe (exact, or inside the time tube)".into()
-    });
-    format!(
-        "uses {:.0} % of the tolerance; below it: {below}",
-        hi * 100.0
-    )
 }
 
 /// Step 4's verdict when a run gave no plots: whose run, and why.

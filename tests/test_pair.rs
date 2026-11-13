@@ -6,6 +6,8 @@
 //! |---|---|---|
 //! | `ngspice-vacask` | ngspice-45 (`-b -r`, R49) | VACASK |
 //! | `vacask-ngspice` | VACASK | ngspice-45 |
+//! | `ngspice-ngspice` | ngspice-45 | ngspice-45 (step 4 bit for bit: `test_pair/same.rs`) |
+//! | `vacask-vacask` | VACASK | VACASK (the same) |
 //!
 //! Oracles per deck, in this order; the first that fails names the component (REWRITE-PLAN
 //! §7.4): 1 read, strict (no refusal, `ir::check` clean, no `Unread`) → the source reader;
@@ -70,10 +72,14 @@ mod vacask;
 
 #[path = "test_pair/files.rs"]
 mod files;
+#[path = "test_pair/numbers.rs"]
+mod numbers;
 #[path = "test_pair/plots.rs"]
 mod plots;
 #[path = "test_pair/run.rs"]
 mod run;
+#[path = "test_pair/same.rs"]
+mod same;
 
 #[cfg(feature = "corpus")]
 #[path = "test_pair/corpus.rs"]
@@ -91,6 +97,9 @@ use sim::Sim;
 /// extension of each dialect's text.
 struct Cell {
     name: &'static str,
+    /// The folder of its authored decks under `tests/fixtures/pair` (a same-dialect cell reads
+    /// the decks of the cell whose source dialect it shares).
+    dir: &'static str,
     from: &'static str,
     to: &'static str,
     from_sim: Sim,
@@ -103,6 +112,7 @@ struct Cell {
 const CELLS: &[Cell] = &[
     Cell {
         name: "ngspice-vacask",
+        dir: "ngspice-vacask",
         from: "ngspice",
         to: "vacask",
         from_sim: Sim::Ngspice,
@@ -112,12 +122,35 @@ const CELLS: &[Cell] = &[
     },
     Cell {
         name: "vacask-ngspice",
+        dir: "vacask-ngspice",
         from: "vacask",
         to: "ngspice",
         from_sim: Sim::Vacask,
         to_sim: Sim::Ngspice,
         from_ext: "sim",
         to_ext: "sp",
+    },
+    // The same-dialect cells (`test_pair/same.rs`): one simulator runs both decks, so step 4
+    // asks for the same bits.
+    Cell {
+        name: "ngspice-ngspice",
+        dir: "ngspice-vacask",
+        from: "ngspice",
+        to: "ngspice",
+        from_sim: Sim::Ngspice,
+        to_sim: Sim::Ngspice,
+        from_ext: "sp",
+        to_ext: "sp",
+    },
+    Cell {
+        name: "vacask-vacask",
+        dir: "vacask-ngspice",
+        from: "vacask",
+        to: "vacask",
+        from_sim: Sim::Vacask,
+        to_sim: Sim::Vacask,
+        from_ext: "sim",
+        to_ext: "sim",
     },
 ];
 
@@ -173,6 +206,16 @@ fn ngspice_to_vacask() {
 #[test]
 fn vacask_to_ngspice() {
     cell(&CELLS[1]);
+}
+
+#[test]
+fn ngspice_to_ngspice() {
+    cell(&CELLS[2]);
+}
+
+#[test]
+fn vacask_to_vacask() {
+    cell(&CELLS[3]);
 }
 
 #[test]
@@ -322,7 +365,7 @@ fn rows(c: &Cell) -> (&'static DialectRow, &'static DialectRow) {
 fn decks(c: &Cell) -> Vec<PathBuf> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/pair")
-        .join(c.name);
+        .join(c.dir);
     let rd = std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
     let mut out: Vec<PathBuf> = rd
         .map(|e| e.expect("an entry").path())

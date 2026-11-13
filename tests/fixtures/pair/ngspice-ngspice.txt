@@ -1,0 +1,4 @@
+# The ngspice-ngspice cell's failing steps (`tests/test_pair.rs`, a same-dialect cell: `test_pair/same.rs`):
+# `<deck> <step 1..6> <class> <proof>`, compared by (deck, step) both ways. Its decks are the
+# authored decks of the cell whose source dialect it shares.
+unresolved_param 1 refused:S0104 ruling=A38 # as ngspice-vacask: the strict read refuses a parameter read no definition binds (R63)
