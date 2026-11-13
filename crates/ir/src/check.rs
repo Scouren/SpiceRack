@@ -121,6 +121,10 @@ pub enum Violation {
     /// An instance on a cycle of subcircuits (no finite elaboration; ngspice-45 and VACASK
     /// refuse it: `hierarchy.rs`). The circuit owner's. `arg`: the instance's row.
     InstanceCycle,
+    /// A device-parameter target that provably names an element's value or a source's DC
+    /// value, which `ElementValue` and `SourceDc` state (one meaning, one form: its text reads
+    /// back as the other kind; `link::target_aliases`). The run owner's. `arg`: the element name.
+    TargetAlias,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -131,7 +135,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::InstanceCycle as usize + 1] = [
+    pub const ALL: [Violation; Violation::TargetAlias as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -156,6 +160,7 @@ impl Violation {
         Violation::InstancePortCount,
         Violation::RunArgumentClass,
         Violation::InstanceCycle,
+        Violation::TargetAlias,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -187,6 +192,9 @@ pub fn check(design: &Design, diags: &mut Diags) {
         for at in crate::hierarchy::cycle_instances(design) {
             out.report(Violation::InstanceCycle, at, at.index);
         }
+        for (at, element) in crate::link::target_aliases(design) {
+            out.report(Violation::TargetAlias, at, element.0);
+        }
         probe_classes(&mut out);
     }
 }
@@ -215,13 +223,6 @@ fn formal_count(d: &Design, def: DefId) -> Option<usize> {
         d.names(d.row::<crate::item::Func>(row.item.index).args)
             .len()
     })
-}
-
-/// Whether the definition index holds `def` under its own key (round 7b: a definition a pass
-/// removed through `Editor::remove_item` is not held).
-fn in_index(d: &Design, def: DefId) -> bool {
-    let row = d.defs[def.index()];
-    d.def_index.get(&(row.scope, row.kind, row.name)) == Some(&def)
 }
 
 /// `ProbeContext` through reads (A15 K3): a constant-in-time field (`Handle::Expr`, a list or
@@ -407,7 +408,7 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
                 out.report(Violation::HandleRange, item, r.def.0);
             } else if d.defs[r.def.index()].kind != kind || d.defs[r.def.index()].name != r.name {
                 out.report(Violation::RefTarget, item, r.def.0);
-            } else if !in_index(d, r.def) {
+            } else if !d.def_is_live(r.def) {
                 out.report(Violation::StaleDefinition, item, r.def.0);
             }
         }
@@ -487,7 +488,7 @@ fn typed_roots(out: &mut Out<'_>, item: ItemRef, h: Handle, strings: &[ExprId]) 
         return; // a value of any type (`Extra::StringValue`, `ListValue`)
     }
     for &e in roots {
-        if e.is_none() || e.index() >= d.expr_count() {
+        if e.is_none() || e.index() >= d.expr_count_all() {
             continue;
         }
         let (string, list) = match d.expr(e) {
@@ -554,7 +555,7 @@ fn expression(
                 out.report(Violation::RefTarget, item, r.def.0)
             }
             Expr::Param(r) | Expr::UserCall(r, _)
-                if r.is_resolved() && def_ok(d, r.def) && !in_index(d, r.def) =>
+                if r.is_resolved() && def_ok(d, r.def) && !d.def_is_live(r.def) =>
             {
                 out.report(Violation::StaleDefinition, item, r.def.0)
             }

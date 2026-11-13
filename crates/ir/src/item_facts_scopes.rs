@@ -220,7 +220,7 @@ impl RowFacts for Subckt {
         let params: Vec<(&str, ExprId)> = keys.iter().map(String::as_str).zip(defaults).collect();
         let item = b.subckt(scope, &name, &ports, &params, Span::NONE).0;
         // the head defaults are the last definitions, in order
-        let last = b.design().definitions().len();
+        let last = b.design().definitions_all().len();
         for (k, class) in classes.into_iter().enumerate() {
             g.note(DefId((last - params.len() + k) as u32), class);
         }

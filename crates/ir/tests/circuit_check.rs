@@ -88,7 +88,7 @@ mod tests {
             ..model(n, family, polarity)
         };
         b.model(top, row, Span::NONE);
-        let def = DefId(b.design().definitions().len() as u32 - 1);
+        let def = DefId(b.design().definitions_all().len() as u32 - 1);
         Ref { name: n, def }
     }
 

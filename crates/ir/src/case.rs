@@ -51,7 +51,7 @@ pub(crate) fn case_clashes(design: &Design) -> HashSet<ItemRef> {
     }
     let mut seen: Spaces = HashMap::new();
     // definitions of one kind in a scope
-    for def in design.definitions() {
+    for def in design.definitions_all() {
         if live.contains(&def.item) {
             let space = (Space::Def(def.kind as u8), def.scope);
             if spelled_again(seen.entry(space).or_default(), design, def.name) {

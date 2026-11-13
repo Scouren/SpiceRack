@@ -408,7 +408,7 @@ pub(crate) fn reads_dependent(design: &Design, root: ExprId) -> bool {
     let mut stack = vec![root];
     let mut kids = Vec::new();
     while let Some(e) = stack.pop() {
-        if e.index() >= design.expr_count() {
+        if e.index() >= design.expr_count_all() {
             continue;
         }
         if let crate::expr::Expr::Param(_) | crate::expr::Expr::Tnom = design.expr(e) {
@@ -424,7 +424,7 @@ pub(crate) fn reads_dependent(design: &Design, root: ExprId) -> bool {
 /// Adds `Extra::StringValue` or `Extra::ListValue` when the value `e` (a `Param`'s, or a
 /// `Subckt` head default) is a string or a list at its root (A25 item 4). `NONE`: nothing.
 pub(crate) fn value_type(design: &Design, e: ExprId, set: &mut FeatureSet) {
-    if e.is_none() || e.index() >= design.expr_count() {
+    if e.is_none() || e.index() >= design.expr_count_all() {
         return;
     }
     match design.expr(e) {

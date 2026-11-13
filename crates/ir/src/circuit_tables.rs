@@ -264,7 +264,7 @@ pub(crate) fn builtin_fits(kind: ElemKind, family: ModelFamily) -> bool {
 /// The family of the model `r` is bound to, if it is bound to a model row (total: a bad
 /// definition index is the kernel's `HandleRange`).
 pub(crate) fn bound_family(design: &Design, r: crate::id::Ref) -> Option<ModelFamily> {
-    let def = design.definitions().get(r.def.0 as usize)?;
+    let def = design.definitions_all().get(r.def.0 as usize)?;
     (def.item.kind == crate::item::ItemKind::Model)
         .then(|| get_item::<Model>(design, def.item.index))
         .flatten()

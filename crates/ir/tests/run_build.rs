@@ -414,7 +414,7 @@ fn a_measure_is_a_definition() {
     assert_eq!(d.detail::<MeasureTrigTarg>(h.detail), row);
     assert_eq!(d.row::<Measure>(p.index).kind, MeasureKind::Param);
     let defs: Vec<(DefKind, &str, ItemRef)> = d
-        .definitions()
+        .definitions_all()
         .iter()
         .map(|x| (x.kind, d.str(x.name), x.item))
         .collect();

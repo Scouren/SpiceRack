@@ -82,6 +82,19 @@ Decisions:
   `RunExtra::DcRestart` (was `Dc::restart`); each axis above it is `DcOuterAfresh` (ngspice's
   nested `.dc`) or `DcOuterCarries` (VACASK's default; `continuation=0` is afresh), exactly one.
   Runs: step3-runrules 8379e74f, `tests/passes_run/decks/latch*`.)
+  (One meaning, one form: a `DeviceParam` target whose element provably is a resistor,
+  capacitor or inductor with parameter `r`/`c`/`l`, or an independent source with `dc`, is
+  `Violation::TargetAlias` (X0025): `ElementValue` and `SourceDc` state those. The lookup is
+  `unbound_targets`'; an element it cannot find is not flagged; names compare exactly.)
+  (Not an invariant, declined by the lead: a node set or initial condition that no analysis
+  follows in its walk. ngspice-45, a bistable of two behavioural inverters: without a node set
+  the `.op` fails ("Timestep too small; trouble with node a"); `.nodeset v(a)=5 v(b)=0` on the
+  line after the only `.op` gives v(a)=5, v(b)=9.6e-22, flipped 9.6e-22 and 5. So (1) a
+  `WholeRun` node set's position means nothing, its mode says who reads it; (2) a `FromHere` or
+  `next_only` one with nothing after it is legal user text, and `check` refuses only a
+  producer's bug; (3) a target that cannot place it refuses it by its own features
+  (`IcNextOnly`/`IcBeyondNext`, `NodeSetFromHere`/`NodeSetWholeRun`). A pass may drop dead
+  state; `check` does not.)
   (`INV-semantics.md` 8.01–8.03): every field named, none inferred from another, `NONE` is not 0.
   Each simulator reads the positional `.tran` fields differently (Xyce's first is an initial-step
   guess, ngspice's a print step that also caps the step, HSPICE's extra fields are segments): the

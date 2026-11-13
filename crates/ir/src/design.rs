@@ -50,8 +50,8 @@
 //!   `Design::branches(&self, BranchList) -> &[Branch]`, `Design::text(&self, TextId) -> &str`,
 //!   `Design::detail<D: DetailRow>(&self, u32) -> D`,
 //!   `Design::expr(&self, ExprId) -> Expr`, `Design::num(&self, NumId) -> Literal`,
-//!   `Design::expr_count(&self) -> usize`, `Design::class_computes(&self) -> u32` (gen),
-//!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
+//!   `Design::expr_count_all(&self) -> usize`, `Design::class_computes(&self) -> u32` (gen),
+//!   `Design::definitions_all(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
 //!   `Design::eq_ignoring_spans(&self, &Design) -> bool`,
 //!   `Design::eq_meaning(&self, &Design) -> bool`, `Design::children(&self, ExprId, &mut Vec<ExprId>)`
 
@@ -142,6 +142,10 @@ pub struct Design {
     /// demand, extended by every element push and cleared where `editor` hands out its door and
     /// by each Editor mutation that can move or rename an element. Not part of equality.
     pub(crate) element_names: std::sync::OnceLock<crate::names::FxMap<(ScopeId, NameId), ItemRef>>,
+    /// The first element of each whole name in each name scope (`Design::name_scope`, R82), for
+    /// `element_uses`' paths; built on demand, cleared with the derived caches and by every
+    /// element push. Not part of equality.
+    pub(crate) name_index: std::sync::OnceLock<crate::names::FxMap<(ScopeId, NameId), ItemRef>>,
     /// How many times the definition classes were computed (`class::def_classes`): a count a
     /// test reads instead of a clock (`Design::class_computes`). Not part of equality.
     #[cfg(any(test, feature = "gen"))]
@@ -246,6 +250,7 @@ impl Design {
             classes: std::sync::OnceLock::new(),
             forms: std::sync::OnceLock::new(),
             element_names: std::sync::OnceLock::new(),
+            name_index: std::sync::OnceLock::new(),
             #[cfg(any(test, feature = "gen"))]
             class_computes: crate::class::Computes::default(),
         }
@@ -435,13 +440,17 @@ impl Design {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Expression row count; ids `0..expr_count()` are valid.
-    pub fn expr_count(&self) -> usize {
+    /// Expression row count, dead rows included (the table is append-only: a rewrite leaves
+    /// the row it replaced); ids `0..expr_count_all()` are valid. Size a table by it; decide
+    /// from `Design::live_exprs` (`live.rs`).
+    pub fn expr_count_all(&self) -> usize {
         self.exprs.tags.len()
     }
 
-    /// Every definition, in definition order (a kit's model of what it defines).
-    pub fn definitions(&self) -> &[Def] {
+    /// Every definition row, in definition order, indexed by `DefId`, dead rows included (a
+    /// removed item's definition stays, out of the index: `Editor::remove_item`). Index by it;
+    /// decide from `Design::live_definitions` (`live.rs`).
+    pub fn definitions_all(&self) -> &[Def] {
         &self.defs
     }
 
@@ -559,6 +568,7 @@ impl Design {
     pub(crate) fn derived_changed(&mut self) {
         self.classes.take();
         self.forms.take();
+        self.name_index.take();
     }
 }
 

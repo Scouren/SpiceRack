@@ -31,8 +31,8 @@ fn ground_is_name_zero() {
     assert_eq!(d.str(NameId::GROUND), "0");
     assert_eq!(d.find_name("a"), NameId::NONE);
     assert_eq!(d.files().count(), 0);
-    assert_eq!(d.expr_count(), 0);
-    assert!(d.definitions().is_empty());
+    assert_eq!(d.expr_count_all(), 0);
+    assert!(d.definitions_all().is_empty());
 }
 
 #[test]

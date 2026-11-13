@@ -14,8 +14,12 @@
 //!
 //! Contents: `pub fn link(&mut Design, &mut Diags)`, `pub struct UnboundRead`,
 //! `pub fn unbound_reads(&Design) -> Vec<UnboundRead>`, `pub struct UnboundTarget`,
-//! `pub fn unbound_targets(&Design) -> Vec<UnboundTarget>`
+//! `pub fn unbound_targets(&Design) -> Vec<UnboundTarget>`; crate:
+//! `pub(crate) fn target_aliases(&Design) -> Vec<(ItemRef, NameId)>`,
+//! `pub(crate) fn scope_element(&mut Gen, &Design, ScopeId, &dyn Fn(ElemKind) -> bool) -> Option<NameId>` (gen)
 
+use crate::analysis::{Analysis, AnalysisKind};
+use crate::dc_ac::Dc;
 use crate::design::Design;
 use crate::diag::Diags;
 #[cfg(doc)]
@@ -25,7 +29,8 @@ use crate::expr::Expr;
 use crate::facts::RowFacts;
 use crate::feature::{ExprWalk, expr_roots};
 use crate::id::{DefId, ExprId, ItemRef, NameId, ScopeId};
-use crate::item::{DefKind, Include, ItemKind, Role, ScopeKind, Subckt};
+use crate::item::{DefKind, Include, ItemKind, Role, Subckt};
+use crate::plan::{Alter, Loop, LoopKind, SweepLoop, TableLoop, Target, TargetKind};
 
 /// A parameter read no definition is bound to (A38, R63), at the item whose expressions hold it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,11 +56,22 @@ pub struct UnboundTarget {
     pub name: NameId,
 }
 
-/// Where an element target is looked up: the deck's top (every file's top, and what it nests
-/// outside a subcircuit) is `ScopeId::NONE`, a subcircuit's body is its scope. Per lookup scope:
+/// Where an element target is looked up: its name scope (`Design::name_scope`, R82: the deck,
+/// keyed by the entry file's top, or a subcircuit's body). Per lookup scope:
 /// its elements by name, and whether it is open (an `Opaque` item, or an include of a file the
 /// design lacks or holds as `Missing`: an element may hide there).
-type Lookup = std::collections::HashMap<ScopeId, (Vec<(NameId, ItemRef)>, bool)>;
+type Lookup =
+    std::collections::HashMap<ScopeId, (std::collections::HashMap<NameId, ItemRef>, bool)>;
+
+/// What an element path finds from a lookup scope.
+enum Found {
+    /// The element's item.
+    Element(ItemRef),
+    /// The name the lookup provably fails at.
+    Fails(NameId),
+    /// The lookup cannot tell (an open scope, an unresolved master, an empty name).
+    Unknown,
+}
 
 /// Binds every still-unresolved reference by `Design::lookup` from the scope of the item (or the
 /// expression's item) that holds it, innermost scope first, exact names, with the kind the field
@@ -253,7 +269,7 @@ pub fn unbound_targets(design: &Design) -> Vec<UnboundTarget> {
                 }
             }
         }
-        let from = lookup_scope(design, scope);
+        let from = design.name_scope(scope);
         for path in paths {
             if let Some(name) = element_unbound(design, &lookup, from, &path) {
                 out.push(UnboundTarget { item, name });
@@ -263,16 +279,90 @@ pub fn unbound_targets(design: &Design) -> Vec<UnboundTarget> {
     out
 }
 
+/// The device-parameter targets that provably name what another kind states (the lead's "one
+/// meaning, one form"): the element they reach is a resistor, capacitor or inductor and the
+/// parameter its value (`r`, `c`, `l`: `TargetKind::ElementValue`), or an independent source and
+/// the parameter `dc` (`TargetKind::SourceDc`). Each as (the run item, the element's name), in
+/// `reachable` order; an element the lookup cannot find is not listed (`unbound_targets`'
+/// lookup). Names compare exactly. Assumes the design's handles hold (`check`'s
+/// `TargetAlias`). O(design + targets × path length).
+pub(crate) fn target_aliases(design: &Design) -> Vec<(ItemRef, NameId)> {
+    let lookup = element_scopes(design);
+    let mut out = Vec::new();
+    for (item, scope) in design.reachable() {
+        for t in item_targets(design, item) {
+            if t.kind != TargetKind::DeviceParam {
+                continue;
+            }
+            let mut path = design.names(t.path).to_vec();
+            path.push(t.a.name);
+            let Found::Element(e) = find_element(design, &lookup, design.name_scope(scope), &path)
+            else {
+                continue;
+            };
+            let kind = design.row::<Element>(e.index).kind;
+            let alias = matches!(
+                (kind, design.str(t.b)),
+                (ElemKind::Resistor, "r")
+                    | (ElemKind::Capacitor, "c")
+                    | (ElemKind::Inductor, "l")
+                    | (ElemKind::VSource | ElemKind::ISource, "dc")
+            );
+            if alias {
+                out.push((item, t.a.name));
+            }
+        }
+    }
+    out
+}
+
+/// A random element of `scope`'s name scope (`Design::name_scope`, R82) whose kind `fits`, or
+/// none after a few tries: one a run item listed in `scope` finds by name with an empty path
+/// under both walks, `unbound_targets`' and `element_uses`'. The generator's, so a target names
+/// a real element some of the time (the lead's reach finding on `TargetAlias`). O(1): draws an
+/// index into the generator's own list (`Gen::elements`).
+#[cfg(any(test, feature = "gen"))]
+pub(crate) fn scope_element(
+    g: &mut crate::r#gen::Gen,
+    design: &Design,
+    scope: ScopeId,
+    fits: &dyn Fn(ElemKind) -> bool,
+) -> Option<NameId> {
+    let n = g
+        .elements
+        .get(&design.name_scope(scope))
+        .map_or(0, Vec::len);
+    if n == 0 {
+        return None;
+    }
+    // ponytail: 32 draws; a scope with few fitting elements is hit less often
+    for _ in 0..32 {
+        let k = g.below(n as u32) as usize;
+        let (name, kind, _) = g.elements[&design.name_scope(scope)][k];
+        if fits(kind) {
+            return Some(name);
+        }
+    }
+    None
+}
+
 // ---- private ----
 
 /// Every lookup scope's elements and openness. O(items × scope depth).
 fn element_scopes(design: &Design) -> Lookup {
     let mut out: Lookup = Lookup::new();
-    out.entry(ScopeId::NONE).or_default();
+    out.entry(design.name_scope(design.files.first().map_or(ScopeId::NONE, |f| f.top)))
+        .or_default();
     for (item, scope) in design.reachable() {
-        let entry = out.entry(lookup_scope(design, scope)).or_default();
+        let entry = out.entry(design.name_scope(scope)).or_default();
         match item.kind {
-            ItemKind::Element => entry.0.push((design.row::<Element>(item.index).name, item)),
+            ItemKind::Element => {
+                // the first element of a name is the one a lookup finds
+                entry
+                    .0
+                    .entry(design.row::<Element>(item.index).name)
+                    .or_insert(item);
+            }
             ItemKind::Opaque => entry.1 = true,
             ItemKind::Include => {
                 let path = design.str(design.row::<Include>(item.index).path);
@@ -285,24 +375,6 @@ fn element_scopes(design: &Design) -> Lookup {
     out
 }
 
-/// The lookup scope of an item listed in `scope`: the body of the subcircuit it sits in, or
-/// the deck's top (`ScopeId::NONE`).
-fn lookup_scope(design: &Design, scope: ScopeId) -> ScopeId {
-    let mut at = scope;
-    // bounded by the scope count: each step moves to a parent
-    for _ in 0..=design.scopes.len() {
-        let s = design.scope(at);
-        if s.kind == ScopeKind::Subckt {
-            return at;
-        }
-        if s.parent.is_none() {
-            break;
-        }
-        at = s.parent;
-    }
-    ScopeId::NONE
-}
-
 /// The name `path` (instances, then the element) provably fails at from the lookup scope
 /// `from` (`unbound_targets`' doc), or `None` when it names an element or the lookup cannot
 /// tell.
@@ -312,20 +384,32 @@ fn element_unbound(
     from: ScopeId,
     path: &[NameId],
 ) -> Option<NameId> {
+    match find_element(design, lookup, from, path) {
+        Found::Fails(name) => Some(name),
+        Found::Element(_) | Found::Unknown => None,
+    }
+}
+
+/// The lookup of `path` (instances, then the element) from `from` (`unbound_targets`' doc).
+fn find_element(design: &Design, lookup: &Lookup, from: ScopeId, path: &[NameId]) -> Found {
     let mut at = from;
     for (k, &name) in path.iter().enumerate() {
         if name.is_none() {
-            return None;
+            return Found::Unknown;
         }
         // a body with no item has no entry: empty, and closed
-        let (list, open) = lookup
+        let (found, open) = lookup
             .get(&at)
-            .map_or((&[][..], false), |(l, o)| (&l[..], *o));
-        let Some(&(_, item)) = list.iter().find(|(n, _)| *n == name) else {
-            return (!open).then_some(name);
+            .map_or((None, false), |(l, o)| (l.get(&name).copied(), *o));
+        let Some(item) = found else {
+            return if open {
+                Found::Unknown
+            } else {
+                Found::Fails(name)
+            };
         };
         if k + 1 == path.len() {
-            return None; // the element itself is there
+            return Found::Element(item); // the element itself is there
         }
         let e: Element = design.row(item.index);
         let master = e
@@ -337,10 +421,37 @@ fn element_unbound(
             (ElemKind::Instance, Some(m)) if m.kind == ItemKind::Subckt => {
                 design.row::<Subckt>(m.index).body
             }
-            (ElemKind::Instance, _) => return None, // an unresolved master: the kit may hold it
+            (ElemKind::Instance, _) => return Found::Unknown, // the kit may hold it
             // no element lives below an element that is no instance
-            _ => return Some(path[k + 1]),
+            _ => return Found::Fails(path[k + 1]),
         };
     }
-    None
+    Found::Unknown
+}
+
+/// The targets an alter, a loop or a DC analysis sets, in field order.
+fn item_targets(design: &Design, item: ItemRef) -> Vec<Target> {
+    match item.kind {
+        ItemKind::Alter => vec![design.row::<Alter>(item.index).target],
+        ItemKind::Loop => {
+            let row: Loop = design.row(item.index);
+            match row.kind {
+                LoopKind::Sweep => vec![design.detail::<SweepLoop>(row.detail).target],
+                LoopKind::Table => {
+                    let t: TableLoop = design.detail(row.detail);
+                    design.targets(t.columns).to_vec()
+                }
+                LoopKind::MonteCarlo => Vec::new(),
+            }
+        }
+        ItemKind::Analysis => {
+            let row: Analysis = design.row(item.index);
+            if row.kind != AnalysisKind::Dc {
+                return Vec::new();
+            }
+            let dc: Dc = design.detail(row.detail);
+            design.dc_axes(dc.axes).iter().map(|a| a.target).collect()
+        }
+        _ => Vec::new(),
+    }
 }

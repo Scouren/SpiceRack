@@ -48,6 +48,12 @@ fn a_removed_item_leaves_the_index() {
     d.editor().remove_item(top, item);
     assert!(d.lookup(top, DefKind::Param, d.find_name("p")).is_none());
     assert_eq!(violations(&d), vec![]);
+    // the row stays, the live walk leaves it out (the `passes` agent's finding)
+    assert_eq!(d.definitions_all().len(), 1);
+    assert_eq!(d.live_definitions(), vec![]);
+    assert!(!d.def_is_live(spicerack_ir::DefId(0)));
+    let (kept, _) = build();
+    assert_eq!(kept.live_definitions(), vec![spicerack_ir::DefId(0)]);
     // a read still bound to the removed definition is stale too
     let mut r = Design::new();
     let (top, p) = {

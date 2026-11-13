@@ -66,6 +66,12 @@ pub struct Gen {
     /// The definitions of each kind seen so far, in definition order (`pick_def`'s index,
     /// caught up from the design's table on each call: definitions are only appended).
     pub(crate) by_kind: Vec<Vec<DefId>>,
+    /// The elements generated so far, by name scope (`Design::name_scope`, R82): each one's name,
+    /// kind and listing scope, in creation order (a run target draws from its item's name scope;
+    /// an element in an `if` branch may reuse the name of one in a sibling branch).
+    pub(crate) elements: crate::names::FxMap<ScopeId, Vec<(NameId, ElemKind, ScopeId)>>,
+    /// The same elements by listing scope, (name, kind): a branch's siblings are read here.
+    pub(crate) listed: crate::names::FxMap<ScopeId, Vec<(NameId, ElemKind)>>,
     /// Per element kind, the models generated so far of a family it takes (R48 d: an element
     /// names a model that exists; appended by the circuit owner's model generator).
     pub(crate) models_for: Vec<Vec<DefId>>,
@@ -295,7 +301,7 @@ impl Gen {
         kind: DefKind,
     ) -> DefId {
         let seen: usize = self.by_kind.iter().map(Vec::len).sum();
-        for (k, def) in design.definitions().iter().enumerate().skip(seen) {
+        for (k, def) in design.definitions_all().iter().enumerate().skip(seen) {
             self.by_kind[def.kind as usize].push(DefId(k as u32));
         }
         let mut chain = Vec::new();
@@ -368,6 +374,8 @@ impl Gen {
             scope: ScopeId::NONE,
             formals: Vec::new(),
             by_kind: vec![Vec::new(); DefKind::COUNT],
+            elements: crate::names::FxMap::default(),
+            listed: crate::names::FxMap::default(),
             models_for: vec![Vec::new(); ElemKind::COUNT],
             def_class: Vec::new(),
             class: ExprClass::Constant,

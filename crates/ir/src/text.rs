@@ -206,7 +206,7 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
     let bodies = design.bodies();
     let mut modules: HashMap<ItemRef, Vec<NameId>> = HashMap::new();
     for def in design
-        .definitions()
+        .definitions_all()
         .iter()
         .filter(|def| def.kind == DefKind::Module)
     {
