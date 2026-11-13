@@ -12,7 +12,8 @@
 //! 3.06; IR-KERNEL A10 (a head default is read from the subcircuit's body).
 //!
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
-//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::head`, `Declared::top_head`, `Declared::cycles`, `Declared::arity`, `Declared::class`,
+//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::head`, `Declared::top_head`, `Declared::arity`, `Declared::class`,
+//! `pub(super) fn cycles(&[Declared], usize, Node, &str) -> bool`,
 //! `pub(super) struct Script`, `pub(super) fn script(&Ast, &Tokens) -> Script`
 
 use std::collections::HashMap;
@@ -266,42 +267,6 @@ impl Declared {
         Some((*ports, f))
     }
 
-    /// Whether an X card in `block` naming `name` closes a cycle of instances (X0024): the
-    /// subcircuit it names is one that encloses `block`, or reaches one through the X cards of
-    /// its body and theirs (a worklist, each subcircuit once). This file's definitions only.
-    pub(super) fn cycles(&self, block: Node, name: &str) -> bool {
-        let mut enclosing = Vec::new();
-        let mut at = Some(block.0);
-        // Bounded by the nesting.
-        for _ in 0..=self.parent.len() {
-            let Some(b) = at else { break };
-            if self.nodes.values().any(|&n| n == b) {
-                enclosing.push(b);
-            }
-            at = self.parent.get(&b).copied();
-        }
-        let Some(first) = self.resolve(block.0, name) else {
-            return false;
-        };
-        let mut seen = vec![first];
-        let mut todo = vec![first];
-        // Bounded: each subcircuit is pushed once.
-        while let Some(sub) = todo.pop() {
-            if enclosing.contains(&sub) {
-                return true;
-            }
-            for m in self.masters.get(&sub).into_iter().flatten() {
-                if let Some(next) = self.resolve(sub, m)
-                    && !seen.contains(&next)
-                {
-                    seen.push(next);
-                    todo.push(next);
-                }
-            }
-        }
-        false
-    }
-
     /// The formal count of the `.func name` visible from `block`: the nearest block outward that
     /// defines it; `None` when this file has none there.
     pub(super) fn arity(&self, block: Node, name: &str) -> Option<usize> {
@@ -337,6 +302,55 @@ impl Declared {
         }
         class
     }
+}
+
+/// Whether an X card in `block` of file `here` naming `name` closes a cycle of instances
+/// (X0024): the subcircuit it names is one that encloses `block`, or reaches one through the X
+/// cards of its body and theirs (a worklist, each subcircuit once). A name binds in its own file
+/// outward, else to the first top-level `.subckt` of any file of the read (ngspice inlines every
+/// include first, as `Lower::subckt_head`; run: a cycle through an included file is "unknown
+/// subckt: x1.xb.xa.xb…").
+pub(super) fn cycles(files: &[Declared], here: usize, block: Node, name: &str) -> bool {
+    let d = &files[here];
+    let mut enclosing = Vec::new();
+    let mut at = Some(block.0);
+    // Bounded by the nesting.
+    for _ in 0..=d.parent.len() {
+        let Some(b) = at else { break };
+        if d.nodes.values().any(|&n| n == b) {
+            enclosing.push((here, b));
+        }
+        at = d.parent.get(&b).copied();
+    }
+    let bind = |f: usize, from: u32, name: &str| {
+        files[f].resolve(from, name).map(|n| (f, n)).or_else(|| {
+            let key = name::key(name);
+            files
+                .iter()
+                .enumerate()
+                .find_map(|(g, o)| o.nodes.get(&(o.root, key.clone())).map(|&n| (g, n)))
+        })
+    };
+    let Some(first) = bind(here, block.0, name) else {
+        return false;
+    };
+    let mut seen = vec![first];
+    let mut todo = vec![first];
+    // Bounded: each subcircuit of each file is pushed once.
+    while let Some((f, sub)) = todo.pop() {
+        if enclosing.contains(&(f, sub)) {
+            return true;
+        }
+        for m in files[f].masters.get(&sub).into_iter().flatten() {
+            if let Some(next) = bind(f, sub, m)
+                && !seen.contains(&next)
+            {
+                seen.push(next);
+                todo.push(next);
+            }
+        }
+    }
+    false
 }
 
 // ---- private ----

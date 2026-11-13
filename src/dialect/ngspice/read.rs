@@ -425,9 +425,14 @@ impl<'a, 'd> Lower<'a, 'd> {
     }
 
     /// Whether an X card of `st` naming the subcircuit `name` closes a cycle of instances
-    /// (`Declared::cycles`).
+    /// through the subcircuits of every file of the read (`declare::cycles`).
     pub(super) fn subckt_cycle(&self, st: Stmt, name: &str) -> bool {
-        self.declared.cycles(st.container, name)
+        let here = self
+            .files
+            .iter()
+            .position(|d| std::ptr::eq(d, self.declared))
+            .expect("the file's declare step is one of the read's");
+        declare::cycles(self.files, here, st.container, name)
     }
 
     /// How many parameter reads and calls wait for the bind step (a mark for [`Lower::rescope`]).

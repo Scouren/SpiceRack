@@ -4,7 +4,7 @@
 //! `.param` defined twice keeps the last, a `.subckt` the first; an include cycle is refused.
 //!
 //! Oracle: ngspice-45 runs, the settle decks under `tests/fixtures/dialect/ngspice/settle/`
-//! (`include_subckt_*`, `inc_*`), each with its printed value or message on its second line;
+//! (`include_subckt_*`, `inc_*`, `inst_cycle_inc`), each with its printed value or message on its second line;
 //! the test reads each deck with the files it names and asserts what each reference binds to.
 //!
 //! Contents: tests only.
@@ -84,6 +84,17 @@ fn an_include_cycle_is_refused() {
     let (_, diags) = read(&["inc_cycle.sp", "inc_cycle_a.inc", "inc_cycle_b.inc"]);
     let cycles = codes(&diags).iter().filter(|c| *c == "P1015").count();
     assert_eq!(cycles, 2, "{diags:?}");
+}
+
+#[test]
+fn an_instance_cycle_through_an_included_file_is_refused() {
+    // inst_cycle_inc.sp: "unknown subckt: x1.xb.xa.xb…", exit 1 (a calls b of the included
+    // file, b calls a); the X card closing it is P1110, so `check` sees no cycle (X0024)
+    let (d, diags) = read(&["inst_cycle_inc.sp", "inst_cycle_inc.inc"]);
+    assert!(codes(&diags).contains(&"P1110".to_string()), "{diags:?}");
+    let mut found = ir::Diags::new();
+    ir::check(&d, &mut found);
+    assert!(found.is_empty(), "{found:?}");
 }
 
 #[test]
