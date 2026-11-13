@@ -23,7 +23,7 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes `pub(super) const FLOW`, `READS`, `EFFECT`, `STATE_WITH_CARDS`, `UNROLL`, `DISPLAY`,
-//! `NO_RESET`, `FORM`, `OWN`, `IN_BRANCH`, `NO_COMMAND`, `REJECTED`, `IN_SUBCKT`,
+//! `NO_RESET`, `FORM`, `OWN`, `IN_BRANCH`, `NO_COMMAND`, `REJECTED`, `IN_SUBCKT`, `OUTPUT_FILE`,
 //! `pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt)`,
 //! `pub(super) fn script_line(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, index: usize, span: ir::Span)`
 
@@ -118,6 +118,10 @@ pub(super) const REJECTED: ir::Code = ir::Code::new(b'P', 1412);
 /// subcircuit has an instance (settle `control_in_subckt.sp`, `control_in_subckt_unused.sp`),
 /// which no IR item states (R98, X0028): its own text, `Script`.
 pub(super) const IN_SUBCKT: ir::Code = ir::Code::new(b'P', 1413);
+/// A command writing vectors to a file (`write`, `wrdata`, `wrs2p`, `eprvcd`): the deck's
+/// product, which no IR item states (R49 (5); spice-bench `examples/various/dc_loop.sp` keeps its
+/// derived vectors so): `Private`.
+pub(super) const OUTPUT_FILE: ir::Code = ir::Code::new(b'P', 1414);
 
 /// This area's codes, `P1400–P1499`.
 pub(super) const CODES: &[Row] = &[
@@ -180,6 +184,12 @@ pub(super) const CODES: &[Row] = &[
         "a control block in an .if branch",
         "ngspice-45 inp.c:742-812; S3-CONTROL O1",
         "ngspice runs it whatever the condition; kept as text (Private).",
+    ),
+    note(
+        OUTPUT_FILE,
+        "a script command writing vectors to a file",
+        "ngspice-45 commands.c (write, wrdata, wrs2p, eprvcd); rewrite/RULINGS.md R49 (5)",
+        "the file is the deck's product, which no IR item states; kept as its own .control pair (Private), refused by another dialect.",
     ),
     note(
         IN_SUBCKT,
