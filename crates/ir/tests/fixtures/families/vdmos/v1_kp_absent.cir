@@ -1,0 +1,12 @@
+vdmos kp absent: nchan vto=2, vgs=5, vds=10
+.model mn vdmos vto=2
+vd d 0 10
+vg g 0 5
+m1 d g 0 mn
+.options reltol=1e-9
+.control
+set numdgt=12
+op
+print i(vd)
+.endc
+.end

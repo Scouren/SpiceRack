@@ -170,7 +170,7 @@ fn walk_small(design: &Design, root: ExprId, out: &mut Vec<ExprId>, read_only: b
     let mut stack = vec![root];
     let mut kids = Vec::new();
     while let Some(e) = stack.pop() {
-        if e.is_none() || e.index() >= design.expr_count() || !seen.insert(e.0) {
+        if e.is_none() || e.index() >= design.expr_count_all() || !seen.insert(e.0) {
             continue;
         }
         out.push(e);

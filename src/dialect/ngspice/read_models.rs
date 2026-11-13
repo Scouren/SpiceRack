@@ -46,7 +46,7 @@ use super::families::{self, Reading};
 use super::number;
 use super::read::{Lower, Stmt};
 use super::tables::{self, Eval};
-use super::value::{Val, Wrap, emit, unwrap};
+use super::value::{Val, Wrap, emit, substituted, unwrap};
 use crate::ir::{self, Code, Feature, Info, Kind, ModelFamily as F, OpaqueClass, Polarity};
 use crate::syntax::ast::{NONE, Node, Tag};
 
@@ -586,9 +586,12 @@ fn read_value(lw: &Lower<'_, '_>, st: Stmt, node: Node) -> Result<Val, Refusal> 
         Class::Temp => Eval::Behavioural,
         Class::Circuit => return Err(unread()),
     };
-    expr_read::parse_in(expr, eval)
-        .map(Val::Tree)
-        .map_err(|f| (f.class, f.code))
+    let tree = expr_read::parse_in(expr, eval).map_err(|f| (f.class, f.code))?;
+    Ok(if eval == Eval::Numparam {
+        substituted(tree)
+    } else {
+        Val::Tree(tree)
+    })
 }
 
 /// The double a card number token reads to (for a level or a txl decision), or `None` when it

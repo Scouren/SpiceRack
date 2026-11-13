@@ -1,0 +1,15 @@
+laws bc_sat_area_times_areab sub_sat_last_factor diode_wl_mult_twice diode_sidewall_bottom_f1 diode_xom_absent_1e4 vdmos_kp_absent_35 vdmos_tcvth_lowers vdmos_clamp_by_n mos_small_signal_hand mos6_small_signal_absent bjt_irb_small_signal_frozen vdmos_mult_charges_off diode_isr_reverse_none diode_isr_small_signal_hand diode_tt_factor_unclamped trig_reduce_cast exp_clamp_1e99 log_zero_minus_1e99 div_gmin_guard asin_edge_zero
+# codes:
+file "formal_scope.sp" deck
+  title "formal_scope"
+  comment " oracle: settle formal_scope.sp (a formal binds in its own subckt; the top reads the top w; F34: the reader bound every subckt's formal w to the last one, b's)"
+  param w = 9
+  subckt a (1 2) w=1
+    param x = w * 2
+    element resistor r1 (1 2) value=x
+  subckt b (1 2) w=1
+    param y = w * 3
+    element resistor r1 (1 2) value=y
+  param t = w * 5
+  element instance x1 (n 0) model=a
+  element instance x2 (m 0) model=b params=(w=4)

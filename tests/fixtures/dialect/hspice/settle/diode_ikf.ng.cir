@@ -1,0 +1,11 @@
+diode_ikf (ngspice twin)
+* settle (ngspice-45, -b): i(v1) = -5.39777284e-03
+v1 1 0 0.75
+d1 1 0 dm
+.model dm d is=1e-14 ikf=1m
+.control
+set numdgt=9
+op
+print i(v1)
+.endc
+.end

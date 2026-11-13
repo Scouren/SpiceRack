@@ -1,0 +1,11 @@
+laws bc_sat_areab_only sub_sat_emission_ns diode_wl_mult_once diode_sidewall_own_f1 diode_xom_absent_1e14 vdmos_kp_absent_20 vdmos_tcvth_raises vdmos_clamp_by_fc mos_small_signal_exact mos6_small_signal_exact bjt_irb_small_signal_exact vdmos_mult_charges_copies diode_isr_reverse_present diode_isr_small_signal_exact diode_tt_factor_clamped trig_exact exp_exact log_zero_error div_exact asin_edge_fails
+# Oracle: spice/mos6.va (VACASK on PATH, dhxz6l3…): the model parameter ps is spelled ps_mod
+# (it shares the instance's ps; params.txt), read as the family's ps (R92; red before: ps_mod
+# reached the IR as written). kf, af and nlev are sp_mos6's own: kept as given, the ngspice
+# writer refuses what its level 6 lacks (R91a).
+# codes:
+file "mos6_names.sim" deck
+  title "sp_mos6 names: ps_mod and the module-only kf af nlev"
+  device_library mos6
+  model m6 mos6 polarity=n params=(vto=0.7 ps=0.1 kf=1e-25 af=1i nlev=2i)
+  element mosfet m1 (d g 0 0) model=m6 params=(w=1u l=1u ps=2u)

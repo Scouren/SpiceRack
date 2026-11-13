@@ -4,7 +4,7 @@
 //! `.param` defined twice keeps the last, a `.subckt` the first; an include cycle is refused.
 //!
 //! Oracle: ngspice-45 runs, the settle decks under `tests/fixtures/dialect/ngspice/settle/`
-//! (`include_subckt_*`, `inc_*`), each with its printed value or message on its second line;
+//! (`include_subckt_*`, `inc_*`, `inst_cycle_inc`), each with its printed value or message on its second line;
 //! the test reads each deck with the files it names and asserts what each reference binds to.
 //!
 //! Contents: tests only.
@@ -87,13 +87,24 @@ fn an_include_cycle_is_refused() {
 }
 
 #[test]
+fn an_instance_cycle_through_an_included_file_is_refused() {
+    // inst_cycle_inc.sp: "unknown subckt: x1.xb.xa.xb…", exit 1 (a calls b of the included
+    // file, b calls a); the X card closing it is P1110, so `check` sees no cycle (X0024)
+    let (d, diags) = read(&["inst_cycle_inc.sp", "inst_cycle_inc.inc"]);
+    assert!(codes(&diags).contains(&"P1110".to_string()), "{diags:?}");
+    let mut found = ir::Diags::new();
+    ir::check(&d, &mut found);
+    assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
 fn a_section_calling_another_section_of_its_own_file_is_no_cycle_and_reads_its_caller() {
     // inc_lib_self.sp: i(v1) = -5e-4 (mim's R1 = 1k*scale, scale from the calling corner
     // section): the gf180 kit's idiom (sm141064.ngspice); no P1015, X1 and scale bound
     let (d, diags) = read(&["inc_lib_self.sp", "inc_lib_self.lib"]);
     assert!(!codes(&diags).contains(&"P1015".to_string()), "{diags:?}");
     assert_eq!(master_file(&d, "x1"), Some("inc_lib_self.lib".into()));
-    let reads: Vec<ir::DefId> = (0..d.expr_count())
+    let reads: Vec<ir::DefId> = (0..d.expr_count_all())
         .filter_map(|k| match d.expr(ir::ExprId(k as u32)) {
             ir::Expr::Param(r) if d.str(r.name) == "scale" => Some(r.def),
             _ => None,
@@ -112,6 +123,26 @@ fn section_chains_of_one_file_are_no_cycle() {
     let (d, diags) = read(&["inc_lib_chain.sp", "inc_lib_chain.lib"]);
     assert!(!codes(&diags).contains(&"P1015".to_string()), "{diags:?}");
     assert_eq!(master_file(&d, "x1"), Some("inc_lib_chain.lib".into()));
+}
+
+#[test]
+fn a_formal_binds_in_its_own_subckt_also_in_a_lib_section() {
+    // formal_scope_lib.sp: i(v1) = -0.5 (a's w = 1), i(v2) = -1/12 (b's w = 4 at x2), v(k) = 9
+    // (the top w): F34, the reader bound every subckt's formal w to the last subckt's
+    let (d, _) = read(&["formal_scope_lib.sp", "formal_scope.lib"]);
+    assert_eq!(read_owner(&d, "x"), Some("a".into()));
+    assert_eq!(read_owner(&d, "y"), Some("b".into()));
+    assert_eq!(read_owner(&d, "t"), None, "t reads the top w");
+}
+
+#[test]
+fn a_func_defined_in_the_deck_and_the_include_keeps_the_last() {
+    // dup_func_inc_before.sp: v(n) = 5 (the included f, after the deck's); dup_func_inc_after.sp:
+    // v(n) = 2 (the deck's f, after the include): a .func keeps the last, as a .param
+    let (d, _) = read(&["dup_func_inc_before.sp", "dup_func.inc"]);
+    assert_eq!(call_file(&d), Some("dup_func.inc".into()));
+    let (d, _) = read(&["dup_func_inc_after.sp", "dup_func.inc"]);
+    assert_eq!(call_file(&d), Some("dup_func_inc_after.sp".into()));
 }
 
 /// The files read (the first the deck) from the settle folder, leniently.
@@ -168,4 +199,43 @@ fn value_file(d: &ir::Design, name: &str) -> Option<String> {
         ir::Expr::Param(r) => def_file(d, r.def),
         other => panic!("{name}: a parameter read, not {other:?}"),
     }
+}
+
+/// The subcircuit whose formal the `.param name={w}` reads (its value one parameter read), or
+/// `None` when the bound definition stands outside every subcircuit.
+fn read_owner(d: &ir::Design, name: &str) -> Option<String> {
+    let item = d
+        .reachable()
+        .into_iter()
+        .map(|(i, _)| i)
+        .find(|i| {
+            i.kind == ir::ItemKind::Param
+                && d.str(d.row::<ir::item::Param>(i.index).name)
+                    .eq_ignore_ascii_case(name)
+        })
+        .unwrap_or_else(|| panic!("a .param {name}"));
+    let p: ir::item::Param = d.row(item.index);
+    let ir::Expr::Param(r) = d.expr(p.value) else {
+        panic!("{name}: a parameter read");
+    };
+    assert!(!r.def.is_none(), "{name}: bound");
+    let owner = d.scope(d.def(r.def).scope).owner;
+    (owner.kind == ir::ItemKind::Subckt).then(|| {
+        d.str(d.row::<ir::item::Subckt>(owner.index).name)
+            .to_string()
+    })
+}
+
+/// The file of the `.func` the design's one user call binds to, or `None` (unresolved).
+fn call_file(d: &ir::Design) -> Option<String> {
+    let calls: Vec<ir::Ref> = (0..d.expr_count_all())
+        .filter_map(
+            |k| match d.expr(ir::ExprId(u32::try_from(k).expect("fits"))) {
+                ir::Expr::UserCall(r, _) => Some(r),
+                _ => None,
+            },
+        )
+        .collect();
+    assert_eq!(calls.len(), 1, "one user call: {calls:?}");
+    def_file(d, calls[0].def)
 }

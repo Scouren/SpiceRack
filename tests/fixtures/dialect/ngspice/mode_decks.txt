@@ -1,0 +1,47 @@
+# The 41 spice-bench decks whose folder's .spiceinit sets ngbehavior (ltpsa: ddt, optran, probe,
+# p-to-n-examples, soa, kicad/sallen_key-bandpass-072; ps: paranoia/{optran,pton}), each run by
+# ngspice-45 (/nix/store/jfngv2gd...-ngspice-45, HOME empty) in a copy of its folder with and
+# without the .spiceinit, binary raw files compared (2026-11-13): 'differs' = the plain run fails
+# (exit 1) or its raw data differ; 'same' = byte-identical raw data. Oracle of
+# tests/dialect_ngspice_modes.rs.
+ngspice/examples/ddt/ddt-test1.sp same
+ngspice/examples/ddt/ddt-test2.sp differs
+ngspice/examples/ddt/ddt-test3.sp same
+ngspice/examples/optran/F5TurboV2thermal-optran.sp differs
+ngspice/examples/optran/TLV6001-test.sp differs
+ngspice/examples/optran/TLV9002-test.sp differs
+ngspice/examples/p-to-n-examples/555-timer-2.sp differs
+ngspice/examples/p-to-n-examples/MOS1_out.sp same
+ngspice/examples/p-to-n-examples/OP_MCP6041.sp same
+ngspice/examples/p-to-n-examples/logic.sp differs
+ngspice/examples/p-to-n-examples/op-test-adi.sp differs
+ngspice/examples/p-to-n-examples/op-test.sp differs
+ngspice/examples/p-to-n-examples/switch-oscillators.sp same
+ngspice/examples/p-to-n-examples/switch-oscillators_inc.sp differs
+ngspice/examples/probe/555-timer-2.sp differs
+ngspice/examples/probe/Dual-NMOS-amp.sp same
+ngspice/examples/probe/F5TurboV2-Probe.sp same
+ngspice/examples/probe/ac-test.sp same
+ngspice/examples/probe/cntrl-sources.sp same
+ngspice/examples/probe/mos-test.sp same
+ngspice/examples/probe/probe-i-dev.sp same
+ngspice/examples/probe/switches-manual-p92.sp same
+ngspice/examples/soa/bjt-soa.sp differs
+ngspice/examples/soa/diode-soa-sh.sp same
+ngspice/examples/soa/diode-soa-simple.sp same
+ngspice/examples/soa/nic_soa.sp differs
+ngspice/kicad/sallen_key-bandpass-072/sallen_key_bp.sp same
+ngspice/paranoia/optran/F5TurboV2thermal-ic-out.sp differs
+ngspice/paranoia/optran/TLV6001-test.sp differs
+ngspice/paranoia/optran/TLV9002-test.sp differs
+ngspice/paranoia/optran/simple-tran.sp same
+ngspice/paranoia/pton/555-timer-2.sp differs
+ngspice/paranoia/pton/MOS1_out.sp same
+ngspice/paranoia/pton/OP_MCP6041.sp same
+ngspice/paranoia/pton/Optimos_out.sp differs
+ngspice/paranoia/pton/op-test-adi.sp differs
+ngspice/paranoia/pton/op-test-test.sp differs
+ngspice/paranoia/pton/op-test.sp differs
+ngspice/paranoia/pton/relax_osc_st.sp differs
+ngspice/paranoia/pton/switch-oscillators.sp same
+ngspice/paranoia/pton/switch-oscillators_inc.sp differs

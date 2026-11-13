@@ -1,0 +1,3 @@
+U0444  # v1: AC 0.1 (Xyce refers to 0.1: ten times ngspice's input noise)
+U0444  # v2: a parameter, not a literal 1
+U0444  # r1: no source

@@ -13,8 +13,9 @@
 //!   `Sources::add(&mut self, path: &str, text: &str) -> usize`,
 //!   `Sources::has(&self, path: &str) -> bool`, `Sources::files(&self) -> &[(String, String)]`,
 //!   `Sources::entries(&self) -> &[(String, String)]`, `Sources::set_form(&mut self, form: ir::Role)`,
-//!   `Sources::form(&self) -> ir::Role`,
-//!   `Sources::load(entries: &[&str], form: ir::Role, reader: &dyn Read, loader: &mut dyn FnMut(&str) -> Option<String>) -> Sources`
+//!   `Sources::form(&self) -> ir::Role`, `Sources::environment(&self) -> Option<(&str, &str)>`,
+//!   `Sources::set_environment(&mut self, path: &str, text: &str)`,
+//!   `Sources::load(entries: &[&str], form: ir::Role, reader: &dyn Read, cwd: Option<&str>, loader: &mut dyn FnMut(&str) -> Option<String>) -> Sources`
 //! - `Reference::path(&self) -> &str`, `Reference::resolve(&self, from: &str) -> String`
 //! - `pub fn relative_path(from: &str, to: &str) -> Option<String>`,
 //!   `pub fn written_path(design: &ir::Design, from: ir::FileId, path: &str) -> Result<String, String>`
@@ -32,6 +33,9 @@ pub struct Sources {
     files: Vec<(String, String)>,
     entries: usize,
     form: Form,
+    /// The deck's start-up file, `(path, text)` (`Read::environment`): read by the reader, no
+    /// file of the design.
+    environment: Option<(String, String)>,
 }
 
 /// A file a text names, as `Read::references` lists it.
@@ -110,6 +114,19 @@ impl Sources {
         };
     }
 
+    /// The start-up file the simulator reads before the deck, `(path, text)`, if one was found
+    /// ([`Sources::load`]) or set.
+    pub fn environment(&self) -> Option<(&str, &str)> {
+        self.environment
+            .as_ref()
+            .map(|(p, t)| (p.as_str(), t.as_str()))
+    }
+
+    /// Sets the start-up file a caller found itself.
+    pub fn set_environment(&mut self, path: &str, text: &str) {
+        self.environment = Some((path.to_string(), text.to_string()));
+    }
+
     /// `Role::Deck` or `Role::Library`: what the entries are.
     pub fn form(&self) -> ir::Role {
         match self.form {
@@ -120,7 +137,10 @@ impl Sources {
 
     /// `entries` (in `form`) and every file their `Reference::File`s reach through `reader`,
     /// breadth first, each path once (normalized), to [`DEPTH_MAX`] and `FILES_MAX`. A path
-    /// `loader` returns `None` for is left out: the reader sees a reference with no file.
+    /// `loader` returns `None` for is left out: the reader sees a reference with no file. For a
+    /// deck, the reader's start-up file (`Read::environment`) from the first entry's folder,
+    /// else from `cwd`, the working directory the simulator would run in (R87a: ngspice-45
+    /// reads both and the deck folder's wins, settle `spiceinit/` on `step2-ngspice`).
     ///
     /// # Panics
     /// When `form` is neither `Deck` nor `Library`, or `entries` is empty.
@@ -128,6 +148,7 @@ impl Sources {
         entries: &[&str],
         form: ir::Role,
         reader: &dyn Read,
+        cwd: Option<&str>,
         loader: &mut dyn FnMut(&str) -> Option<String>,
     ) -> Sources {
         assert!(!entries.is_empty(), "Sources::load: at least one entry");
@@ -155,6 +176,16 @@ impl Sources {
             }
         }
         assert!(src.entries <= src.files.len(), "the entries lead the files");
+        if let Some(name) = reader.environment().filter(|_| form == ir::Role::Deck) {
+            let beside = Reference::File(name.to_string()).resolve(&normalize(entries[0]));
+            let here = cwd.map(|c| normalize(&Path::new(c).join(name).to_string_lossy()));
+            for path in std::iter::once(beside).chain(here) {
+                if let Some(text) = loader(&path) {
+                    src.environment = Some((path, text));
+                    break;
+                }
+            }
+        }
         src
     }
 }

@@ -1,5 +1,5 @@
 file "a.sp" deck
   element vsource v1 (in 0) dc=1
   element resistor r1 (in 0) value=1k
-  loop sweep keep_last (device_param r1 r) (list values=[1e3, 2e3])
+  loop sweep keep_last (device_param r1 tc1) (list values=[1e3, 2e3])
     analysis dc (source_dc v1) (lin start=0 stop=1 step=0.5) afresh

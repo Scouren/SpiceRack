@@ -1,0 +1,20 @@
+# Oracle: run F13 (scratchpad vacask/run130, settle run/save_current): an isource's, a
+# resistor's, a vccs's and a cccs's current is `p(x, i)` (they have no `i(x)`), a vsource's and
+# a vcvs's `i(x)`; a path is `i('x1:l1')` as before.
+file "save_current.ir" deck
+  title "save of element currents"
+  device_library resistor
+  model vs source_v
+  model is source_i
+  model r resistor
+  model e vcvs
+  model g vccs
+  model f cccs
+  element vsource v1 (1 0) model=vs dc=1i
+  element isource i1 (7 0) model=is dc=1m
+  element resistor r1 (1 2) model=r value=1k
+  element vcvs e1 (3 0 2 0) model=e gain=2i
+  element vccs g1 (4 0 2 0) model=g gain=1m
+  element cccs f1 (6 0) model=f gain=3i sense=v1
+  save analysis=(op dc tran) from_here (i (r1)) (i (i1)) (i (g1)) (i (f1)) (i (v1)) (i (e1)) (i (x1 l1))
+  analysis op name=op1

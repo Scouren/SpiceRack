@@ -137,7 +137,7 @@ pub(crate) fn check_element(e: &Element, design: &Design, at: ItemRef, out: &mut
 /// The port count of the `Subckt` `master` is bound to, or `None` when it is unbound, out of
 /// range or not a subcircuit.
 pub(crate) fn master_ports(design: &Design, master: crate::id::Ref) -> Option<usize> {
-    if master.def.is_none() || master.def.index() >= design.definitions().len() {
+    if master.def.is_none() || master.def.index() >= design.definitions_all().len() {
         return None;
     }
     let def = design.def(master.def);

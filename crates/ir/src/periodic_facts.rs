@@ -20,48 +20,37 @@
 //! Contents: `DetailFacts` for `Hb`, `Pss` (the small-signal rows: `periodic_ss_facts.rs`)
 
 use crate::analysis_facts::DetailFacts;
+#[cfg(any(test, feature = "gen"))]
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
-use crate::diag::Diags;
-use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::ExprId;
-use crate::id::{NameId, ScopeId};
+use crate::id::NameId;
+#[cfg(any(test, feature = "gen"))]
+use crate::id::ScopeId;
 use crate::periodic::{Hb, HbTruncate, Pss, PssMode};
-use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
-use crate::run_names::Names;
+use crate::run_fields::{EL, N, NN};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
-use crate::run_words::{
-    domain_unless, flag, put_expr, put_exprs, put_flag, put_name, put_word, take_enum, take_expr,
-    take_exprs, take_key, take_name, take_word, word,
-};
-use crate::text::Words;
-use crate::text_expr::Ctx;
+use crate::run_words::{domain_unless, flag};
+
+run_choices!(HbTruncate, PssMode);
+
+run_fields! {
+    Hb { tones: Exprs = EL, harmonics: Exprs = EL, intermod: Expr = N, truncate: Choice = HbTruncate::Box }
+    Pss {
+        mode: Choice("") = PssMode::Driven, uic: Word = false, fundamental: Expr = N,
+        tstab: Expr = N, harmonics: Expr = N, points: Expr = N, osc_p: Name = NN, osc_n: Name = NN,
+        sc_iter: Expr = N, steady_coeff: Expr = N,
+    }
+}
 
 impl DetailFacts for Hb {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        out.extend([
-            Handle::Exprs(self.tones),
-            Handle::Exprs(self.harmonics),
-            Handle::Expr(self.intermod),
-        ]);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.exprs(self.tones);
-        r.exprs(self.harmonics);
-        r.expr(&mut self.intermod);
-    }
-
-    fn map_names(&mut self, _r: &mut Names<'_>) {
-        // no element name
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.tones.len > 1, RunExtra::HbMultiTone);
         flag(set, !self.intermod.is_none(), RunExtra::HbIntermod);
@@ -74,33 +63,6 @@ impl DetailFacts for Hb {
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(self.tones.len > 0 && self.tones.len == self.harmonics.len)
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_exprs(out, design, ctx, "tones", self.tones);
-        put_exprs(out, design, ctx, "harmonics", self.harmonics);
-        put_expr(out, design, ctx, "intermod", self.intermod);
-        put_word(out, &format!("truncate={}", word(self.truncate)));
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let tones = take_exprs(words, "tones", scope, b, diags);
-        let harmonics = take_exprs(words, "harmonics", scope, b, diags);
-        let intermod = take_expr(words, "intermod", scope, b, diags);
-        if !take_key(words, "truncate") {
-            words.error(diags);
-            return None;
-        }
-        let truncate = take_enum(words, &HbTruncate::ALL, diags)?;
-        Some(Hb {
-            tones,
-            harmonics,
-            intermod,
-            truncate,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -148,30 +110,6 @@ impl DetailFacts for Hb {
 }
 
 impl DetailFacts for Pss {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        for e in [self.fundamental, self.tstab, self.harmonics, self.points] {
-            out.push(Handle::Expr(e));
-        }
-        out.extend([Handle::Name(self.osc_p), Handle::Name(self.osc_n)]);
-        out.extend([Handle::Expr(self.sc_iter), Handle::Expr(self.steady_coeff)]);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        for e in [
-            &mut self.fundamental,
-            &mut self.tstab,
-            &mut self.harmonics,
-            &mut self.points,
-            &mut self.sc_iter,
-            &mut self.steady_coeff,
-        ] {
-            r.expr(e);
-        }
-    }
-
-    fn map_names(&mut self, _r: &mut Names<'_>) {
-        // no element name
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         flag(set, self.mode == PssMode::Driven, RunExtra::PssDriven);
         flag(
@@ -203,47 +141,6 @@ impl DetailFacts for Pss {
             PssMode::Autonomous => osc,
         };
         domain_unless(mode && !self.fundamental.is_none() && !self.tstab.is_none())
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_word(out, &word(self.mode));
-        put_flag(out, self.uic, "uic");
-        put_expr(out, design, ctx, "fundamental", self.fundamental);
-        put_expr(out, design, ctx, "tstab", self.tstab);
-        put_expr(out, design, ctx, "harmonics", self.harmonics);
-        put_expr(out, design, ctx, "points", self.points);
-        put_name(out, design, "osc_p", self.osc_p);
-        put_name(out, design, "osc_n", self.osc_n);
-        put_expr(out, design, ctx, "sc_iter", self.sc_iter);
-        put_expr(out, design, ctx, "steady_coeff", self.steady_coeff);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let mode = take_enum(words, &PssMode::ALL, diags)?;
-        let uic = take_word(words, "uic");
-        let fundamental = take_expr(words, "fundamental", scope, b, diags);
-        let tstab = take_expr(words, "tstab", scope, b, diags);
-        let harmonics = take_expr(words, "harmonics", scope, b, diags);
-        let points = take_expr(words, "points", scope, b, diags);
-        let osc_p = take_name(words, "osc_p", b, diags);
-        let osc_n = take_name(words, "osc_n", b, diags);
-        let sc_iter = take_expr(words, "sc_iter", scope, b, diags);
-        let steady_coeff = take_expr(words, "steady_coeff", scope, b, diags);
-        Some(Pss {
-            mode,
-            uic,
-            fundamental,
-            tstab,
-            harmonics,
-            points,
-            osc_p,
-            osc_n,
-            sc_iter,
-            steady_coeff,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(

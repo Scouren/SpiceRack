@@ -1,0 +1,8 @@
+file "a.sp" deck
+  param w = 1
+  element vsource v1 (a 0) dc=1
+  if (w > 0)
+    element resistor rload (a 0) value=1k
+  else
+    element resistor rload (a 0) value=2k
+  alter (element_value rload) value=3k

@@ -5,7 +5,7 @@
 //! Cites: VD input-identifiers, input-reserved, cir-nodes (a node may be a non-negative
 //! integer; `0` is ground).
 //!
-//! Contents: `Place`, `unquote`, `spell`, `GROUND` (crate-private)
+//! Contents: `Place`, `unquote`, `identifier`, `spell`, `GROUND` (crate-private)
 
 /// Ground's name in VACASK and in the IR (`NameId::GROUND`).
 pub(super) const GROUND: &str = "0";
@@ -15,8 +15,12 @@ pub(super) const GROUND: &str = "0";
 pub(super) enum Place {
     /// A node of a terminal list, `global`, `ground` or a probe.
     Node,
-    /// Any other name: an instance, model, subcircuit, parameter or section.
+    /// Any other name: an instance, model, subcircuit or parameter.
     Other,
+    /// A section's name (`section x`, `include "…" section=x`): bare always, a keyword included
+    /// (demo/cmos180n.lib's `model`); VACASK reads no quoted one (run131: "Syntax error,
+    /// unexpected string in include directive.").
+    Section,
 }
 
 /// The words VACASK reads as keywords at a statement's head (VD input-reserved).
@@ -57,18 +61,22 @@ pub(super) fn unquote(text: &str) -> String {
     out
 }
 
-/// Appends `name` as VACASK reads it back: bare when it is an identifier (a letter, `_` or `$`,
-/// then letters, digits, `_`, `$`) and no reserved word, or at a [`Place::Node`] a
-/// non-negative integer; else `'…'` with each `'` doubled.
-pub(super) fn spell(name: &str, place: Place, out: &mut String) {
-    let ident = name
-        .bytes()
+/// Whether `name` is an identifier: a letter, `_` or `$`, then letters, digits, `_`, `$`.
+pub(super) fn identifier(name: &str) -> bool {
+    name.bytes()
         .next()
         .is_some_and(|b| b.is_ascii_alphabetic() || b == b'_' || b == b'$')
         && name
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
-        && !RESERVED.contains(&name);
+}
+
+/// Appends `name` as VACASK reads it back: bare when it is an identifier (a letter, `_` or `$`,
+/// then letters, digits, `_`, `$`) and no reserved word (any word at a [`Place::Section`]), or at
+/// a [`Place::Node`] a non-negative integer; else `'…'` with each `'` doubled (at a section,
+/// no spelling: `write_structure::admit` refuses it first).
+pub(super) fn spell(name: &str, place: Place, out: &mut String) {
+    let ident = identifier(name) && (place == Place::Section || !RESERVED.contains(&name));
     let number =
         place == Place::Node && !name.is_empty() && name.bytes().all(|b| b.is_ascii_digit());
     if ident || number {

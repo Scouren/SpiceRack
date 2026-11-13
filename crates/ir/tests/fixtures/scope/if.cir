@@ -1,0 +1,17 @@
+an element in an .if branch (the other branch holds one of the same name), altered by name from the top level
+.param sel=1
+v1 a 0 1
+r1 a b 1k
+.if (sel == 1)
+r2 b 0 1k
+.else
+r2 b 0 2k
+.endif
+.control
+op
+print v(b)
+alter r2 3k
+op
+print v(b)
+.endc
+.end

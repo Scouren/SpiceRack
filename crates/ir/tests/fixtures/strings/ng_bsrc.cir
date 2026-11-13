@@ -1,0 +1,9 @@
+string compared in a B source
+.param s="tt"
+v1 a 0 1
+b1 a 0 i={(s=="tt") ? v(a)/1k : v(a)/2k}
+.control
+op
+print i(v1)
+.endc
+.end

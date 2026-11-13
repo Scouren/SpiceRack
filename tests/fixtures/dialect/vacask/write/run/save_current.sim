@@ -1,0 +1,18 @@
+save of element currents
+load "spice/resistor.osdi"
+model vs vsource
+model is isource
+model r sp_resistor
+model e vcvs
+model g vccs
+model f cccs
+v1 (1 0) vs dc=1
+i1 (7 0) is dc=1m
+r1 (1 2) r r=1k
+e1 (3 0 2 0) e gain=2
+g1 (4 0 2 0) g gain=1m
+f1 (6 0) f ctlinst="v1" gain=3
+control
+  save p(r1, i) p(i1, i) p(g1, i) p(f1, i) i(v1) i(e1) i('x1:l1')
+  analysis op1 op
+endc

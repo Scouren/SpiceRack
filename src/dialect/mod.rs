@@ -26,7 +26,7 @@
 //! }
 //! let (mut design, mut diags) = (ir::Design::new(), ir::Diags::new());
 //! dialect::read(&src, from, Policy::Lenient, &mut design, &mut diags);
-//! for def in design.definitions() { /* kind, name, scope */ }
+//! for def in design.definitions_all() { /* kind, name, scope */ }
 //! dialect::legalize(&mut design, to, &mut diags);   // once per design and target
 //! for file in design.files() { let text = dialect::write(&design, file, to, &mut diags); }
 //! ```
@@ -34,7 +34,7 @@
 //! Cites: `REWRITE-PLAN.md` §2.1–§2.4, §3.4, §4.1; `rewrite/SPINE.md` §2–§3.
 //!
 //! Contents:
-//! - `pub trait Read` (`Read::references`, `Read::read`),
+//! - `pub trait Read` (`Read::references`, `Read::read`, `Read::environment`),
 //!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`,
 //!   `Write::citations`), `pub struct Citation`
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
@@ -43,25 +43,32 @@
 //!   `pub const PATH_AS_READ: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path}`; `pub mod facade`, `pub mod irtext`,
-//!   `pub mod ngspice`, `pub mod vacask`
+//!   `pub mod hspice`, `pub mod ngspice`, `pub mod vacask`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
 //! - `pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)`
+//! - `pub fn legalize_with(design: &mut ir::Design, to: &DialectRow, roots: Roots, diags: &mut ir::Diags)`,
+//!   `pub use crate::passes::structure::unused::Roots`
 //! - `pub fn write(design: &ir::Design, file: ir::FileId, to: &DialectRow, diags: &mut ir::Diags) -> String`
 //! - `pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Policy) -> Result<Written, ir::Diags>`
 //! - `pub fn info(code: ir::Code) -> Option<ir::Info>`, `pub fn refuses(code: ir::Code) -> bool`
 
 pub mod facade;
+pub mod hspice;
 pub mod irtext;
 pub mod ngspice;
 mod sources;
 pub mod vacask;
 
+pub use crate::passes::structure::unused::Roots;
 pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path};
+
+use std::collections::HashSet;
 
 use crate::ir;
 use crate::ir::ItemRow as _;
 use crate::passes;
+use crate::passes::structure::unused::{Refused, drop_unused};
 
 /// Text of one dialect → the IR.
 pub trait Read: Sync {
@@ -75,6 +82,13 @@ pub trait Read: Sync {
     /// first, even when the text is empty (the facade anchors diagnostics by that order, and
     /// `transpile` writes the entry).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags);
+
+    /// The start-up file the simulator reads before a deck, by file name (ngspice's
+    /// `.spiceinit`), which [`Sources::load`] looks for beside the deck and hands the reader as
+    /// [`Sources::environment`]; `None` when the simulator reads none.
+    fn environment(&self) -> Option<&'static str> {
+        None
+    }
 }
 
 /// The IR → text of one dialect.
@@ -147,6 +161,12 @@ pub static BUILTIN: &[DialectRow] = &[
         read: Some(&vacask::VACASK),
         write: Some(&vacask::VACASK),
     },
+    DialectRow {
+        name: "hspice",
+        text_family: "hspice",
+        read: Some(&hspice::HSPICE),
+        write: Some(&hspice::HSPICE),
+    },
 ];
 
 /// The `text_family` of a writer whose text holds an `Opaque` of any dialect (the IR text,
@@ -177,8 +197,8 @@ pub struct Written {
 pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
 
 /// The refusal a strict read adds at each item holding a parameter read no definition is bound
-/// to (`ir::unbound_reads`, a held formal-default read aside): `S0104`, `arg` the read's
-/// `NameId` (R63, A38).
+/// to (`ir::unbound_reads`, a held formal-default read and a read in a library section the
+/// design never selects aside): `S0104`, `arg` the read's `NameId` (R63, A38, R63a).
 pub const STRICT_UNBOUND: ir::Code = ir::Code::new(b'S', 104);
 
 /// The refusal a strict read adds at each run item (an alter, a loop, an analysis, an
@@ -265,7 +285,8 @@ pub fn by_name(name: &str) -> Option<&'static DialectRow> {
 /// `src` read by `from` into `design`, then checked. A check violation is a bug in the
 /// reader: an `X` row, and a debug assertion. Under [`Policy::Strict`] each `Unread` item
 /// gets a [`STRICT_UNREAD`] row, and each item holding a parameter read no definition binds
-/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38), and
+/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38; and
+/// a read in a library section no include of the design selects: R63a), and
 /// each run item whose target nothing defines one [`STRICT_UNBOUND_TARGET`] row per name (R70).
 ///
 /// # Panics
@@ -299,8 +320,11 @@ pub fn read(
                 diags.push_at(STRICT_UNREAD, design, item, 0);
             }
         }
-        // a complete program: a read no definition binds is one its simulator rejects (R63)
-        for read in ir::unbound_reads(design).into_iter().filter(|r| !r.held) {
+        // a complete program: a read no definition binds is one its simulator rejects (R63),
+        // unless it stands in a library section the program never selects (R63a)
+        let unselected = unselected(design);
+        let reads = ir::unbound_reads(design).into_iter();
+        for read in reads.filter(|r| !r.held && !unselected.contains(&r.item)) {
             diags.push_at(STRICT_UNBOUND, design, read.item, read.name.0);
         }
         // a run item whose target provably names nothing (R70, A43): the IR's list, which
@@ -311,48 +335,102 @@ pub fn read(
     }
 }
 
-/// `design` made legal for `to`, once per (design, target), in place (clone first to keep the
-/// neutral design or to write a second target). Every `Opaque` of another text family is
-/// dropped from its scope with an [`INERT_DROPPED`] note when its class is `Inert` (it moves no
-/// number), with a [`HINT_DROPPED`] note when it is `Hint` (solver tuning: numbers may move
-/// within the solver's tolerance), and refused otherwise (`U0001`, `arg` = `Feature::Item(Opaque)`, at the item); a
-/// writer of [`ANY_FAMILY`] skips that step. Then `passes::legalize` with the writer's features,
-/// whose `ir::check_legal` reports what no pass removed. Last, always, the writer's own
-/// [`Write::admits`], so the caller sees every refusal at once. Legality is of the whole design.
+/// [`legalize_with`] for a kit or a library, where every definition is a root and nothing is
+/// dropped (`Roots::Every`, R80a): one round.
 ///
 /// # Panics
 /// When `to` has no writer (the caller checks the row).
 pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags) {
+    legalize_with(design, to, Roots::Every, diags);
+}
+
+/// `design` made legal for `to`, once per (design, target), in place (clone first to keep the
+/// neutral design or to write a second target); `roots` is the caller's choice (R80a: a deck's
+/// conversion `Roots::Entry`, a kit's or a library's `Roots::Every`), never a dialect's.
+///
+/// One round: every `Opaque` of another text family is dropped from its scope with an
+/// [`INERT_DROPPED`] note when its class is `Inert` (it moves no number), with a
+/// [`HINT_DROPPED`] note when it is `Hint` (solver tuning: numbers may move within the solver's
+/// tolerance), and refused otherwise (`U0001`, `arg` = `Feature::Item(Opaque)`, at the item); a
+/// writer of [`ANY_FAMILY`] skips that step. Then `passes::legalize` with the writer's features,
+/// whose `ir::check_legal` reports what no pass removed, then the writer's own [`Write::admits`],
+/// so the caller sees every refusal at once. Then `drop_unused` on the round's refusals (R80b),
+/// and another round while it drops a definition: at most one round per live definition at
+/// entry, plus the last (R80c, asserted).
+///
+/// What goes out (R80c): the rounds' notes, each once (by code, span, item and argument) in
+/// first-seen order, less those at an item a later drop removed (the `U0314` note at its
+/// definition says what went), then the last round's refusals in that round's order: an
+/// earlier round's refusals are recomputed on the changed design. Legality is of the whole
+/// design. A design refused nowhere ends stating the target's laws (R90a: per law point, the
+/// variant the writer's features hold), as the target's reader would state them.
+///
+/// # Panics
+/// When `to` has no writer (the caller checks the row).
+pub fn legalize_with(
+    design: &mut ir::Design,
+    to: &DialectRow,
+    roots: Roots,
+    diags: &mut ir::Diags,
+) {
     let writer = to
         .write
         .expect("legalize: a row with a writer (the caller checks it)");
-    let opaque = u32::from(ir::Feature::Item(ir::ItemKind::Opaque).index());
-    let mut dropped = Vec::new();
-    for (item, scope) in foreign(design, to) {
-        let row: ir::item::Opaque = design.row(item.index);
-        match row.class {
-            ir::OpaqueClass::Inert => {
-                diags.push_at(INERT_DROPPED, design, item, 0);
-                dropped.push((item, scope));
+    let bound = design.live_definitions().len() + 1;
+    let mut kept: Vec<ir::Diag> = Vec::new();
+    let mut keys: HashSet<(ir::Code, ir::Span, ir::ItemRef, u32)> = HashSet::new();
+    let mut rounds = 0;
+    let last = loop {
+        rounds += 1;
+        assert!(
+            rounds <= bound,
+            "legalize: each round but the last drops a live definition"
+        );
+        let mut round = ir::Diags::new();
+        drop_foreign(design, to, &mut round);
+        passes::legalize(design, writer.features(), &mut round);
+        writer.admits(design, &mut round);
+        let (refusals, notes): (Vec<ir::Diag>, Vec<ir::Diag>) =
+            round.rows().iter().partition(|d| refuses(d.code));
+        for n in notes {
+            if keys.insert((n.code, n.span, n.item, n.arg)) {
+                kept.push(n);
             }
-            ir::OpaqueClass::Hint => {
-                diags.push_at(HINT_DROPPED, design, item, 0);
-                dropped.push((item, scope));
-            }
-            ir::OpaqueClass::Unread
-            | ir::OpaqueClass::Private
-            | ir::OpaqueClass::InvalidInSource
-            | ir::OpaqueClass::Script => diags.push_at(ir::diag::UNSUPPORTED, design, item, opaque),
         }
-    }
-    if !dropped.is_empty() {
-        let mut editor = design.editor();
-        for (item, scope) in &dropped {
-            editor.remove_item(*scope, *item);
+        let refused: Vec<Refused> = refusals.iter().map(|d| (d.item, d.code, d.arg)).collect();
+        let before = design.reachable();
+        let mut dropped = ir::Diags::new();
+        if drop_unused(design, &refused, roots, &mut dropped) == 0 {
+            assert!(
+                dropped.is_empty(),
+                "legalize: a note per dropped definition only"
+            );
+            break refusals;
         }
+        let after: HashSet<ir::ItemRef> = design.reachable().into_iter().map(|p| p.0).collect();
+        let gone: HashSet<ir::ItemRef> = before
+            .into_iter()
+            .map(|p| p.0)
+            .filter(|i| !after.contains(i))
+            .collect();
+        kept.retain(|n| !gone.contains(&n.item));
+        kept.extend(dropped.rows().iter().copied());
+    };
+    if last.is_empty() {
+        restate_laws(design, writer.features());
     }
-    passes::legalize(design, writer.features(), diags);
-    writer.admits(design, diags);
+    for d in kept.iter().chain(&last) {
+        if d.item.index == ir::ItemRef::NONE.index {
+            diags.push(d.code, d.span, d.arg);
+        } else {
+            diags.push_at(d.code, design, d.item, d.arg);
+        }
+        debug_assert_eq!(
+            diags.rows().last(),
+            Some(d),
+            "legalize: a row goes out as made"
+        );
+    }
 }
 
 /// `file` of a design [`legalize`] accepted for `to`, written by `to`'s writer; nothing else
@@ -393,8 +471,9 @@ pub fn write(
     out
 }
 
-/// `src` read by `from`, legalized for `to` and its entry file written, with the verdict: any
-/// row whose code [`refuses`] refuses the deck, and no step runs after a refusal.
+/// `src` read by `from`, legalized for `to` as a deck (`Roots::Entry`: an unused definition
+/// holding a refusal is dropped, R80) and its entry file written, with the verdict: any row
+/// whose code [`refuses`] refuses the deck, and no step runs after a refusal.
 ///
 /// # Errors
 /// Every diagnostic, when one refuses.
@@ -404,24 +483,7 @@ pub fn transpile(
     to: &DialectRow,
     policy: Policy,
 ) -> Result<Written, ir::Diags> {
-    let mut design = ir::Design::new();
-    let mut diags = ir::Diags::new();
-    read(src, from, policy, &mut design, &mut diags);
-    if refused(&diags) {
-        return Err(diags);
-    }
-    legalize(&mut design, to, &mut diags);
-    if refused(&diags) {
-        return Err(diags);
-    }
-    let entry = design.entry();
-    assert!(
-        entry != ir::FileId::NONE,
-        "transpile: the {} reader made no file",
-        from.name
-    );
-    let text = write(&design, entry, to, &mut diags);
-    Ok(Written { text, notes: diags })
+    transpile_with(src, from, to, policy, Roots::Entry)
 }
 
 /// The catalogue row of `code`: the spine's own, the passes' (`passes::info`), else the IR
@@ -436,6 +498,7 @@ pub fn info(code: ir::Code) -> Option<ir::Info> {
         .or_else(|| passes::info(code))
         .or_else(|| ir::diag::info(code))
         .or_else(|| ngspice::info(code))
+        .or_else(|| hspice::info(code))
 }
 
 /// Whether `code` refuses a deck: its row is a refusal, or no catalogue holds it (a missing
@@ -449,6 +512,89 @@ pub fn refuses(code: ir::Code) -> bool {
 /// Whether any row of `diags` refuses.
 fn refused(diags: &ir::Diags) -> bool {
     diags.rows().iter().any(|d| refuses(d.code))
+}
+
+/// [`transpile`] with the caller's `roots` ([`legalize_with`]).
+fn transpile_with(
+    src: &Sources,
+    from: &DialectRow,
+    to: &DialectRow,
+    policy: Policy,
+    roots: Roots,
+) -> Result<Written, ir::Diags> {
+    let mut design = ir::Design::new();
+    let mut diags = ir::Diags::new();
+    read(src, from, policy, &mut design, &mut diags);
+    if refused(&diags) {
+        return Err(diags);
+    }
+    legalize_with(&mut design, to, roots, &mut diags);
+    if refused(&diags) {
+        return Err(diags);
+    }
+    let entry = design.entry();
+    assert!(
+        entry != ir::FileId::NONE,
+        "transpile: the {} reader made no file",
+        from.name
+    );
+    let text = write(&design, entry, to, &mut diags);
+    Ok(Written { text, notes: diags })
+}
+
+/// The design's laws restated as the target's (R90a): per law point (two variants, adjacent in
+/// `Law::ALL`), the one variant `features` holds replaces the stated one; a point whose
+/// variants `features` holds both or neither of is left. Meaning-neutral after a legalize with
+/// no refusal: nothing then carries a variant the target lacks, and a point's carriers do not
+/// depend on its variant.
+fn restate_laws(design: &mut ir::Design, features: &ir::FeatureSet) {
+    const _: () = assert!(
+        ir::Law::ALL.len().is_multiple_of(2),
+        "two variants per law point"
+    );
+    let mut laws = design.laws();
+    for point in ir::Law::ALL.chunks(2) {
+        let held: Vec<ir::Law> = point
+            .iter()
+            .copied()
+            .filter(|l| features.contains(ir::Feature::Circuit(l.member())))
+            .collect();
+        if let [target] = held[..] {
+            let others = laws.iter().filter(|l| !point.contains(l));
+            laws = others.fold(ir::Laws::EMPTY, ir::Laws::with).with(target);
+        }
+    }
+    design.builder().set_laws(laws);
+}
+
+/// The foreign step of a [`legalize_with`] round: every `Opaque` of another text family
+/// dropped with its note (`Inert`, `Hint`) or refused (the rest).
+fn drop_foreign(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags) {
+    let opaque = u32::from(ir::Feature::Item(ir::ItemKind::Opaque).index());
+    let mut dropped = Vec::new();
+    for (item, scope) in foreign(design, to) {
+        let row: ir::item::Opaque = design.row(item.index);
+        match row.class {
+            ir::OpaqueClass::Inert => {
+                diags.push_at(INERT_DROPPED, design, item, 0);
+                dropped.push((item, scope));
+            }
+            ir::OpaqueClass::Hint => {
+                diags.push_at(HINT_DROPPED, design, item, 0);
+                dropped.push((item, scope));
+            }
+            ir::OpaqueClass::Unread
+            | ir::OpaqueClass::Private
+            | ir::OpaqueClass::InvalidInSource
+            | ir::OpaqueClass::Script => diags.push_at(ir::diag::UNSUPPORTED, design, item, opaque),
+        }
+    }
+    if !dropped.is_empty() {
+        let mut editor = design.editor();
+        for (item, scope) in &dropped {
+            editor.remove_item(*scope, *item);
+        }
+    }
 }
 
 /// Every reachable `Opaque` whose dialect is not `to`'s text family, with its listing scope;
@@ -466,6 +612,58 @@ fn foreign(design: &ir::Design, to: &DialectRow) -> Vec<(ir::ItemRef, ir::ScopeI
 }
 
 /// A table position as the IR's `u32` row index.
+/// The items that stand in a library section no include of the design selects, directly or
+/// through a selected section (R63a): text no simulator reads as part of the program. A section
+/// is named by its file and name; an include outside every section selects, one inside a
+/// section selects once that section is selected (a fixpoint, one round per include at most).
+fn unselected(design: &ir::Design) -> std::collections::HashSet<ir::ItemRef> {
+    let listed = design.reachable();
+    let includes: Vec<(ir::ScopeId, ir::FileId, ir::NameId)> = listed
+        .iter()
+        .filter(|(item, _)| item.kind == ir::ItemKind::Include)
+        .filter_map(|&(item, scope)| {
+            let row: ir::item::Include = design.row(item.index);
+            let file = design.find_file(design.str(row.path));
+            (!row.section.is_none()).then_some((scope, file, row.section))
+        })
+        .collect();
+    let mut selected = std::collections::HashSet::new();
+    // whether every section around `scope` is selected; a scope chain is at most every scope
+    let open = |selected: &std::collections::HashSet<(ir::FileId, ir::NameId)>, scope| {
+        let mut at: ir::ScopeId = scope;
+        for _ in 0..=listed.len() {
+            if at.is_none() {
+                return true;
+            }
+            let s = design.scope(at);
+            if s.kind == ir::ScopeKind::Section {
+                let row: ir::item::Section = design.row(s.owner.index);
+                if !selected.contains(&(s.file, row.name)) {
+                    return false;
+                }
+            }
+            at = s.parent;
+        }
+        unreachable!("unselected: a scope chain longer than the design")
+    };
+    for _ in 0..=includes.len() {
+        let before = selected.len();
+        for &(scope, file, section) in &includes {
+            if open(&selected, scope) {
+                selected.insert((file, section));
+            }
+        }
+        if selected.len() == before {
+            break;
+        }
+    }
+    listed
+        .iter()
+        .filter(|&&(_, scope)| !open(&selected, scope))
+        .map(|&(item, _)| item)
+        .collect()
+}
+
 fn index(i: usize) -> u32 {
     u32::try_from(i).expect("an IR table holds fewer than 2^32 rows (ROWS_MAX)")
 }

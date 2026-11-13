@@ -230,7 +230,7 @@ fn write(
 fn literal(design: &ir::Design, e: ir::ExprId) -> Option<f64> {
     let (mut sign, mut at) = (1.0, e);
     // bounded by the expression table
-    for _ in 0..=design.expr_count() {
+    for _ in 0..=design.expr_count_all() {
         if at.is_none() {
             return None;
         }

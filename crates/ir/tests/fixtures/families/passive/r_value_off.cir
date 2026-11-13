@@ -1,0 +1,11 @@
+passive r_value off (80 C, m=3), dc (1 V on a, 1 MHz)
+vd a 0 dc 1
+r1 a 0 1k tc1=1e-3 tc2=1e-5 m=3
+.temp 80
+.options reltol=1e-9 abstol=1e-15
+.control
+set numdgt=12
+op
+print i(vd)
+.endc
+.end

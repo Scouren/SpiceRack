@@ -1,0 +1,11 @@
+diode parameters only VACASK has, and a zero area
+load "spice/diode.osdi"
+model da sp_diode is=1e-14
+model dk sp_diode is=1e-14 ikp=1m
+model dr sp_diode is=1e-14 rsw=1
+model dv sp_diode is=1e-14 vp=1
+model dq sp_diode is=1e-14 qpscale=2
+d1 (a 0) da
+d2 (a 0) da area=0
+d3 (a 0) da area=0.0
+d4 (a 0) dk

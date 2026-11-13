@@ -2,9 +2,9 @@
 //! run on VACASK, against the loops of operating points the rule writes for ngspice, run on
 //! ngspice-45. Each op plot, in loop order, holds the source's DC point of the same index.
 //!
-//! The source's sweep continues from point to point and the rule converts only a restarting
-//! one, so the test sets the axis afresh on the read design: a stand-in, removed when the VACASK
-//! reader reads `continuation=0` as `DcAxis::afresh` (the deck then says `continuation=0`). The axis is a diode's area, a device parameter by the reader's
+//! The rule converts only a sweep whose every point starts afresh, so the deck says
+//! `continuation=0` (R75a: the reader reads it as the axis's `afresh`). The axis is a diode's
+//! area, a device parameter by the reader's
 //! one kind per meaning (a resistor's `r` is an element value, which no row converts). The
 //! circuit (a resistor into a diode) has one operating point, the same however a point starts,
 //! so the two runs still compare. Tolerance: 2·(RELTOL·|v| + VNTOL) with RELTOL 1e-3, VNTOL
@@ -14,8 +14,14 @@
 //! `.dc`) and `decks/bistable_loop.sp` (the same values by `foreach`/`alter`/`op`) on ngspice-45
 //! give other numbers for one bistable circuit (-2 V and 0 V at v(in) = 0).
 //!
+//! And R75a on the reader: the latch decks (`decks/latch*.sim`, `continuation.rs`) read with one
+//! `afresh` bit per sweep level, and the two whose every outer level starts afresh give, written
+//! for ngspice-45 and run there, the points VACASK gives; the two that carry an outer level are
+//! refused for ngspice (F8). Tolerance as above.
+//!
 //! Contents: `pub fn dc_loops_give_the_points_vacask_gives()`,
-//! `pub fn a_loop_of_ops_is_no_continued_sweep()`, `pub fn restart_loops_give_vacasks_afresh_points()`,
+//! `pub fn a_loop_of_ops_is_no_continued_sweep()`,
+//! `pub fn the_vacask_reader_states_continuation_per_level()`,
 //! `pub fn dc_axes_to_loops_convert_generated_designs(Range<u64>, Size)`
 
 use std::path::Path;
@@ -62,7 +68,7 @@ pub fn dc_loops_give_the_points_vacask_gives() {
         .collect();
     assert_eq!(dc.len(), 1, "one DC analysis");
     let detail = design.row::<ir::Analysis>(dc[0].index).detail;
-    let mut row = design.detail::<ir::dc_ac::Dc>(detail);
+    let row = design.detail::<ir::dc_ac::Dc>(detail);
     let kinds: Vec<_> = design
         .dc_axes(row.axes)
         .iter()
@@ -73,14 +79,9 @@ pub fn dc_loops_give_the_points_vacask_gives() {
         [ir::plan::TargetKind::DeviceParam],
         "the axis the rows name"
     );
-    // the deck's sweep restarts each point (R75: its one axis starts afresh)
-    let mut axes = design.dc_axes(row.axes).to_vec();
-    for x in &mut axes {
-        x.afresh = true;
-    }
-    let mut editor = design.editor();
-    row.axes = editor.builder().dc_axes(&axes);
-    editor.set_detail(detail, row);
+    // the deck's `continuation=0`: its one axis starts each point afresh (R75a)
+    let afresh: Vec<bool> = design.dc_axes(row.axes).iter().map(|x| x.afresh).collect();
+    assert_eq!(afresh, [true], "the reader reads continuation=0");
     let read = diags.len();
     dialect::legalize(&mut design, ngspice, &mut diags);
     let new = &diags.rows()[read..];
@@ -177,104 +178,97 @@ pub fn a_loop_of_ops_is_no_continued_sweep() {
     assert!(ops[4].abs() < 1e-3, "the op finds 0 V: {ops:?}");
 }
 
-/// `dc_restart_to_loops` on the latch (R75a): `latch.sim` read, every axis set afresh (the
-/// stand-in for VACASK's `continuation=0` on both levels, which its reader keeps `Private`),
-/// written for ngspice as loops of operating points and run on ngspice-45, against VACASK on
-/// `latch_c0_both.sim`: the fourteen v(c) points, in the same order, within 2·(RELTOL·|v| +
-/// VNTOL). A carried outer axis is the case the rule refuses (`latch.sim` as read).
-///
-/// Stand-in: the axes are set afresh by hand. What removes it: the VACASK reader reading
-/// `continuation=0` as `DcAxis::afresh` (the second VACASK agent's item after the IR round);
-/// then this test reads `latch_c0_both.sim` as written and converts it.
-pub fn restart_loops_give_vacasks_afresh_points() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
-    let text = std::fs::read_to_string(dir.join("latch.sim")).expect("the deck");
+/// The latch decks: each level's `afresh` as read, and toward ngspice the same points or a
+/// refusal.
+pub fn the_vacask_reader_states_continuation_per_level() {
     let (vacask, ngspice) = (
         dialect::by_name("vacask").unwrap(),
         dialect::by_name("ngspice").unwrap(),
     );
-    let read = |afresh: bool| {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
+    use ir::RunExtra::{DcOuterCarries, DcRestart};
+    // innermost first: (vin, rin); toward ngspice, the features refused (none: it converts).
+    // ngspice holds an afresh outer axis and a carrying inner one; every axis afresh becomes
+    // loops of operating points (`dc_restart_to_loops`); a carried outer axis stays refused
+    for (deck, want, refused) in [
+        ("latch.sim", [false, false], &[DcOuterCarries][..]),
+        ("latch_c0_outer.sim", [false, true], &[][..]),
+        (
+            "latch_c0_inner.sim",
+            [true, false],
+            &[DcOuterCarries, DcRestart][..],
+        ),
+        ("latch_c0_both.sim", [true, true], &[][..]),
+    ] {
+        let path = dir.join(deck);
+        let text = std::fs::read_to_string(&path).expect("the deck");
         let mut design = ir::Design::new();
         let mut diags = ir::Diags::new();
-        dialect::read(
-            &Sources::one("latch.sim", &text),
-            vacask,
-            Policy::Strict,
-            &mut design,
-            &mut diags,
-        );
+        let src = Sources::one(deck, &text);
+        dialect::read(&src, vacask, Policy::Strict, &mut design, &mut diags);
         assert!(
             diags.rows().iter().all(|d| !dialect::refuses(d.code)),
-            "read: {:?}",
+            "{deck} read: {:?}",
             diags.rows()
         );
-        let dc = design
+        let dc: Vec<ir::dc_ac::Dc> = design
             .reachable()
             .into_iter()
-            .map(|(i, _)| i)
-            .find(|i| {
-                i.kind == ir::ItemKind::Analysis
-                    && design.row::<ir::Analysis>(i.index).kind == ir::AnalysisKind::Dc
-            })
-            .expect("the DC analysis");
-        let detail = design.row::<ir::Analysis>(dc.index).detail;
-        let mut row = design.detail::<ir::dc_ac::Dc>(detail);
-        let mut axes = design.dc_axes(row.axes).to_vec();
-        assert_eq!(axes.len(), 2, "outer rin, inner vin");
-        for x in &mut axes {
-            x.afresh = afresh || x.afresh;
-        }
-        let mut editor = design.editor();
-        row.axes = editor.builder().dc_axes(&axes);
-        editor.set_detail(detail, row);
-        let n = diags.len();
+            .filter(|(i, _)| i.kind == ir::ItemKind::Analysis)
+            .map(|(i, _)| design.row::<ir::Analysis>(i.index))
+            .filter(|a| a.kind == ir::AnalysisKind::Dc)
+            .map(|a| design.detail(a.detail))
+            .collect();
+        assert_eq!(dc.len(), 1, "{deck}: one DC analysis");
+        let afresh: Vec<bool> = design
+            .dc_axes(dc[0].axes)
+            .iter()
+            .map(|x| x.afresh)
+            .collect();
+        assert_eq!(afresh, want, "{deck}: afresh per axis, innermost first");
+        let read = diags.len();
         dialect::legalize(&mut design, ngspice, &mut diags);
-        let new = diags.rows()[n..].to_vec();
-        (design, diags, new)
-    };
-    let (_, _, carried) = read(false);
-    assert!(
-        carried.iter().any(|d| dialect::refuses(d.code)),
-        "a carried outer axis is refused"
-    );
-    let (design, mut diags, new) = read(true);
-    assert!(
-        new.iter().all(|d| !dialect::refuses(d.code)),
-        "legalize: {new:?}"
-    );
-    assert_eq!(
-        new.iter().filter(|d| d.code == AS_LOOPS).count(),
-        2,
-        "two loops: {new:?}"
-    );
-    let written = dialect::write(&design, design.entry(), ngspice, &mut diags);
-    let both = dir.join("latch_c0_both.sim");
-    let source_text = std::fs::read_to_string(&both).expect("the deck");
-    let a = plots(sim::run(Sim::Vacask, &both, &source_text, &[], 60));
-    let b = plots(sim::run(
-        Sim::Ngspice,
-        &dir.join("latch_loops.sp"),
-        &written,
-        &[],
-        60,
-    ));
-    let source = column(&a[0], "c");
-    let target: Vec<f64> = b
+        let mut got: Vec<(ir::Code, u32)> = diags.rows()[read..]
+            .iter()
+            .filter(|d| dialect::refuses(d.code))
+            .map(|d| (d.code, d.arg))
+            .collect();
+        got.sort();
+        let mut refused: Vec<(ir::Code, u32)> = refused
+            .iter()
+            .map(|&x| {
+                (
+                    ir::Code::new(b'U', 1),
+                    u32::from(ir::Feature::Run(x).index()),
+                )
+            })
+            .collect();
+        refused.sort();
+        assert_eq!(got, refused, "{deck}: toward ngspice");
+        if !got.is_empty() {
+            continue;
+        }
+        let written = dialect::write(&design, design.entry(), ngspice, &mut diags);
+        let a = column(&plots(sim::run(Sim::Vacask, &path, &text, &[], 60))[0], "c");
+        let b: Vec<f64> = plots(sim::run(
+            Sim::Ngspice,
+            &path.with_extension("sp"),
+            &written,
+            &[],
+            60,
+        ))
         .iter()
-        .filter(|p| p.plot_name.eq_ignore_ascii_case("operating point"))
-        .map(|p| column(p, "c")[0])
+        .flat_map(|p| column(p, "c"))
         .collect();
-    assert_eq!(
-        (source.len(), target.len()),
-        (14, 14),
-        "fourteen points:\n{written}"
-    );
-    for (k, (x, y)) in source.iter().zip(&target).enumerate() {
-        let tol = 2.0 * (1e-3 * x.abs() + 1e-6);
-        assert!(
-            (x - y).abs() <= tol,
-            "point {k}: VACASK {x}, ngspice {y}\n{written}"
-        );
+        assert_eq!(a.len(), 14, "{deck}: VACASK's grid");
+        assert_eq!(b.len(), a.len(), "{deck}: ngspice's points\n{written}");
+        for (k, (x, y)) in a.iter().zip(&b).enumerate() {
+            let tol = 2.0 * (1e-3 * x.abs() + 1e-6);
+            assert!(
+                (x - y).abs() <= tol,
+                "{deck} point {k}: VACASK {x}, ngspice {y}\n{written}"
+            );
+        }
     }
 }
 

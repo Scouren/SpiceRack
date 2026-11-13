@@ -1,0 +1,36 @@
+String operands on both simulators (the lead's strings item; uncommitted, PAUSE). Run: nix develop .#testing -c tests/fixtures/strings/run.sh
+Result: VACASK computes a string under == and != in a value and in @if (i(v1) -1 mA, the 1k branch) and refuses one under + ('Operation not supported for string and real.'); ngspice-45 refuses .param s="tt" itself ('Undefined parameter [s]', exit 1), so no string comparison runs there. By the lead's rule: StringCompare is a feature (VACASK computes it), any other string operand a violation.
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+## ng_arith.cir rc=1
+Undefined parameter [s]
+Cannot compute substitute
+ERROR: fatal error in ngspice, exit(1)
+## ng_bsrc.cir rc=1
+Undefined parameter [tt]
+Cannot compute substitute
+ERROR: fatal error in ngspice, exit(1)
+## ng_if.cir rc=1
+Undefined parameter [s]
+Cannot compute substitute
+ERROR: fatal error in ngspice, exit(1)
+## ng_ne.cir rc=1
+Undefined parameter [s]
+Cannot compute substitute
+ERROR: fatal error in ngspice, exit(1)
+## ng_value.cir rc=1
+Undefined parameter [s]
+Cannot compute substitute
+ERROR: fatal error in ngspice, exit(1)
+## va_arith.sim rc=1
+Operation not supported for string and real.
+  r1 (a 0) res r=s+1k
+                  ^
+7:17 (0xa3) in /tmp/claude-1000/-home-omare-Documents-Projects-EDA-Tools-Schematic-SpiceRack/e01833d7-8f66-4c05-a350-6f9152c0c1b7/scratchpad/ir/str/va_arith.sim
+## va_if.sim rc=0
+i(v1)=-0.001
+## va_ne.sim rc=0
+i(v1)=-0.001
+## va_value.sim rc=0
+i(v1)=-0.001
+

@@ -1,0 +1,15 @@
+string compared in a conditional
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+parameters s="tt"
+v1 (a 0) vsource dc=1
+@if s=="tt"
+  r1 (a 0) res r=1k
+@else
+  r1 (a 0) res r=2k
+@end
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

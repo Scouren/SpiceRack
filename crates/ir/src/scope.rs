@@ -12,7 +12,8 @@
 //! Contents: `pub struct File`, `pub struct Scope`, `pub struct Def`,
 //! `Design::lookup(&self, ScopeId, DefKind, NameId) -> DefId`,
 //! `Design::find_file(&self, &str) -> FileId`,
-//! `Design::reachable(&self) -> Vec<(ItemRef, ScopeId)>`; crate:
+//! `Design::reachable(&self) -> Vec<(ItemRef, ScopeId)>`,
+//! `Design::name_scope(&self, ScopeId) -> ScopeId`; crate:
 //! `Design::bodies(&self) -> HashMap<ItemRef, Vec<ScopeId>>`,
 //! `Design::in_enclosing_subckt(&self, ScopeId, ScopeId) -> bool`
 
@@ -143,6 +144,33 @@ impl Design {
             }
         }
         bodies
+    }
+
+    /// The name scope of an element listed in `scope`, where a by-name use from `scope` reads
+    /// element names (R82): the body of the nearest enclosing subcircuit, else the entry file's
+    /// top scope, which stands for the whole deck (every file's top and every section, branch
+    /// and include nested outside a subcircuit: they open no name scope for elements, as a
+    /// simulator's `alter r1` reads them once the deck is put together; runs in
+    /// `tests/fixtures/scope/`). `ScopeId::NONE` for a design with no file or a scope out of
+    /// range. O(scope depth).
+    pub fn name_scope(&self, scope: ScopeId) -> ScopeId {
+        let mut at = scope;
+        // bounded by the scope count: each step moves to a parent
+        for _ in 0..=self.scopes.len() {
+            if at.is_none() || at.index() >= self.scopes.len() {
+                break;
+            }
+            let s = self.scopes[at.index()];
+            if s.kind == ScopeKind::Subckt {
+                return at;
+            }
+            at = s.parent;
+        }
+        let entry = self.entry();
+        if entry.is_none() || scope.is_none() || scope.index() >= self.scopes.len() {
+            return ScopeId::NONE;
+        }
+        self.files[entry.index()].top
     }
 
     /// Whether a definition that lives in `def_scope`, read from `scope`, lies in the body of a

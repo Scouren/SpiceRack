@@ -1,7 +1,7 @@
 //! The verdict word lists of `rewrite/S3-CONTROL.md` §2 (ngspice-45 `commands.c`), the
 //! variables of ngspice's own, the circuit options and the frontend-only option keys: data the planner reads.
 //!
-//! Contents: `pub(super) const INERT`, `EFFECTS`, `FLOWS`, `OWNS`, `ANALYSES`, `PRIVATE_VARS`,
+//! Contents: `pub(super) const INERT`, `EFFECTS`, `FLOWS`, `FILES`, `OWNS`, `ANALYSES`, `PRIVATE_VARS`,
 //! `CIRCUIT_OPTIONS`,
 //! `FRONTEND_KEYS` (each `&[&str]`)
 
@@ -18,18 +18,14 @@ pub(super) const INERT: &[&str] = &[
     "setscale",
     "transpose",
     "gnuplot",
-    "wrdata",
-    "wrs2p",
     "hardcopy",
     "asciiplot",
-    "write",
     "compose",
     "unlet",
     "remzerovec",
     "print",
     "esave",
     "eprint",
-    "eprvcd",
     "edisplay",
     "cross",
     "undefine",
@@ -104,6 +100,10 @@ pub(super) const EFFECTS: &[&str] = &[
 
 /// Data-dependent flow words outside a block they open (`control.c`).
 pub(super) const FLOWS: &[&str] = &["else", "break", "continue", "label", "goto"];
+
+/// Commands that write vectors to a file (`commands.c`): the deck's product, which no IR item
+/// states (R49 (5), the dc_loop finding): `Private`.
+pub(super) const FILES: &[&str] = &["write", "wrdata", "wrs2p", "eprvcd"];
 
 /// ngspice's own (`S3-CONTROL.md` §2: Private).
 pub(super) const OWNS: &[&str] = &["setseed", "optran", "codemodel"];

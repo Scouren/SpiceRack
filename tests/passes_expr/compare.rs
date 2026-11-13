@@ -274,12 +274,7 @@ pub fn keeps_every_root_value(name: &str) -> usize {
                 };
                 let was = ir::eval_typed(&before, old, &at(&before));
                 let now = ir::eval_typed(&design, new, &at(&design));
-                let same = match (was, now) {
-                    (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits(),
-                    (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
-                    (Err(ir::Domain::OutOfDomain(e)), Ok(_)) => int_capable(before.expr(e)),
-                    _ => false,
-                };
+                let same = kept(&before, was, now);
                 assert!(
                     same,
                     "{name} seed {seed} trial {trial}: {was:?} before, {now:?} after"
@@ -291,6 +286,24 @@ pub fn keeps_every_root_value(name: &str) -> usize {
 }
 
 // ---- private ----
+
+/// Whether a root's value after a rule is what the rule owes for its value `was` before:
+/// the same bits for a value; the same kind of error for an error; and where the source has
+/// no value because an Int result is out of range (R12, the lead's ruling on seed 98), any
+/// error, or a value only where the out-of-range row is one an Int computes (the widening).
+fn kept(
+    before: &ir::Design,
+    was: Result<ir::Value, ir::Domain>,
+    now: Result<ir::Value, ir::Domain>,
+) -> bool {
+    match (was, now) {
+        (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits(),
+        (Err(ir::Domain::OutOfDomain(_)), Err(_)) => true,
+        (Err(ir::Domain::OutOfDomain(e)), Ok(_)) => int_capable(before.expr(e)),
+        (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
+        (Ok(_), Err(_)) | (Err(_), Ok(_)) => false,
+    }
+}
 
 /// The operands of `e`.
 fn operands(design: &ir::Design, e: ir::ExprId) -> Vec<ir::ExprId> {
@@ -320,7 +333,7 @@ fn dropped(design: &ir::Design, was: Result<ir::Value, ir::Domain>, new: ir::Exp
     };
     let mut stack = vec![new];
     let mut seen = std::collections::HashSet::new();
-    for _ in 0..=2 * design.expr_count() + 1 {
+    for _ in 0..=2 * design.expr_count_all() + 1 {
         let Some(e) = stack.pop() else { return true };
         if e == at {
             return false;
@@ -358,7 +371,7 @@ fn int_capable(e: ir::Expr) -> bool {
 fn holds(design: &ir::Design, root: ir::ExprId, hit: fn(ir::Expr) -> bool) -> bool {
     let mut stack = vec![root];
     let mut seen = std::collections::HashSet::new();
-    for _ in 0..=2 * design.expr_count() + 1 {
+    for _ in 0..=2 * design.expr_count_all() + 1 {
         let Some(e) = stack.pop() else { return false };
         if e.is_none() || !seen.insert(e) {
             continue;
@@ -397,10 +410,14 @@ fn differ(
     let same = match (a, b) {
         (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits() && (!typed || x.int == y.int),
         (Err(ir::Domain::OutOfDomain(e)), _) if !typed && int_capable(after.expr(e)) => true,
-        // R12: `pow` of a negative base and a fractional exponent is outside its domain, and
-        // `pow_to_powabs` is exact on the domain only (the one rule stated so)
+        // R12: `pow` of a negative base and a fractional exponent, and `clamp` with `lo > hi`,
+        // are outside their domains, and `pow_to_powabs` and `clamp_to_min_max` are exact on
+        // the domain only (the rules stated so)
         (Err(ir::Domain::OutOfDomain(e)), _)
-            if matches!(after.expr(e), ir::Expr::Call(ir::Func::Pow, _)) =>
+            if matches!(
+                after.expr(e),
+                ir::Expr::Call(ir::Func::Pow | ir::Func::Clamp, _)
+            ) =>
         {
             true
         }
@@ -416,4 +433,25 @@ fn tagged(v: f64, int: bool) -> ir::Value {
         true => ir::Value::int(v),
         false => ir::Value::real(v),
     }
+}
+
+#[test]
+fn kept_is_strict_where_the_source_has_a_value() {
+    let d = ir::Design::new();
+    let none = ir::ExprId::NONE;
+    let one = || Ok(ir::Value::real(1.0));
+    assert!(kept(&d, one(), one()));
+    assert!(!kept(&d, one(), Ok(ir::Value::real(2.0))));
+    assert!(!kept(&d, one(), Err(ir::Domain::NotANumber(none))));
+    assert!(!kept(&d, one(), Err(ir::Domain::OutOfDomain(none))));
+    assert!(kept(
+        &d,
+        Err(ir::Domain::OutOfDomain(none)),
+        Err(ir::Domain::NotANumber(none))
+    ));
+    assert!(!kept(
+        &d,
+        Err(ir::Domain::DivideByZero(none)),
+        Err(ir::Domain::NotANumber(none))
+    ));
 }

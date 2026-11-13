@@ -33,7 +33,7 @@ struct Values<'d> {
 impl Constants {
     /// The tables of `design`: one walk over its reachable items.
     pub(super) fn new(design: &ir::Design) -> Constants {
-        let n = design.definitions().len();
+        let n = design.definitions_all().len();
         let (mut pinned, mut passed) = (vec![false; n], vec![false; n]);
         let mut refs = Vec::new();
         for (item, _) in design.reachable() {
@@ -55,7 +55,7 @@ impl Constants {
                 }
                 let subckt = design.def(el.model.def).item;
                 for &(name, _) in design.params(el.params) {
-                    let formal = design.definitions().iter().position(|d| {
+                    let formal = design.definitions_all().iter().position(|d| {
                         d.kind == ir::DefKind::Param && d.item == subckt && d.name == name
                     });
                     if let Some(f) = formal {

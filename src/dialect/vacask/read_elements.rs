@@ -458,6 +458,14 @@ fn device(
         };
         return read::opaque(l, n, class, Some(code));
     }
+    if family == ir::ModelFamily::Diode && super::diode_law::zero_area(l, entries) {
+        return read::opaque(
+            l,
+            n,
+            ir::OpaqueClass::Private,
+            Some(super::diode_law::ZERO_AREA),
+        );
+    }
     let mut slots = Vec::with_capacity(entries.len());
     for (key, _) in entries {
         let slot = match (key.as_str(), families::instance_name_in(word, key)) {

@@ -20,7 +20,7 @@
 //!
 //! Contents: `Module`, `FAMILIES`, `PROVEN`, `Params`, `Name`, `module`, `file_word`, `default_word`,
 //! `Words` (`Words::of`, `Words::get`), `params`, `kind`, `has_polarity`, `model_name_in`, `model_name_out`, `instance_name_in`,
-//! `canonical`, `instance_name_out` (crate-private)
+//! `canonical`, `instance_name_out`, `proven_families` (crate-private)
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -152,6 +152,11 @@ pub(super) const PROVEN: &[&str] = &[
     "sp_mos6",
     "sp_mos9",
     "sp_jfet1",
+    // The same, the transient with VACASK's step capped at ngspice's default (`maxstep` = the
+    // print step): uncapped they differ by VACASK's step control only (the pair's refinement
+    // oracle agrees at span/2000).
+    "sp_jfet2",
+    "sp_mes1",
 ];
 
 /// A shipped module's parameter names, as `params.txt` lists them.
@@ -328,7 +333,12 @@ pub(super) fn model_name_in(word: &str, written: &str) -> Name {
     };
     let target = p.target(written);
     if p.model.contains(&target) {
-        let ir = written.strip_prefix("model_").unwrap_or(written);
+        // A model parameter that shares an instance parameter's name is renamed `model_x`, or
+        // `x_mod` on sp_mos6 (`ps_mod`: spice/mos6.va's header).
+        let ir = written
+            .strip_prefix("model_")
+            .or_else(|| written.strip_suffix("_mod"))
+            .unwrap_or(written);
         return Name::Ir(ir.to_string());
     }
     match p.instance.contains(&target) {
@@ -339,11 +349,11 @@ pub(super) fn model_name_in(word: &str, written: &str) -> Name {
 
 /// The name a `model` line of the module `word` spells the IR model parameter `ir` with.
 pub(super) fn model_name_out(word: &str, ir: &str) -> String {
-    let prefixed = format!("model_{ir}");
-    match params(word).is_some_and(|p| p.has(&prefixed)) {
-        true => prefixed,
-        false => ir.to_string(),
-    }
+    let p = params(word);
+    [format!("model_{ir}"), format!("{ir}_mod")]
+        .into_iter()
+        .find(|renamed| p.is_some_and(|p| p.has(renamed)))
+        .unwrap_or_else(|| ir.to_string())
 }
 
 /// The IR name of parameter `written` on an instance of a model of the module `word`.
@@ -378,6 +388,25 @@ pub(super) fn instance_name_out(word: &str, ir: &str) -> String {
     }
 }
 
+/// `set` with the family of every `PROVEN` module: the families a read yields (an unproven
+/// module's model and library read as a user module and a plain load, R41 a), so a reader's
+/// `FEATURES` claims no other (law L5).
+pub(super) const fn proven_families(set: ir::FeatureSet) -> ir::FeatureSet {
+    let mut out = set;
+    let mut i = 0;
+    while i < FAMILIES.len() {
+        let mut k = 0;
+        while k < PROVEN.len() {
+            if same(FAMILIES[i].word, PROVEN[k]) {
+                out = out.with(ir::Feature::Family(FAMILIES[i].family));
+            }
+            k += 1;
+        }
+        i += 1;
+    }
+    out
+}
+
 // ---- private ----
 
 impl Params {
@@ -410,6 +439,22 @@ const fn m(
         file,
         terminals,
     }
+}
+
+/// `a == b`, in a `const fn`.
+const fn same(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 #[cfg(test)]

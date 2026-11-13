@@ -1,3 +1,4 @@
+laws bc_sat_area_times_areab sub_sat_last_factor diode_wl_mult_twice diode_sidewall_bottom_f1 diode_xom_absent_1e4 vdmos_kp_absent_35 vdmos_tcvth_lowers vdmos_clamp_by_n mos_small_signal_hand mos6_small_signal_absent bjt_irb_small_signal_frozen vdmos_mult_charges_off diode_isr_reverse_none diode_isr_small_signal_hand diode_tt_factor_unclamped trig_reduce_cast exp_clamp_1e99 log_zero_minus_1e99 div_gmin_guard asin_edge_zero
 # codes:
 file "if_chain.sp" deck
   title "if_chain"

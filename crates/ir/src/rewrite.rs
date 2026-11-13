@@ -74,7 +74,7 @@ pub fn rewrite_tree(
     root: ExprId,
     rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
 ) -> ExprId {
-    let n = b.design().expr_count();
+    let n = b.design().expr_count_all();
     if root.is_none() || root.index() >= n {
         return root;
     }
@@ -94,7 +94,7 @@ fn rewrite_where(
     rule: &mut dyn FnMut(&mut Builder<'_>, ExprId) -> Option<ExprId>,
 ) -> u32 {
     let items: Vec<ItemRef> = design.reachable().into_iter().map(|(i, _)| i).collect();
-    let n = design.expr_count();
+    let n = design.expr_count_all();
     // old id -> its rewrite (itself when unchanged); `NONE` until visited
     let mut memo = vec![ExprId::NONE; n];
     // per item, whether each root (in `map_exprs` order) is of the chosen form

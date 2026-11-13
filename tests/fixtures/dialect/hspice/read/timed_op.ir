@@ -1,0 +1,9 @@
+# codes:
+file "timed_op.sp" deck
+  title "timed_op"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): a transient plot and two operating-point plots at time=1e-9 and 5e-9: '.op 1n 5n' is a timed report"
+  element vsource v1 (1 0) wave=pulse(v1=0 v2=1 delay=0 rise=1n fall=1n width=1 period=2 given_zero=spice_default) dc_rule=wave_at_zero
+  element resistor r1 (1 2) value=1k
+  element capacitor c1 (2 0) value=1p
+  analysis tran stop=5n print_step=0.1n cap=ngspice_rule
+  analysis timed_op times=[1n, 5n]

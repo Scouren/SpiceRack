@@ -11,9 +11,10 @@
 //! `subckt`, `subckt_end`, `param`, `global`, `branch`, `if_end`, `opaque` (crate-private)
 
 use super::expr_write::{string, write_expr};
-use super::name::{self, Place};
+use super::name::{self, Place, identifier};
 use super::tables;
 use super::write::Writer;
+use super::write_models;
 use crate::ir;
 
 /// A device library of a family VACASK ships no file for. ponytail: goes when a `DeviceLibrary`
@@ -71,7 +72,7 @@ pub(super) fn include(w: &mut Writer<'_, '_>, at: ir::ItemRef, row: ir::item::In
     string(&path, w.out);
     if !row.section.is_none() {
         w.out.push_str(" section=");
-        name::spell(w.design.str(row.section), Place::Other, w.out);
+        name::spell(w.design.str(row.section), Place::Section, w.out);
     }
     w.out.push('\n');
 }
@@ -80,7 +81,7 @@ pub(super) fn include(w: &mut Writer<'_, '_>, at: ir::ItemRef, row: ir::item::In
 pub(super) fn section(w: &mut Writer<'_, '_>, row: ir::item::Section) {
     w.line();
     w.out.push_str("section ");
-    name::spell(w.design.str(row.name), Place::Other, w.out);
+    name::spell(w.design.str(row.name), Place::Section, w.out);
     w.out.push('\n');
 }
 
@@ -102,7 +103,7 @@ pub(super) fn load(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     // ponytail: decides from the whole definition table, dead rows included (the class of the
     // expression table's replaced rows); a live-definitions view replaces it in the `…_all()` round.
     let modules: Vec<ir::NameId> = d
-        .definitions()
+        .definitions_all()
         .iter()
         .filter(|def| def.kind == ir::DefKind::Module && def.item == at)
         .map(|def| def.name)
@@ -149,14 +150,25 @@ pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags)
             let default = tables::default_file(row.family);
             // VACASK names a library by its file: the family's default, or a file it
             // ships for that family (a variant), which reads back as this row.
+            // `tables::library` reads a file back as a library only for a proven module's.
             let spelled = match row.path.is_none() {
-                true => default.is_some(),
+                true => default.is_some_and(|d| tables::library(&d) == Some(row.family)),
                 false => {
                     let path = design.str(row.path);
                     tables::library(path) == Some(row.family) && default.as_deref() != Some(path)
                 }
             };
             (!spelled).then_some(NO_LIBRARY)
+        }
+        // Run131: a section name is one bare identifier; VACASK reads no quoted one.
+        ir::ItemKind::Include => {
+            let row: ir::item::Include = design.row(at.index);
+            (!row.section.is_none() && !identifier(design.str(row.section)))
+                .then_some(write_models::UNSPELLED)
+        }
+        ir::ItemKind::Section => {
+            let row: ir::item::Section = design.row(at.index);
+            (!identifier(design.str(row.name))).then_some(write_models::UNSPELLED)
         }
         _ => None,
     };
@@ -255,3 +267,35 @@ pub(super) fn opaque(w: &mut Writer<'_, '_>, row: ir::item::Opaque) {
 }
 
 // ---- private ----
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Oracle: `tables::library` (da95fe25: a load of a module not proven its family's reads as a
+    /// plain load) and round9's L5 seed 0 on ir-next 3e565243: a library the reader would not read
+    /// back as a library is refused, one of a proven module is spelled.
+    #[test]
+    fn a_library_of_an_unproven_module_is_refused() {
+        let refused = |family: ir::ModelFamily| {
+            let mut design = ir::Design::new();
+            let at = {
+                let mut b = design.builder();
+                let (_, top) = b.file("t.sim", ir::Role::Deck);
+                let row = ir::DeviceLibrary {
+                    path: ir::NameId::NONE,
+                    family,
+                };
+                b.device_library(top, row, ir::Span::NONE)
+            };
+            let mut diags = ir::Diags::new();
+            admit(&design, at, &mut diags);
+            diags.rows().iter().any(|d| d.code == NO_LIBRARY)
+        };
+        assert!(refused(ir::ModelFamily::GummelPoon));
+        assert!(refused(ir::ModelFamily::Vbic));
+        assert!(!refused(ir::ModelFamily::Diode));
+        assert!(!refused(ir::ModelFamily::JfetShichman));
+        assert!(!refused(ir::ModelFamily::JfetParkerSkellern));
+    }
+}

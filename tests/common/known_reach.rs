@@ -13,10 +13,10 @@
 /// Strict both ways (`reach_every_kind_the_row_claims`).
 #[rustfmt::skip] // a table: one row per line
 pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
-    ("ngspice", "Elem(Inductor)", FIXPOINT, ELEMENTS),
+    ("ngspice", "Elem(Inductor)", "static_passives_with_their_own_keys_round_trip_by_meaning", INDUCTORS),
     ("ngspice", "Elem(ISource)", FIXPOINT, "interim: dialect_ngspice_sources' fixtures; W1150 (the positional card) refuses 138 of 140 generated current sources over 512 seeds, 120 with W1007"),
     ("ngspice", "Elem(Port)", FIXPOINT, SOURCES),
-    ("ngspice", "Elem(Table)", FIXPOINT, ELEMENTS),
+    ("ngspice", "Elem(Table)", "tables_with_number_points_round_trip_by_meaning", TABLE_POINTS),
     ("ngspice", "Wave(Pulse)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Sin)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Exp)", FIXPOINT, SOURCES),
@@ -34,24 +34,44 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Family(CodeModel)", "code_models_of_the_build_round_trip_by_meaning", CODE_MODELS),
     ("vacask", "Item(Save)", "generated_save_plans_read_back_to_their_meaning", "W2303: VACASK spells two save shapes only (R29/S12)"),
     ("vacask", "Elem(Coupling)", "property_am_and_mutual_round_trip", "the generator makes no coupling over seeds 0..512 (it needs two inductor names and a Mutual model), so none is generated, let alone refused"),
-    ("vacask", "Elem(Mosfet)", "proven_device_kinds_round_trip", VC_DRAWS),
     ("vacask", "Elem(Mesfet)", "proven_device_kinds_round_trip", VC_DRAWS),
+    ("vacask", "Wave(Pulse)", VC_FIXPOINT, VC_SOURCES_INTERIM),
+    ("vacask", "Wave(Sin)", VC_FIXPOINT, VC_SOURCES_INTERIM),
+    ("vacask", "Wave(Exp)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Pwl)", VC_FIXPOINT, VC_SOURCES_INTERIM),
-    ("vacask", "Wave(Sffm)", VC_FIXPOINT, "interim: dialect_vacask_sources' fixture am_fm; W2104 or W2007 refuses 55 of 57 generated ones over 512 seeds"),
     ("vacask", "Wave(Am)", "property_am_and_mutual_round_trip", VC_SOURCES),
+    ("hspice", "Elem(Capacitor)", FIXPOINT, HS_CAPACITOR),
+    ("hspice", "Elem(Port)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Elem(Table)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Elem(Behav)", FIXPOINT, HS_BEHAV),
+    ("hspice", "Wave(Pulse)", FIXPOINT, HS_SOURCES),
+    ("hspice", "Wave(Sin)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(Exp)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(Pwl)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(Sffm)", FIXPOINT, HS_SOURCES),
+    ("hspice", "Wave(Am)", FIXPOINT, HS_SOURCES),
+    ("hspice", "Wave(TrNoise)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(TrRandom)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Family(Mesa)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Family(CodeModel)", FIXPOINT, HS_CARRIED),
 ];
 
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
 const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
 // Why, per area: every admitted generated design drops the kind by that area's refusal.
-const ELEMENTS: &str =
-    "interim: dialect_ngspice_elements' fixtures (resistor, capacitor_inductor, controlled)";
+const INDUCTORS: &str = "every admitted design of the round's generator drops its inductors by the elements area's refusal (W1100; the round integrator's row, 2cf26fba); static and dynamic inductors are built by the elements' covering properties (tests/dialect_ngspice_covering.rs)";
+const TABLE_POINTS: &str = "the generator draws a table point as an expression, which the table card cannot spell (W1100 Table; ngspice substitutes a braced point once, settle table_brace_point.sp: R74 (4)); tables with number points are built by the elements' covering property (tests/dialect_ngspice_covering.rs)";
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
 const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, four, noise, pss); W1305 refuses the generator's expression fields in a script deck, so the laws run on no generated script analysis of these kinds; waits for the IR generator to draw literal fields for an analysis written as a script command";
 const SCRIPT_FIELD: &str = "the generator draws an analysis field as an expression, which a script command cannot spell (W1305, settle script_tran_brace.sp); the control area's property builds script plans with number fields";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VC_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
 const VC_SOURCES: &str = "W2104 for sources (law L5 seed 1): VACASK takes a source's kind from its master, and the generator names a source's model with a fresh name no model statement defines, so every generated source is refused";
-const VC_DRAWS: &str = "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws; none over REACH_SEEDS since FEATURES changed (Func(Atan2) left, R76a; the F11 families joined) and moved every later draw";
+const VC_DRAWS: &str = "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws; none over REACH_SEEDS since FEATURES changed (Func(Atan2) left, R76a; the F11 families joined; the unproven families left, R41 a; jfet2 and mes1 proven) and moved every later draw";
 const VC_SOURCES_INTERIM: &str = "interim: dialect_vacask_sources' fixtures (sources, controlled, pulse, sine, exp, pwl); the generator names a source's model with a fresh name: waits for the generator binding it";
 const CODE_MODELS: &str = "the generator's code-model words name none of the build's (W1206); a seeded property of the build's code models covers it (tests/dialect_ngspice_models.rs)";
+// hspice (tests/dialect_hspice.rs's read fixtures; its gate is goal 2's)
+const HS_CAPACITOR: &str = "interim: dialect_hspice's fixtures timed_op, pulse_zero_rise hold a capacitor; no admitted generated design of 512 seeds holds one since the loop features (.temp list, .alter, .data) moved the draw (cause not yet traced)";
+const HS_BEHAV: &str = "interim: dialect_hspice's fixtures e_forms, e_max; the generator names a behavioural source with a B, which HSPICE has not (W4100 Letter: an E or G name is no writer's to invent)";
+const HS_SOURCES: &str = "interim: dialect_hspice's fixtures pulse_zero_rise, timed_op, sffm_order, am_form; the positional source card refuses the generator's sources (W4150)";
+const HS_CARRIED: &str = "interim: carried from the ngspice dialect's shape, no settle deck on ESPice yet (its HSPICE form is a lead)";

@@ -435,6 +435,8 @@ fn proven_device_kinds_round_trip() {
             }
         }
         let (mut design, _) = read(&Sources::one("want.ir", &text), "ir");
+        // the text runs under the reader's build's laws, which every read states (R90, R90a)
+        design.builder().set_laws(spicerack::dialect::vacask::LAWS);
         let before = canonical(&design);
         let back = written(&mut design);
         let (again, _) = read(&back, "vacask");

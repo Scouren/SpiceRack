@@ -73,16 +73,16 @@ fn a_tower_of_copying_rules_stays_bounded_through_legalize() {
             .unwrap_or(0);
         eprintln!(
             "{name}: the largest root spells {size} rows, the design holds {}",
-            design.expr_count()
+            design.expr_count_all()
         );
         assert!(
             size <= TOWER_PATHS_MAX,
             "{name}: a root of {size} rows by paths"
         );
         assert!(
-            design.expr_count() <= 1 << 20,
+            design.expr_count_all() <= 1 << 20,
             "{name}: {} rows",
-            design.expr_count()
+            design.expr_count_all()
         );
     }
 }

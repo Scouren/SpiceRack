@@ -26,6 +26,7 @@
 //! Contents: `pub(super) fn semi`, `pub(super) fn switch` (each
 //! `(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[Item])`)
 
+use super::super::number;
 use super::super::read::{Lower, Stmt};
 use super::{
     Card, Item, Kind, MALFORMED, UNREAD_FORM, Val, emit, head, number_word, push_done, val,
@@ -46,7 +47,9 @@ pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
     let Some(at) = model_at(letter, items).filter(in_card) else {
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     };
-    let model_ok = items[at].kind == Kind::Word && number_word(&items[at].text).is_none();
+    // a model name may start with digits (`2SK170`, run optran/F5TurboV2thermal-optran.sp); a
+    // whole number there is no model (`D1 a k dmod 2`)
+    let model_ok = items[at].kind == Kind::Word && number::whole(&items[at].text).is_none();
     if !model_ok
         || items[..at]
             .iter()
@@ -64,7 +67,12 @@ pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
         .first()
         .filter(|i| i.kind != Kind::Assign && !flag(&i.text))
     {
-        if letter == b'z' {
+        // `thermal`, `tnodeout`: the self-heating nodes (VDMOS, diode); no IR field yet, and
+        // ngspice runs them (optran/F5TurboV2thermal-optran.sp)
+        let thermal = ["thermal", "tnodeout"]
+            .iter()
+            .any(|w| first.text.eq_ignore_ascii_case(w));
+        if letter == b'z' || thermal {
             return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
         }
         if letter == b'm' || first.kind != Kind::Word && first.kind != Kind::Brace {

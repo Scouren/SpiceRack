@@ -1,0 +1,8 @@
+# codes:
+file "e_max.sp" deck
+  title "e_max"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): v(a) = 7: vol='v(x)*5' max=7 clamps"
+  element vsource vx (x 0) dc=2
+  element behav e1 (a 0) expr=(min(v(x) * 5, 7))
+  element resistor ra (a 0) value=1k
+  analysis dc (source_dc vx) (lin start=2 stop=2 step=1)

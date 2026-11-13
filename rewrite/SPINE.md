@@ -67,6 +67,7 @@ reader never touches a file system.
 ```rust
 pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags);
 pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags);
+pub fn legalize_with(design: &mut ir::Design, to: &DialectRow, roots: Roots, diags: &mut ir::Diags);
 pub fn write(design: &ir::Design, file: ir::FileId, to: &DialectRow, diags: &mut ir::Diags) -> String;
 pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Policy) -> Result<Written, ir::Diags>;
 ```
@@ -80,15 +81,27 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   what no pass removed; last, always, the writer's `admits`, so the caller sees every refusal at
   once. The whole design is legal for the target, or it is refused: a file the caller loaded is
   a file the caller converts.
+- `legalize_with` = `legalize` in rounds (R80a–R80c): after each round, `drop_unused` takes the
+  round's refusals (feature and `admits` alike) and drops each unused definition holding one,
+  with a `U0314` note; another round runs while it drops, at most one per live definition at
+  entry plus the last (asserted). Out go the rounds' notes once each, first-seen order, less
+  those at a dropped item, then the last round's refusals. `roots` is the caller's: a deck's
+  conversion `Roots::Entry` (`transpile`), a kit's or a library's `Roots::Every` (`legalize`,
+  the facade's `render_kit`), which drops nothing. Laws (`tests/test_spine/legalize.rs`): every
+  emitted refusal is one the first round had (by item, or by kind, code and argument at an item
+  a later round's rule made); a second run drops nothing and emits the same refusals; one thread
+  and eight give the same rows.
 - `write` = the dialect's `write` of one file of a design `legalize` accepted for that target.
   Handing it a design that is not legal is the caller's bug: a debug assertion
   (`features_used ⊆ features`, no foreign `Opaque`), never a second legalization. A kit is
   `read`, one `legalize`, one `write` per file.
-- `transpile` = `read`, `legalize`, `write` of the entry file, and the verdict: any
+- `transpile` = `read`, `legalize_with` (`Roots::Entry`), `write` of the entry file, and the verdict: any
   `Kind::Refusal` row refuses the deck, and a step is not run after a refusal. `Policy::Strict`
   turns an `Opaque` of class `Unread` into a refusal (`S0101`) and refuses, at its item, each
   parameter read no definition binds (`S0104`, the name as the argument; `ir::unbound_reads`,
-  a formal default's held read aside: R63, A38) and each run item (alter, loop, analysis,
+  a formal default's held read aside: R63, A38; and a read standing in a library section no
+  include of the design selects, directly or through a selected section: R63a) and each run
+  item (alter, loop, analysis,
   elaborate) whose target nothing defines (`S0105`, the name as the argument: R70, A43);
   `Lenient` keeps them all (a writer of the same
   text family copies the opaque; the read stays unresolved).
@@ -128,8 +141,9 @@ reports its note at an item once: R69 d; bounded by the pass count + 1,
 asserted). A feature is legal for the target (A32, `passes::legal`) when the target has it, or
 a registered pass removes it and that pass's `requires` are legal in turn: the least fixed
 point, computed once per call, so a chain (`round_half_even_to_away` then
-`round_half_away_to_floor`) runs for a target with neither rounding, an inverse pair
-(`powabs_to_pow`, `pow_to_powabs`) supports nothing for a target with neither, and a chain whose
+`round_half_away_to_floor`) runs for a target with neither rounding, a cycle
+(`powabs_to_powre`, `powre_to_pow`, `pow_to_powabs`) supports nothing for a target with none of
+the three, and a chain whose
 last link the target cannot take runs nothing (no half-converted design). The bound holds: each
 link of a chain is one pass, the fixed point admits no cycle, so the missing set settles within
 one round per link. P3 still asks a pass to state every feature its output adds, a function,

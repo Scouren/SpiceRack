@@ -1,0 +1,8 @@
+# codes:
+file "expr_unquoted.sp" deck
+  title "expr_unquoted"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): i(vs) = -2.5e-4: r=b*4k/3, an unquoted expression led by a letter, is 4k"
+  element vsource vs (s 0) dc=1
+  param b = 3
+  element resistor r1 (s 0) value=(b * 4k / 3)
+  analysis dc (source_dc vs) (lin start=1 stop=1 step=1)

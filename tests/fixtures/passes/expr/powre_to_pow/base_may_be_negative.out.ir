@@ -1,0 +1,5 @@
+file "p.sp" deck
+  param a = 2
+  param p = pow_re(a - 3, 0.5)
+  param q = pow_re(a - 3, a)
+  param r = pow_re(-4, 0.5)

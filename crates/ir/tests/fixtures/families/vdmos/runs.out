@@ -1,0 +1,14 @@
+Second reading of sp_vdmos against ngspice-45. Builds on PATH: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n (source
+hfvpfb0bgw9819wkb7kzpdaasbd0hd5r, devices/vdmos), VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (devices/spice/vdmos.va,
+ngspice-47-159 vadng-pre-48). Run: `nix develop .#testing -c tests/fixtures/families/vdmos/run.sh`. i(vd) in A.
+Rechecked 2026-11-13 under R91b (../../checked.sh: a run whose exit status is not 0 or whose output says it aborted, stepped too small or met a singular matrix gives refused(<why>), never a reading): every reading reproduced, none refused.
+
+deck               ngspice-45            VACASK                 lead
+v1_kp_given        -9.00000000000e+01    -90.00000000001057     control: kp=20 given
+v1_kp_absent       -1.57500000000e+02    -90.00000000001057     kp default: ngspice 25+10*type (vdmosset.c:35), VACASK 15+5*type (vdmos.va:816)
+v2_n_tcvth_0       -2.88564129295e+01    -28.85641292950946     control
+v2_n_tcvth_0.005   -4.03501025437e+01    -19.2849212965034      tVth: ngspice vth0 - type*tcvth*dt (vdmostemp.c:50), VACASK vth0 + tcvth*dt (vdmos.va:938): opposite for nchan
+v2_p_tcvth_0       2.885641292951e+01    28.85641292950946      control
+v2_p_tcvth_0.005   4.035010254374e+01    40.35010254374203      pchan: the two laws coincide (type = -1)
+v3_vj_1            3.646008353976e-03    0.003646008353975588   control (AC current, 1 MHz)
+v3_vj_6            4.708507422120e-03    0.005523791631810226   body-diode potential clamp when fc*vj > 2.5: ngspice 2.5/n (vdmostemp.c:123), VACASK 2.5/fc (vdmos.va:985)

@@ -294,8 +294,7 @@ mod tests {
         let mut design = ir::Design::new();
         let mut diags = ir::Diags::new();
         let text = format!("file \"t.sp\" deck\n  title \"t\"\n  param k = 1\n  {line}\n");
-        // unchecked: `dc=($time * 2)` is X0012 for `check` too, which `text::parse` now runs
-        ir::parse_unchecked(&text, &mut design.builder(), &mut diags);
+        ir::parse(&text, &mut design.builder(), &mut diags);
         assert!(diags.is_empty(), "{line}: {diags:?}");
         let item = *design
             .items(design.file(design.entry()).top)
@@ -327,7 +326,6 @@ mod tests {
             "element isource i1 (a 0) wave=sffm(offset=0 amplitude=1 delay=1u law=ngspice \
              pre=hold_delay_value given_zero=spice_default) dc_rule=wave_at_zero"
                 .to_string(),
-            "element vsource v1 (a 0) dc=($time * 2)".to_string(),
             "element vsource v1 (a 0) dc=$temp".to_string(),
         ];
         for line in &refusals {

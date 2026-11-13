@@ -149,6 +149,8 @@ fn property_am_and_mutual_round_trip() {
         }
         let mut diags = ir::Diags::new();
         ir::link(&mut design, &mut diags);
+        // the text runs under the reader's build's laws, which every read states (R90, R90a)
+        design.builder().set_laws(spicerack::dialect::vacask::LAWS);
         let before = canonical(&design);
         let (again, _) = read(&written(&mut design), "vacask");
         assert_eq!(canonical(&again), before, "seed {seed}");

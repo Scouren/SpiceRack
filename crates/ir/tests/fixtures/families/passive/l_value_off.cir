@@ -1,0 +1,12 @@
+passive l_value off (80 C, m=3), ac (1 V on a, 1 MHz)
+rs a b 1
+vd a 0 dc 1 ac 1
+l1 b 0 1u tc1=1e-3 tc2=1e-5 m=3
+.temp 80
+.options reltol=1e-9 abstol=1e-15
+.control
+set numdgt=12
+ac lin 1 1meg 1meg
+print mag(i(vd))
+.endc
+.end
