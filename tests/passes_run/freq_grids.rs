@@ -13,11 +13,20 @@
 //! neither says a word. A count given by an expression (an ngspice `.param`, `{5/2}`; a
 //! VACASK control `var`, `5.0/2`) behaves as its value written literally (R99b).
 //!
+//! And the F33 rows' proof (`sweep_end_list.rs`): a sweep stated with each end law, legalized for
+//! VACASK (which writes it as a list of values) and run, gives the frequencies and the response
+//! the source simulator gives on its own deck (`f33_*`), point for point.
+//!
+//! The last two tests are this module's own `#[test]`s (`passes_run.rs` is at its size bound).
+//!
 //! Contents: `pub fn linear_frequency_sweeps_run_what_each_simulator_counts()`,
+//! `pub fn end_law_lists_run_the_source_simulators_points()`,
 //! `pub fn log_frequency_sweeps_run_each_simulators_law()`,
 //! `pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask()`
 
 use std::path::Path;
+
+use spicerack::{dialect, ir};
 
 use crate::sim::{self, Ran, Sim};
 
@@ -153,6 +162,7 @@ pub fn log_frequency_sweeps_run_each_simulators_law() {
 
 /// Each `f33_frac_*` deck runs the exact grid of the integer count its title records: the
 /// decade grid `1k * 10^(k/n)` to 100k, the linear grid `1k + 1k*k/(n-1)` to 2k.
+#[test]
 pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask() {
     // (simulator, deck, the law, the integer count it runs as)
     let cases = [
@@ -203,7 +213,123 @@ pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask() {
     }
 }
 
+/// Each end law's sweep as IR, legalized for VACASK by the F33 rows and run there, against the
+/// source simulator's own deck: the same number of frequencies, each within 1e-9 relative, and
+/// the same `v(out)` within 1e-6 relative (the RC's response is the same function on both).
+#[test]
+pub fn end_law_lists_run_the_source_simulators_points() {
+    let vacask = dialect::by_name("vacask").expect("vacask");
+    let cases = [
+        (
+            "dec ng_decade start=10 stop=20k points=10",
+            Sim::Ngspice,
+            "f33_ac_dec10_10_20k.sp",
+        ),
+        (
+            "dec ng_decade start=1k stop=5k points=2",
+            Sim::Ngspice,
+            "f33_ac_dec2_1k_5k.sp",
+        ),
+        (
+            "dec stretch start=10 stop=20k points=10",
+            Sim::Vacask,
+            "f33_vacask_dec10_10_20k.sim",
+        ),
+        (
+            "dec stretch start=1k stop=5k points=2",
+            Sim::Vacask,
+            "f33_vacask_dec2_1k_5k.sim",
+        ),
+        (
+            "oct stretch start=1k stop=5k points=3",
+            Sim::Vacask,
+            "f33_vacask_oct3_1k_5k.sim",
+        ),
+    ];
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
+    for (spec, source, deck) in cases {
+        let text = format!(
+            "file \"a.sim\" deck\n  title \"rc\"\n  element vsource v1 (in 0) dc=0 ac_mag=1 ac_phase_deg=0\n  element resistor r1 (in out) value=1k\n  element capacitor c1 (out 0) value=1u\n  analysis ac ({spec})\n"
+        );
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(&text, &mut design.builder(), &mut diags);
+        assert!(diags.is_empty(), "{spec}: {:?}", diags.rows());
+        dialect::legalize(&mut design, vacask, &mut diags);
+        let refused: Vec<_> = diags
+            .rows()
+            .iter()
+            .filter(|d| dialect::refuses(d.code))
+            .collect();
+        assert!(refused.is_empty(), "{spec}: {refused:?}");
+        let written = dialect::write(&design, design.entry(), vacask, &mut diags)
+            .replace("control\n", "control\n  options rawfile=\"ascii\"\n");
+        assert!(
+            written.contains("values=["),
+            "{spec}: written as a list\n{written}"
+        );
+        let theirs = response(source, &dir.join(deck), None);
+        let ours = response(
+            Sim::Vacask,
+            &dir.join(deck).with_extension("conv.sim"),
+            Some(&written),
+        );
+        assert_eq!(
+            ours.0.len(),
+            theirs.0.len(),
+            "{spec}: {:?} against {deck}'s {:?}",
+            ours.0,
+            theirs.0
+        );
+        for k in 0..ours.0.len() {
+            let (f, g) = (ours.0[k], theirs.0[k]);
+            assert!(
+                (f - g).abs() <= 1e-9 * g,
+                "{spec}: frequency {k}: {f} against {g}"
+            );
+            let (v, w) = (ours.1[k], theirs.1[k]);
+            assert!(
+                (v - w).abs() <= 1e-6 * w,
+                "{spec}: |v(out)| at {g}: {v} against {w}"
+            );
+        }
+        eprintln!("{spec}: {} points as {deck}", ours.0.len());
+    }
+}
+
 // ---- private ----
+
+/// The first plot's frequencies and `|v(out)|`, from `deck` run on `simulator` (its own text, or
+/// `text` when given).
+fn response(simulator: Sim, deck: &Path, text: Option<&str>) -> (Vec<f64>, Vec<f64>) {
+    let own;
+    let text = match text {
+        Some(t) => t,
+        None => {
+            own = std::fs::read_to_string(deck).expect("the deck");
+            &own
+        }
+    };
+    let plots = match sim::run(simulator, deck, text, &[], 60) {
+        Ran::Plots(p) => p,
+        Ran::Timeout => panic!("{deck:?}: past the CPU budget"),
+        Ran::Failed(why) => panic!("{deck:?}: {why}\n{text}"),
+    };
+    let p = &plots[0];
+    let out = p
+        .variables
+        .iter()
+        .position(|v| v.name.eq_ignore_ascii_case("out") || v.name.eq_ignore_ascii_case("v(out)"))
+        .unwrap_or_else(|| {
+            panic!(
+                "{deck:?}: no out in {:?}",
+                p.variables.iter().map(|v| &v.name).collect::<Vec<_>>()
+            )
+        });
+    let freq = p.complex_data[0].iter().map(|z| z.re).collect();
+    let mag = p.complex_data[out].iter().map(|z| z.norm()).collect();
+    (freq, mag)
+}
 
 /// The first plot's sweep vector (its first column), real part.
 fn sweep(simulator: Sim, deck: &str) -> Vec<f64> {

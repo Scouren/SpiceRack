@@ -8,7 +8,7 @@
 use super::{
     alter_at_reset, dc_axes_to_loops, device_ic, device_ic_in_op, drop_print, fs, ic_next_only,
     inert_options, loop_end, names_dropped, names_given, noise_ref_unit, param_arguments,
-    run_items_together, save_set_to_all, sweep_forms, tc, tran_print_step, wr,
+    run_items_together, save_set_to_all, sweep_end_list, sweep_forms, tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -191,6 +191,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a frequency list other than one value of an AC analysis",
             cite: "rewrite/IR-RUN.md §1; ngspice-45 acan.c",
             explain: "The target sweeps frequency by decade, octave or a linear count. One listed frequency of an AC analysis is a linear sweep of one point; two or more are not exact (ngspice's linear sweep of two points runs one, and its end test scales with reltol), and another analysis's list is not rewritten. The analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        sweep_end_list::SWEEP_END_KEPT,
+        ir::Info {
+            title: "a logarithmic frequency sweep whose end law is not written as a list",
+            cite: "rewrite/IR-RUN.md R99; ngspice-45 acan.c; VACASK lib/answeep.cpp",
+            explain: "The deck's sweep follows its simulator's own end law (VACASK stretches the count up, ngspice's decade sweep stretches it down at a decade or more), which the target spells only as a list of values. This one has a start, stop or count that is no literal, does not rise from a positive start, belongs to an analysis the rule does not rewrite, has more values than a list holds, or stands in a design that sets reltol, which ngspice's end test reads. The analysis is refused.",
             kind: ir::Kind::Note,
         },
     ),

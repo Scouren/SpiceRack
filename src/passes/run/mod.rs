@@ -19,7 +19,7 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod alter_at_reset`, `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod device_ic_in_op`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod noise_ref_unit`, `pub mod param_arguments`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod alter_at_reset`, `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod device_ic_in_op`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod noise_ref_unit`, `pub mod param_arguments`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_end_list`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
 //! `codes.rs`)
@@ -39,6 +39,7 @@ pub mod noise_ref_unit;
 pub mod param_arguments;
 pub mod run_items_together;
 pub mod save_set_to_all;
+pub mod sweep_end_list;
 pub mod sweep_forms;
 pub mod tran_ceiling_given;
 pub mod tran_first_step_to_print;
@@ -290,6 +291,21 @@ pub(super) const PASSES: &[Pass] = &[
         &[sweep_forms::SWEEP_KEPT],
         sweep_forms::sweep_dc_list_to_step,
     ),
+    // before the list row: an end-law sweep becomes a list it may take on (F33, R99)
+    Pass {
+        name: "sweep_end_stretch_to_list",
+        removes: ir::Feature::Run(RunExtra::SweepEndStretch),
+        requires: sweep_end_list::REQUIRES,
+        notes: &[sweep_end_list::SWEEP_END_KEPT],
+        run: sweep_end_list::sweep_end_stretch_to_list,
+    },
+    Pass {
+        name: "sweep_end_ng_decade_to_list",
+        removes: ir::Feature::Run(RunExtra::SweepEndNgDecade),
+        requires: sweep_end_list::REQUIRES,
+        notes: &[sweep_end_list::SWEEP_END_KEPT],
+        run: sweep_end_list::sweep_end_ng_decade_to_list,
+    },
     sweep(
         "sweep_freq_list_to_lin_points",
         (RunExtra::SweepFreqList, RunExtra::SweepFreqLinPoints),
