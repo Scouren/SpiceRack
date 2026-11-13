@@ -1,4 +1,5 @@
-//! The writer's refusal of an element current VACASK cannot save (W2314, run F13).
+//! The writer's refusals of an element current VACASK cannot save (W2314, run F13) and of a lin
+//! count below one (W2315, run132).
 //!
 //! Contents: tests only.
 
@@ -57,5 +58,33 @@ fn a_current_vacask_cannot_save_is_refused() {
         dialect::legalize(&mut design, row, &mut diags);
         let got = diags.rows().iter().any(|d| dialect::refuses(d.code));
         assert_eq!(got, refused, "{body}{:?}", diags.rows());
+    }
+}
+
+/// Oracle: run132 (scratchpad vacask/run132): VACASK refuses a negative lin interval count ("Number
+/// of intervals (specified by points parameter) must be nonnegative."), so an IR count below 1
+/// is refused (W2315); a count of 1 is `points=0`, one frequency. Law L5 seed 3 (the IR round):
+/// -424 was written `points=-425`.
+#[test]
+fn a_lin_count_below_one_is_refused() {
+    let row = dialect::by_name("vacask").expect("the vacask row");
+    for (points, refused) in [("-424i", true), ("0i", true), ("1i", false), ("3i", false)] {
+        let text = format!(
+            "file \"w.ir\" deck\n  title \"counts\"\n  analysis ac name=a1 (lin start=1k stop=2k points={points})\n"
+        );
+        let (mut design, _) = read("w.ir", &text, "ir");
+        let mut diags = ir::Diags::new();
+        dialect::legalize(&mut design, row, &mut diags);
+        let got: Vec<String> = diags
+            .rows()
+            .iter()
+            .filter(|d| dialect::refuses(d.code))
+            .map(|d| format!("{}{:04}", d.code.letter as char, d.code.number))
+            .collect();
+        let want: Vec<String> = match refused {
+            true => vec!["W2315".to_string()],
+            false => Vec::new(),
+        };
+        assert_eq!(got, want, "{points}");
     }
 }

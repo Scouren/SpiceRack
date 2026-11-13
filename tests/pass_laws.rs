@@ -169,6 +169,10 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ("analysis_param_args_to_values", gen_sets::PARAM_ARGS),
     ("param_reads_to_typed", gen_sets::behav_reads()),
     (
+        "sweep_dc_list_to_step",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
+    ),
+    (
         "tran_cap_ngspice_to_given",
         tran_set(ir::RunExtra::TranCapNgspice),
     ),
