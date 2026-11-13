@@ -21,8 +21,6 @@ use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::{ExprId, List};
 use crate::id::{NameId, ScopeId};
-#[cfg(any(test, feature = "gen"))]
-use crate::probe::gen_probe;
 use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
@@ -263,7 +261,7 @@ impl DetailFacts for Net {
         b: &mut Builder<'_>,
         features: &FeatureSet,
     ) -> Option<Self> {
-        let output = gen_probe(g, b, features, true);
+        let output = crate::dc_ac_facts::gen_output(g, b, features);
         let source = g.fresh_name(b);
         let rin = if g.chance(2) {
             g.expr(b, features, Reads::Constant)

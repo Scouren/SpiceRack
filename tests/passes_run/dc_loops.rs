@@ -73,8 +73,14 @@ pub fn dc_loops_give_the_points_vacask_gives() {
         [ir::plan::TargetKind::DeviceParam],
         "the axis the rows name"
     );
-    row.restart = true;
-    design.editor().set_detail(detail, row);
+    // the deck's sweep restarts each point (R75: its one axis starts afresh)
+    let mut axes = design.dc_axes(row.axes).to_vec();
+    for x in &mut axes {
+        x.afresh = true;
+    }
+    let mut editor = design.editor();
+    row.axes = editor.builder().dc_axes(&axes);
+    editor.set_detail(detail, row);
     let read = diags.len();
     dialect::legalize(&mut design, ngspice, &mut diags);
     let new = &diags.rows()[read..];

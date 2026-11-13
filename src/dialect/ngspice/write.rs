@@ -14,7 +14,8 @@
 //! `pub(super) fn write(&ir::Design, ir::FileId, &mut String, &mut ir::Diags)`,
 //! `pub(super) fn admits(&ir::Design, &mut ir::Diags)`,
 //! `Out::open(&mut self, ir::ScopeId, String)`, `Out::open_script(&mut self, ir::ScopeId, String)`,
-//! `Out::line(&mut self, &str)`, `Out::script(&mut self, &str)`, `Out::scripted(&self) -> bool`
+//! `Out::line(&mut self, &str)`, `Out::script(&mut self, &str)`, `Out::path(&mut self, ir::ItemRef, &str) -> String`,
+//! `Out::scripted(&self) -> bool`
 //!
 //! A script region (R49, A27): consecutive `Out::script` commands share one `.control` …
 //! `.endc` pair; any deck line (`Out::line`) or a frame's tail closes it first, as does the end
@@ -33,11 +34,9 @@ pub(super) struct Out<'a> {
     /// region always closes before a deck line.
     out: &'a mut String,
     /// Diagnostics.
-    #[allow(
-        dead_code,
-        reason = "no area writer notes yet; a writer's note goes here"
-    )]
     pub(super) diags: &'a mut ir::Diags,
+    /// The file being written.
+    file: ir::FileId,
     frames: Vec<Frame<'a>>,
     /// Whether a `.control` line is open.
     region: bool,
@@ -81,6 +80,7 @@ pub(super) fn write(
         design,
         out,
         diags,
+        file,
         frames: Vec::new(),
         region: false,
         scripted: deck && write_control::needs_script(design, f.top),
@@ -204,6 +204,19 @@ impl<'a> Out<'a> {
         }
         self.out.push_str(cmd);
         self.out.push('\n');
+    }
+
+    /// The text spelling path `path` of `item` in this file (R78: relative to its directory,
+    /// `dialect::written_path`); a path it cannot state so is spelled as read, with a note.
+    pub(super) fn path(&mut self, item: ir::ItemRef, path: &str) -> String {
+        match crate::dialect::written_path(self.design, self.file, path) {
+            Ok(text) => text,
+            Err(read) => {
+                self.diags
+                    .push_at(crate::dialect::PATH_AS_READ, self.design, item, 0);
+                read
+            }
+        }
     }
 
     /// Whether this deck's run plan takes the script form (R49, A27): run items are spelled as

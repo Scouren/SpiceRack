@@ -185,8 +185,40 @@ const _: () = assert!(size_of::<Analysis>() == 12);
 const _: () = assert!(AnalysisKind::COUNT <= 32); // one bit each in `AnalysisKinds`
 const _: () = assert!(size_of::<AnalysisKinds>() == 4);
 
+/// The one list of analysis kinds with a detail row: each `AnalysisKind` member, its detail
+/// type and its `RunDetails` table, handed to `$cb` after `$args` (`details!`'s impls here,
+/// `analysis_facts`' `by_detail!`). A new kind is one line here.
+macro_rules! with_analysis_details {
+    ($cb:ident ! $args:tt) => {
+        $cb! { $args
+            Dc => Dc, dcs;
+            Ac => Ac, acs;
+            Tran => Tran, trans;
+            Noise => Noise, noises;
+            Tf => Tf, tfs;
+            DcXf => DcXf, dc_xfs;
+            Xf => Xf, xfs;
+            Sens => Sens, senses;
+            SensAc => SensAc, sens_acs;
+            Pz => Pz, pzs;
+            Sp => Sp, sps;
+            Net => Net, nets;
+            Four => Four, fours;
+            Disto => Disto, distos;
+            Hb => Hb, hbs;
+            Pss => Pss, psses;
+            Pac => Pac, pacs;
+            Pnoise => Pnoise, pnoises;
+            Pxf => Pxf, pxfs;
+            Pstb => Pstb, pstbs;
+            Stb => Stb, stbs;
+            TimedOp => TimedOp, timed_ops;
+        }
+    };
+}
+
 macro_rules! details {
-    ($($row:ty => $kind:ident :: $variant:ident, $field:ident;)*) => {
+    (($kind:ident) $($variant:ident => $row:ty, $field:ident;)*) => {
         $(
             impl DetailRow for $row {
                 fn rows(design: &Design) -> &[Self] {
@@ -204,38 +236,23 @@ macro_rules! details {
     };
 }
 
+with_analysis_details!(details!(AnalysisKind));
+
 details! {
-    Dc => AnalysisKind::Dc, dcs;
-    Ac => AnalysisKind::Ac, acs;
-    Tran => AnalysisKind::Tran, trans;
-    Noise => AnalysisKind::Noise, noises;
-    Tf => AnalysisKind::Tf, tfs;
-    DcXf => AnalysisKind::DcXf, dc_xfs;
-    Xf => AnalysisKind::Xf, xfs;
-    Sens => AnalysisKind::Sens, senses;
-    SensAc => AnalysisKind::SensAc, sens_acs;
-    Pz => AnalysisKind::Pz, pzs;
-    Sp => AnalysisKind::Sp, sps;
-    Net => AnalysisKind::Net, nets;
-    Four => AnalysisKind::Four, fours;
-    Disto => AnalysisKind::Disto, distos;
-    Hb => AnalysisKind::Hb, hbs;
-    Pss => AnalysisKind::Pss, psses;
-    Pac => AnalysisKind::Pac, pacs;
-    Pnoise => AnalysisKind::Pnoise, pnoises;
-    Pxf => AnalysisKind::Pxf, pxfs;
-    Pstb => AnalysisKind::Pstb, pstbs;
-    Stb => AnalysisKind::Stb, stbs;
-    TimedOp => AnalysisKind::TimedOp, timed_ops;
-    SweepLoop => LoopKind::Sweep, sweep_loops;
-    TableLoop => LoopKind::Table, table_loops;
-    MonteCarlo => LoopKind::MonteCarlo, monte_carlos;
-    MeasureTrigTarg => MeasureKind::TrigTarg, trig_targs;
-    MeasureWhen => MeasureKind::When, whens;
-    MeasureFind => MeasureKind::Find, finds;
-    MeasureDeriv => MeasureKind::Deriv, derivs;
-    MeasureStat => MeasureKind::Stat, stats;
-    MeasureParam => MeasureKind::Param, measure_params;
+    (LoopKind)
+    Sweep => SweepLoop, sweep_loops;
+    Table => TableLoop, table_loops;
+    MonteCarlo => MonteCarlo, monte_carlos;
+}
+
+details! {
+    (MeasureKind)
+    TrigTarg => MeasureTrigTarg, trig_targs;
+    When => MeasureWhen, whens;
+    Find => MeasureFind, finds;
+    Deriv => MeasureDeriv, derivs;
+    Stat => MeasureStat, stats;
+    Param => MeasureParam, measure_params;
 }
 
 impl AnalysisKind {

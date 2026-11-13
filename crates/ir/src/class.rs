@@ -14,7 +14,7 @@
 //! Cites: `rewrite/RULINGS.md` R14; `rewrite/IR-KERNEL.md` §7.4 (A11).
 //!
 //! Contents: `pub enum ExprClass`, `pub fn expr_class(&Design, ExprId) -> ExprClass`; crate:
-//! `pub(crate) fn def_classes(&Design) -> &[ExprClass]`,
+//! `pub(crate) struct Computes` (gen), `pub(crate) fn def_classes(&Design) -> &[ExprClass]`,
 //! `pub(crate) fn tree_class(&Design, ExprId, &[ExprClass]) -> ExprClass`,
 //! `pub(crate) fn tree_class_with(&Design, ExprId, &dyn Fn(DefId) -> ExprClass) -> ExprClass`,
 //! `pub(crate) fn class_nodes(&Design, ExprId, &mut Vec<ExprId>)`,
@@ -40,6 +40,20 @@ pub enum ExprClass {
     Temp,
     /// Reads the circuit or the time (directly or through a definition).
     Circuit,
+}
+
+/// A count of the classes' computations (`Design::class_computes`) that clones as its value
+/// (an atomic is not `Clone`).
+#[cfg(any(test, feature = "gen"))]
+#[derive(Debug, Default)]
+pub(crate) struct Computes(pub(crate) std::sync::atomic::AtomicU32);
+
+#[cfg(any(test, feature = "gen"))]
+impl Clone for Computes {
+    fn clone(&self) -> Computes {
+        let n = self.0.load(std::sync::atomic::Ordering::Relaxed);
+        Computes(std::sync::atomic::AtomicU32::new(n))
+    }
 }
 
 /// The class of `e` (see the module header). O(its tree) once the design's definition classes
@@ -95,7 +109,14 @@ pub(crate) fn tree_nodes(design: &Design, root: ExprId, out: &mut Vec<ExprId>) {
 /// The class of every definition, by `DefId` (`Constant` for kinds an expression does not read),
 /// computed once per design state.
 pub(crate) fn def_classes(design: &Design) -> &[ExprClass] {
-    design.classes.get_or_init(|| compute(design))
+    design.classes.get_or_init(|| {
+        #[cfg(any(test, feature = "gen"))]
+        design
+            .class_computes
+            .0
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        compute(design)
+    })
 }
 
 /// The definitions on a reference cycle (A28): those neither a deps-first nor a readers-first

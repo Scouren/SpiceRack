@@ -486,7 +486,7 @@ pub(crate) fn item_features(
     let mut refs: Vec<DefId> = handles
         .iter()
         .filter_map(|h| match h {
-            Handle::Ref(r) => Some(r.def),
+            Handle::Ref(r, _) => Some(r.def),
             _ => None,
         })
         .collect();
@@ -617,7 +617,7 @@ pub(crate) fn roots_with_use(
             Handle::Exprs(_)
             | Handle::Params(_)
             | Handle::Name(_)
-            | Handle::Ref(_)
+            | Handle::Ref(..)
             | Handle::Names(_)
             | Handle::Scope(_)
             | Handle::Text(_)

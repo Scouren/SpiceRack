@@ -42,7 +42,7 @@ use crate::controlled::{Behav, Controlled, Delay, FreqTable, Laplace, Poly, Tabl
 use crate::design::{Design, DetailRow};
 use crate::element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
 use crate::facts::Handle;
-use crate::id::{ExprId, NameId};
+use crate::id::{ExprId, NameId, Ref};
 use crate::item::DefKind;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
@@ -195,7 +195,11 @@ pub(crate) fn element_handles(e: &Element, design: &Design, out: &mut Vec<Handle
     out.extend([
         Handle::Name(e.name),
         Handle::Names(e.terminals),
-        Handle::Ref(e.model),
+        // R5: only a kind's master is a reference (`map_refs` skips any other)
+        match e.kind.master_kind() {
+            Some(kind) if e.model.name != NameId::NONE => Handle::Ref(e.model, kind),
+            _ => Handle::Name(e.model.name),
+        },
         Handle::Params(e.params),
         Handle::Expr(e.mult),
     ]);
@@ -223,8 +227,8 @@ pub(crate) fn model_handles(m: &Model, out: &mut Vec<Handle>) {
         Handle::Name(m.name),
         Handle::Params(m.params),
         Handle::Name(m.bin_of),
-        Handle::Ref(m.ako),
-        Handle::Ref(m.module),
+        ref_or_name(m.ako, DefKind::Model),
+        ref_or_name(m.module, DefKind::Module),
         Handle::Expr(m.version),
         Handle::Name(m.word),
     ]);
@@ -242,7 +246,7 @@ pub(crate) fn dump_element(e: &Element, design: &Design, ctx: &Ctx, out: &mut St
     );
     out.push_str(KIND_WORDS[e.kind as usize]);
     out.push(' ');
-    write_name(design, e.name, out);
+    text::write_name(design.str(e.name), out);
     out.push(' ');
     text::write_names(design, e.terminals, out);
     if e.model.name != NameId::NONE {
@@ -282,7 +286,7 @@ pub(crate) fn dump_element(e: &Element, design: &Design, ctx: &Ctx, out: &mut St
 
 /// Writes `model <name> <family> …` (module header).
 pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String) {
-    write_name(design, m.name, out);
+    text::write_name(design.str(m.name), out);
     out.push(' ');
     out.push_str(FAMILY_WORDS[m.family as usize]);
     if m.polarity != Polarity::None {
@@ -298,7 +302,7 @@ pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String
     }
     if m.bin_of != NameId::NONE {
         out.push_str(" bin_of=");
-        write_name(design, m.bin_of, out);
+        text::write_name(design.str(m.bin_of), out);
     }
     if m.ako.name != NameId::NONE {
         out.push_str(" ako=");
@@ -314,7 +318,7 @@ pub(crate) fn dump_model(m: &Model, design: &Design, ctx: &Ctx, out: &mut String
     }
     if m.word != NameId::NONE {
         out.push_str(" word=");
-        write_name(design, m.word, out);
+        text::write_name(design.str(m.word), out);
     }
 }
 
@@ -328,6 +332,16 @@ pub(crate) fn dump_library(l: &DeviceLibrary, design: &Design, out: &mut String)
 }
 
 // ---- private ----
+
+/// A reference field as a handle: `Ref` when it names something (`map_refs` visits it), else
+/// its `NONE` name.
+fn ref_or_name(r: Ref, kind: DefKind) -> Handle {
+    if r.name == NameId::NONE {
+        Handle::Name(r.name)
+    } else {
+        Handle::Ref(r, kind)
+    }
+}
 
 /// The fields of a kind with no detail row: none.
 /// Appends the handles of row `index` of `D`'s table, if it exists.
@@ -402,7 +416,7 @@ fn dump_field(design: &Design, key: &str, field: Field<'_>, ctx: &Ctx, out: &mut
     out.push('=');
     match field {
         Field::Expr(e) | Field::Dyn(e) => text::write_value(design, *e, ctx, out),
-        Field::Name(n) => write_name(design, *n, out),
+        Field::Name(n) => text::write_name(design.str(*n), out),
         Field::Names(l) => text::write_names(design, *l, out),
         Field::Exprs(l) => text::write_exprs(design, *l, ctx, out),
         Field::Count(c) => out.push_str(&c.to_string()),
@@ -426,9 +440,4 @@ fn dump_field(design: &Design, key: &str, field: Field<'_>, ctx: &Ctx, out: &mut
             }
         }
     }
-}
-
-/// A name in a name position (the kernel's writer takes the text).
-fn write_name(design: &Design, name: NameId, out: &mut String) {
-    text::write_name(design.str(name), out);
 }

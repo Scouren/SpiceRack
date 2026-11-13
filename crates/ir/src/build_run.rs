@@ -39,8 +39,8 @@
 //!
 //! let v1 = b.target(TargetKind::SourceDc, &[], "V1", None);
 //! let sweep = SweepSpec::lin_step(b.num(0.0), b.num(5.0), b.num(0.1));
-//! let axes = b.dc_axes(&[DcAxis { target: v1, sweep, name: NameId::NONE }]);
-//! b.analysis(body, None, Dc { axes, restart: false }, span);
+//! let axes = b.dc_axes(&[DcAxis { target: v1, sweep, name: NameId::NONE, afresh: false }]);
+//! b.analysis(body, None, Dc { axes }, span);
 //!
 //! let tran = Tran {
 //!     stop: b.num(1e-6), print_step: b.num(1e-9), record_start: ExprId::NONE,
@@ -90,11 +90,12 @@ use crate::option::{Applies, Env, IcScope, NodeSet, NodeSetKind, OptionRow};
 use crate::option_key::OptionKey;
 use crate::output::{Measure, Print, PrintView, Save};
 use crate::plan::{
-    Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, Target, TargetKind, TargetList,
+    Alter, AlterEffect, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, Target, TargetKind,
+    TargetList,
 };
 use crate::probe::{Probe, ProbeKind, ProbeList};
 use crate::reset::{Reset, ResetSet};
-use crate::run_words::{loop_depth, pool};
+use crate::run_words::loop_depth;
 use crate::span::Span;
 use crate::stats::{Correlation, CorrelationList, Statistics, Vary, VaryList};
 
@@ -104,28 +105,28 @@ impl Builder<'_> {
     /// Appends a list of probes. Like `push`, it does not check the probes' fields (`check`'s
     /// `FieldDomain` does); the probe constructors below assert them.
     pub fn probes(&mut self, probes: &[Probe]) -> ProbeList {
-        pool(&mut self.design.run.probes, probes)
+        crate::build::pooled(&mut self.design.run.probes, probes)
     }
 
     /// Appends a list of targets (a table loop's columns).
     pub fn targets(&mut self, targets: &[Target]) -> TargetList {
-        pool(&mut self.design.run.targets, targets)
+        crate::build::pooled(&mut self.design.run.targets, targets)
     }
 
     /// Appends a DC sweep's axes, innermost first (fields unchecked, as `probes`; a sweep with
     /// no axis is `check`'s `FieldDomain`).
     pub fn dc_axes(&mut self, axes: &[DcAxis]) -> DcAxisList {
-        pool(&mut self.design.run.dc_axes, axes)
+        crate::build::pooled(&mut self.design.run.dc_axes, axes)
     }
 
     /// Appends a list of variations.
     pub fn varies(&mut self, varies: &[Vary]) -> VaryList {
-        pool(&mut self.design.run.varies, varies)
+        crate::build::pooled(&mut self.design.run.varies, varies)
     }
 
     /// Appends a list of correlations (fields unchecked, as `probes`).
     pub fn correlations(&mut self, correlations: &[Correlation]) -> CorrelationList {
-        pool(&mut self.design.run.correlations, correlations)
+        crate::build::pooled(&mut self.design.run.correlations, correlations)
     }
 
     // ---- values ----
@@ -314,15 +315,36 @@ impl Builder<'_> {
         )
     }
 
-    /// From here on, `target` holds `value`. Asserts `value` is not `NONE` and the target is no
-    /// `Temp` or `Option` (a `FromHere` `Env` or option row states those, A28).
-    pub fn alter(&mut self, scope: ScopeId, target: Target, value: ExprId, span: Span) -> ItemRef {
+    /// From here on (or, for a parameter alter of `AlterEffect::AtReset`, from the next reset),
+    /// `target` holds `value`. A reader states `effect` by its simulator's rule (R70). Asserts
+    /// `value` is not `NONE`, the target is no `Temp` or `Option` (a `FromHere` `Env` or option
+    /// row states those, A28), and `AtReset` only on a parameter target.
+    pub fn alter(
+        &mut self,
+        scope: ScopeId,
+        target: Target,
+        value: ExprId,
+        effect: AlterEffect,
+        span: Span,
+    ) -> ItemRef {
         assert!(!value.is_none(), "an alter has a value");
         assert!(
             !matches!(target.kind, TargetKind::Temp | TargetKind::Option),
             "an alter of the temperature or an option is an Env or option row"
         );
-        self.push(scope, Alter { target, value }, span)
+        assert!(
+            effect == AlterEffect::AtOnce || target.kind.is_parameter(),
+            "only a parameter alter waits for a reset"
+        );
+        self.push(
+            scope,
+            Alter {
+                target,
+                value,
+                effect,
+            },
+            span,
+        )
     }
 
     /// From here on, the classes in `restores` hold the design's own value again (A27, A28).
@@ -512,7 +534,7 @@ impl Builder<'_> {
             .iter()
             .map(|c| Ref::unresolved(self.name(c)))
             .collect();
-        let circuits = pool(&mut self.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut self.design.run.refs, &refs);
         self.push(scope, Elaborate { circuits }, span)
     }
 

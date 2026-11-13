@@ -35,12 +35,14 @@
 //!
 //! Contents:
 //! - `pub trait Read` (`Read::references`, `Read::read`),
-//!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`)
+//!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`,
+//!   `Write::citations`), `pub struct Citation`
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
 //! - `pub enum Policy`, `pub struct Written`, `pub const STRICT_UNREAD: ir::Code`,
-//!   `pub const STRICT_UNBOUND: ir::Code`,
+//!   `pub const STRICT_UNBOUND: ir::Code`, `pub const STRICT_UNBOUND_TARGET: ir::Code`,
+//!   `pub const PATH_AS_READ: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
-//! - `pub use sources::{DEPTH_MAX, Reference, Sources}`; `pub mod facade`, `pub mod irtext`,
+//! - `pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path}`; `pub mod facade`, `pub mod irtext`,
 //!   `pub mod ngspice`, `pub mod vacask`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
@@ -55,7 +57,7 @@ pub mod ngspice;
 mod sources;
 pub mod vacask;
 
-pub use sources::{DEPTH_MAX, Reference, Sources};
+pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path};
 
 use crate::ir;
 use crate::ir::ItemRow as _;
@@ -90,6 +92,26 @@ pub trait Write: Sync {
     /// not have, a name it cannot quote). Never for something a feature could state. Default:
     /// nothing. [`legalize`] calls it last, always (AMEND-A12 S1, R21).
     fn admits(&self, _design: &ir::Design, _diags: &mut ir::Diags) {}
+
+    /// The features this dialect lacks because its simulator has no exact form for them, each
+    /// with its evidence (R57, A34): law L7 counts a lacked feature cited, not missing. A
+    /// citation is never a to-do: a feature some pass could remove exactly is missing, not
+    /// cited, and a citation of a feature the writer has or that a pass makes legal fails the
+    /// law. Default: none.
+    fn citations(&self) -> &'static [Citation] {
+        &[]
+    }
+}
+
+/// Why a dialect lacks a feature (R57, A34): the evidence that its simulator has no exact form
+/// for it. The facade's refusal message for the feature ends with it.
+#[derive(Clone, Copy, Debug)]
+pub struct Citation {
+    /// The lacked feature.
+    pub feature: ir::Feature,
+    /// The manual clause, the simulator's source (file and function), or a settle deck's path
+    /// relative to the dialect's fixtures (`tests/fixtures/dialect/<row>/`, checked to exist).
+    pub evidence: &'static str,
 }
 
 /// One language. CDL and Verilog have no reader.
@@ -159,6 +181,16 @@ pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
 /// `NameId` (R63, A38).
 pub const STRICT_UNBOUND: ir::Code = ir::Code::new(b'S', 104);
 
+/// The refusal a strict read adds at each run item (an alter, a loop, an analysis, an
+/// elaborate) that holds a target nothing defines (an element no scope lists, a parameter,
+/// model or subcircuit reference nothing binds): `S0105`, `arg` the name's `NameId` (R70, A43).
+pub const STRICT_UNBOUND_TARGET: ir::Code = ir::Code::new(b'S', 105);
+
+/// The note a writer adds where it spells an include, library or load path as it was read,
+/// because the file's key cannot be stated relative to the including file (an absolute key, or
+/// one above the root: [`written_path`], R78): `S0106`, `arg` 0, at the item.
+pub const PATH_AS_READ: ir::Code = ir::Code::new(b'S', 106);
+
 /// The note [`legalize`] adds where it drops an `Inert` statement of another dialect: `S0102`,
 /// `arg` 0.
 pub const INERT_DROPPED: ir::Code = ir::Code::new(b'S', 102);
@@ -205,6 +237,24 @@ const SPINE_CODES: &[(ir::Code, ir::Info)] = &[
             kind: ir::Kind::Refusal,
         },
     ),
+    (
+        STRICT_UNBOUND_TARGET,
+        ir::Info {
+            title: "a run item whose target nothing defines, under a strict read",
+            cite: "rewrite/RULINGS.md R70; rewrite/AMEND-A12.md A43 (the pair's F7)",
+            explain: "An alter, a loop, a DC axis or an elaborate names an element, model, parameter or subcircuit no statement of the complete program defines. A simulator either rejects it or (ngspice: \"no such device\") runs on at the old value, a wrong number with no error. The argument is the name.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        PATH_AS_READ,
+        ir::Info {
+            title: "a path written as it was read",
+            cite: "rewrite/RULINGS.md R78",
+            explain: "A written include, library or load path is spelled relative to the file that holds it, so the converted files keep the source tree's layout. This file's key is absolute or above the root the sources were loaded under, so it cannot be stated that way and is written as it was read; it resolves only where the original did.",
+            kind: ir::Kind::Note,
+        },
+    ),
 ];
 
 /// The row named `name`, or `None`.
@@ -215,7 +265,8 @@ pub fn by_name(name: &str) -> Option<&'static DialectRow> {
 /// `src` read by `from` into `design`, then checked. A check violation is a bug in the
 /// reader: an `X` row, and a debug assertion. Under [`Policy::Strict`] each `Unread` item
 /// gets a [`STRICT_UNREAD`] row, and each item holding a parameter read no definition binds
-/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38).
+/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38), and
+/// each run item whose target nothing defines one [`STRICT_UNBOUND_TARGET`] row per name (R70).
 ///
 /// # Panics
 /// When `from` has no reader (the caller checks the row) or `src` holds no file.
@@ -251,6 +302,11 @@ pub fn read(
         // a complete program: a read no definition binds is one its simulator rejects (R63)
         for read in ir::unbound_reads(design).into_iter().filter(|r| !r.held) {
             diags.push_at(STRICT_UNBOUND, design, read.item, read.name.0);
+        }
+        // a run item whose target provably names nothing (R70, A43): the IR's list, which
+        // leaves out a path through an unresolved master (a kit may bind it)
+        for t in ir::unbound_targets(design) {
+            diags.push_at(STRICT_UNBOUND_TARGET, design, t.item, t.name.0);
         }
     }
 }

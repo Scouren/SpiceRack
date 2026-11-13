@@ -59,6 +59,7 @@ fn pools_give_back_what_was_appended() {
         target: t[1],
         sweep,
         name: b.name("sw1"),
+        afresh: true,
     }];
     let axes = b.dc_axes(&axes_in);
     let spread = b.num(0.1);
@@ -212,7 +213,13 @@ fn state_items_hold_their_fields() {
     let mut b = d.builder();
     let (v, t85, t27) = (b.num(1e-3), b.num(85.0), b.num(27.0));
     let r1 = b.target(TargetKind::ElementValue, &[], "r1", None);
-    let al = b.alter(top, r1, t85, Span::NONE);
+    let al = b.alter(
+        top,
+        r1,
+        t85,
+        spicerack_ir::plan::AlterEffect::AtOnce,
+        Span::NONE,
+    );
     let op = b.option(top, OptionKey::RelTol, v, Span::NONE);
     let fl = b.option(top, OptionKey::Klu, ExprId::NONE, Span::NONE);
     let pr = b.option_private(top, "xyce", "timeint.reltol", v, Span::NONE);
@@ -230,7 +237,8 @@ fn state_items_hold_their_fields() {
         d.row::<Alter>(al.index),
         Alter {
             target: r1,
-            value: t85
+            value: t85,
+            effect: spicerack_ir::plan::AlterEffect::AtOnce,
         }
     );
     let o: OptionRow = d.row(op.index);
@@ -465,22 +473,15 @@ fn statistics_and_dc_hold_their_lists() {
         target: src,
         sweep,
         name: NameId::NONE,
+        afresh: true,
     }]);
-    let dc = b.analysis(
-        top,
-        None,
-        Dc {
-            axes,
-            restart: true,
-        },
-        Span::NONE,
-    );
+    let dc = b.analysis(top, None, Dc { axes }, Span::NONE);
     assert_eq!(st.kind, ItemKind::Statistics);
     assert_eq!(d.row::<Statistics>(st.index), row);
     assert_eq!(d.varies(row.process), &v);
     let h: Analysis = d.row(dc.index);
     let got = d.detail::<Dc>(h.detail);
-    assert!(got.restart);
+    assert!(d.dc_axes(got.axes)[0].afresh);
     assert_eq!(d.dc_axes(got.axes)[0].target, src);
 }
 
@@ -512,5 +513,11 @@ fn an_alter_of_the_temperature_asserts() {
     let (mut d, top) = deck();
     let mut b = d.builder();
     let v = b.num(85.0);
-    b.alter(top, Target::TEMP, v, Span::NONE);
+    b.alter(
+        top,
+        Target::TEMP,
+        v,
+        spicerack_ir::plan::AlterEffect::AtOnce,
+        Span::NONE,
+    );
 }

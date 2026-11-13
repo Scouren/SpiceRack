@@ -25,6 +25,8 @@
 #[path = "common/memcap.rs"]
 mod memcap;
 
+#[path = "common/feature_states.rs"]
+mod feature_states;
 #[path = "common/known_reach.rs"]
 mod known_reach;
 #[path = "common/laws.rs"]
@@ -50,8 +52,6 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
     ("l5", "ngspice", "seed 19 Untyped: a whole-run `option no_init` in a `.lib` section is written as `.control` / `option noinit` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area. (Seed 11's causes are gone: a script number word keeps its long digits, settle loop_long.sp; an element-value loop over `g149` is refused by the writer, W1407)"),
-    ("l7", "ngspice", "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)"),
-    ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the
@@ -95,7 +95,8 @@ impl Write for Panicky {
     fn admits(&self, design: &ir::Design, diags: &mut ir::Diags) {
         for (item, _) in design.reachable() {
             if item.kind != ir::ItemKind::Element {
-                diags.push_at(ir::Code::new(b'W', 9001), design, item, 0);
+                // a catalogued refusal: the harness asserts every emitted code has a row
+                diags.push_at(dialect::STRICT_UNREAD, design, item, 0);
             }
         }
     }
@@ -253,23 +254,25 @@ fn l6_a_corpus_text_is_a_fixpoint_of_read_write_read() {
 #[test]
 fn l7_legalized_designs_use_only_the_writers_features() {
     let all = dialect::irtext::IrText.features();
-    laws("l7", |_row, writer| {
-        for f in all.minus(*writer.features()).iter() {
-            let removed = spicerack::passes::all().any(|p| p.removes == f);
-            if !removed {
-                return Err(format!("lacks {f:?}: no pass removes it, and no citation"));
-            }
+    laws("l7", |row, writer| {
+        // a citation is of a lacked feature no pass makes legal, with its evidence (A34)
+        let stale = feature_states::stale(row, writer);
+        if !stale.is_empty() {
+            return Err(format!("stale citations: {}", stale.join("; ")));
         }
         for seed in SEEDS {
             let mut design = generate(seed, all, SIZE);
             let mut diags = ir::Diags::new();
             spicerack::passes::legalize(&mut design, writer.features(), &mut diags);
-            let refused: Vec<u32> = diags
+            // one row per item that carries a feature: compared as the set of features
+            let mut refused: Vec<u32> = diags
                 .rows()
                 .iter()
                 .filter(|d| d.code == ir::diag::UNSUPPORTED)
                 .map(|d| d.arg)
                 .collect();
+            refused.sort_unstable();
+            refused.dedup();
             let left: Vec<u32> = ir::features_used(&design)
                 .minus(*writer.features())
                 .iter()

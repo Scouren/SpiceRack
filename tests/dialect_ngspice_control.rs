@@ -299,7 +299,7 @@ fn script_items_ngspice_cannot_spell_are_refused() {
         ("a load naming its modules", "  load osdi \"a.osdi\" modules=(m1)", "W1405"),
         ("a Verilog-A load", "  load veriloga \"a.va\"", "W1404"),
         ("a loop over an expression", "  param p = 1\n  element resistor r1 (a 0) value=1k\n  loop sweep keep_last (element_value r1) (list values=[p])\n    analysis op", "W1402"),
-        ("a parameter alter not right before a reset", "  param p = 1\n  alter (param p) value=3\n  analysis op", "W1401"),
+        ("a parameter alter not right before a reset", "  param p = 1\n  alter (param p) value=3 at_reset\n  analysis op", "W1401"),
         ("a parameter loop whose body does not start with a reset", "  param p = 1\n  loop sweep keep_last (param p) (list values=[2])\n    analysis op", "W1401"),
         ("a partial reset", "  reset values saves", "W1406"),
         ("an element-value alter of a G", "  element vccs g1 (a 0 c 0) gain=2\n  alter (element_value g1) value=2", "W1407"),
@@ -309,7 +309,7 @@ fn script_items_ngspice_cannot_spell_are_refused() {
         ("an alter of a model nothing defines", "  alter (model_param nope vth0) value=2", "W1408"),
         ("a loop over an element nothing holds", "  element resistor r1 (a 0) value=1\n  loop sweep keep_last (element_value r9) (list values=[1])", "W1408"),
         ("a DC axis over a source nothing holds", "  analysis dc (source_dc vnope) (lin start=0 stop=1 step=1)", "W1408"),
-        ("F7: a parameter alter between two analyses", "  param a = 1\n  analysis op\n  alter (param a) value=2\n  analysis op", "W1401"),
+        ("F7: a parameter alter between two analyses", "  param a = 1\n  analysis op\n  alter (param a) value=2 at_reset\n  analysis op", "W1401"),
     ];
 
     for (why, items, code) in REFUSED {
