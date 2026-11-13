@@ -1,2 +1,2 @@
 file "a.sp" deck
-  analysis dc (model_param g0 g1) (lin start=0 stop=0 step=8020.19a) restart
+  analysis dc (model_param g0 g1) (lin start=0 stop=0 step=8020.19a) afresh

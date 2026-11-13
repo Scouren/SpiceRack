@@ -288,7 +288,6 @@ ngspice DistDyn(AbsUnif) owed from=vacask
 ngspice DistDyn(RelUnif) owed from=vacask
 ngspice DistDyn(Limit) unspoken
 vacask Item(Statistics) unspoken
-vacask Item(Print) owed from=ngspice
 vacask Item(Measure) owed from=ngspice
 vacask Elem(ChargeCapacitor) owed from=ngspice
 vacask Elem(FluxInductor) unspoken
@@ -509,26 +508,11 @@ vacask Option(DefL) owed from=ngspice
 vacask Option(DefW) owed from=ngspice
 vacask Option(DefAd) owed from=ngspice
 vacask Option(DefAs) owed from=ngspice
-vacask Option(Klu) owed from=ngspice
-vacask Option(Sparse) owed from=ngspice
 vacask Option(Seed) owed from=ngspice
 vacask Option(Search) unspoken
 vacask Option(Autostop) owed from=ngspice
 vacask Option(Interp) owed from=ngspice
-vacask Option(Acct) owed from=ngspice
-vacask Option(NoAcct) owed from=ngspice
-vacask Option(List) owed from=ngspice
-vacask Option(NoMod) owed from=ngspice
-vacask Option(NoPage) owed from=ngspice
-vacask Option(Node) owed from=ngspice
-vacask Option(Opts) owed from=ngspice
-vacask Option(Warn) owed from=ngspice
-vacask Option(MaxWarns) owed from=ngspice
-vacask Option(NoRefValue) owed from=ngspice
 vacask Option(KeepOpInfo) owed from=ngspice
-vacask Option(NoInit) owed from=ngspice
-vacask Option(NFreqs) owed from=ngspice
-vacask Option(FourGridSize) owed from=ngspice
 vacask Family(ResistorMultiplier) unspoken
 vacask Family(CapacitorMultiplier) unspoken
 vacask Family(InductorMultiplier) unspoken
