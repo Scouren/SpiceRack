@@ -86,11 +86,10 @@ impl Roots<'_> {
         }
     }
 
-    /// Each vary's mean and spread, in place.
+    /// Each vary's spread, in place.
     pub(crate) fn varies(&mut self, list: VaryList) {
         for k in span(list.start, list.len, self.run.varies.len()) {
             let mut v = self.run.varies[k];
-            self.expr(&mut v.mean);
             self.expr(&mut v.spread);
             self.run.varies[k] = v;
         }

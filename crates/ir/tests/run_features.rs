@@ -146,7 +146,6 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::StatsTruncate, "  statistics process (p gauss spread=1) truncate=4", ST),
     (RunExtra::VaryLogNormal, "  statistics process (p log_normal spread=1)", ST),
     (RunExtra::VaryPercent, "  statistics process (p gauss percent spread=1)", ST),
-    (RunExtra::VaryMean, "  statistics process (p gauss mean=2 spread=1)", ST),
     (RunExtra::LoopOverOp, L, "  loop sweep (temp) (list values=[1])\n    analysis dc_inc"),
     (RunExtra::EnvMidRun, "  analysis op\n  env temp=1", "  env temp=1\n  analysis op"),
     (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),

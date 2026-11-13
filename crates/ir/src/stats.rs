@@ -20,7 +20,7 @@
 //!
 //! IR text: `statistics [process <vary> …] [mismatch <vary> …] [process_correlate <corr> …]
 //! [mismatch_correlate <corr> …] [truncate=v] [process_truncate=v] [mismatch_truncate=v]`, with
-//! `vary = (param gauss|unif|log_normal [percent] [mean=v] spread=v)` and `corr = (a b cc=v)`.
+//! `vary = (param gauss|unif|log_normal [percent] spread=v)` and `corr = (a b cc=v)`.
 //! The references in a block's pools are reached by `map_refs` (A9), so the linker binds them.
 
 use crate::analysis_facts::report;
@@ -80,8 +80,6 @@ pub struct Vary {
     /// Whether `spread` is a percentage of the parameter's nominal value (`percent=yes`)
     /// instead of an absolute amount in the parameter's unit.
     pub percent: bool,
-    /// The distribution's centre, or `NONE` for the parameter's own value.
-    pub mean: ExprId,
     /// The spread [`VaryDist`] states; never `NONE`.
     pub spread: ExprId,
 }
@@ -92,9 +90,9 @@ pub struct Vary {
 pub enum VaryDist {
     /// Normal, `spread` = one standard deviation (Spectre `dist=gauss std=`).
     Gauss,
-    /// Uniform on `mean ± spread` (Spectre `dist=unif N=`).
+    /// Uniform on the parameter's value ± `spread` (Spectre `dist=unif N=`).
     Unif,
-    /// Log-normal: the value's natural logarithm is normal around the logarithm of `mean`,
+    /// Log-normal: the value's natural logarithm is normal around the logarithm of the parameter's value,
     /// with standard deviation `spread` (Spectre `dist=lnorm std=`; per the Spectre Reference,
     /// not verified by a run, `INV-semantics.md` B4).
     LogNormal,
@@ -118,7 +116,7 @@ pub type VaryList = List<Vary>;
 pub type CorrelationList = List<Correlation>;
 
 const _: () = assert!(size_of::<Statistics>() == 44);
-const _: () = assert!(size_of::<Vary>() == 20);
+const _: () = assert!(size_of::<Vary>() == 16);
 const _: () = assert!(size_of::<Correlation>() == 20);
 
 impl VaryDist {
@@ -144,11 +142,7 @@ impl RowFacts for Statistics {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         for list in [self.process, self.mismatch] {
             for v in get(&design.run.varies, list).unwrap_or(&[]) {
-                out.extend([
-                    Handle::Ref(v.param, DefKind::Param),
-                    Handle::Expr(v.mean),
-                    Handle::Expr(v.spread),
-                ]);
+                out.extend([Handle::Ref(v.param, DefKind::Param), Handle::Expr(v.spread)]);
             }
         }
         for list in [self.process_correlations, self.mismatch_correlations] {
@@ -216,7 +210,6 @@ impl RowFacts for Statistics {
             for v in get(&design.run.varies, list).unwrap_or(&[]) {
                 flag(set, v.dist == VaryDist::LogNormal, RunExtra::VaryLogNormal);
                 flag(set, v.percent, RunExtra::VaryPercent);
-                flag(set, !v.mean.is_none(), RunExtra::VaryMean);
             }
         }
     }
@@ -254,7 +247,6 @@ impl RowFacts for Statistics {
                     crate::text_expr::write_ref(design, v.param, DefKind::Param, ctx, out);
                     put_word(out, &word(v.dist));
                     put_flag(out, v.percent, "percent");
-                    put_expr(out, design, ctx, "mean", v.mean);
                     put_expr(out, design, ctx, "spread", v.spread);
                     out.push(')');
                 }
@@ -349,17 +341,11 @@ impl RowFacts for Statistics {
             }
             let dist = dists[g.below(dists.len() as u32) as usize];
             let percent = has(features, RunExtra::VaryPercent) && g.chance(3);
-            let mean = if has(features, RunExtra::VaryMean) && g.chance(3) {
-                g.expr(b, features, Reads::Constant)
-            } else {
-                ExprId::NONE
-            };
             let spread = g.expr(b, features, Reads::Constant);
             Vary {
                 param,
                 dist,
                 percent,
-                mean,
                 spread,
             }
         };
@@ -414,13 +400,11 @@ fn parse_vary(
     let param = words.reference(b, diags);
     let dist = take_enum(words, &VaryDist::ALL, diags)?;
     let percent = take_word(words, "percent");
-    let mean = take_expr(words, "mean", scope, b, diags);
     let spread = take_expr(words, "spread", scope, b, diags);
     close(words, diags).then_some(Vary {
         param,
         dist,
         percent,
-        mean,
         spread,
     })
 }
