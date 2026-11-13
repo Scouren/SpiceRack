@@ -1,0 +1,5 @@
+file "a.sp" deck
+  element resistor r1 (a 0) value=1k
+  element capacitor c1 (a 0) value=1u ic=2 ic_mode=uic_only
+  element diode d1 (a 0) model=dmod
+  analysis tran stop=1m print_step=10u max_step=10u uic

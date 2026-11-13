@@ -17,6 +17,8 @@ mod bindings;
 mod continuation;
 #[path = "passes_run/dc_loops.rs"]
 mod dc_loops;
+#[path = "passes_run/device_ic.rs"]
+mod device_ic;
 #[path = "passes_run/first_step.rs"]
 mod first_step;
 #[allow(dead_code)] // `sources_only` is the laws'

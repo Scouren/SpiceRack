@@ -1,10 +1,11 @@
 //! The read spine's bind step (ruling R3): every row reference and every parameter read or user
-//! call the areas queued, bound once every file is lowered, by ngspice's scoping (the nearest
-//! definition outward, `Design::lookup`). Split from `read.rs`.
+//! call the areas queued, bound once every file is lowered, by ngspice's scoping: the nearest
+//! definition outward, includes expanded (`visible::Visible`, R71). Split from `read.rs`.
 //!
 //! Contents: `pub(super) struct RowRef`, `pub(super) fn bind`, `pub(super) fn bind_rows`,
 //! `pub(super) fn bind_reads`
 
+use super::visible::Visible;
 use crate::ir;
 
 /// A row's reference waiting for the bind step ([`Lower::refer`]): its item, its slot in
@@ -31,16 +32,17 @@ pub(super) fn bind(
     measured: &[(usize, usize)],
     rows: &[RowRef],
 ) {
-    bind_rows(b, rows);
-    bind_reads(b, pending, measured);
+    let seen = Visible::new(b.design());
+    bind_rows(b, &seen, rows);
+    bind_reads(b, &seen, pending, measured);
 }
 
 /// The bind step's row half: each queued reference bound to the `kind` definition of its name
 /// nearest its scope outward (`Design::lookup`), through `Builder::bind_ref`; left unresolved
 /// when there is none (R4).
-pub(super) fn bind_rows(b: &mut ir::Builder<'_>, rows: &[RowRef]) {
+pub(super) fn bind_rows(b: &mut ir::Builder<'_>, seen: &Visible, rows: &[RowRef]) {
     for r in rows {
-        let def = b.design().lookup(r.scope, r.kind, r.name);
+        let def = seen.lookup(b.design(), r.scope, r.kind, r.name);
         if !def.is_none() {
             b.bind_ref(r.item, r.k, def);
         }
@@ -53,6 +55,7 @@ pub(super) fn bind_rows(b: &mut ir::Builder<'_>, rows: &[RowRef]) {
 /// measure of its name first, then to a parameter.
 pub(super) fn bind_reads(
     b: &mut ir::Builder<'_>,
+    seen: &Visible,
     pending: &[(ir::ExprId, ir::ScopeId)],
     measured: &[(usize, usize)],
 ) {
@@ -68,10 +71,10 @@ pub(super) fn bind_reads(
         let in_measure = measured.iter().any(|&(a, z)| (a..z).contains(&k));
         let mut def = ir::DefId::NONE;
         if in_measure && kind == ir::DefKind::Param {
-            def = b.design().lookup(scope, ir::DefKind::Measure, r.name);
+            def = seen.lookup(b.design(), scope, ir::DefKind::Measure, r.name);
         }
         if def.is_none() {
-            def = b.design().lookup(scope, kind, r.name);
+            def = seen.lookup(b.design(), scope, kind, r.name);
         }
         if !def.is_none() {
             b.resolve(e, def);

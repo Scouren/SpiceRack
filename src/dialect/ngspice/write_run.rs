@@ -12,7 +12,7 @@
 //! `rewrite/DIALECT-NGSPICE.md` §4; `rewrite/RULINGS.md` R21, R24–R26.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
+//! `pub(super) fn admits(&ir::Design, ir::ItemRef, bool, &mut ir::Diags)` (the bool: the deck is written in the script form),
 //! `pub(super) fn analysis`, `option`, `env`, `node_set`, `statistics`
 
 use super::codes::Row;
@@ -50,6 +50,12 @@ pub(super) const CODES: &[Row] = &[
         "a script option's value is the frontend's number, never a numparam expression; refused.",
     ),
     refusal(
+        SCRIPT_FIELD,
+        "a script analysis command whose field is no number",
+        "ngspice-45 runs (settle script_tran_brace.sp: 'unknown parameter on .tran - ignored'; script_ac_brace.sp, script_noise_brace.sp: misread with a warning)",
+        "a command drops a field's braces and reads the text; only a number (or a $var, which the writer has none of) is read as written; refused.",
+    ),
+    refusal(
         CARD_FORM,
         "an analysis field ngspice's card has no position for",
         "ngspice-45 dctrcurv.c:89-149, inp2dot.c dot_pss",
@@ -74,13 +80,19 @@ const READS_TEMP: ir::Code = ir::Code::new(b'W', 1302);
 /// An option or temperature that holds from its place on (a script `option`) whose value is no
 /// number literal: the frontend reads a number, never a numparam expression.
 const SCRIPT_VALUE: ir::Code = ir::Code::new(b'W', 1304);
+/// An analysis written as a script command (the deck's plan needs a script, R49) with a field
+/// that is no number literal: a command's braces are dropped, not evaluated ("unknown parameter
+/// on .tran", or another field read with a warning: settle `script_tran_brace.sp`,
+/// `script_ac_brace.sp`, `script_noise_brace.sp`; F12). The card form evaluates them
+/// (`card_tran_brace.sp`).
+const SCRIPT_FIELD: ir::Code = ir::Code::new(b'W', 1305);
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
 /// (R21): a card form (`W1300`, `W1301`), a state card's value that reads the temperature
-/// (`W1302`), a script
-/// option's value that is no number (`W1304`). A node set that holds from its place on is
+/// (`W1302`), a script option's value that is no number (`W1304`), a script command's field that
+/// is no number (`W1305`). A node set that holds from its place on is
 /// `NodeSetFromHere`, which `FEATURES` lack (`commands.c` has no command that sets one).
-pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
+pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, script: bool, diags: &mut ir::Diags) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     let mut values = Vec::new();
     // a script `option`'s value is the frontend's number, never a numparam `{…}` (ng-control's
@@ -116,7 +128,11 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     let mut outs = Vec::new();
     // an analysis argument reading the temperature is X0023 and an output with a part
     // FieldDomain (R68, A42); a `.pss` missing an argument is `PssArgumentOmitted`, which
-    // FEATURES lack: what is left is ngspice's own card form
+    // FEATURES lack: what is left is ngspice's own card form, and in a script a field that is
+    // no number (W1305); a sweep's form is a feature (`Sweep{Dc,Freq}*`, A24)
+    let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
+        values.extend([s.start, s.stop, s.points]);
+    };
     match a.kind {
         AnalysisKind::Dc => {
             let dc: Dc = design.detail(a.detail);
@@ -131,12 +147,37 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
                     ir::TargetKind::ElementValue => name == Some(b'r'),
                     _ => true,
                 };
+                let s = axis.sweep;
+                values.extend([s.start, s.stop, s.step]);
             }
         }
-        AnalysisKind::Noise => outs.push(design.detail::<Noise>(a.detail).output),
+        AnalysisKind::Ac => freq(design.detail::<Ac>(a.detail).sweep, &mut values),
+        AnalysisKind::Noise => {
+            let n: Noise = design.detail(a.detail);
+            outs.push(n.output);
+            freq(n.sweep, &mut values);
+            values.push(n.points_per_summary);
+        }
         AnalysisKind::Tf => outs.push(design.detail::<Tf>(a.detail).output),
         AnalysisKind::Sens => outs.push(design.detail::<Sens>(a.detail).output),
-        AnalysisKind::SensAc => outs.push(design.detail::<SensAc>(a.detail).output),
+        AnalysisKind::SensAc => {
+            let s: SensAc = design.detail(a.detail);
+            outs.push(s.output);
+            freq(s.sweep, &mut values);
+        }
+        AnalysisKind::Disto => {
+            let d: Disto = design.detail(a.detail);
+            freq(d.sweep, &mut values);
+            values.push(d.f2_over_f1);
+        }
+        AnalysisKind::Sp => freq(design.detail::<Sp>(a.detail).sweep, &mut values),
+        AnalysisKind::Tran => {
+            let t: Tran = design.detail(a.detail);
+            values.extend([t.print_step, t.stop, t.record_start]);
+            if let StepCeiling::Given(e) = t.ceiling {
+                values.push(e);
+            }
+        }
         AnalysisKind::Four => {
             let f: Four = design.detail(a.detail);
             // a given count is ngspice's default; none is the deck's `nfreqs` (A16)
@@ -145,13 +186,23 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
             if !nine {
                 refuse(FOUR_HARMONICS);
             }
+            values.push(f.fundamental);
             outs.extend_from_slice(design.probes(f.outputs));
+        }
+        AnalysisKind::Pss => {
+            let p: Pss = design.detail(a.detail);
+            values.extend([p.fundamental, p.tstab]);
+            values.extend([p.harmonics, p.points, p.sc_iter, p.steady_coeff]);
         }
         _ => {}
     }
     form_ok &= outs.iter().all(|p| write_outputs::probe_admits(design, p));
     if !form_ok {
         refuse(CARD_FORM);
+    }
+    let number = |e: &ir::ExprId| e.is_none() || matches!(design.expr(*e), ir::Expr::Num(_));
+    if script && !values.iter().all(number) {
+        refuse(SCRIPT_FIELD);
     }
 }
 

@@ -38,9 +38,9 @@ const DROPPED: &[&str] = &[
 /// Runs the probe with each option and compares the plots with the probe's own.
 pub fn inert_options_leave_the_raw_file_alone() {
     assert_eq!(
-        DROPPED.len() + 1,
+        DROPPED.len() + 2,
         spicerack::passes::run::inert_options::INERT.len(),
-        "one spelling a row, and klu"
+        "one spelling a row, and klu (bounded) and trtol (a hint, R84)"
     );
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks/options_probe.sp");

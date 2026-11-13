@@ -85,6 +85,9 @@ struct Spine {
     renames: HashMap<String, String>,
     devices: BTreeSet<String>,
     axes: BTreeSet<String>,
+    /// A transient has `uic` in the legalized design: its t = 0 point is not compared
+    /// (`cmp::without_start`).
+    uic: bool,
 }
 
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
@@ -181,13 +184,19 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         (a, b)
     });
     let (a, b) = match ran {
-        Ok((Ran::Plots(a), Ran::Plots(b))) => (
-            plots::only(plots::hierarchical(a), pair.vectors.as_ref()),
-            plots::only(
-                plots::renamed(plots::hierarchical(b), &spine.renames),
-                pair.vectors.as_ref(),
-            ),
-        ),
+        Ok((Ran::Plots(mut a), Ran::Plots(mut b))) => {
+            if spine.uic {
+                cmp::without_start(&mut a);
+                cmp::without_start(&mut b);
+            }
+            (
+                plots::only(plots::hierarchical(a), pair.vectors.as_ref()),
+                plots::only(
+                    plots::renamed(plots::hierarchical(b), &spine.renames),
+                    pair.vectors.as_ref(),
+                ),
+            )
+        }
         Ok((a, b)) => return stop(fails, 4, ran_fail(a, b), written),
         Err((_, f)) => return stop(fails, 4, f, written),
     };
@@ -212,7 +221,11 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
                         SECS,
                     );
                     match (a2, b2) {
-                        (Ran::Plots(x), Ran::Plots(y)) => Some(
+                        (Ran::Plots(mut x), Ran::Plots(mut y)) => Some({
+                            if spine.uic {
+                                cmp::without_start(&mut x);
+                                cmp::without_start(&mut y);
+                            }
                             cmp::compare(
                                 &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
                                 &plots::only(
@@ -221,8 +234,8 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
                                 ),
                                 tol,
                             )
-                            .is_ok(),
-                        ),
+                            .is_ok()
+                        }),
                         _ => None,
                     }
                 });
@@ -393,12 +406,14 @@ fn spine(
             devices.insert(name);
         }
     }
+    let uic = ir::features_used(&design).contains(ir::Feature::Run(ir::RunExtra::TranUic));
     Ok(Spine {
         legal: design,
         files,
         renames,
         devices,
         axes,
+        uic,
     })
 }
 
@@ -548,7 +563,9 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
         .collect()
 }
 
-/// How much of step 4's tolerance a passing pair uses (`PAIR_MARGINS=1`, triage): the smallest
+/// How much of step 4's value tolerance a passing pair uses (`PAIR_MARGINS=1`, triage). It
+/// measures the value band only: on a smooth transient the 1 % time tube covers the difference,
+/// so "passes at 0" there means not measured by this probe, never 0 %. Reports the smallest
 /// fraction `f` of RELTOL, VNTOL and ABSTOL (the transient's band scales with them) at which
 /// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
 /// below it (the worst vector, its value and the tolerance there).
@@ -570,7 +587,9 @@ fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
             Err(_) => lo = mid,
         }
     }
-    let below = at(lo).err().unwrap_or_else(|| "passes at 0: exact".into());
+    let below = at(lo).err().unwrap_or_else(|| {
+        "passes at 0: not measured by this probe (exact, or inside the time tube)".into()
+    });
     format!(
         "uses {:.0} % of the tolerance; below it: {below}",
         hi * 100.0
@@ -580,7 +599,10 @@ fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
 /// Step 4's verdict when a run gave no plots: whose run, and why.
 fn ran_fail(a: Ran, b: Ran) -> Fail {
     match (a, b) {
-        (Ran::Timeout, _) | (_, Ran::Timeout) => fail("slow", "past the CPU budget".into()),
+        (Ran::Timeout, _) | (_, Ran::Timeout) => fail(
+            "slow",
+            "past the CPU budget or the output cap (512 MiB a file)".into(),
+        ),
         (Ran::Failed(why), _) => fail("source-fails", why),
         (_, Ran::Failed(why)) => fail("target-fails", why),
         (Ran::Plots(_), Ran::Plots(_)) => unreachable!("a run without plots"),
