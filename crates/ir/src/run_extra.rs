@@ -99,6 +99,14 @@ pub enum RunExtra {
     SweepFreqList,
     /// A sweep that ends on its stop value off the grid (LTspice).
     SweepEndOnStop,
+    /// A `dec` or `oct` sweep off its grid stretched to end on its stop, the interval count
+    /// rounded up (VACASK; R99 law C).
+    SweepEndStretch,
+    /// A `dec` sweep off its grid under ngspice's decade rule (R99 laws F and G).
+    SweepEndNgDecade,
+    /// A linear frequency sweep whose count, not a literal, is read by ngspice's rule (2 runs
+    /// one value, 0 runs ten; R97a, R99).
+    SweepCountNgLin,
     /// A sweep written as centre and span (Spectre).
     SweepCenterSpan,
     /// A noise analysis with a summary interval.
@@ -410,7 +418,7 @@ pub enum RunExtra {
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 174] = [
+    pub const ALL: [RunExtra; 177] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -452,6 +460,9 @@ impl RunExtra {
         RunExtra::SweepFreqLog,
         RunExtra::SweepFreqList,
         RunExtra::SweepEndOnStop,
+        RunExtra::SweepEndStretch,
+        RunExtra::SweepEndNgDecade,
+        RunExtra::SweepCountNgLin,
         RunExtra::SweepCenterSpan,
         RunExtra::NoiseSummary,
         RunExtra::NoiseAcSweep,

@@ -3,7 +3,7 @@
 //! can push while it validates a statement and take a refused statement's rows back instead of
 //! building a second tree first. Design in, the same design as it stood at the mark out.
 //!
-//! What it undoes is appends only: a builder call that changes a row which existed at the mark
+//! What it undoes is appends, and the stated laws (R90; one value the mark keeps): a builder call that changes a row which existed at the mark
 //! (`Builder::resolve`, `Builder::bind_ref` on an older expression or item) is not undone, and
 //! the caller does not make one between a mark and its truncate. Every table is listed through
 //! an exhaustive destructuring of its struct (`Design`, `CircuitDetails`, `RunDetails`), so a
@@ -35,6 +35,8 @@ pub struct Mark {
     scopes: u32,
     /// Rows of each item table, by `ItemKind` (the scope lists keep the items below these).
     items: [u32; ItemKind::ALL.len()],
+    /// The stated laws (R90): a value, not a table, restored whole.
+    laws: crate::laws::Laws,
 }
 
 /// A table the undo cuts back by length. Implemented for the plain columns (`Vec`) and the item
@@ -77,6 +79,7 @@ impl Builder<'_> {
             defs: d.defs.len() as u32,
             scopes: d.scopes.len() as u32,
             items,
+            laws: d.laws(),
         }
     }
 
@@ -115,6 +118,7 @@ impl Builder<'_> {
             list.truncate(keep);
         }
         d.scopes.truncate(mark.scopes as usize);
+        d.circuit.laws = mark.laws;
         cut_names(&mut d.names, mark.names);
         cut_texts(&mut d.texts, mark.texts);
         let mut columns = columns_of(d);
@@ -201,6 +205,8 @@ fn columns_of(d: &mut Design) -> Vec<&mut dyn Column> {
         classes: _,
         forms: _,
         element_names: _,
+        name_index: _,
+        analysis_reach: _,
         #[cfg(any(test, feature = "gen"))]
             class_computes: _,
     } = d;
@@ -279,6 +285,8 @@ fn circuit_columns(t: &mut crate::element::CircuitDetails) -> Vec<&mut dyn Colum
         trnoises,
         trrandoms,
         patterns,
+        // a value, not a table: the mark keeps it whole
+        laws: _,
     } = t;
     vec![
         passives as &mut dyn Column,

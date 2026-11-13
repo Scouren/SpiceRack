@@ -263,6 +263,20 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 b.subckt(top, "t", &[], &[("w", outer)], Span::NONE);
             },
         ),
+        (
+            // `"tt" == "tt"`; the neighbour: the same strings as a list
+            Extra::StringCompare,
+            |b, top| {
+                let (x, y) = (b.string("tt"), b.string("tt"));
+                let eq = b.binary(BinOp::Eq, x, y);
+                b.param(top, "c", eq, Span::NONE);
+            },
+            |b, top| {
+                let (x, y) = (b.string("tt"), b.string("tt"));
+                let l = b.list(&[x, y]);
+                b.param(top, "c", l, Span::NONE);
+            },
+        ),
     ];
     for (extra, sets, neighbour) in cases {
         let f = Feature::Extra(extra);

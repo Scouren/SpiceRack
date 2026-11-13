@@ -35,7 +35,7 @@ pub(crate) fn dump_load(row: &Load, d: &Design, modules: &[NameId], out: &mut St
 
 /// The `Module` names a load defines, in definition order. O(definitions): for one load.
 pub(crate) fn modules_of(d: &Design, at: ItemRef) -> Vec<NameId> {
-    let defs = d.definitions().iter();
+    let defs = d.definitions_all().iter();
     defs.filter(|def| def.kind == DefKind::Module && def.item == at)
         .map(|def| def.name)
         .collect()

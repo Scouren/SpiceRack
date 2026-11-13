@@ -13,6 +13,8 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/known.rs"]
+mod known;
 #[path = "common/memcap.rs"]
 mod memcap;
 
@@ -20,6 +22,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use known::{Fails, Known};
 use spicerack::dialect::{BUILTIN, DialectRow, Sources};
 use spicerack::ir;
 
@@ -30,8 +33,9 @@ const MUTANTS: u64 = 32;
 /// mutant reached is reported, marked as not minimal (a large fixture shrank for minutes).
 const SHRINK_STEPS: usize = 400;
 
-/// The rows that fail today: (law, row, why). Strict both ways.
-const KNOWN: &[(&str, &str, &str)] = &[];
+/// The rows that fail today: (law, row, the `<deck> seed <n>` labels, why). Strict both ways by
+/// (row, label) (`known::compare`).
+const KNOWN: &[Known] = &[];
 
 /// splitmix64.
 struct Rng(u64);
@@ -83,25 +87,12 @@ fn an_allocation_past_the_memory_cap_aborts_the_binary() {
 
 #[test]
 fn l1_l2_card_shaped_mutants_read_and_check_clean() {
-    let mut failing = Vec::new();
-    let mut messages = Vec::new();
-    for row in BUILTIN.iter().filter(|r| r.read.is_some()) {
-        if let Err(m) = mutants_of(row) {
-            failing.push(row.name);
-            messages.push(format!("{}: {m}", row.name));
-        }
-    }
-    let known: Vec<&str> = KNOWN
+    let failing: Vec<(&str, Fails)> = BUILTIN
         .iter()
-        .filter(|k| k.0 == "l1-mutants")
-        .map(|k| k.1)
+        .filter(|r| r.read.is_some())
+        .map(|row| (row.name, mutants_of(row)))
         .collect();
-    assert_eq!(
-        failing,
-        known,
-        "l1-mutants against KNOWN\n{}",
-        messages.join("\n\n")
-    );
+    known::compare("l1-mutants", &failing, KNOWN);
 }
 
 #[test]
@@ -161,13 +152,18 @@ fn a_shrink_that_hits_its_bound_says_it_is_not_minimal() {
 }
 
 /// Every mutant of every fixture deck of `row`, read and checked; each distinct failure (by
-/// its reason, names and numbers masked: [`masked`]) once, with the first seed and deck that showed it, its mutant shrunk.
-fn mutants_of(row: &DialectRow) -> Result<(), String> {
+/// its reason, names and numbers masked: [`masked`]) once, labelled `<deck> seed <n>` by the
+/// first mutant that showed it, its mutant shrunk.
+fn mutants_of(row: &DialectRow) -> Fails {
+    let mut fails = Fails::default();
     let decks = decks(row.name);
     if decks.is_empty() {
-        return Err("no fixture deck to mutate (unsupported fails)".to_string());
+        return Fails::one(
+            "no deck",
+            "no fixture deck to mutate (unsupported fails)".to_string(),
+        );
     }
-    let mut found: Vec<(String, String)> = Vec::new();
+    let mut found: Vec<String> = Vec::new();
     for (path, text) in &decks {
         for seed in 0..MUTANTS {
             let mutant = mutate(text, seed);
@@ -175,24 +171,18 @@ fn mutants_of(row: &DialectRow) -> Result<(), String> {
             let Some(why) = bad(&mutant) else { continue };
             // One bug, one shrink: reasons are grouped with the names and numbers in them masked.
             let group = masked(&why);
-            if found.iter().any(|(w, _)| *w == group) {
+            if found.contains(&group) {
                 continue;
             }
             let small = shrink(&mutant, &bad);
-            found.push((
-                group,
-                format!("{path} seed {seed}: {why}\nshrunk mutant:\n{small}"),
-            ));
+            found.push(group);
+            fails.check(
+                &format!("{path} seed {seed}"),
+                format!("{why}\nshrunk mutant:\n{small}"),
+            );
         }
     }
-    match found.is_empty() {
-        true => Ok(()),
-        false => Err(found
-            .into_iter()
-            .map(|(_, m)| m)
-            .collect::<Vec<_>>()
-            .join("\n")),
-    }
+    fails
 }
 
 /// `why` with every word holding a digit masked, a diagnostic code (`X0016`) kept

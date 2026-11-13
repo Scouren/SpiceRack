@@ -52,17 +52,20 @@ pub(crate) fn gen_nfreqs(
 pub(crate) fn gen_holds(
     g: &mut Gen,
     b: &Builder<'_>,
-    _scope: ScopeId,
+    scope: ScopeId,
     features: &FeatureSet,
     modes: &Modes,
 ) -> Option<Applies> {
     let d = b.design();
+    // R98: nothing holds from here inside a subcircuit body
+    let in_body = crate::feature::chain_kinds(d, scope)[crate::item::ScopeKind::Subckt as usize];
     let after = !d.analyses.is_empty() || !d.loops.is_empty() || !d.alters.is_empty();
     let modes: Vec<Applies> = [
         (Applies::FromHere, modes.mid),
         (Applies::WholeRun, modes.whole_mid),
     ]
     .into_iter()
+    .filter(|&(m, _)| !(in_body && m == Applies::FromHere))
     .filter(|&(m, x)| (!after || has(features, x)) && has(features, mode_feature(modes, m)))
     .map(|(m, _)| m)
     .collect();

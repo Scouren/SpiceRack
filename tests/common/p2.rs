@@ -2,16 +2,16 @@
 //! carrying the pass's feature has exactly one of its notes (R69 d); and P2's second self-test,
 //! a pass that notes an item twice.
 //!
-//! Contents: `pub fn p2_on(&Pass) -> Result<(), String>`
+//! Contents: `pub fn p2_on(&Pass) -> Fails`
 
 use spicerack::ir;
 use spicerack::passes::Pass;
 
-use super::{LEAKY, carrying, each_with};
+use super::{Fails, LEAKY, carrying, each_with};
 
 /// P2 on one pass: every item still carrying `removes` after it has exactly one of its notes at
 /// that item (`Diag::item`).
-pub fn p2_on(pass: &Pass) -> Result<(), String> {
+pub fn p2_on(pass: &Pass) -> Fails {
     each_with(pass, |seed, mut design| {
         let mut diags = ir::Diags::new();
         (pass.run)(&mut design, &mut diags);
@@ -52,8 +52,11 @@ fn p2_catches_a_pass_that_notes_an_item_twice() {
         notes: &[LEAKY],
         run: note_every_comment_twice,
     };
-    let found = p2_on(&twice).expect_err("P2 sees the repeated note");
-    assert!(found.contains("keeps it with 2 notes"), "{found}");
+    let found = p2_on(&twice).evidence();
+    assert!(
+        found.contains("keeps it with 2 notes"),
+        "P2 sees the repeated note: {found}"
+    );
 }
 
 /// The repeating self-test pass: two notes at every comment, and no change.

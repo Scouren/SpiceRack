@@ -134,7 +134,7 @@ fn checked(
     for &i in &is {
         for (r, _) in refs_and_reads(after, i) {
             if r.is_resolved() {
-                let d = after.definitions()[r.def.index()].item;
+                let d = after.definitions_all()[r.def.index()].item;
                 assert!(
                     is.contains(&d),
                     "seed {seed}: {i:?} binds {d:?}, which went"
@@ -157,11 +157,11 @@ fn checked(
             i == d || !s.is_none()
         };
         let named = refs_and_reads(before, *d).iter().any(|(r, _)| {
-            r.is_resolved() && outer.contains(&before.definitions()[r.def.index()].item)
+            r.is_resolved() && outer.contains(&before.definitions_all()[r.def.index()].item)
         });
         let inside_named = was.keys().filter(|i| at(i)).any(|&i| {
             refs_and_reads(before, i).iter().any(|(r, _)| {
-                r.is_resolved() && outer.contains(&before.definitions()[r.def.index()].item)
+                r.is_resolved() && outer.contains(&before.definitions_all()[r.def.index()].item)
             })
         });
         assert!(
@@ -170,7 +170,7 @@ fn checked(
         );
         let o = owner(d);
         if o == ir::ItemRef::NONE || o.kind == ir::ItemKind::Section {
-            for x in before.definitions().iter().filter(|x| x.item == *d) {
+            for x in before.definitions_all().iter().filter(|x| x.item == *d) {
                 let name = before.str(x.name).to_ascii_lowercase();
                 assert!(
                     !names.contains(&name),
@@ -348,7 +348,7 @@ fn on_generated_designs_nothing_used_goes_and_every_drop_held_a_lacking_feature(
         // the spine's outer loop, copied: the rules' fixed point, then the step, until a round
         // drops nothing, bounded by the definition count
         let mut design = before.clone();
-        let bound = design.definitions().len();
+        let bound = design.definitions_all().len();
         let mut rounds = 0;
         loop {
             let mut scratch = ir::Diags::new();

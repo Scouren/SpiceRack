@@ -106,7 +106,7 @@ fn enclosing(design: &Design, scope: ScopeId) -> Option<u32> {
 
 /// The `Subckt` row `def` is bound to, if it is a subcircuit's definition.
 fn subckt_of(design: &Design, def: DefId) -> Option<u32> {
-    if def.is_none() || def.index() >= design.definitions().len() {
+    if def.is_none() || def.index() >= design.definitions_all().len() {
         return None;
     }
     let d = design.def(def);

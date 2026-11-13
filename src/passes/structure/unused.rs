@@ -225,7 +225,7 @@ fn used(
     reach: &[(ir::ItemRef, ir::ScopeId)],
     body: &HashMap<ir::ItemRef, Vec<ir::ItemRef>>,
 ) -> HashSet<ir::ItemRef> {
-    let defs = design.definitions();
+    let defs = design.definitions_all();
     let mut stack = roots(design, reach);
     let mut used = HashSet::new();
     let (mut names, mut bases, mut families) = (HashSet::new(), HashSet::new(), HashSet::new());
@@ -333,7 +333,7 @@ fn follow(
 
 /// `item`'s edges, into `out` (cleared first).
 fn edges(design: &ir::Design, item: ir::ItemRef, out: &mut Edges) {
-    let defs = design.definitions();
+    let defs = design.definitions_all();
     out.defs.clear();
     out.names.clear();
     out.bases.clear();

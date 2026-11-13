@@ -19,6 +19,7 @@ mod tests {
         Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, OutKind, Quantity,
         TableLaw, TableSource,
     };
+    use spicerack_ir::expr::{BinOp, Func};
     use spicerack_ir::passive::{Coupling, IcMode, Parasitics, Passive, TcBase, TcLaw};
     use spicerack_ir::semi::{InitialState, Switch};
     use spicerack_ir::source::{DcRule, Distof, Source};
@@ -28,7 +29,8 @@ mod tests {
     };
     use spicerack_ir::{
         Builder, CircuitExtra as X, Design, DeviceLibrary, ElemKind, ExprId, Feature, FeatureSet,
-        ModelFamily, NO_ROW, NameId, Polarity, Ref, ScopeId, Span, WaveKind, features_used,
+        Law, Laws, ModelFamily, NO_ROW, NameId, Polarity, Ref, ScopeId, Span, WaveKind,
+        features_used,
     };
     use spicerack_ir::{DefKind, LoadKind};
 
@@ -1486,7 +1488,467 @@ mod tests {
                 },
             )
         }),
+        // R90: each law's member at a row carrying its point under the stated law; the
+        // neighbour is the row where the two builds agree (`laws.rs`, each variant's doc).
+        // R86: a BJT of area 2 against area 1
+        (X::BjtBcSatAreaTimesAreab, |b, t, on| {
+            bjt_law(b, t, on, Law::BcSatAreaTimesAreab)
+        }),
+        (X::BjtBcSatAreabOnly, |b, t, on| {
+            bjt_law(b, t, on, Law::BcSatAreabOnly)
+        }),
+        // R88: a Gummel-Poon model giving `iss` with `ns = 2` against `ns = 1`
+        (X::ModelSubSatLastFactor, |b, t, on| {
+            substrate_law(b, t, on, Law::SubSatLastFactor)
+        }),
+        (X::ModelSubSatEmissionNs, |b, t, on| {
+            substrate_law(b, t, on, Law::SubSatEmissionNs)
+        }),
+        // R91 F20: a level-3 diode from `w` and `l` with `m = 2` against `m = 1`
+        (X::DiodeWlMultTwice, |b, t, on| {
+            diode_mult(b, t, on, Law::DiodeWlMultTwice)
+        }),
+        (X::DiodeWlMultOnce, |b, t, on| {
+            diode_mult(b, t, on, Law::DiodeWlMultOnce)
+        }),
+        // R91 F22: a diode of `pj = 1` against `pj = 0` on a model with `cjsw`
+        (X::DiodeSidewallBottomF1, |b, t, on| {
+            diode_sidewall(b, t, on, Law::DiodeSidewallBottomF1)
+        }),
+        (X::DiodeSidewallOwnF1, |b, t, on| {
+            diode_sidewall(b, t, on, Law::DiodeSidewallOwnF1)
+        }),
+        // R92 F21: a diode model with `wm` and `xom` lacking `xoi` against one giving both
+        (X::DiodeXomAbsent1e4, |b, t, on| {
+            xom(b, t, on, Law::DiodeXomAbsent1e4)
+        }),
+        (X::DiodeXomAbsent1e14, |b, t, on| {
+            xom(b, t, on, Law::DiodeXomAbsent1e14)
+        }),
+        // R92 F24: a VDMOS model lacking `kp` against one giving it
+        (X::VdmosKpAbsent35, |b, t, on| {
+            kp(b, t, on, Law::VdmosKpAbsent35)
+        }),
+        (X::VdmosKpAbsent20, |b, t, on| {
+            kp(b, t, on, Law::VdmosKpAbsent20)
+        }),
+        // R92 F25: an n-channel VDMOS with `tcvth = 1` against `tcvth = 0`
+        (X::VdmosTcvthLowers, |b, t, on| {
+            tcvth(b, t, on, Law::VdmosTcvthLowers)
+        }),
+        (X::VdmosTcvthRaises, |b, t, on| {
+            tcvth(b, t, on, Law::VdmosTcvthRaises)
+        }),
+        // R92 F26: a VDMOS with `cjo` and `vj = 6` (fc·vj 3) against `vj = 1` (0.5)
+        (X::VdmosClampByN, |b, t, on| {
+            clamp(b, t, on, Law::VdmosClampByN)
+        }),
+        (X::VdmosClampByFc, |b, t, on| {
+            clamp(b, t, on, Law::VdmosClampByFc)
+        }),
+        // R94 F27, F28: a MOSFET of the family in a design with no analysis against one whose
+        // design holds an operating point only
+        (X::MosSmallSignalHand, |b, t, on| {
+            mos_small(b, t, on, Law::MosSmallSignalHand, ModelFamily::Mos2)
+        }),
+        (X::MosSmallSignalExact, |b, t, on| {
+            mos_small(b, t, on, Law::MosSmallSignalExact, ModelFamily::Mos3)
+        }),
+        (X::Mos6SmallSignalAbsent, |b, t, on| {
+            mos_small(b, t, on, Law::Mos6SmallSignalAbsent, ModelFamily::Mos6)
+        }),
+        (X::Mos6SmallSignalExact, |b, t, on| {
+            mos_small(b, t, on, Law::Mos6SmallSignalExact, ModelFamily::Mos6)
+        }),
+        // R94a F29: a BJT on a Gummel-Poon model with `irb = 1` against `irb = 0`
+        (X::BjtIrbSmallSignalFrozen, |b, t, on| {
+            irb(b, t, on, Law::BjtIrbSmallSignalFrozen)
+        }),
+        (X::BjtIrbSmallSignalExact, |b, t, on| {
+            irb(b, t, on, Law::BjtIrbSmallSignalExact)
+        }),
+        // R95 F30: a VDMOS of m = 2 against m = 1, no analysis
+        (X::VdmosMultChargesOff, |b, t, on| {
+            vdmos_mult(b, t, on, Law::VdmosMultChargesOff)
+        }),
+        (X::VdmosMultChargesCopies, |b, t, on| {
+            vdmos_mult(b, t, on, Law::VdmosMultChargesCopies)
+        }),
+        // R95 F31: a diode on a model of `isr = 1` against `isr = 0`, beside an operating point
+        (X::DiodeIsrReverseNone, |b, t, on| {
+            diode_isr(b, t, on, true, Law::DiodeIsrReverseNone)
+        }),
+        (X::DiodeIsrReversePresent, |b, t, on| {
+            diode_isr(b, t, on, true, Law::DiodeIsrReversePresent)
+        }),
+        // R96: the same diode of `isr = 1`, no analysis, against one beside an operating point
+        (X::DiodeIsrSmallSignalHand, |b, t, on| {
+            diode_isr(b, t, true, !on, Law::DiodeIsrSmallSignalHand)
+        }),
+        (X::DiodeIsrSmallSignalExact, |b, t, on| {
+            diode_isr(b, t, true, !on, Law::DiodeIsrSmallSignalExact)
+        }),
+        // R96: a diode model of `ttt1 = 1` against `ttt1 = 0`
+        (X::DiodeTtFactorUnclamped, |b, t, on| {
+            ttt(b, t, on, Law::DiodeTtFactorUnclamped)
+        }),
+        (X::DiodeTtFactorClamped, |b, t, on| {
+            ttt(b, t, on, Law::DiodeTtFactorClamped)
+        }), // R93a F42-F46: the function in a behavioural source's expression against `sqrt` (a
+        // division against a product)
+        (X::TrigReduceCast, |b, t, on| {
+            func_point(b, t, on, Law::TrigReduceCast, Some(Func::Sin))
+        }),
+        (X::TrigExact, |b, t, on| {
+            func_point(b, t, on, Law::TrigExact, Some(Func::Cos))
+        }),
+        (X::ExpClamp1e99, |b, t, on| {
+            func_point(b, t, on, Law::ExpClamp1e99, Some(Func::Exp))
+        }),
+        (X::ExpExact, |b, t, on| {
+            func_point(b, t, on, Law::ExpExact, Some(Func::Exp))
+        }),
+        (X::LogZeroMinus1e99, |b, t, on| {
+            func_point(b, t, on, Law::LogZeroMinus1e99, Some(Func::Ln))
+        }),
+        (X::LogZeroError, |b, t, on| {
+            func_point(b, t, on, Law::LogZeroError, Some(Func::Log10))
+        }),
+        (X::DivGminGuard, |b, t, on| {
+            func_point(b, t, on, Law::DivGminGuard, None)
+        }),
+        (X::DivExact, |b, t, on| {
+            func_point(b, t, on, Law::DivExact, None)
+        }),
+        (X::AsinEdgeZero, |b, t, on| {
+            func_point(b, t, on, Law::AsinEdgeZero, Some(Func::Asin))
+        }),
+        (X::AsinEdgeFails, |b, t, on| {
+            func_point(b, t, on, Law::AsinEdgeFails, Some(Func::Acos))
+        }),
     ];
+
+    /// A behavioural source `b1` under `law` whose expression is `f(v(a))` (a division `1/v(a)`
+    /// when `f` is `None`); off, `sqrt(v(a))` (a product `1*v(a)`).
+    fn func_point(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law, f: Option<Func>) {
+        b.set_laws(Laws::of(&[law]));
+        let v = b.v("a", None);
+        let e = match (f, on) {
+            (Some(f), true) => b.call(f, &[v]),
+            (Some(_), false) => b.call(Func::Sqrt, &[v]),
+            (None, on) => {
+                let one = n(b, 1);
+                b.binary(if on { BinOp::Div } else { BinOp::Mul }, one, v)
+            }
+        };
+        let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+        b.behav(
+            t,
+            ElemKind::Behav,
+            h,
+            behav(e, OutKind::Voltage),
+            Span::NONE,
+        );
+    }
+
+    fn vdmos_mult(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        let one = n(b, 1);
+        law_model(b, t, law, ModelFamily::Vdmos, &[("kp", one)]);
+        let name = b.design().find_name("m");
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mult = n(b, if on { 2 } else { 1 });
+        let mut h = b.head("m1", &["d", "g", "s"], Some("m"), &[], mult);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Mosfet, h, semi(), Span::NONE);
+    }
+
+    fn diode_isr(b: &mut Builder<'_>, t: ScopeId, on: bool, op: bool, law: Law) {
+        let value = n(b, if on { 1 } else { 0 });
+        law_model(b, t, law, ModelFamily::Diode, &[("isr", value)]);
+        let name = b.design().find_name("m");
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mut h = b.head("d1", &["a", "c"], Some("m"), &[], ExprId::NONE);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Diode, h, semi(), Span::NONE);
+        if op {
+            b.op(t, None, Span::NONE);
+        }
+    }
+
+    fn ttt(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        let value = n(b, if on { 1 } else { 0 });
+        law_model(b, t, law, ModelFamily::Diode, &[("ttt1", value)]);
+    }
+
+    /// A model `m` of `family` (n polarity where the family has one) with `params`, under `law`.
+    fn law_model(
+        b: &mut Builder<'_>,
+        t: ScopeId,
+        law: Law,
+        family: ModelFamily,
+        params: &[(&str, ExprId)],
+    ) {
+        b.set_laws(Laws::of(&[law]));
+        let name = b.name("m");
+        let list = if params.is_empty() {
+            spicerack_ir::List::EMPTY
+        } else {
+            b.params(params)
+        };
+        let polarity = match family {
+            ModelFamily::Diode | ModelFamily::DiodeLevel3 => Polarity::None,
+            _ => Polarity::N,
+        };
+        let row = spicerack_ir::Model {
+            params: list,
+            ..model(name, family, polarity)
+        };
+        b.model(t, row, Span::NONE);
+    }
+
+    fn xom(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        let one = n(b, 1);
+        // one of the two absent is enough
+        let given: &[(&str, ExprId)] = if on {
+            &[("wm", one), ("xom", one)]
+        } else {
+            &[("wm", one), ("xom", one), ("xoi", one)]
+        };
+        law_model(b, t, law, ModelFamily::Diode, given);
+    }
+
+    fn kp(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        let one = n(b, 1);
+        let given: &[(&str, ExprId)] = if on { &[] } else { &[("kp", one)] };
+        law_model(b, t, law, ModelFamily::Vdmos, given);
+    }
+
+    fn tcvth(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        let (one, tc) = (n(b, 1), n(b, if on { 1 } else { 0 }));
+        law_model(b, t, law, ModelFamily::Vdmos, &[("kp", one), ("tcvth", tc)]);
+    }
+
+    fn clamp(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        let (one, vj) = (n(b, 1), n(b, if on { 6 } else { 1 }));
+        law_model(
+            b,
+            t,
+            law,
+            ModelFamily::Vdmos,
+            &[("kp", one), ("cjo", one), ("vj", vj)],
+        );
+    }
+
+    fn mos_small(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law, family: ModelFamily) {
+        law_model(b, t, law, family, &[]);
+        let name = b.design().find_name("m");
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mut h = b.head("m1", &["d", "g", "s", "b"], Some("m"), &[], ExprId::NONE);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Mosfet, h, semi(), Span::NONE);
+        if !on {
+            b.op(t, None, Span::NONE);
+        }
+    }
+
+    fn irb(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        let value = n(b, if on { 1 } else { 0 });
+        law_model(b, t, law, ModelFamily::GummelPoon, &[("irb", value)]);
+        let name = b.design().find_name("m");
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mut h = b.head("q1", &["c", "b", "e"], Some("m"), &[], ExprId::NONE);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Bjt, h, semi(), Span::NONE);
+    }
+
+    fn substrate_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let iss = n(b, 1);
+        let ns = n(b, if on { 2 } else { 1 });
+        let params = b.params(&[("iss", iss), ("ns", ns)]);
+        let name = b.name("m");
+        let row = spicerack_ir::Model {
+            params,
+            ..model(name, ModelFamily::GummelPoon, Polarity::N)
+        };
+        b.model(t, row, Span::NONE);
+    }
+
+    fn bjt_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let name = b.name("m");
+        b.model(
+            t,
+            model(name, ModelFamily::GummelPoon, Polarity::N),
+            Span::NONE,
+        );
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let area = n(b, if on { 2 } else { 1 });
+        let mut h = b.head("q1", &["c", "b", "e"], Some("m"), &[], ExprId::NONE);
+        h.model = Ref { name, def };
+        let row = spicerack_ir::semi::Semi { area, ..semi() };
+        b.semi(t, ElemKind::Bjt, h, row, Span::NONE);
+    }
+
+    /// A diode `d1` naming model `m` of `family` (with `model_params`), bound.
+    fn diode(
+        b: &mut Builder<'_>,
+        t: ScopeId,
+        family: ModelFamily,
+        model_params: &[(&str, ExprId)],
+        params: &[(&str, ExprId)],
+        mult: ExprId,
+    ) {
+        let name = b.name("m");
+        let list = if model_params.is_empty() {
+            spicerack_ir::List::EMPTY
+        } else {
+            b.params(model_params)
+        };
+        let row = spicerack_ir::Model {
+            params: list,
+            ..model(name, family, Polarity::None)
+        };
+        b.model(t, row, Span::NONE);
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mut h = b.head("d1", &["a", "c"], Some("m"), params, mult);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Diode, h, semi(), Span::NONE);
+    }
+
+    fn diode_mult(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let (w, l) = (n(b, 1), n(b, 1));
+        let m = n(b, if on { 2 } else { 1 });
+        diode(
+            b,
+            t,
+            ModelFamily::DiodeLevel3,
+            &[],
+            &[("w", w), ("l", l)],
+            m,
+        );
+    }
+
+    fn diode_sidewall(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let cjsw = n(b, 1);
+        let pj = n(b, if on { 1 } else { 0 });
+        diode(
+            b,
+            t,
+            ModelFamily::Diode,
+            &[("cjsw", cjsw)],
+            &[("pj", pj)],
+            ExprId::NONE,
+        );
+    }
+
+    /// R90: a carrier reports nothing while no law is stated (a built design states none), and
+    /// an unresolved model carries the stated law.
+    #[test]
+    fn a_law_is_reported_only_where_stated() {
+        let law = |x: Law| Feature::Circuit(x.member());
+        let laws = CASES
+            .iter()
+            .filter(|c| Law::ALL.iter().any(|l| l.member() == c.0));
+        for &(x, case) in laws {
+            let mut d = Design::new();
+            let top = deck(&mut d);
+            case(&mut d.builder(), top, true);
+            assert!(features_used(&d).contains(Feature::Circuit(x)));
+            d.builder().set_laws(Laws::EMPTY);
+            assert!(
+                !features_used(&d).contains(Feature::Circuit(x)),
+                "{x:?} reported unstated"
+            );
+        }
+        let unresolved = used(
+            |b, t, _| {
+                b.set_laws(Laws::of(&[Law::BcSatAreabOnly, Law::DiodeSidewallOwnF1]));
+                let (area, pj) = (n(b, 2), n(b, 1));
+                let h = b.head("q1", &["c", "b", "e"], Some("nomodel"), &[], ExprId::NONE);
+                let row = spicerack_ir::semi::Semi { area, ..semi() };
+                b.semi(t, ElemKind::Bjt, h, row, Span::NONE);
+                let h = b.head(
+                    "d1",
+                    &["a", "c"],
+                    Some("nomodel"),
+                    &[("pj", pj)],
+                    ExprId::NONE,
+                );
+                b.semi(t, ElemKind::Diode, h, semi(), Span::NONE);
+            },
+            true,
+        );
+        let got: Vec<Law> = Law::ALL
+            .into_iter()
+            .filter(|&x| unresolved.contains(law(x)))
+            .collect();
+        assert_eq!(got, [Law::BcSatAreabOnly, Law::DiodeSidewallOwnF1]);
+        // R94: a linearised analysis beside an operating point keeps the small-signal carrier
+        let linearised = used(
+            |b, t, _| {
+                mos_small(b, t, false, Law::MosSmallSignalHand, ModelFamily::Mos9);
+                b.dc_inc(t, None, Span::NONE);
+            },
+            true,
+        );
+        assert!(linearised.contains(law(Law::MosSmallSignalHand)));
+        // R96: a diode whose model's `isr` is literally 0 carries no `isr` small-signal point
+        let no_isr = used(
+            |b, t, _| diode_isr(b, t, false, false, Law::DiodeIsrSmallSignalHand),
+            true,
+        );
+        assert!(!no_isr.contains(law(Law::DiodeIsrSmallSignalHand)));
+        // R95a: F30 is the charges at m != 1, carried beside a transient (which uses charges),
+        // not beside operating points alone
+        let tran = used(
+            |b, t, _| {
+                vdmos_mult(b, t, true, Law::VdmosMultChargesOff);
+                let (stop, step) = (b.num(1e-6), b.num(1e-9));
+                let row = spicerack_ir::tran::Tran {
+                    stop,
+                    record_start: ExprId::NONE,
+                    print_step: step,
+                    initial_step: ExprId::NONE,
+                    noise_fmax: ExprId::NONE,
+                    noise_fmin: ExprId::NONE,
+                    noise_seed: ExprId::NONE,
+                    segments: spicerack_ir::List::EMPTY,
+                    ceiling: spicerack_ir::tran::StepCeiling::Rule(
+                        spicerack_ir::tran::StepCap::None,
+                    ),
+                    uic: false,
+                    startup: false,
+                };
+                b.analysis(t, None, row, Span::NONE);
+            },
+            true,
+        );
+        assert!(tran.contains(law(Law::VdmosMultChargesOff)));
+        let op = used(
+            |b, t, _| {
+                vdmos_mult(b, t, true, Law::VdmosMultChargesOff);
+                b.op(t, None, Span::NONE);
+            },
+            true,
+        );
+        assert!(!op.contains(law(Law::VdmosMultChargesOff)));
+        // R93a: a function point is carried only in a root of dynamic form, not by a resistor's
+        // constant value
+        let constant = used(
+            |b, t, _| {
+                b.set_laws(Laws::of(&[Law::ExpClamp1e99]));
+                let one = n(b, 1);
+                let value = b.call(Func::Exp, &[one]);
+                let row = Passive { value, ..plain(b) };
+                passive(b, t, ElemKind::Resistor, ExprId::NONE, row);
+            },
+            true,
+        );
+        assert!(!constant.contains(law(Law::ExpClamp1e99)));
+    }
 
     #[test]
     fn every_circuit_extra_is_set_by_its_field_and_not_by_its_neighbour() {

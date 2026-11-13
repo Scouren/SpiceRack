@@ -482,3 +482,45 @@ fn a_valid_run_reports_nothing() {
     });
     assert!(got.is_empty(), "{got:?}");
 }
+
+#[test]
+fn a_device_parameter_target_never_names_a_value_another_kind_states() {
+    // the lead's "one meaning, one form": a resistor's `r`, a capacitor's `c`, an inductor's `l`
+    // is `element_value`, an independent source's `dc` is `source_dc`; a `device_param` naming
+    // one is `TargetAlias` where the element provably is that kind (through an instance path
+    // too). Neighbours: another parameter, the canonical kinds, an element the lookup cannot
+    // find, a name of another case. Oracle: the `TargetKind` docs, read by hand
+    let codes_of = |target: &str| {
+        let text = format!(
+            "file \"t.sp\" deck\n  subckt div (a b)\n    element resistor r1 (a b) value=1\n  element instance x1 (n1 0) model=div\n  element resistor r1 (n1 0) value=1\n  element capacitor c1 (n1 0) value=1\n  element inductor l1 (n1 0) value=1\n  element vsource v1 (n1 0) dc=1\n  alter {target} value=2\n"
+        );
+        let mut d = Design::new();
+        let mut diags = Diags::new();
+        spicerack_ir::parse_unchecked(&text, &mut d.builder(), &mut diags);
+        assert!(diags.is_empty(), "{text}: {:?}", diags.rows());
+        spicerack_ir::link(&mut d, &mut diags);
+        let mut out = Diags::new();
+        check(&d, &mut out);
+        out.rows().iter().map(|r| r.code).collect::<Vec<_>>()
+    };
+    let alias = vec![violation_code(Violation::TargetAlias)];
+    for t in [
+        "(device_param r1 r)",
+        "(device_param c1 c)",
+        "(device_param l1 l)",
+        "(device_param v1 dc)",
+        "(device_param r1 r path=(x1))",
+    ] {
+        assert_eq!(codes_of(t), alias, "{t}");
+    }
+    for t in [
+        "(device_param r1 tc1)",
+        "(element_value r1)",
+        "(source_dc v1)",
+        "(device_param r9 r)",
+        "(device_param r1 R)",
+        "(device_param c1 r)",
+    ] {
+        assert!(codes_of(t).is_empty(), "{t}");
+    }
+}

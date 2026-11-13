@@ -67,6 +67,7 @@ reader never touches a file system.
 ```rust
 pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags);
 pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags);
+pub fn legalize_with(design: &mut ir::Design, to: &DialectRow, roots: Roots, diags: &mut ir::Diags);
 pub fn write(design: &ir::Design, file: ir::FileId, to: &DialectRow, diags: &mut ir::Diags) -> String;
 pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Policy) -> Result<Written, ir::Diags>;
 ```
@@ -80,11 +81,21 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   what no pass removed; last, always, the writer's `admits`, so the caller sees every refusal at
   once. The whole design is legal for the target, or it is refused: a file the caller loaded is
   a file the caller converts.
+- `legalize_with` = `legalize` in rounds (R80a–R80c): after each round, `drop_unused` takes the
+  round's refusals (feature and `admits` alike) and drops each unused definition holding one,
+  with a `U0314` note; another round runs while it drops, at most one per live definition at
+  entry plus the last (asserted). Out go the rounds' notes once each, first-seen order, less
+  those at a dropped item, then the last round's refusals. `roots` is the caller's: a deck's
+  conversion `Roots::Entry` (`transpile`), a kit's or a library's `Roots::Every` (`legalize`,
+  the facade's `render_kit`), which drops nothing. Laws (`tests/test_spine/legalize.rs`): every
+  emitted refusal is one the first round had (by item, or by kind, code and argument at an item
+  a later round's rule made); a second run drops nothing and emits the same refusals; one thread
+  and eight give the same rows.
 - `write` = the dialect's `write` of one file of a design `legalize` accepted for that target.
   Handing it a design that is not legal is the caller's bug: a debug assertion
   (`features_used ⊆ features`, no foreign `Opaque`), never a second legalization. A kit is
   `read`, one `legalize`, one `write` per file.
-- `transpile` = `read`, `legalize`, `write` of the entry file, and the verdict: any
+- `transpile` = `read`, `legalize_with` (`Roots::Entry`), `write` of the entry file, and the verdict: any
   `Kind::Refusal` row refuses the deck, and a step is not run after a refusal. `Policy::Strict`
   turns an `Opaque` of class `Unread` into a refusal (`S0101`) and refuses, at its item, each
   parameter read no definition binds (`S0104`, the name as the argument; `ir::unbound_reads`,

@@ -142,7 +142,7 @@ impl Value {
 /// `Ddt` and `Idt` need a time history no `Bindings` gives: they are [`Domain::Unbound`].
 pub fn eval_typed(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<Value, Domain> {
     assert!(
-        !e.is_none() && e.index() < design.expr_count(),
+        !e.is_none() && e.index() < design.expr_count_all(),
         "an expression id in range"
     );
     let mut m = Machine {

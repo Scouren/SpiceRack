@@ -1,0 +1,10 @@
+diode_load nom (27 C, m=1), bkdn (vds=-5.2), dc
+load "spice/diode.osdi"
+model vs vsource
+model nm sp_diode is=1e-14 n=1.05 rs=5 bv=5 ibv=1e-6 ikf=10m cjo=1p vj=0.7 m=0.4 fc=0.5 tt=1n xti=3 eg=1.11 isr=1e-12 nr=2
+vd (d 0) vs dc=-5.2 mag=1
+d1 (d 0) nm area=2
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis ac1 ac from=1e3 to=1e3 mode="lin" points=1
+endc

@@ -453,3 +453,67 @@ fn every_generated_outer_dc_axis_states_one_continuation() {
     }
     assert!(seen.iter().all(|&n| n > 10), "outer axes per set: {seen:?}");
 }
+
+#[test]
+fn generated_element_targets_name_real_elements_above_a_floor() {
+    // the lead's reach finding: with only fresh names no generated alter, sweep or DC axis ever
+    // set a real element's parameter, so the laws never saw one. Floor: of the element targets
+    // without a path in 400 designs, at least 40 name an element of the design that
+    // `unbound_targets` does not list
+    use spicerack_ir::dc_ac::Dc;
+    use spicerack_ir::plan::{SweepLoop, TableLoop};
+    use spicerack_ir::{Alter, Element, Loop, LoopKind, Target, TargetKind, unbound_targets};
+    let set = FeatureSet::ALL; // elements and run items together
+    let (mut real, mut all) = (0usize, 0usize);
+    for seed in 0..400u64 {
+        let d = generate(seed, &set, SIZE);
+        let mut targets: Vec<Target> = Vec::new();
+        let mut elements = std::collections::HashSet::new();
+        for (item, _) in d.reachable() {
+            match item.kind {
+                ItemKind::Element => {
+                    elements.insert(d.row::<Element>(item.index).name);
+                }
+                ItemKind::Alter => targets.push(d.row::<Alter>(item.index).target),
+                ItemKind::Loop => {
+                    let l: Loop = d.row(item.index);
+                    match l.kind {
+                        LoopKind::Sweep => targets.push(d.detail::<SweepLoop>(l.detail).target),
+                        LoopKind::Table => {
+                            let t: TableLoop = d.detail(l.detail);
+                            targets.extend_from_slice(d.targets(t.columns));
+                        }
+                        LoopKind::MonteCarlo => {}
+                    }
+                }
+                ItemKind::Analysis => {
+                    let a: spicerack_ir::Analysis = d.row(item.index);
+                    if a.kind == AnalysisKind::Dc {
+                        let dc: Dc = d.detail(a.detail);
+                        targets.extend(d.dc_axes(dc.axes).iter().map(|x| x.target));
+                    }
+                }
+                _ => {}
+            }
+        }
+        let unbound: Vec<_> = unbound_targets(&d).iter().map(|u| u.name).collect();
+        let element_kinds = [
+            TargetKind::SourceDc,
+            TargetKind::ElementValue,
+            TargetKind::DeviceParam,
+        ];
+        for t in targets
+            .iter()
+            .filter(|t| element_kinds.contains(&t.kind) && t.path.len == 0)
+        {
+            all += 1;
+            if elements.contains(&t.a.name) && !unbound.contains(&t.a.name) {
+                real += 1;
+            }
+        }
+    }
+    assert!(
+        real >= 40,
+        "{real} of {all} element targets name a real element"
+    );
+}

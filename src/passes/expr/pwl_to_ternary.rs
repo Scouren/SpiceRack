@@ -113,7 +113,7 @@ fn segment(
 /// Whether a literal (under negations) has the `Int` form.
 fn int_form(d: &ir::Design, e: ir::ExprId) -> bool {
     let mut at = e;
-    for _ in 0..=d.expr_count() {
+    for _ in 0..=d.expr_count_all() {
         match d.expr(at) {
             ir::Expr::Num(n) => return d.num(n).form == ir::NumForm::Int,
             ir::Expr::Unary(ir::UnOp::Neg, a) => at = a,

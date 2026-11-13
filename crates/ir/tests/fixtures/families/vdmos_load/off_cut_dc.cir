@@ -1,0 +1,13 @@
+vdmos_load off (80 C, m=3), cut (vgs=1.0, vds=10.0), dc
+.model nm vdmos vto=2 kp=20 lambda=0.01 rd=10m rs=10m rg=1 cgdmin=50p cgdmax=500p a=0.5 cgs=1n cjo=1n vj=0.8 m=0.4 fc=0.5 is=1e-12 n=1.2 tt=50n
+vd d 0 dc 10.0
+vg g 0 dc 1.0
+m1 d g 0 nm  m=3
+.temp 80
+.options reltol=1e-9 abstol=1e-12
+.control
+set numdgt=12
+op
+print i(vd)
+.endc
+.end

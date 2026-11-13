@@ -1,0 +1,13 @@
+string compared in an .if
+.param s="tt"
+v1 a 0 1
+.if (s=="tt")
+r1 a 0 1k
+.else
+r1 a 0 2k
+.endif
+.control
+op
+print i(v1)
+.endc
+.end

@@ -1,0 +1,13 @@
+substrate saturation current: iss=1e-12 ns=2 at 27 C (vertical, substrate forward 0.6 V)
+load "spice/bjt.osdi"
+model vsrc vsource
+model qm sp_bjt type=1 is=1e-15 bf=100 iss=1e-12 ns=2 subs=1
+vc (c 0) vsrc dc=0
+vb (b 0) vsrc dc=0
+ve (e 0) vsrc dc=0
+vs (s 0) vsrc dc=0.6
+q1 (c b e s) qm
+control
+  options temp=27 tnom=27 reltol=1e-9 rawfile="ascii"
+  analysis op1 op
+endc

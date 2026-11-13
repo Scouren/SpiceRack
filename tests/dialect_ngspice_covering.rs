@@ -216,6 +216,9 @@ fn round_trips(shape: fn(&mut Draw, usize) -> String) -> usize {
         );
         let mut dumped = String::new();
         ir::dump(&back, back.entry(), &mut dumped);
+        // the text runs under the reader's build's laws, which every read states (R90, R90a)
+        let mut design = design.clone();
+        design.builder().set_laws(spicerack::dialect::ngspice::LAWS);
         assert!(
             back.eq_meaning(&design),
             "seed {seed}:\n{ir}written as\n{text}\nread back as\n{dumped}{read:?}"
