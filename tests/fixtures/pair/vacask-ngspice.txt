@@ -24,3 +24,8 @@ diode_isr 4 mismatch finding=F31 # R95: as ngspice-vacask: op vd:flow(br) 1.6607
 ac_lin_two 4 mismatch finding=F32 # R97: VACASK `mode="lin" points=1` runs 1 and 2 kHz, ngspice-45 the `.ac lin 2 1e3 2e3` written for it 1 kHz alone: "ac: sweep grid changed (2 -> 1 points)"
 ac_dec_offgrid 4 mismatch finding=F33 # VACASK `mode="dec" points=2` 1k to 5k runs 1000, 2236.07, 5000; ngspice-45 stops below the stop (1000, 3162.28): "ac: sweep grid changed (3 -> 2 points)"
 mos6_ac_nocap 4 mismatch finding=F28 # R94, the silent form: no capacitance, so ngspice-45 runs and prints 0: ac vd:flow(br) -3.0412009e-4 (VACASK) vs 0 at 1 kHz (tol 6.082e-7)
+dio_recovery 4 mismatch finding=F52 # R84a: as ngspice-vacask (VACASK's demo/spice/dio.sim); classed refinement until the refined comparison narrowed its tube to ten refined steps
+dio_ring 4 mismatch finding=F51 # R84a: ngspice-45 rings +-1.05 A each step after the snap-off (VACASK -1e-7 A); the one-sided tube held VACASK's run inside ngspice's ringing band, the two-sided comparison does not (it first fails at the snap-off itself, 481.8 vs 485.9 ns at 0.9 A, refined)
+sp_mos3inv 4 simulator-differs:refinement proof=harness # the gate current in the input ramp: at the deck's 1 ns cap ngspice-45 -3.8451 mA, VACASK -3.7979 mA at 1.075 us (1.2 %, over tol 3.85e-5); at 0.1 ns -3.8144 vs -3.8049 (0.25 %), both moving: seen once step 4 compared both ways
+sp_mos6inv 4 simulator-differs:refinement proof=harness # as sp_mos3inv (level 6, at 3.09 us)
+sp_mos9inv 4 simulator-differs:refinement proof=harness # as sp_mos3inv (level 9, the same numbers)
