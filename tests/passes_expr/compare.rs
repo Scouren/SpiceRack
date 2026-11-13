@@ -276,8 +276,13 @@ pub fn keeps_every_root_value(name: &str) -> usize {
                 let now = ir::eval_typed(&design, new, &at(&design));
                 let same = match (was, now) {
                     (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits(),
+                    // R12: an Int result out of range is outside the domain, so what the
+                    // widened tree does there (a value, or its own error) is not carried
+                    (Err(ir::Domain::OutOfDomain(e)), _) => {
+                        int_capable(before.expr(e))
+                            || matches!(now, Err(ir::Domain::OutOfDomain(_)))
+                    }
                     (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
-                    (Err(ir::Domain::OutOfDomain(e)), Ok(_)) => int_capable(before.expr(e)),
                     _ => false,
                 };
                 assert!(
