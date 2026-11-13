@@ -12,7 +12,7 @@
 //! 3.06; IR-KERNEL A10 (a head default is read from the subcircuit's body).
 //!
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
-//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::head`, `Declared::top_head`, `Declared::arity`, `Declared::class`,
+//! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::redefault`, `Declared::head`, `Declared::top_head`, `Declared::arity`, `Declared::class`,
 //! `pub(super) fn cycles(&[Declared], usize, Node, &str) -> bool`,
 //! `pub(super) struct Script`, `pub(super) fn script(&Ast, &Tokens) -> Script`
 
@@ -46,6 +46,9 @@ pub(super) struct Declared {
     nodes: HashMap<(u32, String), u32>,
     /// Each `.subckt` node → the masters (folded) of the X cards directly in its body.
     masters: HashMap<u32, Vec<String>>,
+    /// `(.subckt node, folded head parameter)` → the value of the last `.param` of its body
+    /// naming it: ngspice's new default (settle `dup_formal.sp`).
+    redefaults: HashMap<(u32, String), String>,
 }
 
 /// A file's script facts (R49): its script statements in file order, and whether a dot card
@@ -120,6 +123,10 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
                 Tag::Param => {
                     for (k, (name, value)) in assigns(ast, toks, s).into_iter().enumerate() {
                         let clash = head.iter().any(|h| name::key(h) == name::key(&name));
+                        if clash {
+                            d.redefaults
+                                .insert((block, name::key(&name)), value.clone());
+                        }
                         put(Def::Param, &name, if clash { usize::MAX } else { k }, true);
                         texts.push(text(block, Def::Param, &name, value, Vec::new()));
                     }
@@ -127,10 +134,9 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
                 Tag::Func => {
                     let line = rest(toks, ast, s);
                     if let Some((name, formals, body)) = read_structure::func_parts(&line) {
-                        put(Def::Func, &name, 0, false);
-                        d.arity
-                            .entry((block, name::key(&name)))
-                            .or_insert(formals.len());
+                        // the last .func of a name wins (settle dup_func.sp)
+                        put(Def::Func, &name, 0, true);
+                        d.arity.insert((block, name::key(&name)), formals.len());
                         texts.push(text(block, Def::Func, &name, body.to_string(), formals));
                     }
                 }
@@ -243,6 +249,15 @@ impl Declared {
     pub(super) fn wins(&self, block: Node, def: Def, name: &str, node: Node, k: usize) -> bool {
         let key = (block.0, def, name::key(name));
         self.winners.get(&key) == Some(&(node.0, k))
+    }
+
+    /// The new default a body `.param` gives head parameter `name` of the `.subckt` `node`, when
+    /// moving it to the default is exact: its value reads no name, no temperature and no circuit
+    /// (a default is read where the instance stands, a body `.param` in the body, R53).
+    pub(super) fn redefault(&self, node: Node, name: &str) -> Option<&str> {
+        let text = self.redefaults.get(&(node.0, name::key(name)))?;
+        let leaves = expr_lex::leaves(text);
+        (leaves.names.is_empty() && !leaves.circuit && !leaves.temp).then_some(text.as_str())
     }
 
     /// The port count and the head parameter names (folded) of the `.subckt name` visible from

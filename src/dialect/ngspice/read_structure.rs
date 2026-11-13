@@ -1,5 +1,5 @@
-//! The structure statements → their IR items: line 1 → `Title`; `.end` → framing; `.include`,
-//! `.lib file section` → `Include`; `.subckt` … `.ends` (nested too) → `Subckt` and its body;
+//! The structure statements → their IR items: line 1 → `Title`; `.end` → framing (`.include` and
+//! `.lib file section` are `read_include.rs`'s); `.subckt` … `.ends` (nested too) → `Subckt` and its body;
 //! `.lib name` … `.endl` → `Section`; `.if`/`.elseif`/`.else`/`.endif` → `If`; `.param` →
 //! `Param`s; `.func` → `Func`; `.global` → `Global`. A card ngspice rejects is an `Opaque` of
 //! class `InvalidInSource`, one with no IR rule yet an `Unread`, each with its code.
@@ -14,11 +14,10 @@
 //! `rewrite/INV-semantics.md` 3.01, 11.01, 11.05, 11.07, 14.12; `rewrite/INV-constructs.md`
 //! A1, A3, A8, A11, A13, A21, B1–B6, B13, B28, C1, C6.
 //!
-//! Contents: `pub(super) fn title`, `end`, `include`, `subckt`, `section`, `if_chain`, `param`,
+//! Contents: `pub(super) fn title`, `end`, `subckt`, `section`, `if_chain`, `param`,
 //! `func`, `global`, `card` (each `(lw: &mut Lower<'_, '_>, st: Stmt)`);
-//! `pub(super) fn def_name`, `func_parts` (the declare step's readers)
-
-use std::collections::HashSet;
+//! `pub(super) fn def_name`, `func_parts` (the declare step's readers); `pub(super) fn
+//! in_branch`, `malformed` (shared with `read_include.rs`)
 
 use super::codes;
 use super::cst::{self, joined};
@@ -30,7 +29,6 @@ use super::read_outputs;
 use super::read_run;
 use super::tables::Eval;
 use super::value::{Wrap, unwrap};
-use crate::dialect::Reference;
 use crate::ir;
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::token::Tokens;
@@ -61,41 +59,6 @@ pub(super) fn end(lw: &mut Lower<'_, '_>, _st: Stmt) {
     lw.framing();
 }
 
-/// `.include path` (whole file) or `.lib path section` (one section of it).
-pub(super) fn include(lw: &mut Lower<'_, '_>, st: Stmt) {
-    if in_branch(lw, st) {
-        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::BRANCH_DEF);
-    }
-    let fields = lw.ast.fields(st.node);
-    let want = if lw.ast.tag(st.node) == Tag::LibCall {
-        2
-    } else {
-        1
-    };
-    if fields.len() != want {
-        return malformed(lw, st);
-    }
-    let path = cst::unquote(&lw.text(Node(fields[0])));
-    if path.is_empty() {
-        return malformed(lw, st);
-    }
-    let section = (want == 2).then(|| lw.names.fold(&lw.text(Node(fields[1]))));
-    let path = lw.include_path(st, &path);
-    if includes_back(
-        lw,
-        st,
-        (
-            path.clone(),
-            section.as_deref().map(str::to_ascii_lowercase),
-        ),
-    ) {
-        // ngspice-45 crashes on an include cycle (settle inc_cycle.sp: exit 139)
-        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::INCLUDE_CYCLE);
-    }
-    let span = lw.span(st.node);
-    lw.b.include(st.scope, &path, section.as_deref(), span);
-}
-
 /// `.subckt name ports [params:] k=v …` and its body, scheduled after it.
 pub(super) fn subckt(lw: &mut Lower<'_, '_>, st: Stmt) {
     if in_branch(lw, st) {
@@ -104,8 +67,19 @@ pub(super) fn subckt(lw: &mut Lower<'_, '_>, st: Stmt) {
     let Some(head) = head(lw, st.node) else {
         return malformed(lw, st);
     };
-    if !lw.wins(st, Def::Subckt, &head.name, 0) || !distinct(&head.params) {
+    if !lw.wins(st, Def::Subckt, &head.name, 0) {
+        // ngspice keeps the first (settle dup_subckt.sp)
+        return lw.opaque(st, ir::OpaqueClass::Inert, codes::REDEFINED);
+    }
+    if !distinct(&head.params) {
         return lw.opaque(st, ir::OpaqueClass::Unread, codes::DUPLICATE_DEF);
+    }
+    let mut head = head;
+    for (k, value) in &mut head.params {
+        // a body `.param` naming it is its default (settle dup_formal.sp), when that is exact
+        if let Some(text) = lw.declared.redefault(st.node, k) {
+            *value = text.to_string();
+        }
     }
     let mut trees = Vec::new();
     for (_, value) in &head.params {
@@ -153,7 +127,8 @@ pub(super) fn section(lw: &mut Lower<'_, '_>, st: Stmt) {
         return malformed(lw, st);
     };
     if !lw.wins(st, Def::Section, &name, 0) {
-        return lw.opaque(st, ir::OpaqueClass::Unread, codes::DUPLICATE_DEF);
+        // ngspice reads the first (settle dup_section.sp)
+        return lw.opaque(st, ir::OpaqueClass::Inert, codes::REDEFINED);
     }
     let name = lw.names.fold(&name);
     let span = lw.span(st.node);
@@ -239,9 +214,14 @@ pub(super) fn param(lw: &mut Lower<'_, '_>, st: Stmt) {
         return malformed(lw, st);
     }
     let mut trees = Vec::new();
+    let mut moved = 0;
     for (k, (name, value)) in pairs.iter().enumerate() {
         if !lw.wins(st, Def::Param, name, k) && lw.wins(st, Def::Param, name, usize::MAX) {
-            return lw.opaque(st, ir::OpaqueClass::Unread, codes::DUPLICATE_DEF);
+            // it names a head parameter: its default when that is exact, else unread
+            if lw.declared.redefault(st.container, name).is_none() {
+                return lw.opaque(st, ir::OpaqueClass::Unread, codes::DUPLICATE_DEF);
+            }
+            moved += 1;
         }
         match parameter(lw, st.container, value) {
             Ok(t) => trees.push(t),
@@ -251,11 +231,19 @@ pub(super) fn param(lw: &mut Lower<'_, '_>, st: Stmt) {
     let winners: Vec<usize> = (0..pairs.len())
         .filter(|&k| lw.wins(st, Def::Param, &pairs[k].0, k))
         .collect();
+    if moved == pairs.len() {
+        // every assignment is a head parameter's default now: the card changes no number (L1
+        // keeps it as an item)
+        return lw.opaque(st, ir::OpaqueClass::Inert, codes::DUPLICATE_DEF);
+    }
+    if moved > 0 {
+        lw.note(st, codes::DUPLICATE_DEF);
+    }
     if winners.is_empty() {
-        return lw.opaque(st, ir::OpaqueClass::Inert, codes::DUPLICATE_PARAM);
+        return lw.opaque(st, ir::OpaqueClass::Inert, codes::REDEFINED);
     }
     if winners.len() < pairs.len() {
-        lw.note(st, codes::DUPLICATE_PARAM);
+        lw.note(st, codes::REDEFINED);
     }
     let span = lw.span(st.node);
     for k in winners {
@@ -275,7 +263,8 @@ pub(super) fn func(lw: &mut Lower<'_, '_>, st: Stmt) {
         return malformed(lw, st);
     };
     if !lw.wins(st, Def::Func, &name, 0) {
-        return lw.opaque(st, ir::OpaqueClass::Unread, codes::DUPLICATE_DEF);
+        // ngspice keeps the last (settle dup_func.sp)
+        return lw.opaque(st, ir::OpaqueClass::Inert, codes::REDEFINED);
     }
     let class = lw.class(st.container, body, &args);
     let tree = match expr_read::parse_in(body, eval(class)) {
@@ -371,6 +360,16 @@ pub(super) fn func_parts(text: &str) -> Option<(String, Vec<String>, &str)> {
     (!body.trim().is_empty()).then(|| (name.to_string(), args, body))
 }
 
+/// Whether the statement stands in an `.if` branch.
+pub(super) fn in_branch(lw: &Lower<'_, '_>, st: Stmt) -> bool {
+    matches!(lw.ast.tag(st.container), Tag::If | Tag::Else)
+}
+
+/// `st` as `InvalidInSource` with `P1007`.
+pub(super) fn malformed(lw: &mut Lower<'_, '_>, st: Stmt) {
+    lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::MALFORMED);
+}
+
 // ---- private ----
 
 /// The pieces of a `.subckt` head, or `None` when it is no `name ports [params:] k=v…`.
@@ -456,71 +455,6 @@ fn eval(class: Class) -> Eval {
     }
 }
 
-/// Whether the include of `target` (a file, and the section a `.lib` call names) reads back,
-/// itself or through the includes and calls it holds, the (file, section) the statement `st`
-/// stands in: an include cycle. Keyed by (file, section), so a section calling another section
-/// of its own file is none (settle inc_lib_self.sp, the gf180 kit's idiom). A worklist with a
-/// visited set over the sources' texts.
-fn includes_back(lw: &Lower<'_, '_>, st: Stmt, target: (String, Option<String>)) -> bool {
-    let here = (
-        lw.path.to_string(),
-        (lw.ast.tag(st.container) == Tag::Section)
-            .then(|| def_name(lw.ast, lw.toks, st.container))
-            .flatten()
-            .map(|n| n.to_ascii_lowercase()),
-    );
-    let mut seen: HashSet<(String, Option<String>)> = HashSet::new();
-    let mut todo = vec![target];
-    // Bounded: each (file, section) is taken once, and only files of the sources are followed.
-    while let Some(node) = todo.pop() {
-        if node == here {
-            return true;
-        }
-        if !seen.insert(node.clone()) {
-            continue;
-        }
-        let Some((_, text)) = lw.src.files().iter().find(|(p, _)| *p == node.0) else {
-            continue;
-        };
-        for (path, section) in calls(text, node.1.as_deref()) {
-            let resolved = Reference::File(path).resolve(&node.0);
-            todo.push((resolved, section.map(|s| s.to_ascii_lowercase())));
-        }
-    }
-    false
-}
-
-/// The `.include` paths and `.lib path section` calls of `text` that stand in `section` (`None`:
-/// outside every `.lib name` … `.endl` section), as written.
-fn calls(text: &str, section: Option<&str>) -> Vec<(String, Option<String>)> {
-    let mut out = Vec::new();
-    let mut inside: Option<String> = None;
-    for line in text.lines() {
-        let words: Vec<&str> = line.split_whitespace().collect();
-        let Some(first) = words.first().map(|w| w.to_ascii_lowercase()) else {
-            continue;
-        };
-        let unq = |w: &str| w.trim_matches(['"', '\'']).to_string();
-        match (first.as_str(), words.len()) {
-            (".lib", 2) => inside = Some(words[1].to_ascii_lowercase()),
-            (".endl", _) => inside = None,
-            (".lib", n) if n >= 3 && inside.as_deref() == section => {
-                out.push((unq(words[1]), Some(words[2].to_string())));
-            }
-            (".include" | ".inc", n) if n >= 2 && inside.as_deref() == section => {
-                out.push((unq(words[1]), None));
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
-/// Whether the statement stands in an `.if` branch.
-fn in_branch(lw: &Lower<'_, '_>, st: Stmt) -> bool {
-    matches!(lw.ast.tag(st.container), Tag::If | Tag::Else)
-}
-
 /// Schedules a block's body into `body`, with a note when the file ends before its closer.
 fn open_body(lw: &mut Lower<'_, '_>, st: Stmt, body: ir::ScopeId) {
     let closer = cst::closer(lw.ast, st.node);
@@ -529,11 +463,6 @@ fn open_body(lw: &mut Lower<'_, '_>, st: Stmt, body: ir::ScopeId) {
     }
     let items = cst::body(lw.ast, st.node);
     lw.open(body, items, st.node, closer);
-}
-
-/// `st` as `InvalidInSource` with `P1007`.
-fn malformed(lw: &mut Lower<'_, '_>, st: Stmt) {
-    lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::MALFORMED);
 }
 
 /// Whether the pairs' names are distinct under ngspice's case folding.

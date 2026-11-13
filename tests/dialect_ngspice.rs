@@ -30,6 +30,8 @@ const READ: &[&str] = &[
     "default_which2",
     "default_which3",
     "default_which4",
+    "dup_def",
+    "dup_formal",
     "element_twice",
     "expr_ops",
     "expr_power",

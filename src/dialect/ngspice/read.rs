@@ -66,7 +66,8 @@ pub(super) struct Lower<'a, 'd> {
     pending: &'a mut Vec<(ir::ExprId, ir::ScopeId)>,
     rows: &'a mut Vec<RowRef>,
     measured: &'a mut Vec<(usize, usize)>,
-    declared: &'a Declared,
+    /// This file's declare step.
+    pub(super) declared: &'a Declared,
     /// Every file's declare step, in `src`'s order (a `.subckt` of any file is ngspice's: it
     /// expands every include into one deck before it looks for subcircuits).
     files: &'a [Declared],
@@ -558,7 +559,7 @@ fn dispatch(lw: &mut Lower<'_, '_>, st: Stmt) {
     match lw.ast.tag(st.node) {
         Tag::Title => read_structure::title(lw, st),
         Tag::End => read_structure::end(lw, st),
-        Tag::Include | Tag::LibCall => read_structure::include(lw, st),
+        Tag::Include | Tag::LibCall => super::read_include::include(lw, st),
         Tag::Subckt => read_structure::subckt(lw, st),
         Tag::Section => read_structure::section(lw, st),
         Tag::If => read_structure::if_chain(lw, st),

@@ -135,6 +135,16 @@ fn a_formal_binds_in_its_own_subckt_also_in_a_lib_section() {
     assert_eq!(read_owner(&d, "t"), None, "t reads the top w");
 }
 
+#[test]
+fn a_func_defined_in_the_deck_and_the_include_keeps_the_last() {
+    // dup_func_inc_before.sp: v(n) = 5 (the included f, after the deck's); dup_func_inc_after.sp:
+    // v(n) = 2 (the deck's f, after the include): a .func keeps the last, as a .param
+    let (d, _) = read(&["dup_func_inc_before.sp", "dup_func.inc"]);
+    assert_eq!(call_file(&d), Some("dup_func.inc".into()));
+    let (d, _) = read(&["dup_func_inc_after.sp", "dup_func.inc"]);
+    assert_eq!(call_file(&d), Some("dup_func_inc_after.sp".into()));
+}
+
 /// The files read (the first the deck) from the settle folder, leniently.
 fn read(files: &[&str]) -> (ir::Design, ir::Diags) {
     let mut src = Sources::new();
@@ -214,4 +224,18 @@ fn read_owner(d: &ir::Design, name: &str) -> Option<String> {
         d.str(d.row::<ir::item::Subckt>(owner.index).name)
             .to_string()
     })
+}
+
+/// The file of the `.func` the design's one user call binds to, or `None` (unresolved).
+fn call_file(d: &ir::Design) -> Option<String> {
+    let calls: Vec<ir::Ref> = (0..d.expr_count())
+        .filter_map(
+            |k| match d.expr(ir::ExprId(u32::try_from(k).expect("fits"))) {
+                ir::Expr::UserCall(r, _) => Some(r),
+                _ => None,
+            },
+        )
+        .collect();
+    assert_eq!(calls.len(), 1, "one user call: {calls:?}");
+    def_file(d, calls[0].def)
 }
