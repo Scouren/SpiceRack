@@ -35,7 +35,7 @@ pub(crate) const OPERAND_TOO_LARGE: ir::Code = ir::Code::new(b'U', 116);
 pub(crate) const UNTYPED_READ: ir::Code = ir::Code::new(b'U', 115);
 /// A function body its callers read in both forms.
 pub(crate) const BOTH_FORMS: ir::Code = ir::Code::new(b'U', 112);
-/// A typed conversion of a value that may be a string or a list.
+/// A rewrite that would put a value that may be a string or a list where a number is read.
 pub(crate) const TEXT_OPERAND: ir::Code = ir::Code::new(b'U', 117);
 /// An integer literal whose tag a typed operator or conversion may read.
 pub(crate) const INT_TAG_READ: ir::Code = ir::Code::new(b'U', 118);
@@ -182,9 +182,9 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
     (
         TEXT_OPERAND,
         ir::Info {
-            title: "a conversion to a real of a string or a list",
+            title: "a conversion to a real, or a draw, of a string or a list",
             cite: "rewrite/AMEND-A12.md A21, A25",
-            explain: "real(x) is x as a Real; this x may be a string or a list, which has no numeric tag, so writing x alone or 1 * x would put text where a number is read. The call is left and the item is refused.",
+            explain: "real(x) is x as a Real, and a draw read in a run that does not sample is its nominal x; this x may be a string or a list, which has no numeric tag, so writing x alone or 1 * x would put text where a number is read. The call or the draw is left and the item is refused.",
             kind: ir::Kind::Note,
         },
     ),
