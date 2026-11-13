@@ -1,0 +1,8 @@
+# codes: P1406 P1414 P1414
+file "output_files.sp" deck
+  title "output_files"
+  comment " oracle: R49 (5), the lead's dc_loop finding (spice-bench examples/various/dc_loop.sp keeps its derived vectors in dc_loop.out): a command writing vectors to a file (commands.c write, wrdata, wrs2p, eprvcd) states nothing the IR holds and is the deck's product: Private, never a display command a conversion may drop"
+  analysis op
+  opaque ngspice inert ".control\nlet k = v(b)*2\n.endc"
+  opaque ngspice private ".control\nwrite out.raw k\n.endc"
+  opaque ngspice private ".control\nwrdata out.txt v(b)\n.endc"
