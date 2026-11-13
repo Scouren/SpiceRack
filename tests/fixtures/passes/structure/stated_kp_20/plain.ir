@@ -1,0 +1,5 @@
+laws vdmos_kp_absent_20
+file "a.sp" deck
+  model mn vdmos polarity=n params=(vto=2)
+  model mp vdmos polarity=p params=(vto=-2)
+  model mk vdmos polarity=n params=(vto=2 kp=10)

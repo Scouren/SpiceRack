@@ -1,0 +1,5 @@
+laws diode_xom_absent_1e4
+file "a.sp" deck
+  model d1 diode params=(is=1e-14 wm=1u xom=10k xoi=10k)
+  model d2 diode params=(is=1e-14 lm=2u xom=5 xoi=10k)
+  model d3 diode params=(is=1e-14)
