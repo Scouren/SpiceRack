@@ -89,7 +89,7 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   conversion `Roots::Entry` (`transpile`), a kit's or a library's `Roots::Every` (`legalize`,
   the facade's `render_kit`), which drops nothing. Laws (`tests/test_spine/legalize.rs`): every
   emitted refusal is one the first round had (by item, or by kind, code and argument at an item
-  a later round's rule made); a second run drops nothing and emits the same refusals; one thread
+  a later round's rule made, any number of times: R80d, R80e); a second run drops nothing and emits the same refusals; one thread
   and eight give the same rows.
 - `write` = the dialect's `write` of one file of a design `legalize` accepted for that target.
   Handing it a design that is not legal is the caller's bug: a debug assertion

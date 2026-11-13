@@ -125,8 +125,8 @@ fn the_loop_only_removes_refusals_and_a_second_run_changes_nothing() {
 }
 
 /// The law's own oracle: a refusal at an item the first round left counts by (item, code,
-/// argument); one at an item a later rule made counts against an unmatched first-round refusal
-/// of its kind, code and argument, once; anything else is new.
+/// argument); one at an item a later rule made counts when the first round refused something of
+/// its kind, code and argument (R80e: any number of times); anything else is new.
 #[test]
 fn not_had_sees_a_new_refusal_and_a_rewritten_items_old_one() {
     let mut design = ir::Design::new();
@@ -141,8 +141,15 @@ fn not_had_sees_a_new_refusal_and_a_rewritten_items_old_one() {
         [(el(0), w, 3)]
     );
     assert!(not_had(&[(el(7), u, 3)], &[(el(0), u, 3)], &design).is_empty());
+    // R80e: copies of an exactly rewritten item carry the same reason, any number of times
     let twice = [(el(7), u, 3), (el(8), u, 3)];
-    assert_eq!(not_had(&twice, &[(el(0), u, 3)], &design), [(el(8), u, 3)]);
+    assert!(not_had(&twice, &[(el(0), u, 3)], &design).is_empty());
+    // a rule-made item with a reason the first round had nowhere is new
+    let planted = [(el(7), u, 3), (el(8), w, 3)];
+    assert_eq!(
+        not_had(&planted, &[(el(0), u, 3)], &design),
+        [(el(8), w, 3)]
+    );
 }
 
 #[test]
@@ -183,36 +190,21 @@ fn legalized(
 
 /// The refusals of `emitted` the first round (`first`, on the design it left, `round1`) did not
 /// have: one at an item that round left, by (item, code, argument); one at an item a later
-/// round's rule made (a row the first round never listed), by (kind, code, argument), each of
-/// the first round's at most once.
+/// round's rule made (a row the first round never listed), by (kind, code, argument), any number
+/// of times (R80e: copies of an exactly rewritten item carry the same reason).
 fn not_had(
     emitted: &[(ir::ItemRef, ir::Code, u32)],
     first: &[(ir::ItemRef, ir::Code, u32)],
     round1: &ir::Design,
 ) -> Vec<(ir::ItemRef, ir::Code, u32)> {
     let old: Vec<ir::ItemRef> = round1.reachable().into_iter().map(|p| p.0).collect();
-    let mut spare: Vec<(ir::ItemKind, ir::Code, u32)> = first
-        .iter()
-        .filter(|r| !emitted.contains(r))
-        .map(|r| (r.0.kind, r.1, r.2))
-        .collect();
-    let mut out = Vec::new();
-    for r in emitted {
-        let had = match old.contains(&r.0) {
-            true => first.contains(r),
-            false => match spare.iter().position(|s| *s == (r.0.kind, r.1, r.2)) {
-                Some(at) => {
-                    spare.swap_remove(at);
-                    true
-                }
-                None => false,
-            },
-        };
-        if !had {
-            out.push(*r);
-        }
-    }
-    out
+    let reasons: Vec<(ir::ItemKind, ir::Code, u32)> =
+        first.iter().map(|r| (r.0.kind, r.1, r.2)).collect();
+    let had = |r: &(ir::ItemRef, ir::Code, u32)| match old.contains(&r.0) {
+        true => first.contains(r),
+        false => reasons.contains(&(r.0.kind, r.1, r.2)),
+    };
+    emitted.iter().copied().filter(|r| !had(r)).collect()
 }
 
 /// The refusing rows of `rows`, by (item, code, argument).
