@@ -1,6 +1,6 @@
 //! The expression group's pass rows, in the order `legalize` tries them: the typed arithmetic
 //! first after the functions are inlined (every other rule then sees the inlined trees, and a
-//! later rule may read the tags the typed ones settle), then the powers, the roundings (even
+//! later rule may read the tags the typed ones settle), then the powers and `clamp`, the roundings (even
 //! before away: the first emits the second), the ternaries and the other functions, the bit
 //! folds, the leaves, the draws, the long literals and the integer literals. Each rule is its plain row then its
 //! `_dyn` row (A26); each `requires` is what its output may add, per form.
@@ -33,10 +33,14 @@ pub(crate) const PASSES: &[Pass] = &[
     row("toreal_to_mul_dyn", X::FuncDyn(F::ToReal), &[X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[TEXT_OPERAND, BOTH_FORMS], toreal_to_mul::toreal_to_mul_dyn),
     row("sgnzeropos_to_ternary", X::Func(F::SgnZeroPos), &[X::Expr(T::Ternary), X::Binary(O::Lt), X::Expr(T::Binary)], &[TAG_READ, BOTH_FORMS], sgnzeropos_to_ternary::sgnzeropos_to_ternary),
     row("sgnzeropos_to_ternary_dyn", X::FuncDyn(F::SgnZeroPos), &[X::Expr(T::Ternary), X::BinaryDyn(O::Lt), X::Expr(T::Binary)], &[TAG_READ, BOTH_FORMS], sgnzeropos_to_ternary::sgnzeropos_to_ternary_dyn),
+    row("powabs_to_powre", X::Func(F::PowAbs), &[X::Func(F::Abs), X::Func(F::PowRe), X::Expr(T::Call)], &[BOTH_FORMS], powabs_to_powre::powabs_to_powre),
+    row("powabs_to_powre_dyn", X::FuncDyn(F::PowAbs), &[X::FuncDyn(F::Abs), X::FuncDyn(F::PowRe), X::Expr(T::Call)], &[BOTH_FORMS], powabs_to_powre::powabs_to_powre_dyn),
+    row("powre_to_pow", X::Func(F::PowRe), &[X::Func(F::Pow), X::Expr(T::Call)], &[POW_BASE, BOTH_FORMS], powre_to_pow::powre_to_pow),
+    row("powre_to_pow_dyn", X::FuncDyn(F::PowRe), &[X::FuncDyn(F::Pow), X::Expr(T::Call)], &[POW_BASE, BOTH_FORMS], powre_to_pow::powre_to_pow_dyn),
     row("pow_to_powabs", X::Func(F::Pow), &[X::Func(F::PowAbs), X::Func(F::PowSigned), X::Expr(T::Call)], &[POW_BASE, BOTH_FORMS], pow_to_powabs::pow_to_powabs),
     row("pow_to_powabs_dyn", X::FuncDyn(F::Pow), &[X::FuncDyn(F::PowAbs), X::FuncDyn(F::PowSigned), X::Expr(T::Call)], &[POW_BASE, BOTH_FORMS], pow_to_powabs::pow_to_powabs_dyn),
-    row("powabs_to_pow", X::Func(F::PowAbs), &[X::Func(F::Abs), X::Func(F::Pow), X::Expr(T::Call)], &[BOTH_FORMS], powabs_to_pow::powabs_to_pow),
-    row("powabs_to_pow_dyn", X::FuncDyn(F::PowAbs), &[X::FuncDyn(F::Abs), X::FuncDyn(F::Pow), X::Expr(T::Call)], &[BOTH_FORMS], powabs_to_pow::powabs_to_pow_dyn),
+    row("clamp_to_min_max", X::Func(F::Clamp), &[X::Func(F::Min), X::Func(F::Max), X::Binary(O::Mul), X::Expr(T::Binary), X::Expr(T::Call)], &[BOTH_FORMS], clamp_to_min_max::clamp_to_min_max),
+    row("clamp_to_min_max_dyn", X::FuncDyn(F::Clamp), &[X::FuncDyn(F::Min), X::FuncDyn(F::Max), X::BinaryDyn(O::Mul), X::Expr(T::Binary), X::Expr(T::Call)], &[BOTH_FORMS], clamp_to_min_max::clamp_to_min_max_dyn),
     row("round_half_even_to_away", X::Func(F::RoundHalfEven), &[X::Expr(T::Ternary), X::Binary(O::Eq), X::Binary(O::Sub), X::Binary(O::Mul), X::Func(F::Floor), X::Func(F::RoundHalfAway), X::Expr(T::Binary), X::Expr(T::Call)], &[DRAW_TWICE, BOTH_FORMS, OPERAND_TOO_LARGE], round_half_even_to_away::round_half_even_to_away),
     row("round_half_even_to_away_dyn", X::FuncDyn(F::RoundHalfEven), &[X::Expr(T::Ternary), X::BinaryDyn(O::Eq), X::BinaryDyn(O::Sub), X::BinaryDyn(O::Mul), X::FuncDyn(F::Floor), X::FuncDyn(F::RoundHalfAway), X::Expr(T::Binary), X::Expr(T::Call)], &[DRAW_TWICE, BOTH_FORMS, OPERAND_TOO_LARGE], round_half_even_to_away::round_half_even_to_away_dyn),
     row("round_half_away_to_floor", X::Func(F::RoundHalfAway), &[X::Expr(T::Ternary), X::Binary(O::Ge), X::Binary(O::Sub), X::Binary(O::Add), X::Func(F::Floor), X::Func(F::Ceil), X::Expr(T::Binary), X::Expr(T::Call)], &[DRAW_TWICE, BOTH_FORMS, OPERAND_TOO_LARGE], round_half_away_to_floor::round_half_away_to_floor),

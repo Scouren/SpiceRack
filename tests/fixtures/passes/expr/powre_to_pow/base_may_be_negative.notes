@@ -1,0 +1,4 @@
+# pow_re of a negative base and a fractional exponent is |x|^y cos(pi y); pow has none there
+U0104  # p: a - 3 may be negative, 0.5 is fractional
+U0104  # q: a - 3 may be negative, the exponent is no literal
+U0104  # r: -4 is negative
