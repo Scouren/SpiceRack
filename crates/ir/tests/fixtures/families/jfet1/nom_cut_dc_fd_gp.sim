@@ -1,0 +1,11 @@
+jfet1 nom (27 C, m=1), cut (vgs=-2.5, vds=2.0), dc
+load "spice/jfet1.osdi"
+model vs vsource
+model nm sp_jfet1 type=1 vt0=-2 beta=1e-4 lambda=0.02 rd=10 rs=10 cgs=2p cgd=1p pb=0.8 is=1e-14 n=1 fc=0.5 b=0.9 tcv=2e-3 bex=-1.5 xti=3 eg=1.11
+vd (d 0) vs dc=2.0
+vg (g 0) vs dc=-2.49999
+j1 (d g 0) nm area=2
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis op1 op
+endc

@@ -1,6 +1,6 @@
 """load.py FAMILY: writes a family's load decks beside it, one ngspice deck (.cir) and one VACASK
 deck (.sim) per (condition, region, reading). Families: mos1, mos2, mos3, mos6, mos9 (a bulk at
--0.5 V), jfet1, jfet2, mes1 (three terminals), passive. Conditions: `nom` (27 C, m=1) is the control of
+-0.5 V), jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, passive. Conditions: `nom` (27 C, m=1) is the control of
 `off` (80 C, m=3); geometry is given in both. Readings: `dc` the operating-point current of `vd`,
 `acg` |i(vd)| at 1 GHz with the gate driven, `acd` |i(vd)| at 1 GHz with the drain driven.
 `load.py passive` writes the resistor, capacitor and inductor decks (PASSIVES).
@@ -57,6 +57,19 @@ FAMILIES['mes1'] = dict(
     params='vt0=-1 alpha=2 beta=2.5e-3 lambda=0.05 b=0.3 rd=5 rs=5 cgs=1p cgd=0.5p pb=0.8 is=1e-14 '
            'fc=0.5',
     regions={'cut': (-1.5, 2.0), 'lin': (0.0, 0.2), 'sat': (-0.5, 3.0)})
+# Gummel-Poon: collector on d, base on g, emitter grounded, substrate at -0.5 V; ibe and ibc
+# given, where R86's two area laws agree, and no iss (R88)
+FAMILIES['bjt'] = dict(
+    load='spice/bjt.osdi', letter='q', nodes='d g 0 b', geometry='area=2',
+    ng_model='.model nm npn {p}', va_model='model nm sp_bjt type=1 {p}',
+    params='ibe=1e-16 ibc=2e-16 bf=100 br=2 nf=1 nr=1 vaf=50 var=20 ikf=10m ikr=5m ise=1e-14 ne=1.5 '
+           'isc=1e-14 nc=2 rb=50 rbm=10 irb=1m rc=5 re=1 cje=1p vje=0.75 mje=0.33 cjc=0.5p vjc=0.75 '
+           'mjc=0.33 xcjc=0.8 cjs=0.3p vjs=0.7 mjs=0.5 tf=10p xtf=1 vtf=2 itf=10m tr=1n xtb=1.5 '
+           'eg=1.11 xti=3 subs=1',
+    regions={'cut': (0.2, 2.0), 'fwd': (0.7, 2.0), 'sat': (0.8, 0.1), 'rev': (0.0, -0.5)})
+# the control of bjt's small-signal: a constant base resistance (no rbm, irb)
+FAMILIES['bjt_rbconst'] = dict(FAMILIES['bjt'],
+                               params=FAMILIES['bjt']['params'].replace(' rbm=10 irb=1m', ''))
 CONDITIONS = {'nom': (27, 1), 'off': (80, 3)}
 
 # the passives: one region each, so per (condition, form) one reading of `vd` driving node a; an
@@ -115,16 +128,16 @@ def decks(name, f):
                       '  analysis op1 op' if reading == 'dc' else
                       '  analysis ac1 ac from=1e9 to=1e9 mode="lin" points=1', 'endc']
                 yield stem, '\n'.join(ng) + '\n', '\n'.join(va) + '\n'
-                if (cond, region, reading) == ('nom', 'sat', 'dc'):
+                if (cond, reading) == ('nom', 'dc'):
                     yield from probes(stem, vg, vd, '\n'.join(ng) + '\n', '\n'.join(va) + '\n')
 
 
 def probes(stem, vg, vd, ng, va):
-    """The oracle of an AC reading: the operating point moved by 1e-4 V either way on the gate
+    """The oracle of an AC reading: the operating point moved by 1e-5 V either way on the gate
     (`_fd_gp`, `_fd_gm`) and the drain (`_fd_dp`, `_fd_dm`), whose central differences are gm and
     gds of the DC law both simulators share; and the AC readings at 1 kHz (`_acg_1k`, `_acd_1k`),
     where the capacitances add under 1e-8 relative."""
-    h = 1e-4
+    h = 1e-5
     for tag, (g, d) in {'gp': (vg + h, vd), 'gm': (vg - h, vd), 'dp': (vg, vd + h),
                         'dm': (vg, vd - h)}.items():
         yield (f'{stem}_fd_{tag}',
@@ -138,7 +151,7 @@ def probes(stem, vg, vd, ng, va):
         a = va.replace(f'{src} ({src[1]} 0) vs dc={v}', f'{src} ({src[1]} 0) vs dc={v} mag=1')
         n = n.replace('op\nprint i(vd)', 'ac lin 1 1k 1k\nprint mag(i(vd))')
         a = a.replace('analysis op1 op', 'analysis ac1 ac from=1e3 to=1e3 mode="lin" points=1')
-        yield f'nom_sat_{drive}_1k', n, a
+        yield stem.replace('_dc', f'_{drive}_1k'), n, a
 
 
 def passive_decks():

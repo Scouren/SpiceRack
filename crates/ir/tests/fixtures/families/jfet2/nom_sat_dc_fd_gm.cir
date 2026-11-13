@@ -1,7 +1,7 @@
 jfet2 nom (27 C, m=1), sat (vgs=-1.0, vds=3.0), dc
 .model nm njf level=2 vt0=-2 beta=1e-4 lambda=0.02 rd=10 rs=10 cgs=2p cgd=1p is=1e-14 n=1 fc=0.5 delta=0.1 xi=1000 p=2 q=2 z=1 vbi=1 hfeta=0.05
 vd d 0 dc 3.0
-vg g 0 dc -1.0001
+vg g 0 dc -1.00001
 j1 d g 0 nm area=2
 .temp 27
 .options reltol=1e-9 abstol=1e-15

@@ -1,0 +1,12 @@
+mos3 nom (27 C, m=1), lin (vgs=3.0, vds=0.2, vbs=-0.5), dc
+load "spice/mos3.osdi"
+model vs vsource
+model nm sp_mos3 type=1 vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 nsub=1e16 vmax=5e4 xj=0.5u nfs=1e11 theta=0.05 eta=0.1 kappa=0.2 delta=0.5 ld=0.1u tox=20n cgso=3e-10 cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 fc=0.5 rd=10 rs=10
+vd (d 0) vs dc=0.20001000000000002
+vg (g 0) vs dc=3.0
+vb (b 0) vs dc=-0.5
+m1 (d g 0 b) nm w=10u l=2u ad=20p as=20p pd=24u ps=24u
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis op1 op
+endc
