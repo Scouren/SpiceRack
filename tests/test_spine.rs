@@ -9,8 +9,11 @@
 //! hand-built include graph with its expected breadth-first order.
 
 //!
-//! Contents: tests only (`strict`: the strict read; `sources`: `Sources::load`).
+//! Contents: tests only (`strict`: the strict read; `sources`: `Sources::load`; `legalize`:
+//! `legalize_with`'s outer loop, R80c).
 
+#[path = "test_spine/legalize.rs"]
+mod legalize;
 #[path = "test_spine/sources.rs"]
 mod sources;
 #[path = "test_spine/strict.rs"]
@@ -212,9 +215,12 @@ fn the_worked_example_is_a_fixpoint_of_the_ir_dialect() {
 
 #[test]
 fn a_feature_no_pass_removes_is_refused_at_its_item() {
+    // a kit (every definition a root): a deck would drop the subckt nothing instances (R80)
     let src = Sources::one("kit.ir", KERNEL);
-    let refused = dialect::transpile(&src, ir_row(), &NO_SUBCKT, Policy::Lenient)
-        .expect_err("no pass removes subcircuits");
+    let mut design = ir::Design::new();
+    let mut refused = ir::Diags::new();
+    dialect::read(&src, ir_row(), Policy::Lenient, &mut design, &mut refused);
+    dialect::legalize(&mut design, &NO_SUBCKT, &mut refused);
     let subckt = u32::from(ir::Feature::Item(ir::ItemKind::Subckt).index());
     let rows: Vec<(ir::Code, u32)> = refused.rows().iter().map(|d| (d.code, d.arg)).collect();
     assert_eq!(rows, [(ir::diag::UNSUPPORTED, subckt)]);
