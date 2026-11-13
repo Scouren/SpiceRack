@@ -10,8 +10,8 @@
 use crate::ir;
 
 use super::{
-    atan2, expr_read, expr_write, fold, read_elements, read_models, read_outputs, read_run,
-    read_sources, read_structure, write_structure,
+    atan2, diode_law, expr_read, expr_write, fold, read_elements, read_models, read_outputs,
+    read_run, read_sources, read_structure, write_structure,
 };
 
 /// A statement VACASK has no syntax for (an ngspice card, a `*` line): invalid in source.
@@ -66,9 +66,10 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
 
 /// The row of `code` in any area's table, or `None`.
 pub(super) fn info(code: ir::Code) -> Option<ir::Info> {
-    let tables: [&[(ir::Code, ir::Info)]; 12] = [
+    let tables: [&[(ir::Code, ir::Info)]; 13] = [
         CODES,
         atan2::CODES,
+        diode_law::CODES,
         expr_read::CODES,
         expr_write::CODES,
         fold::CODES,
@@ -94,9 +95,10 @@ mod tests {
     /// Oracle: the range rule of §7 (each code `P`, `R` or `W`, 2000–2999) and uniqueness.
     #[test]
     fn every_row_is_in_vacasks_range_and_unique() {
-        let tables: [&[(ir::Code, ir::Info)]; 12] = [
+        let tables: [&[(ir::Code, ir::Info)]; 13] = [
             CODES,
             atan2::CODES,
+            diode_law::CODES,
             expr_read::CODES,
             expr_write::CODES,
             fold::CODES,
