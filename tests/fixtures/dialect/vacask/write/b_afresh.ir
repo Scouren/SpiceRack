@@ -1,0 +1,11 @@
+# Oracle: R75a (runrules' latch decks, tests/passes_run/decks/latch_c0_{outer,inner,both}.sim:
+# `continuation=0` on a sweep level starts exactly that level's steps from the initial guess);
+# VD cmd-sweep. An axis with `afresh` is its sweep line with `continuation=0`, one without has
+# none.
+file "b_afresh.ir" deck
+  title "written continuation per level"
+  model vsource source_v
+  element vsource v1 (a 0) model=vsource dc=1i
+  element vsource v2 (b 0) model=vsource dc=1i
+  analysis dc name=dc1 (source_dc v1) (list values=[0i, 1i]) name=inner (source_dc v2) (list values=[1i, 2i]) name=outer afresh
+  analysis dc name=dc2 (source_dc v1) (list values=[0i, 1i]) name=inner afresh (source_dc v2) (list values=[1i, 2i]) name=outer

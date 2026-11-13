@@ -19,7 +19,9 @@ use super::sweep::{
     BAD, Spec, Sweep, Why, check, check_arg, get, pairs, private, range, spec, sweep, target,
     value, vector,
 };
-use super::{ANALYSIS_FIELD, ANALYSIS_HB_SMALL, HB_FORM, OWN_PSS, PSS_PERIOD, bare_name, string};
+use super::{
+    ANALYSIS_FIELD, ANALYSIS_HB_SMALL, HB_FORM, OWN_PSS, PSS_PERIOD, SWEEP_FORM, bare_name, string,
+};
 use crate::dialect::vacask::number;
 use crate::dialect::vacask::read::{self, Lower};
 use crate::dialect::vacask::read_outputs::{self, NodeEntry};
@@ -98,6 +100,14 @@ pub(super) fn analysis(l: &mut Lower<'_, '_, '_>, sweeps: &[Node], n: Node) {
         }
     }
     let plan = plan(l, n);
+    // `continuation=0` on a loop around another analysis is unsettled: Private
+    if plan.as_ref().is_ok_and(|p| !matches!(p.kind, Kind::Op)) {
+        for s in &mut swept {
+            if s.as_ref().is_ok_and(|s| s.afresh) {
+                *s = Err(private(SWEEP_FORM));
+            }
+        }
+    }
     let failed = swept.iter().any(Result::is_err) || plan.is_err();
     if failed {
         let why = |w: Option<&Why>| w.copied();
@@ -133,12 +143,12 @@ pub(super) fn analysis(l: &mut Lower<'_, '_, '_>, sweeps: &[Node], n: Node) {
             let target = target(l, &s.aim);
             let sweep = spec(l, s.spec);
             let name = l.b.name(&s.name);
-            // VACASK carries every level (R75, latch.sim); `continuation=0` stays Private
+            // VACASK carries each level unless `continuation=0` (R75a, latch*.sim)
             axes.push(ir::dc_ac::DcAxis {
                 target,
                 sweep,
                 name,
-                afresh: false,
+                afresh: s.afresh,
             });
         }
         let axes = l.b.dc_axes(&axes);

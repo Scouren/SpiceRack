@@ -1,8 +1,8 @@
 laws bc_sat_area_times_areab sub_sat_last_factor diode_wl_mult_twice diode_sidewall_bottom_f1 diode_xom_absent_1e4 vdmos_kp_absent_35 vdmos_tcvth_lowers vdmos_clamp_by_n mos_small_signal_hand mos6_small_signal_absent bjt_irb_small_signal_frozen vdmos_mult_charges_off diode_isr_reverse_none diode_isr_small_signal_hand diode_tt_factor_unclamped trig_reduce_cast exp_clamp_1e99 log_zero_minus_1e99 div_gmin_guard asin_edge_zero
-# codes:
+# codes: P1101
 file "controlled.sp" deck
   title "controlled"
-  comment " oracle: ngspice-45 inp2e.c..inp2h.c, inpcom.c inp_compat (vcvs word, value=/vol=/cur= to B, table to XSPICE pwl input_domain=0.1), inp_poly_2g6_compat; run f5"
+  comment " oracle: ngspice-45 inp2e.c..inp2h.c, inpcom.c inp_compat (vcvs word, value=/vol=/cur= to B, table to XSPICE pwl input_domain=0.1), inp_poly_2g6_compat; run f5; settle table_brace_point.sp (a braced point is numparam's number, the IR's expression point is no writer's: Unread, R74 (4))"
   param k = 3
   element vcvs E1 (o 0 c 0) gain=2
   element vcvs E2 (o 0 c 0) gain=(k * 2)
@@ -16,3 +16,4 @@ file "controlled.sp" deck
   element behav E5 (o 0) expr=(v(c) * 6)
   element behav G3 (o 0) mult=2 expr=(v(c) / 1k) output=current
   element table E6 (o 0) input=(v(c)) points=[0, 0, 1, 2] law=ngspice_rounded
+  opaque ngspice unread "E7 o 0 table {v(c)} = (0,0) ({k},2)"

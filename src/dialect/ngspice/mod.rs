@@ -18,7 +18,7 @@
 //!
 //! Layout (`rewrite/DIALECT-NGSPICE.md` §2): the two spines (`read.rs`, `write.rs`), numbers,
 //! names and expressions (`number.rs`, `name.rs`, `expr_read.rs`, `expr_write.rs`, the shared
-//! rows in `tables.rs`), the structure area (`read_structure.rs`, `write_structure.rs`), the
+//! rows in `tables.rs`), the structure area (`read_structure.rs`, `read_include.rs`, `write_structure.rs`), the
 //! code table (`codes.rs`), and the areas of the later sub-slices as stubs (elements and
 //! sources S3.1, models S3.2, run and outputs S3.3, control S3.4; `rewrite/S3-AREAS.md`).
 //!
@@ -43,6 +43,7 @@ mod outputs;
 mod read;
 mod read_control;
 mod read_elements;
+mod read_include;
 mod read_models;
 mod read_outputs;
 mod read_run;

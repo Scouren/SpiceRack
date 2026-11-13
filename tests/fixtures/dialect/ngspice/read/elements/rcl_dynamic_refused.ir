@@ -1,9 +1,10 @@
 laws bc_sat_area_times_areab sub_sat_last_factor diode_wl_mult_twice diode_sidewall_bottom_f1 diode_xom_absent_1e4 vdmos_kp_absent_35 vdmos_tcvth_lowers vdmos_clamp_by_n mos_small_signal_hand mos6_small_signal_absent bjt_irb_small_signal_frozen vdmos_mult_charges_off diode_isr_reverse_none diode_isr_small_signal_hand diode_tt_factor_unclamped trig_reduce_cast exp_clamp_1e99 log_zero_minus_1e99 div_gmin_guard asin_edge_zero
-# codes: P1103 P1105 P1100 P1102
+# codes: P1103 P1105 P1100 P1102 P1105
 file "rcl_dynamic_refused.sp" deck
   title "rcl_dynamic_refused"
-  comment " oracle: ngspice-45 inpcom.c inp_compat (first { on the line is the value; no brace: mal formed, exit; dtemp and ic dropped), asrcload.c:41 (tc from 300.15 K, which the IR states only on a value that reads the circuit); INV-semantics 14.13"
+  comment " oracle: ngspice-45 inpcom.c inp_compat (first { on the line is the value; no brace: mal formed, exit; dtemp and ic dropped; settle rcl_dyn_dtemp.sp, rcl_static_scale_temper.sp: a static value beside a field reading temper runs that field's brace), asrcload.c:41 (tc from 300.15 K, which the IR states only on a value that reads the circuit); INV-semantics 14.13"
   opaque ngspice unread "R1 a b {temper*1k} tc1=1m"
   opaque ngspice private "R2 a b tc1={1m} r={v(a)}"
   opaque ngspice invalid "R3 a b v(a)"
   element capacitor C1 (a b) value=(v(a) * 1p) noisy=false
+  opaque ngspice private "R4 a 0 1k scale={temper/27}"

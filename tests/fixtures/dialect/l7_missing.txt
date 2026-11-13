@@ -407,7 +407,6 @@ vacask Circuit(TcLawDirect) owed from=ngspice
 vacask Circuit(TcLawReciprocal) owed from=ngspice
 vacask Run(TranStartup) unspoken
 vacask Run(TranSegments) unspoken
-vacask Run(DcRestart) unspoken
 vacask Run(DcAxisSubcktParam) unspoken
 vacask Run(SweepDcLog) unspoken
 vacask Run(SweepLoopLog) unspoken
@@ -486,7 +485,6 @@ vacask Run(ResetTemp) owed from=ngspice
 vacask Run(ResetTnom) owed from=ngspice
 vacask Run(PssArgumentOmitted) unspoken
 vacask Run(AlterParamAtReset) owed from=ngspice
-vacask Run(DcOuterAfresh) owed from=ngspice
 vacask Option(PivTol) owed from=ngspice
 vacask Option(PivRel) owed from=ngspice
 vacask Option(MethodGear) owed from=ngspice
