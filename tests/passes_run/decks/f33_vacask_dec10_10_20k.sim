@@ -1,0 +1,13 @@
+f33_vacask_dec10_10_20k: VACASK runs 35 frequencies, 10, 12.5052, 15.6379 ... 15993.4, 20000: ceil(10*log10(2000)) + 1 points stretched to end on to (answeep.cpp setupLogSweep)
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=1.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  options rawfile="ascii"
+  analysis ac1 ac from=10 to=20k mode="dec" points=10
+endc

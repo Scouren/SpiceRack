@@ -1,12 +1,18 @@
-//! Rule `dc_axes_to_loops`: a DC analysis with an axis over a device parameter
-//! (`dc_axis_device_param_to_loop`, removes `DcAxisDeviceParam`) or a model parameter
-//! (`dc_axis_model_param_to_loop`, removes `DcAxisModelParam`) becomes nested sweep loops over
-//! listed values around what is left of it. The axes are peeled from the outermost through the
-//! innermost axis of the row's kind, outermost loop first, each loop over its axis's values
-//! as decimal literals (`sweep_forms::values`); the analysis moves into the innermost body, a
-//! DC over the axes left inside, or an operating point when none is left. Requires `Item(Loop)`,
-//! a list sweep loop that keeps its last value, the loop target kinds, an operating point in a
-//! loop's body and the names its loops and analysis carry.
+//! Rule `dc_axes_to_loops`: a DC analysis becomes nested sweep loops over listed values around
+//! what is left of it, where ngspice's `.dc` cannot state it. Three rows (R72, R75):
+//! - `dc_axis_device_param_to_loop` (removes `DcAxisDeviceParam`) and
+//!   `dc_axis_model_param_to_loop` (`DcAxisModelParam`): ngspice's `.dc` sweeps a source, an
+//!   element's value or the temperature, so the axes are peeled from the outermost through the
+//!   innermost axis of the row's target kind;
+//! - `dc_restart_to_loops` (`DcRestart`): ngspice's `.dc` continues its innermost axis point to
+//!   point, so a DC whose innermost axis restarts each point is peeled whole into loops of
+//!   operating points.
+//!
+//! Each loop runs over its axis's values as decimal literals (`sweep_forms::values`); the
+//! analysis moves into the innermost body, a DC over the axes left inside, or an operating point
+//! when none is left. Requires `Item(Loop)`, a list sweep loop that keeps its last value, the
+//! loop target kinds, an operating point in a loop's body and the names its loops and analysis
+//! carry.
 //!
 //! What changes for the reader of the results: the source writes one DC plot over every axis
 //! (its swept vectors named by the axes); the target writes one plot per pass of the loops,
@@ -18,11 +24,12 @@
 //! analysis's name as read.
 //!
 //! Exact only when:
-//! - the analysis restarts every point from the initial guess (`Dc::restart`): a loop's
-//!   operating points each start afresh, where a continued sweep starts from the previous
-//!   point (a bistable circuit settles elsewhere, `INV-semantics.md` 8.09; R72; run, ngspice-45,
-//!   `tests/passes_run/decks/bistable_{dc,loop}.sp`: at v(in) = 0 the `.dc` gives -2 V and the
-//!   loop of ops 0 V);
+//! - every peeled axis starts afresh (`DcAxis::afresh`, R75): a loop's pass reruns what it holds
+//!   from the initial guess (ngspice-45's op after alter starts afresh, R72's run
+//!   `tests/passes_run/decks/bistable_{dc,loop}.sp`: at v(in) = 0 the continued `.dc` gives
+//!   -2 V and the loop of ops 0 V; and its nested `.dc` starts each outer step afresh too,
+//!   `latch_desc.sp`), where an axis that carries starts from the solve before it (VACASK's
+//!   default, `latch.sim`: 4.9734 against 3.490099). An axis that carries stays refused (R72);
 //! - it stands in its walk's top and no analysis follows it in the walk: the loops keep their
 //!   last values, which no later analysis then sees;
 //! - every peeled axis has a target a loop sweeps (no temperature, option or subcircuit
@@ -31,15 +38,10 @@
 //!
 //! Otherwise the analysis keeps the feature with a `DC_AXIS_KEPT` note.
 //!
-//! Next step, once R75's per-axis continuation members are on the trunk (not before): the
-//! condition `dc.restart` in `convert` becomes "every peeled axis starts afresh". The rows are
-//! keyed by the continuation feature they remove, not by a target kind. They peel through the
-//! innermost axis whose continuation the target cannot state, not the innermost of one kind.
-//! And they take any target a loop can alter (`peel`'s list; the temperature needs `LoopTemp`).
-//!
 //! Cites: `crates/ir/src/{dc_ac,plan}.rs`; `rewrite/IR-RUN.md` §1; AMEND-A12 A22, A27.
 //!
 //! Contents: `pub fn dc_axis_device_param_to_loop(&mut ir::Design, &mut ir::Diags)`,
+//! `pub fn dc_restart_to_loops(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn dc_axis_model_param_to_loop(&mut ir::Design, &mut ir::Diags)`,
 //! `pub const DC_AXIS_KEPT: ir::Code`, `pub const AS_LOOPS: ir::Code`
 
@@ -53,6 +55,14 @@ pub const DC_AXIS_KEPT: ir::Code = ir::Code::new(b'U', 415);
 /// The note at each loop a DC analysis's peeled axis became: `arg` is the analysis's name.
 pub const AS_LOOPS: ir::Code = ir::Code::new(b'U', 416);
 
+/// The axis a row peels through: the innermost of a target kind (a device or model
+/// parameter), or every axis of a DC whose innermost axis restarts (`DcRestart`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Through {
+    Kind(TargetKind),
+    Restart,
+}
+
 /// One conversion: the analysis, its scope, the peeled axes (outermost first) with their
 /// values, and the axes left inside.
 type Work = (
@@ -64,20 +74,27 @@ type Work = (
 
 /// DC analyses with a device-parameter axis made loops.
 pub fn dc_axis_device_param_to_loop(design: &mut ir::Design, diags: &mut ir::Diags) {
-    convert(design, diags, TargetKind::DeviceParam);
+    convert(design, diags, Through::Kind(TargetKind::DeviceParam));
 }
 
 /// DC analyses with a model-parameter axis made loops.
 pub fn dc_axis_model_param_to_loop(design: &mut ir::Design, diags: &mut ir::Diags) {
-    convert(design, diags, TargetKind::ModelParam);
+    convert(design, diags, Through::Kind(TargetKind::ModelParam));
+}
+
+/// DC analyses whose innermost axis restarts each point (`DcRestart`) made loops of
+/// operating points over every axis.
+pub fn dc_restart_to_loops(design: &mut ir::Design, diags: &mut ir::Diags) {
+    convert(design, diags, Through::Restart);
 }
 
 // ---- private ----
 
-fn convert(design: &mut ir::Design, diags: &mut ir::Diags, kind: TargetKind) {
+/// The rows' body: `through` names the axis peeled through.
+fn convert(design: &mut ir::Design, diags: &mut ir::Diags, through: Through) {
     assert!(matches!(
-        kind,
-        TargetKind::DeviceParam | TargetKind::ModelParam
+        through,
+        Through::Restart | Through::Kind(TargetKind::DeviceParam | TargetKind::ModelParam)
     ));
     let mut work: Vec<Work> = Vec::new();
     for (top, order) in ir::run_walks(design) {
@@ -91,7 +108,11 @@ fn convert(design: &mut ir::Design, diags: &mut ir::Diags, kind: TargetKind) {
             }
             let dc = design.detail::<Dc>(a.detail);
             let axes = design.dc_axes(dc.axes);
-            let Some(inner) = axes.iter().position(|x| x.target.kind == kind) else {
+            let inner = match through {
+                Through::Restart => axes.first().filter(|x| x.afresh).map(|_| 0),
+                Through::Kind(kind) => axes.iter().position(|x| x.target.kind == kind),
+            };
+            let Some(inner) = inner else {
                 continue;
             };
             let later = order[k + 1..]

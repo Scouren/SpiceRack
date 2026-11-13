@@ -11,7 +11,6 @@
 #       __topinst__", every op at a=1 (corpus test/test_cblock.sim). Owner: the VACASK reader
 #       (an AlterParam target), or the IR (a device alter naming no element), then the ngspice
 #       writer (alterparam and reset).
-alter_toplevel 2 refused:U0001,W1401:Run(AlterParamAtOnce) finding=F7 # the IR round: VACASK's alter takes effect at once, ngspice's alterparam at the next reset; no rule converts it yet (W1401 beside it)
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314)
 dc_device_param 2 refused:U0001:Run(DcAxisDeviceParam)+Run(SweepDcList) ruling=R75 # runrules: a continued sweep over a diode's area; dc_axes_to_loops fires only on a restarting DC (R72), so the axis stays (its U0415 note) until R75's per-axis continuation

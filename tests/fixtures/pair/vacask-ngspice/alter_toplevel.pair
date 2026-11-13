@@ -1,0 +1,3 @@
+# The at-once parameter alter written for ngspice as alterparam then reset (F7, R70): both simulators give r1 = 2k at op2.
+owner = runrules
+proves = alter_param_at_once_to_at_reset
