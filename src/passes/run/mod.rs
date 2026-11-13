@@ -78,27 +78,37 @@ pub(super) const PASSES: &[Pass] = &[
     to_from_here(
         "whole_run_option_to_from_here",
         (RunExtra::OptionWholeRun, RunExtra::OptionFromHere),
-        &[wr::MID_RUN, wr::RESET_RESTORES, wr::FROM_HERE_SAME],
+        &[
+            wr::MID_RUN,
+            wr::RESET_RESTORES,
+            wr::FROM_HERE_SAME,
+            wr::IN_SUBCKT,
+        ],
         wr::whole_run_option_to_from_here,
     ),
     to_from_here(
         "whole_run_env_to_from_here",
         (RunExtra::EnvWholeRun, RunExtra::EnvFromHere),
-        &[wr::MID_RUN, wr::RESET_RESTORES, wr::FROM_HERE_SAME],
+        &[
+            wr::MID_RUN,
+            wr::RESET_RESTORES,
+            wr::FROM_HERE_SAME,
+            wr::IN_SUBCKT,
+        ],
         wr::whole_run_env_to_from_here,
     ),
     // a node set is no class a reset restores
     to_from_here(
         "whole_run_node_set_to_from_here",
         (RunExtra::NodeSetWholeRun, RunExtra::NodeSetFromHere),
-        &[wr::MID_RUN, wr::FROM_HERE_SAME],
+        &[wr::MID_RUN, wr::FROM_HERE_SAME, wr::IN_SUBCKT],
         wr::whole_run_node_set_to_from_here,
     ),
     // two saves never set one thing: they add up
     to_from_here(
         "whole_run_save_to_from_here",
         (RunExtra::SaveWholeRun, RunExtra::SaveFromHere),
-        &[wr::MID_RUN, wr::RESET_RESTORES],
+        &[wr::MID_RUN, wr::RESET_RESTORES, wr::IN_SUBCKT],
         wr::whole_run_save_to_from_here,
     ),
     Pass {
