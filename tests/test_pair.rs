@@ -6,6 +6,8 @@
 //! |---|---|---|
 //! | `ngspice-vacask` | ngspice-45 (`-b -r`, R49) | VACASK |
 //! | `vacask-ngspice` | VACASK | ngspice-45 |
+//! | `ngspice-ngspice` | ngspice-45 | ngspice-45 (step 4 bit for bit: `test_pair/same.rs`) |
+//! | `vacask-vacask` | VACASK | VACASK (the same) |
 //!
 //! Oracles per deck, in this order; the first that fails names the component (REWRITE-PLAN
 //! §7.4): 1 read, strict (no refusal, `ir::check` clean, no `Unread`) → the source reader;
@@ -70,10 +72,14 @@ mod vacask;
 
 #[path = "test_pair/files.rs"]
 mod files;
+#[path = "test_pair/numbers.rs"]
+mod numbers;
 #[path = "test_pair/plots.rs"]
 mod plots;
 #[path = "test_pair/run.rs"]
 mod run;
+#[path = "test_pair/same.rs"]
+mod same;
 
 #[cfg(feature = "corpus")]
 #[path = "test_pair/corpus.rs"]
@@ -91,6 +97,9 @@ use sim::Sim;
 /// extension of each dialect's text.
 struct Cell {
     name: &'static str,
+    /// The folder of its authored decks under `tests/fixtures/pair` (a same-dialect cell reads
+    /// the decks of the cell whose source dialect it shares).
+    dir: &'static str,
     from: &'static str,
     to: &'static str,
     from_sim: Sim,
@@ -103,6 +112,7 @@ struct Cell {
 const CELLS: &[Cell] = &[
     Cell {
         name: "ngspice-vacask",
+        dir: "ngspice-vacask",
         from: "ngspice",
         to: "vacask",
         from_sim: Sim::Ngspice,
@@ -112,12 +122,35 @@ const CELLS: &[Cell] = &[
     },
     Cell {
         name: "vacask-ngspice",
+        dir: "vacask-ngspice",
         from: "vacask",
         to: "ngspice",
         from_sim: Sim::Vacask,
         to_sim: Sim::Ngspice,
         from_ext: "sim",
         to_ext: "sp",
+    },
+    // The same-dialect cells (`test_pair/same.rs`): one simulator runs both decks, so step 4
+    // asks for the same bits.
+    Cell {
+        name: "ngspice-ngspice",
+        dir: "ngspice-vacask",
+        from: "ngspice",
+        to: "ngspice",
+        from_sim: Sim::Ngspice,
+        to_sim: Sim::Ngspice,
+        from_ext: "sp",
+        to_ext: "sp",
+    },
+    Cell {
+        name: "vacask-vacask",
+        dir: "vacask-ngspice",
+        from: "vacask",
+        to: "vacask",
+        from_sim: Sim::Vacask,
+        to_sim: Sim::Vacask,
+        from_ext: "sim",
+        to_ext: "sim",
     },
 ];
 
@@ -131,8 +164,30 @@ fn spice_bench_to_vacask() {
         var: "SPICE_BENCH",
         keep: |p| !p.contains("/src") && !p.contains("/."),
         source_list: "spice-bench",
+        list: "ngspice-vacask-corpus",
     };
     let wrong = corpus::census(&CELLS[0], &spice_bench);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn spice_bench_twinless_to_vacask() {
+    // The spice-bench decks under `src.assets` that no adapted twin under ngspice/examples or
+    // ngspice/paranoia carries, by the list (its header states the rule): every other
+    // `/src` deck stays out, as in `spice_bench_to_vacask`.
+    let twinless = corpus::Corpus {
+        var: "SPICE_BENCH",
+        keep: twinless,
+        source_list: "spice-bench",
+        list: "ngspice-vacask-twinless",
+    };
+    let wrong = corpus::census(&CELLS[0], &twinless);
     assert!(
         wrong.is_empty(),
         "{} differ:\n{}",
@@ -155,8 +210,53 @@ fn vacask_corpus_to_ngspice() {
                 .any(|seg| other.iter().any(|o| seg.starts_with(o)))
         },
         source_list: "vacask",
+        list: "vacask-ngspice-corpus",
     };
     let wrong = corpus::census(&CELLS[1], &vacask);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn ngspice_examples_to_ngspice() {
+    // The same-dialect cell over spice-bench's ngspice examples (the cross-sim keep rule, under
+    // `ngspice/examples/`).
+    let examples = corpus::Corpus {
+        var: "SPICE_BENCH",
+        keep: |p| p.contains("/ngspice/examples/") && !p.contains("/src") && !p.contains("/."),
+        source_list: "spice-bench",
+        list: "ngspice-ngspice-corpus",
+    };
+    let wrong = corpus::census(&CELLS[2], &examples);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn vacask_corpus_to_vacask() {
+    // The same-dialect cell over the VACASK corpus, VACASK's own text only (as
+    // `vacask_corpus_to_ngspice`).
+    let vacask = corpus::Corpus {
+        var: "VACASK_CORPUS",
+        keep: |p| {
+            let other = ["ngspice", "xyce", "gnucap"];
+            !p.split('/')
+                .any(|seg| other.iter().any(|o| seg.starts_with(o)))
+        },
+        source_list: "vacask",
+        list: "vacask-vacask-corpus",
+    };
+    let wrong = corpus::census(&CELLS[3], &vacask);
     assert!(
         wrong.is_empty(),
         "{} differ:\n{}",
@@ -173,6 +273,16 @@ fn ngspice_to_vacask() {
 #[test]
 fn vacask_to_ngspice() {
     cell(&CELLS[1]);
+}
+
+#[test]
+fn ngspice_to_ngspice() {
+    cell(&CELLS[2]);
+}
+
+#[test]
+fn vacask_to_vacask() {
+    cell(&CELLS[3]);
 }
 
 #[test]
@@ -194,6 +304,24 @@ fn a_pair_file_tightens_and_never_loosens() {
         "below the solvers' floor"
     );
     assert!(files::pair_text("speed = 2\n").is_err(), "an unknown key");
+}
+
+#[test]
+fn an_include_is_named_from_the_decks_folder() {
+    // Oracle: the paths written out by hand (VACASK's demo/bsim3-ptm/amp.sim includes
+    // demo/cmos180n.lib). Checks: 4.
+    let base = Path::new("demo/bsim3-ptm");
+    let named = |p: &str| files::relative(base, p);
+    assert_eq!(named("demo/bsim3-ptm/x.inc").as_deref(), Some("x.inc"));
+    assert_eq!(
+        named("demo/cmos180n.lib").as_deref(),
+        Some("../cmos180n.lib")
+    );
+    assert_eq!(named("lib/a/b.lib").as_deref(), Some("../../lib/a/b.lib"));
+    assert_eq!(
+        named("demo/bsim3-ptm/sub/y.inc").as_deref(),
+        Some("sub/y.inc")
+    );
 }
 
 #[test]
@@ -322,7 +450,7 @@ fn rows(c: &Cell) -> (&'static DialectRow, &'static DialectRow) {
 fn decks(c: &Cell) -> Vec<PathBuf> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/pair")
-        .join(c.name);
+        .join(c.dir);
     let rd = std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
     let mut out: Vec<PathBuf> = rd
         .map(|e| e.expect("an entry").path())
@@ -338,4 +466,23 @@ fn stem(p: &Path) -> String {
         .expect("a file name")
         .to_string_lossy()
         .into_owned()
+}
+
+/// Whether the absolute path `p` is one of `tests/fixtures/pair/spice-bench-twinless.txt`'s
+/// decks (paths relative to the corpus root).
+#[cfg(feature = "corpus")]
+fn twinless(p: &str) -> bool {
+    static LIST: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    let list = LIST.get_or_init(|| {
+        let f = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/pair/spice-bench-twinless.txt"
+        );
+        let text = std::fs::read_to_string(f).unwrap_or_else(|e| panic!("{f}: {e}"));
+        text.lines()
+            .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+            .map(|l| format!("/{}", l.trim()))
+            .collect()
+    });
+    list.iter().any(|rel| p.ends_with(rel.as_str()))
 }

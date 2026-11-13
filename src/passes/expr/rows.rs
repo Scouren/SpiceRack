@@ -78,7 +78,7 @@ pub(crate) const PASSES: &[Pass] = &[
     row("substitute_tstop", X::Expr(T::TStop), &[X::Expr(T::Num)], &[NO_LEAF_VALUE], substitute_tran_leaves::substitute_tstop),
     row("draws_always_to_sampling", X::DrawWhen(W::Always), &[X::DrawWhen(W::Sampling)], &[], draws_always_to_sampling::draws_always_to_sampling),
     row("draws_per_reference_to_call_site", X::DrawPer(P::Reference), &[X::DrawPer(P::CallSite)], &[DRAW_SAMPLES], draws_per_reference_to_call_site::draws_per_reference_to_call_site),
-    row("sampling_draws_to_nominal", X::DrawWhen(W::Sampling), &[X::Binary(O::Mul), X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[DRAW_SAMPLES], sampling_draws_to_nominal::sampling_draws_to_nominal),
+    row("sampling_draws_to_nominal", X::DrawWhen(W::Sampling), &[X::Binary(O::Mul), X::BinaryDyn(O::Mul), X::Expr(T::Binary)], &[DRAW_SAMPLES, TEXT_OPERAND], sampling_draws_to_nominal::sampling_draws_to_nominal),
     row("long_literal_to_shortest", X::Extra(E::LongLiteral), &[X::Expr(T::Num)], &[], long_literal_to_shortest::long_literal_to_shortest),
     // last: the typed rules decide by an integer literal's tag first
     row("int_literal_to_plain", X::Extra(E::IntLiteral), &[], &[INT_TAG_READ], int_literal_to_plain::int_literal_to_plain),

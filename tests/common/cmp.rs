@@ -149,7 +149,7 @@ pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String> {
         for x in pa {
             let near = |u: f64, v: f64| (u - v).abs() <= 1e-9 * u.abs().max(v.abs()).max(1e-30);
             let same = |p: &RawData, q: &RawData| {
-                let (s, t) = (p.re(0), q.re(swept(q)));
+                let (s, t) = (p.re(swept(p)), q.re(swept(q)));
                 s.len() == t.len()
                     && s.first().zip(t.first()).is_some_and(|(&u, &v)| near(u, v))
                     && s.last().zip(t.last()).is_some_and(|(&u, &v)| near(u, v))
@@ -368,17 +368,20 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
     let first = usize::from(k != "op" && k != "total");
     let (xa, xb) = (a.re(0), b.re(0));
     if first == 1 && k != "tran" {
-        let span = xa.iter().fold(0.0f64, |m, x| m.max(x.abs()));
         // A grid point holds to 1e-9 of the span, or to 1e-6 of itself: a
         // log sweep's points are printed to 7 digits in Xyce's noise table.
-        let close = |x: f64, y: f64| (x - y).abs() <= (1e-9 * span).max(1e-6 * x.abs());
-        let same =
-            |ys: &[f64]| ys.len() == xa.len() && xa.iter().zip(ys).all(|(&x, &y)| close(x, y));
+        let same = |xs: &[f64], ys: &[f64]| {
+            let span = xs.iter().fold(0.0f64, |m, x| m.max(x.abs()));
+            let close = |x: f64, y: f64| (x - y).abs() <= (1e-9 * span).max(1e-6 * x.abs());
+            ys.len() == xs.len() && xs.iter().zip(ys).all(|(&x, &y)| close(x, y))
+        };
         // A nested `.dc` is one plot over the inner source in ngspice; VACASK
         // writes each sweep's vector first, the outer one (`sweep1`) before
-        // the inner (`vsweep`). The grid holds if any leading vector is `a`'s.
-        let lead = b.variables.len().min(4);
-        if !(0..lead).any(|j| same(&b.re(j))) {
+        // the inner (`vsweep`). The grid holds if a leading vector of one is a
+        // leading vector of the other, either run first (`test_pair` compares
+        // both ways).
+        let (la, lb) = (a.variables.len().min(4), b.variables.len().min(4));
+        if !(0..la).any(|i| (0..lb).any(|j| same(&a.re(i), &b.re(j)))) {
             return Err(format!(
                 "{k}: sweep grid changed ({} -> {} points)",
                 xa.len(),
@@ -704,6 +707,11 @@ mod tests {
         // A card whose values differ still fails.
         let off = [vacask(outer, to1, low), vacask(outer, to2, low)];
         assert!(compare(&a, &off, Tol::of(&[])).is_err());
+        // Either way round (`test_pair`'s step 4 compares both ways): VACASK's outer sweep is
+        // its first vector, ngspice's inner sweep is one of VACASK's leading ones (vacask2-2,
+        // the pair deck latch.sp: "dc: sweep grid changed (14 -> 14 points)").
+        assert_eq!(compare(&b, &a, Tol::of(&[])), Ok(()));
+        assert!(compare(&off, &a, Tol::of(&[])).is_err());
     }
 
     #[test]
