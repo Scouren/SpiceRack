@@ -271,6 +271,7 @@ fn each_kernel_invariant_has_its_fixture() {
         // run-owned (run_check.rs has its fixtures)
         Violation::RunArgumentClass,
         Violation::TargetAlias,
+        Violation::RunOrderInSubckt,
     ];
     let kernel: Vec<Violation> = Violation::ALL
         .into_iter()

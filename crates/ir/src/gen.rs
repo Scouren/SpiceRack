@@ -496,6 +496,11 @@ fn candidates(
     ItemKind::ALL
         .into_iter()
         .filter(|&k| has(Feature::Item(k)) && placeable(d, scope, k, features))
+        // R98: no alter, loop or reset inside a subcircuit body
+        .filter(|&k| {
+            let run_order = matches!(k, ItemKind::Alter | ItemKind::Loop | ItemKind::Reset);
+            !(run_order && crate::feature::chain_kinds(d, scope)[ScopeKind::Subckt as usize])
+        })
         .filter(|&k| match k {
             ItemKind::Title => false,
             ItemKind::Subckt => opens,

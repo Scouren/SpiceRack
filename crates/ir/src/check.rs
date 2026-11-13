@@ -135,6 +135,12 @@ pub enum Violation {
     /// a reader bound a read of one subcircuit's `w` to another's `w`; no simulator lets a body
     /// see a sibling's names). `arg`: the definition.
     RefScope,
+    /// A run item whose effect depends on its place in the run order (an alter, a loop, a
+    /// reset, or an option, environment value, node set or save that holds from where it
+    /// stands) inside a subcircuit body (R98: a subcircuit is instantiated, not executed; no
+    /// simulator gives such an item a meaning). Whole-run items there are placements (R27). The
+    /// run owner's (`state_order::order_in_subckt`). `arg`: the item's row.
+    RunOrderInSubckt,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -145,7 +151,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::RefScope as usize + 1] = [
+    pub const ALL: [Violation; Violation::RunOrderInSubckt as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -173,6 +179,7 @@ impl Violation {
         Violation::TargetAlias,
         Violation::LawConflict,
         Violation::RefScope,
+        Violation::RunOrderInSubckt,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -208,6 +215,7 @@ pub fn check(design: &Design, diags: &mut Diags) {
             out.report(Violation::InstanceCycle, at, at.index);
         }
         crate::check_scopes::reference_scopes(&mut out);
+        crate::state_order::order_in_subckt(design, out.diags);
         for (at, element) in crate::link::target_aliases(design) {
             out.report(Violation::TargetAlias, at, element.0);
         }

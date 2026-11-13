@@ -13,7 +13,7 @@
 //! `pub fn in_force(&Design, &[(ItemRef, ScopeId)], usize, Setting) -> ItemRef` (a parameter
 //! and a device too, R70); crate:
 //! `pub(crate) fn state_order_features`, `pub(crate) fn interleaved_features`,
-//! `pub(crate) fn design_check`, `pub(crate) fn node_set_mix`,
+//! `pub(crate) fn design_check`, `pub(crate) fn order_in_subckt` (R98), `pub(crate) fn node_set_mix`,
 //! `pub(crate) fn run_append_ok` (gen)
 
 use std::collections::{HashMap, HashSet};
@@ -395,7 +395,51 @@ pub(crate) fn run_append_ok(design: &Design, scope: ScopeId, features: &FeatureS
     items.len() <= SCAN_MAX // read to the start: no run item before
 }
 
+/// R98: `RunOrderInSubckt` at every run item whose effect depends on its place in the run order
+/// (`order_dependent`) listed in a scope inside a subcircuit body. O(items × scope depth). Run on a design whose handles hold.
+pub(crate) fn order_in_subckt(design: &Design, out: &mut Diags) {
+    for (item, scope) in design.reachable() {
+        let in_body =
+            crate::feature::chain_kinds(design, scope)[crate::item::ScopeKind::Subckt as usize];
+        if in_body && order_dependent(design, item) {
+            report(design, item, Violation::RunOrderInSubckt, out);
+        }
+    }
+}
+
 // ---- private ----
+
+/// Whether `item` acts from where it stands in the run order: an alter, a loop, a reset, or an
+/// option, environment value, node set or save that holds from here.
+fn order_dependent(design: &Design, item: ItemRef) -> bool {
+    let i = item.index;
+    match item.kind {
+        ItemKind::Alter | ItemKind::Loop | ItemKind::Reset => true,
+        ItemKind::Option => design.row::<OptionRow>(i).holds == Applies::FromHere,
+        ItemKind::Env => design.row::<Env>(i).holds == Applies::FromHere,
+        ItemKind::NodeSet => design.row::<NodeSet>(i).holds == Applies::FromHere,
+        ItemKind::Save => design.row::<Save>(i).holds == Applies::FromHere,
+        ItemKind::Analysis
+        | ItemKind::Print
+        | ItemKind::Measure
+        | ItemKind::Elaborate
+        | ItemKind::Title
+        | ItemKind::Comment
+        | ItemKind::Include
+        | ItemKind::Global
+        | ItemKind::Load
+        | ItemKind::Opaque
+        | ItemKind::Subckt
+        | ItemKind::Section
+        | ItemKind::If
+        | ItemKind::Param
+        | ItemKind::Func
+        | ItemKind::Model
+        | ItemKind::DeviceLibrary
+        | ItemKind::Statistics
+        | ItemKind::Element => false,
+    }
+}
 
 /// Reports `FieldDomain` at each Fourier analysis with no harmonic count (`Four::harmonics`
 /// `NONE`) where no `nfreqs` option is in force (`in_force`, A16, A28): a `WholeRun` one in its

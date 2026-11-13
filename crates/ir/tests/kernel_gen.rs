@@ -206,7 +206,11 @@ fn the_full_set_runs_every_property() {
         .map(|&s| Feature::Placed(s, ItemKind::Title));
     // (A28, R51: an uncalled function body counts static, so `Func(Ddt)` and `Func(Idt)` are
     // reached through one; they were unreachable while a body counted dynamic always)
-    let unreachable: Vec<Feature> = titles.collect();
+    // R98: an alter, a loop or a reset inside a subcircuit body is `RunOrderInSubckt`, so no
+    // valid design places one there
+    let run_order = [ItemKind::Loop, ItemKind::Alter, ItemKind::Reset]
+        .map(|k| Feature::Placed(ScopeKind::Subckt, k));
+    let unreachable: Vec<Feature> = titles.chain(run_order).collect();
     // known gaps, a marker: none left (the run owner's generators reach `LoopOverOp`)
     let not_yet: [Feature; 0] = [];
     let goal = unreachable
