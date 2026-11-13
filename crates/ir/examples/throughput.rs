@@ -25,6 +25,13 @@
 //! that runs it under `perf stat -x, -e <event>` (`taskset -c <cores>` first on a hybrid CPU) and
 //! reads the count from the first CSV field of the stderr line naming the event.
 //!
+//! A phase's count here is a plain difference from the phase before; the earlier phases' run-to-run
+//! variation (HashMap seeds) moves it about 1 % for dump, the smallest (3.7e8 under a 4.6e9 build).
+//! When a phase is small enough for that to move its ratio (a stage of 1e7 under 1e10 did, in the
+//! pipeline's example), run the phase k times in one child and take (count at 1 + k − count at 1) / k:
+//! the reference form is `examples/pipeline_scaling.rs`' `count <from> <to> <stage> <n> <k>`
+//! (`ir-next` 88bb3b06).
+//!
 //! Contents: none (a measurement binary).
 
 use std::time::Instant;
