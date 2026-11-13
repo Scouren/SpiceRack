@@ -18,7 +18,7 @@
 //! `rewrite/DIALECT-HSPICE.md` §3; `rewrite/RULINGS.md` R24–R26.
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
-//! `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) use state::KEYS`
+//! `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) fn deck_loop`, `pub(super) use state::KEYS`
 //! (ngspice's option spellings, which `write_run` spells back); for the control area, which reads
 //! a script command (`tran 1n 1u uic`) as the card without its dot:
 //! `pub(super) use words::split as split_words` (`fn(&str) -> Vec<String>`),
@@ -106,6 +106,14 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
     Feature::Run(RunExtra::SweepLoopDec),
     Feature::Run(RunExtra::SweepLoopOct),
     Feature::Run(RunExtra::SweepLoopList),
+    // a deck's `.temp` list: a loop over the temperature around every top-level analysis
+    Feature::Run(RunExtra::LoopTemp),
+    // a deck's `.alter` blocks: a table loop over parameters around every analysis
+    Feature::Run(RunExtra::LoopTable),
+    // a `.data` table's loop carries the table's name
+    Feature::Run(RunExtra::LoopNamed),
+    Feature::Run(RunExtra::SweepBodyNotOne),
+    Feature::Run(RunExtra::LoopOverOp),
     Feature::Run(RunExtra::SweepFreqLinPoints),
     Feature::Run(RunExtra::SweepFreqDec),
     Feature::Run(RunExtra::SweepFreqOct),
@@ -269,7 +277,14 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
             // the control area's path: the words, one analysis, its rows
             let w = split_words(&lw.rest(st.node));
             match read_analysis(lw, st, name, &w) {
-                Ok(c) => push_analysis(lw, st, &c),
+                Ok(c) => {
+                    let scope = deck_loop(lw, st).unwrap_or(st.scope);
+                    push_analysis(lw, Stmt { scope, ..st }, &c);
+                    if scope != st.scope {
+                        // L1: its item stands in the loop's body, not in `st.scope`
+                        lw.framing();
+                    }
+                }
                 Err(f) => lw.opaque(st, f.class, f.code),
             }
         }
@@ -286,7 +301,92 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
     }
 }
 
+/// The body of the deck's temperature loop when `st` stands at the deck's top level and the
+/// deck has one `.temp` list (`Lower::temp_card`): made at the first of that card and the first
+/// top-level analysis, a sweep of the temperature over the listed values around every
+/// top-level analysis (settle `temp_list.sp`: one plot per temperature; ESPice only; restored
+/// after: the lead). `None` when no loop applies, or the list does not read (then the card is
+/// `Unread`, `state::temp`).
+pub(super) fn deck_loop(lw: &mut Lower<'_, '_>, st: Stmt) -> Option<ir::ScopeId> {
+    if lw.ast.tag(st.container) != crate::syntax::ast::Tag::Root {
+        return None;
+    }
+    if let Some(body) = lw.temp_loop {
+        return Some(body);
+    }
+    if lw.temp_card.is_some() && lw.alter.is_some() {
+        // ponytail: a `.temp` list and `.alter` blocks together is not settled: neither loop
+        lw.temp_card = None;
+        lw.alter = None;
+    }
+    if lw.alter.is_some() {
+        return alter_loop(lw, st);
+    }
+    let card = lw.temp_card?;
+    let at = Stmt { node: card, ..st };
+    let rest = lw.rest(card);
+    let text = rest.trim().trim_start_matches('=');
+    let vals: Result<Vec<_>, _> = words::split(text)
+        .iter()
+        .map(|w| words::value(lw, at, w))
+        .collect();
+    let Ok(vals) = vals else {
+        lw.temp_card = None;
+        return None;
+    };
+    let span = lw.span(st.node);
+    let v: Vec<ir::ExprId> = vals.iter().map(|x| super::value::emit(lw, at, x)).collect();
+    let list = lw.b.exprs(&v);
+    let row = ir::plan::SweepLoop {
+        target: ir::Target::TEMP,
+        sweep: ir::SweepSpec::list(list),
+    };
+    let (_, body) = lw.b.loop_(st.scope, None, row, ir::LoopEnd::Restore, span);
+    lw.temp_loop = Some(body);
+    Some(body)
+}
+
 // ---- private ----
+
+/// The `.alter` table's loop, made at the first top-level analysis (`deck_loop`): one column per
+/// parameter a block sets, the deck's own values first. `None`, and the blocks read as cards,
+/// when a value does not read.
+fn alter_loop(lw: &mut Lower<'_, '_>, st: Stmt) -> Option<ir::ScopeId> {
+    let plan = lw.alter.clone().expect("an alter plan");
+    let trees: Result<Vec<_>, _> = plan
+        .rows
+        .iter()
+        .flatten()
+        .map(|v| match super::value::unwrap(v) {
+            super::value::Wrap::Whole(inner, false) | super::value::Wrap::Bare(inner) => {
+                super::expr_read::parse(inner)
+            }
+            _ => Err(super::expr_read::Fail::invalid()),
+        })
+        .collect();
+    let Ok(trees) = trees else {
+        lw.alter = None;
+        return None;
+    };
+    let span = lw.span(st.node);
+    let names: Vec<String> = plan.columns.iter().map(|c| lw.names.fold(c)).collect();
+    let targets: Vec<ir::Target> = names
+        .iter()
+        .map(|n| lw.b.target(ir::TargetKind::Param, &[], n, None))
+        .collect();
+    let columns = lw.b.targets(&targets);
+    let v: Vec<ir::ExprId> = trees.iter().map(|t| lw.expr(st, t, st.scope)).collect();
+    let values = lw.b.exprs(&v);
+    let row = ir::plan::TableLoop { columns, values };
+    let (item, body) = lw.b.loop_(st.scope, None, row, ir::LoopEnd::Restore, span);
+    for (k, n) in names.iter().enumerate() {
+        let id = lw.b.name(n);
+        let slot = u32::try_from(k).expect("columns under 4 G");
+        lw.refer(item, slot, st.scope, ir::DefKind::Param, id);
+    }
+    lw.temp_loop = Some(body);
+    Some(body)
+}
 
 /// A note row of this area.
 const fn note(

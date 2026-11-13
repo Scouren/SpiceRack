@@ -9,7 +9,7 @@
 
 use super::super::read::{Lower, Stmt};
 use super::super::value::emit;
-use super::analysis::{Axis, Card, Sweep, Swept};
+use super::analysis::{Axis, Card, Outer, Sweep, Swept};
 use crate::ir;
 use crate::ir::dc_ac::{
     Ac, Dc, DcAxis, Disto, Noise, NoiseRef, Pz, PzInput, Sens, SensAc, Sp, Tf, TimedOp,
@@ -36,17 +36,42 @@ pub(in super::super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card) {
             // a `sweep` tail is a loop over a parameter around the analysis (settle
             // dc_sweep_param.sp: one plot per value)
             let mut inner = st;
-            if let Some((name, values)) = outer {
-                let p = lw.names.fold(name);
-                let target = lw.b.target(ir::TargetKind::Param, &[], &p, None);
-                let row = ir::plan::SweepLoop {
-                    target,
-                    sweep: emit_axis(lw, st, values),
-                };
-                let (item, body) = lw.b.loop_(scope, None, row, ir::LoopEnd::Restore, span);
-                let id = lw.b.name(&p);
-                lw.refer(item, 0, scope, ir::DefKind::Param, id);
-                inner = Stmt { scope: body, ..st };
+            match outer {
+                Some(Outer::Param(name, values)) => {
+                    let p = lw.names.fold(name);
+                    let target = lw.b.target(ir::TargetKind::Param, &[], &p, None);
+                    let row = ir::plan::SweepLoop {
+                        target,
+                        sweep: emit_axis(lw, st, values),
+                    };
+                    let (item, body) = lw.b.loop_(scope, None, row, ir::LoopEnd::Restore, span);
+                    let id = lw.b.name(&p);
+                    lw.refer(item, 0, scope, ir::DefKind::Param, id);
+                    inner = Stmt { scope: body, ..st };
+                }
+                // a `.data` table: a table loop named as the table (settle data_sweep.sp)
+                Some(Outer::Data(table, columns, values)) => {
+                    let table = lw.names.fold(table);
+                    lw.b.name(&table); // interned before its columns, as the IR text names them
+                    let names: Vec<String> = columns.iter().map(|c| lw.names.fold(c)).collect();
+                    let targets: Vec<ir::Target> = names
+                        .iter()
+                        .map(|n| lw.b.target(ir::TargetKind::Param, &[], n, None))
+                        .collect();
+                    let columns = lw.b.targets(&targets);
+                    let v: Vec<ir::ExprId> = values.iter().map(|x| emit(lw, st, x)).collect();
+                    let values = lw.b.exprs(&v);
+                    let row = ir::plan::TableLoop { columns, values };
+                    let (item, body) =
+                        lw.b.loop_(scope, Some(&table), row, ir::LoopEnd::Restore, span);
+                    for (k, n) in names.iter().enumerate() {
+                        let id = lw.b.name(n);
+                        let slot = u32::try_from(k).expect("columns under 4 G");
+                        lw.refer(item, slot, scope, ir::DefKind::Param, id);
+                    }
+                    inner = Stmt { scope: body, ..st };
+                }
+                None => {}
             }
             let mut rows = Vec::new();
             for (swept, values) in axes {

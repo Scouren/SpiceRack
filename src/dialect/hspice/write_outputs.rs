@@ -294,7 +294,12 @@ fn measure_why(d: &ir::Design, m: ir::Measure) -> u32 {
                 && bound(&r.to, true)
                 && ordered(&r.from, &r.to)
         }
-        MeasureKind::Param => constant(d, d.detail::<MeasureParam>(m.detail).value),
+        // a `param=` read of a name nothing defines is no measure the reader reads back (its
+        // `param_reads`: "Undefined parameter", the ngspice lead)
+        MeasureKind::Param => {
+            let v = d.detail::<MeasureParam>(m.detail).value;
+            constant(d, v) && !expr_write::reads_unbound(d, v)
+        }
         MeasureKind::Deriv => false,
     };
     let checks = [(kind, 6), (name_ok, 7), (body, 8 + m.kind as u32)];

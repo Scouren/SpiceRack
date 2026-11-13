@@ -33,7 +33,9 @@ use super::declare::{self, Class, Declared, declare};
 use super::expr_read::Tree;
 use super::name::{self, Folder};
 use super::number;
-use super::{read_elements, read_models, read_outputs, read_run, read_sources, read_structure};
+use super::{
+    read_elements, read_models, read_outputs, read_plan, read_run, read_sources, read_structure,
+};
 use crate::dialect::{Reference, Sources};
 use crate::ir;
 use crate::syntax::ast::{Ast, Node, Tag};
@@ -75,6 +77,16 @@ pub(super) struct Lower<'a, 'd> {
     shift: u32,
     frames: Vec<Frame<'a>>,
     framed: bool,
+    /// A deck's one top-level `.temp` card that lists several temperatures (`temp_list.sp`):
+    /// a loop around every top-level analysis (`read_run::deck_loop`).
+    pub(super) temp_card: Option<Node>,
+    /// That loop's body, once made (also the `.alter` table's).
+    pub(super) temp_loop: Option<ir::ScopeId>,
+    /// The `.data` tables a `sweep data=` of the file reads: (node, name, columns, values
+    /// row-major), each framing (its loop states it).
+    pub(super) data: Vec<(u32, String, Vec<String>, Vec<String>)>,
+    /// A deck's `.alter` blocks as a table around every top-level analysis (`read_plan::AlterPlan`).
+    pub(super) alter: Option<read_plan::AlterPlan>,
 }
 
 /// A statement as an area function gets it: its CST node, the IR scope its items go into, and
@@ -169,6 +181,14 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             shift: u32::from(roles[k] == ir::Role::Library),
             frames: Vec::new(),
             framed: false,
+            temp_card: (roles[k] == ir::Role::Deck)
+                .then(|| read_plan::temp_list(&asts[k], &toks[k]))
+                .flatten(),
+            temp_loop: None,
+            data: read_plan::data_tables(&asts[k], &toks[k]),
+            alter: (roles[k] == ir::Role::Deck)
+                .then(|| read_plan::alter_plan(&asts[k], &toks[k]))
+                .flatten(),
         };
         lower(&mut lw, top);
     }
@@ -493,6 +513,16 @@ fn lower(lw: &mut Lower<'_, '_>, top: ir::ScopeId) {
 /// The one dispatch: a statement's tag → its area function. An element card whose name the
 /// scope has already is no element: HSPICE bails out ("device already exists", run dup.cir).
 fn dispatch(lw: &mut Lower<'_, '_>, st: Stmt) {
+    // the `.alter` blocks and the swept `.data` tables: their loops state them
+    let swept = lw.data.iter().any(|d| d.0 == st.node.0);
+    if swept
+        || lw
+            .alter
+            .as_ref()
+            .is_some_and(|a| a.nodes.contains(&st.node.0))
+    {
+        return lw.framing();
+    }
     if lw.ast.tag(st.node) == Tag::Instance {
         let name = name::key(&lw.card_head(st.node).0);
         if !lw.elements.insert((st.scope, name)) {

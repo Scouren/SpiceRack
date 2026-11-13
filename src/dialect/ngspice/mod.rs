@@ -19,7 +19,7 @@
 //! Layout (`rewrite/DIALECT-NGSPICE.md` §2): the two spines (`read.rs`, `write.rs`), numbers,
 //! names and expressions (`number.rs`, `name.rs`, `expr_read.rs`, `expr_write.rs`, the shared
 //! rows in `tables.rs`), the structure area (`read_structure.rs`, `read_include.rs`, `write_structure.rs`), the
-//! code table (`codes.rs`), and the areas of the later sub-slices as stubs (elements and
+//! code table (`codes.rs`), the start-up file's statements (`mode.rs`), and the areas of the later sub-slices as stubs (elements and
 //! sources S3.1, models S3.2, run and outputs S3.3, control S3.4; `rewrite/S3-AREAS.md`).
 //!
 //! Cites: `rewrite/DIALECT-NGSPICE.md`; `REWRITE-PLAN.md` §2–§4; `rewrite/SPINE.md`.
@@ -37,6 +37,7 @@ mod expr_lex;
 mod expr_read;
 mod expr_write;
 mod families;
+mod mode;
 mod name;
 mod number;
 mod outputs;
@@ -138,6 +139,12 @@ impl Read for Ngspice {
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
         out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
+    }
+
+    /// `.spiceinit`: ngspice-45 runs it before the deck (settle `spiceinit/`, R87a); its
+    /// compatibility mode is `mode.rs`'s.
+    fn environment(&self) -> Option<&'static str> {
+        Some(".spiceinit")
     }
 }
 

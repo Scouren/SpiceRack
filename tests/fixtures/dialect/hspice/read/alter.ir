@@ -1,0 +1,9 @@
+# codes:
+file "alter.sp" deck
+  title "alter"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): two plots: -1e-3, then (alter=1) -5e-4: the .alter block's .param reruns the analysis"
+  param rr = 1k
+  element vsource v1 (1 0) dc=1
+  element resistor r1 (1 0) value=rr
+  loop table (param rr) values=[1k, 2k]
+    analysis dc (source_dc v1) (lin start=1 stop=1 step=1)

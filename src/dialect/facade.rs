@@ -149,7 +149,7 @@ pub fn render_kit(
             .map(|f| f.text.clone())
     };
     let path = entry.path.to_string_lossy();
-    let src = Sources::load(&[&path], form, reader, &mut loader);
+    let src = Sources::load(&[&path], form, reader, None, &mut loader);
     assert!(
         src.entries().len() == 1,
         "render_kit: the kit's own file loads"

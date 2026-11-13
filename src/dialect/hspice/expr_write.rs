@@ -11,7 +11,8 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`,
 //! `pub(super) fn expr(&ir::Design, ir::ExprId, &mut String)`,
 //! `pub(super) fn value(&ir::Design, ir::ExprId, &mut String)`,
-//! `pub(super) fn spells(&ir::Design, ir::ExprId) -> bool`
+//! `pub(super) fn spells(&ir::Design, ir::ExprId) -> bool`,
+//! `pub(super) fn reads_unbound(&ir::Design, ir::ExprId) -> bool`
 
 use super::number;
 use super::tables;
@@ -205,6 +206,25 @@ pub(super) fn spells(design: &ir::Design, e: ir::ExprId) -> bool {
         stack.extend_from_slice(&kids);
     }
     true
+}
+
+/// Whether `e` reads a parameter that binds to no definition (an unbound name).
+pub(super) fn reads_unbound(design: &ir::Design, e: ir::ExprId) -> bool {
+    let mut stack = vec![e];
+    let mut kids = Vec::new();
+    // Bounded: every child id is lower than its parent's, so the walk ends.
+    while let Some(x) = stack.pop() {
+        let row = design.expr(x);
+        if let ir::Expr::Param(r) = row
+            && !r.is_resolved()
+        {
+            return true;
+        }
+        kids.clear();
+        children(design, row, &mut kids);
+        stack.extend_from_slice(&kids);
+    }
+    false
 }
 
 // ---- private ----

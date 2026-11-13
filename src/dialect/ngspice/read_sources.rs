@@ -45,7 +45,7 @@ use super::expr_read::{self, Fail};
 use super::number;
 use super::read::{Lower, Stmt};
 use super::tables::{self, Eval};
-use super::value::{Val, Wrap, emit, parens, unwrap};
+use super::value::{Val, Wrap, emit, parens, substituted, unwrap};
 use crate::ir;
 use crate::ir::Feature as F;
 use crate::ir::circuit_extra::CircuitExtra as X;
@@ -248,7 +248,7 @@ pub(super) fn val(lw: &Lower<'_, '_>, st: Stmt, tok: &str) -> Result<Val, Fail> 
             class: ir::OpaqueClass::InvalidInSource,
         });
     }
-    expr_read::parse_in(text, Eval::Numparam).map(Val::Tree)
+    expr_read::parse_in(text, Eval::Numparam).map(substituted)
 }
 
 /// Appends an optional value (`NONE` when absent).

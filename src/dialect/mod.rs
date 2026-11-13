@@ -34,7 +34,7 @@
 //! Cites: `REWRITE-PLAN.md` §2.1–§2.4, §3.4, §4.1; `rewrite/SPINE.md` §2–§3.
 //!
 //! Contents:
-//! - `pub trait Read` (`Read::references`, `Read::read`),
+//! - `pub trait Read` (`Read::references`, `Read::read`, `Read::environment`),
 //!   `pub trait Write` (`Write::features`, `Write::write`, `Write::admits`,
 //!   `Write::citations`), `pub struct Citation`
 //! - `pub struct DialectRow`, `pub static BUILTIN: &[DialectRow]`, `pub const ANY_FAMILY: &str`
@@ -82,6 +82,13 @@ pub trait Read: Sync {
     /// first, even when the text is empty (the facade anchors diagnostics by that order, and
     /// `transpile` writes the entry).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags);
+
+    /// The start-up file the simulator reads before a deck, by file name (ngspice's
+    /// `.spiceinit`), which [`Sources::load`] looks for beside the deck and hands the reader as
+    /// [`Sources::environment`]; `None` when the simulator reads none.
+    fn environment(&self) -> Option<&'static str> {
+        None
+    }
 }
 
 /// The IR → text of one dialect.

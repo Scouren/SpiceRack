@@ -12,7 +12,8 @@
 //!
 //! Contents: `pub(super) enum Val` (`Val::of(Scan) -> Val`), `pub(super) enum Wrap`
 //! (`Wrap::plain(self) -> Option<&str>`), `pub(super) fn emit(&mut Lower, Stmt, &Val) -> ExprId`,
-//! `pub(super) fn unwrap(&str) -> Wrap`, `pub(super) fn parens(&str) -> String`
+//! `pub(super) fn unwrap(&str) -> Wrap`, `pub(super) fn parens(&str) -> String`,
+//! `pub(super) fn substituted(Tree) -> Val`
 
 use super::expr_read::Tree;
 use super::number::{self, Scan};
@@ -115,4 +116,19 @@ pub(super) fn parens(inner: &str) -> String {
             c => c,
         })
         .collect()
+}
+
+/// A card's `{…}` / `'…'` value numparam evaluated: ngspice substitutes its result back into the
+/// card as `% 23.15e` text (`numparam/xpressn.c:1176`), which the card's `INPevaluate` reads as
+/// its 16 digits times a power of ten (`inpeval.c`: `'3'` runs as 3.0000000000000004, `'0.2'`
+/// as 0.19999999999999998, `'1.0453385141288605'` as 1.04533851412886; bare they read 3, 0.2,
+/// …8605; settle `numparam_round.sp`, spice-bench `xpressn-1.sp`). So a lone number is that
+/// text, every digit kept (the writer spells the reader's digits, A18). An expression stays a
+/// tree: the writer keeps it in braces, where numparam does the same again.
+pub(super) fn substituted(tree: Tree) -> Val {
+    let Some(lit) = tree.lone_literal() else {
+        return Val::Tree(tree);
+    };
+    let x = lit.value();
+    number::card(&format!("{x:.15e}")).map_or(Val::Tree(tree), Val::of)
 }
