@@ -1,0 +1,12 @@
+level 3 diode from w and l with m=2, forward 0.5 V
+load "spice/diode.osdi"
+load "spice/capacitor.osdi"
+model vs vsource
+model c sp_capacitor
+model dm sp_diode level=3 is=1e-4
+v1 (a 0) vs dc=0.5
+d1 (a 0) dm w=10u l=10u $mfactor=2
+control
+  options rawfile="ascii" reltol=1e-9
+  analysis op1 op
+endc

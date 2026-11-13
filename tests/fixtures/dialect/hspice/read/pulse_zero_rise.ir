@@ -1,0 +1,7 @@
+# codes:
+file "pulse_zero_rise.sp" deck
+  title "pulse_zero_rise"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): 0 until 1 us, then a ramp to 1 at 1.1 us: a given zero rise is TSTEP (0.1 us)"
+  element vsource v1 (1 0) wave=pulse(v1=0 v2=1 delay=1u rise=0 fall=0 width=1u period=4u given_zero=spice_default) dc_rule=wave_at_zero
+  element resistor r1 (1 0) value=1k
+  analysis tran stop=3u print_step=0.1u cap=ngspice_rule

@@ -23,7 +23,7 @@
 //!
 //! Contents: `pub(super) struct Tree`, `pub(super) struct Fail`,
 //! `pub(super) fn parse_in(&str, Eval) -> Result<Tree, Fail>`,
-//! `Tree::notes(&self) -> &[ir::Code]`, `Fail::invalid() -> Fail`, `Fail::unread() -> Fail`,
+//! `Tree::notes(&self) -> &[ir::Code]`, `Tree::lone_literal(&self) -> Option<ir::Literal>`, `Fail::invalid() -> Fail`, `Fail::unread() -> Fail`,
 //! `Tree::emit(&self, b, names, scope, pending) -> ir::ExprId`
 
 use super::codes;
@@ -128,6 +128,14 @@ impl Tree {
     /// read by its first and last argument), each once.
     pub(super) fn notes(&self) -> &[ir::Code] {
         &self.notes
+    }
+
+    /// The number the tree is, when it is one literal and nothing else.
+    pub(super) fn lone_literal(&self) -> Option<ir::Literal> {
+        match &self.nodes[self.root] {
+            N::Num(lit) => Some(*lit),
+            _ => None,
+        }
     }
 
     /// Appends the reachable nodes as expression rows (children first) and returns the root's

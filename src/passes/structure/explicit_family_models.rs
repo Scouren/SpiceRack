@@ -154,14 +154,14 @@ fn fresh(design: &ir::Design, word: &str) -> String {
     let taken = |n: &str| {
         !design.find_name(n).is_none()
             || design
-                .definitions()
+                .definitions_all()
                 .iter()
                 .any(|d| design.str(d.name).eq_ignore_ascii_case(n))
     };
     if !taken(word) {
         return word.to_string();
     }
-    let bound = design.definitions().len() + 1;
+    let bound = design.definitions_all().len() + 1;
     (1..=bound)
         .map(|n| format!("{word}_{n}"))
         .find(|n| !taken(n))

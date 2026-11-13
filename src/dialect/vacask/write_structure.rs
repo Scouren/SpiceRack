@@ -11,9 +11,10 @@
 //! `subckt`, `subckt_end`, `param`, `global`, `branch`, `if_end`, `opaque` (crate-private)
 
 use super::expr_write::{string, write_expr};
-use super::name::{self, Place};
+use super::name::{self, Place, identifier};
 use super::tables;
 use super::write::Writer;
+use super::write_models;
 use crate::ir;
 
 /// A device library of a family VACASK ships no file for. ponytail: goes when a `DeviceLibrary`
@@ -71,7 +72,7 @@ pub(super) fn include(w: &mut Writer<'_, '_>, at: ir::ItemRef, row: ir::item::In
     string(&path, w.out);
     if !row.section.is_none() {
         w.out.push_str(" section=");
-        name::spell(w.design.str(row.section), Place::Other, w.out);
+        name::spell(w.design.str(row.section), Place::Section, w.out);
     }
     w.out.push('\n');
 }
@@ -80,7 +81,7 @@ pub(super) fn include(w: &mut Writer<'_, '_>, at: ir::ItemRef, row: ir::item::In
 pub(super) fn section(w: &mut Writer<'_, '_>, row: ir::item::Section) {
     w.line();
     w.out.push_str("section ");
-    name::spell(w.design.str(row.name), Place::Other, w.out);
+    name::spell(w.design.str(row.name), Place::Section, w.out);
     w.out.push('\n');
 }
 
@@ -102,7 +103,7 @@ pub(super) fn load(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     // ponytail: decides from the whole definition table, dead rows included (the class of the
     // expression table's replaced rows); a live-definitions view replaces it in the `…_all()` round.
     let modules: Vec<ir::NameId> = d
-        .definitions()
+        .definitions_all()
         .iter()
         .filter(|def| def.kind == ir::DefKind::Module && def.item == at)
         .map(|def| def.name)
@@ -158,6 +159,16 @@ pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags)
                 }
             };
             (!spelled).then_some(NO_LIBRARY)
+        }
+        // Run131: a section name is one bare identifier; VACASK reads no quoted one.
+        ir::ItemKind::Include => {
+            let row: ir::item::Include = design.row(at.index);
+            (!row.section.is_none() && !identifier(design.str(row.section)))
+                .then_some(write_models::UNSPELLED)
+        }
+        ir::ItemKind::Section => {
+            let row: ir::item::Section = design.row(at.index);
+            (!identifier(design.str(row.name))).then_some(write_models::UNSPELLED)
         }
         _ => None,
     };

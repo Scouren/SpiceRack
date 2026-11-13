@@ -1,0 +1,5 @@
+file "a.cir" deck
+  element vsource v1 (in 0) dc=0 ac_mag=1 ac_phase_deg=0
+  element resistor r1 (in out) value=1k
+  element resistor r2 (out 0) value=1k
+  analysis noise (v (out)) source=v1 (dec start=1k stop=100k points=5) source_ac

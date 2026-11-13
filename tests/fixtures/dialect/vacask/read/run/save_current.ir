@@ -1,0 +1,23 @@
+laws bc_sat_areab_only sub_sat_emission_ns diode_wl_mult_once diode_sidewall_own_f1 diode_xom_absent_1e14 vdmos_kp_absent_20 vdmos_tcvth_raises vdmos_clamp_by_fc mos_small_signal_exact mos6_small_signal_exact bjt_irb_small_signal_exact vdmos_mult_charges_copies diode_isr_reverse_present diode_isr_small_signal_exact diode_tt_factor_clamped trig_exact exp_exact log_zero_error div_exact asin_edge_fails
+# Oracle: run F13 (scratchpad vacask/run130, settle run/save_current): `p(x, i)` is the current
+# into x's first terminal for an isource, a resistor (sp_resistor and resistor), a vccs and a
+# cccs, which have no `i(x)` ("Node 'x:flow(br)' not found."), so it is their branch current
+# (`i`); a vsource's, an inductor's, a vcvs's and a ccvs's current is `i(x)`, so their `p(x, i)`
+# stays the device quantity it names (VACASK names that vector `x.i`, not `x:flow(br)`); another
+# quantity, a path, and a name no element before the line has stay `param`.
+# codes:
+file "save_current.sim" deck
+  title "save of element currents"
+  device_library resistor
+  model vs source_v
+  model is source_i
+  model r resistor
+  model g vccs
+  model f cccs
+  element vsource v1 (1 0) model=vs dc=1i
+  element isource i1 (7 0) model=is dc=1m
+  element resistor r1 (1 2) model=r value=1k
+  element vccs g1 (4 0 2 0) model=g gain=1m
+  element cccs f1 (6 0) model=f gain=3i sense=v1
+  save analysis=(op dc tran) from_here (i (r1)) (i (i1)) (i (g1)) (i (f1)) (param (v1) (i)) (i (v1)) (param (r1) (v)) (param (x1 r1) (i)) (param (r9) (i))
+  analysis op name=op1

@@ -37,7 +37,7 @@ impl Visible {
     /// The table of `d` as read (its definitions and its include items).
     pub(super) fn new(d: &ir::Design) -> Visible {
         let mut own = HashMap::new();
-        for (k, def) in d.definitions().iter().enumerate() {
+        for (k, def) in d.definitions_all().iter().enumerate() {
             let id = ir::DefId(u32::try_from(k).expect("definitions fit a u32"));
             own.entry((def.scope, def.kind, def.name)).or_insert(id);
         }
@@ -76,7 +76,7 @@ impl Visible {
     /// an include.
     pub(super) fn redefinitions(&self, d: &ir::Design) -> Vec<(ir::ItemRef, ir::DefId)> {
         let mut defs_of: HashMap<ir::ItemRef, Vec<ir::DefId>> = HashMap::new();
-        for (k, def) in d.definitions().iter().enumerate() {
+        for (k, def) in d.definitions_all().iter().enumerate() {
             let id = ir::DefId(u32::try_from(k).expect("definitions fit a u32"));
             defs_of.entry(def.item).or_default().push(id);
         }

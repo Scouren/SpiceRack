@@ -1,0 +1,6 @@
+file "d.sp" deck
+  param t = "w"
+  param s = draw:rel_gauss:sampling:run("back\\slash", 0.1, 3)
+  param u = draw:abs_gauss:sampling:call_site(t, 0.1, 3)
+  param v = draw:abs_unif:sampling:call_site([1, 2], 0.1)
+  param a = draw:abs_gauss:sampling:call_site(1, 0.1, 3) + 2

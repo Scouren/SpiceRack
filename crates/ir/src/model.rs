@@ -405,8 +405,8 @@ impl RowFacts for Model {
         out.push(self.version);
     }
 
-    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        crate::circuit_features::model_features(self, set)
+    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
+        crate::circuit_features::model_features(self, design, set)
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {

@@ -1,0 +1,15 @@
+vdmos_load transient, 80 C, m=3, pulse 0..5 V on the gate through 10, 2k load from 3 V
+load "spice/vdmos.osdi"
+load "spice/resistor.osdi"
+model vs vsource
+model r sp_resistor
+model nm sp_vdmos type=1 vto=2 kp=20 lambda=0.01 rd=10m rs=10m rg=1 cgdmin=50p cgdmax=500p a=0.5 cgs=1n cjo=1n vj=0.8 m=0.4 fc=0.5 is=1e-12 n=1.2 tt=50n
+vdd (dd 0) vs dc=3
+rl (dd d) r r=2k
+vin (in 0) vs type="pulse" val0=0 val1=5 delay=1n rise=1n fall=1n width=5n period=20n
+rg (in g) r r=10
+m1 (d g 0 t1 tc1) nm  $mfactor=3
+control
+  options temp=80 tnom=27 reltol=1e-6 abstol=1e-12 rawfile="ascii"
+  analysis tran1 tran step=10p stop=40n maxstep=20p
+endc

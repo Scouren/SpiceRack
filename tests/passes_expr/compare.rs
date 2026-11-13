@@ -333,7 +333,7 @@ fn dropped(design: &ir::Design, was: Result<ir::Value, ir::Domain>, new: ir::Exp
     };
     let mut stack = vec![new];
     let mut seen = std::collections::HashSet::new();
-    for _ in 0..=2 * design.expr_count() + 1 {
+    for _ in 0..=2 * design.expr_count_all() + 1 {
         let Some(e) = stack.pop() else { return true };
         if e == at {
             return false;
@@ -371,7 +371,7 @@ fn int_capable(e: ir::Expr) -> bool {
 fn holds(design: &ir::Design, root: ir::ExprId, hit: fn(ir::Expr) -> bool) -> bool {
     let mut stack = vec![root];
     let mut seen = std::collections::HashSet::new();
-    for _ in 0..=2 * design.expr_count() + 1 {
+    for _ in 0..=2 * design.expr_count_all() + 1 {
         let Some(e) = stack.pop() else { return false };
         if e.is_none() || !seen.insert(e) {
             continue;
@@ -410,10 +410,14 @@ fn differ(
     let same = match (a, b) {
         (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits() && (!typed || x.int == y.int),
         (Err(ir::Domain::OutOfDomain(e)), _) if !typed && int_capable(after.expr(e)) => true,
-        // R12: `pow` of a negative base and a fractional exponent is outside its domain, and
-        // `pow_to_powabs` is exact on the domain only (the one rule stated so)
+        // R12: `pow` of a negative base and a fractional exponent, and `clamp` with `lo > hi`,
+        // are outside their domains, and `pow_to_powabs` and `clamp_to_min_max` are exact on
+        // the domain only (the rules stated so)
         (Err(ir::Domain::OutOfDomain(e)), _)
-            if matches!(after.expr(e), ir::Expr::Call(ir::Func::Pow, _)) =>
+            if matches!(
+                after.expr(e),
+                ir::Expr::Call(ir::Func::Pow | ir::Func::Clamp, _)
+            ) =>
         {
             true
         }

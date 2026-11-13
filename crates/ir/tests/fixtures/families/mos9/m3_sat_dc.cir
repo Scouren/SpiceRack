@@ -1,0 +1,14 @@
+mos9 m3 (27 C, m=3), sat (vgs=1.5, vds=3.0, vbs=-0.5), dc
+.model nm nmos level=9 vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 nsub=1e16 vmax=5e4 xj=0.5u nfs=1e11 theta=0.05 eta=0.1 kappa=0.2 delta=0.5 ld=0.1u tox=20n cgso=3e-10 cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 fc=0.5 rd=10 rs=10
+vd d 0 dc 3.0
+vg g 0 dc 1.5
+vb b 0 dc -0.5
+m1 d g 0 b nm w=10u l=2u ad=20p as=20p pd=24u ps=24u m=3
+.temp 27
+.options reltol=1e-9 abstol=1e-15
+.control
+set numdgt=12
+op
+print i(vd)
+.endc
+.end

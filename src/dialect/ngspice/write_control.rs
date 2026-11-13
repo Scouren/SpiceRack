@@ -192,7 +192,7 @@ pub(super) fn admits(
                 refuse(LOAD_SOURCE);
             }
             let defines = |d: &ir::scope::Def| d.kind == ir::DefKind::Module && d.item == item;
-            if design.definitions().iter().any(defines) {
+            if design.definitions_all().iter().any(defines) {
                 refuse(LOAD_MODULES);
             }
         }

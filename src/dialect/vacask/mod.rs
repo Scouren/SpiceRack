@@ -12,7 +12,8 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §1–§4, §7; `REWRITE-PLAN.md` §4.1, §4.3.
 //!
 //! Contents: `pub struct Vacask` (`impl Read`, `impl Write`), `pub static VACASK: Vacask`,
-//! `pub static FEATURES: ir::FeatureSet`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
+//! `pub const LAWS: ir::Laws`, `pub static FEATURES: ir::FeatureSet`,
+//! `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
 mod atan2;
 mod bind;
@@ -51,6 +52,33 @@ pub struct Vacask;
 /// The one value the `vacask` row of `dialect::BUILTIN` points at.
 pub static VACASK: Vacask = Vacask;
 
+/// The laws the VACASK modules the flake pins compute by: one variant of each of the IR's law
+/// points (devices R90–R96, functions R93a), the second of each pair in `crates/ir/src/laws.rs`
+/// (each variant's doc names the run). Every read states them (`Builder::set_laws`), so
+/// [`FEATURES`] holds their members.
+pub const LAWS: ir::Laws = ir::Laws::of(&[
+    ir::Law::BcSatAreabOnly,
+    ir::Law::SubSatEmissionNs,
+    ir::Law::DiodeWlMultOnce,
+    ir::Law::DiodeSidewallOwnF1,
+    ir::Law::DiodeXomAbsent1e14,
+    ir::Law::VdmosKpAbsent20,
+    ir::Law::VdmosTcvthRaises,
+    ir::Law::VdmosClampByFc,
+    ir::Law::MosSmallSignalExact,
+    ir::Law::Mos6SmallSignalExact,
+    ir::Law::BjtIrbSmallSignalExact,
+    ir::Law::VdmosMultChargesCopies,
+    ir::Law::DiodeIsrReversePresent,
+    ir::Law::DiodeIsrSmallSignalExact,
+    ir::Law::DiodeTtFactorClamped,
+    ir::Law::TrigExact,
+    ir::Law::ExpExact,
+    ir::Law::LogZeroError,
+    ir::Law::DivExact,
+    ir::Law::AsinEdgeFails,
+]);
+
 /// What VACASK spells: the union of every area's part, and exactly the reader's image (law L5).
 pub static FEATURES: ir::FeatureSet = expr_read::FEATURES
     .union(read_structure::FEATURES)
@@ -58,7 +86,8 @@ pub static FEATURES: ir::FeatureSet = expr_read::FEATURES
     .union(read_models::FEATURES)
     .union(read_sources::FEATURES)
     .union(read_run::FEATURES)
-    .union(read_outputs::FEATURES);
+    .union(read_outputs::FEATURES)
+    .union(LAWS.features());
 
 impl Read for Vacask {
     /// The files `text` names: each `include "path"` (`Reference::File`) and each `load` of a
@@ -70,6 +99,7 @@ impl Read for Vacask {
 
     /// Every file of `src`, in `src`'s order (`read.rs`).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
     }
 }
@@ -92,7 +122,9 @@ impl Write for Vacask {
             expr_write::admit(design, at, &mut handles, diags);
             folds.see(design, at, scope);
             match at.kind {
-                K::Load | K::DeviceLibrary => write_structure::admit(design, at, diags),
+                K::Load | K::DeviceLibrary | K::Include | K::Section => {
+                    write_structure::admit(design, at, diags);
+                }
                 K::Model => write_models::admit(design, &index.words, at, diags),
                 K::Element => {
                     write_elements::admit(design, &index, at, scope, diags);
@@ -105,11 +137,9 @@ impl Write for Vacask {
                 K::Save => write_outputs::admit(design, at, diags),
                 K::Title
                 | K::Comment
-                | K::Include
                 | K::Global
                 | K::Opaque
                 | K::Subckt
-                | K::Section
                 | K::If
                 | K::Param
                 | K::Func

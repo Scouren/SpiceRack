@@ -2,9 +2,14 @@
 //! reference the item holds out, each segment of a path one use with the scope whose element
 //! list the name is read in; a pass's renames stored back. Rows report their references
 //! (`RowFacts::map_element_names`); the kernel adds `Expr::I` in the item's expressions and
-//! resolves every path: segment 0 is read in the item's listing scope, each next one in the body
-//! of the master of the instance the segment before names, and a segment after a non-instance
-//! or an unresolved master is read in `ScopeId::NONE` (unresolved: never guessed).
+//! resolves every path: segment 0 is read in the name scope of the item's listing scope
+//! (`Design::name_scope`, R82: the enclosing subcircuit's body or the whole deck, never a
+//! section, a branch or an include), each next one in the body of the master of the instance
+//! the segment before names, and a segment after a non-instance or an unresolved master is read
+//! in `ScopeId::NONE` (unresolved: never guessed). A use binds by name within its name scope: to
+//! every element of that name there (two exclusive `if` branches may each hold one, and `check`
+//! allows it: `DuplicateElement` is per listing scope), so a pass that renames an element
+//! renames every element of that name in the name scope with its uses.
 //!
 //! Cites: `rewrite/AMEND-A12.md` A23 (Later), A32; `rewrite/RULINGS.md` R23.
 //!
@@ -22,11 +27,12 @@ use crate::feature::expr_roots;
 use crate::id::{ExprId, ItemRef, NameId, ScopeId};
 use crate::item::{DefKind, ItemKind, Subckt};
 
-/// One element name read by name: `name` is looked up in `scope`'s element list
-/// (`ScopeId::NONE`: the scope cannot be resolved, so the name names no known element).
+/// One element name read by name: `name` names every element of that name whose listing scope's
+/// `Design::name_scope` is `scope` (`ScopeId::NONE`: the scope cannot be resolved, so the name
+/// names no known element).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ElementUse {
-    /// The scope whose element list `name` is read in.
+    /// The name scope `name` is read in (`Design::name_scope`).
     pub scope: ScopeId,
     /// The element name as written (the whole name, A13).
     pub name: NameId,
@@ -59,7 +65,10 @@ impl Editor<'_> {
         }
         let current_names: Vec<NameId> = currents
             .iter()
-            .map(|&(_, old)| f(ElementUse { scope, name: old }).unwrap_or(old))
+            .map(|&(_, old)| {
+                let scope = read.name_scope(scope);
+                f(ElementUse { scope, name: old }).unwrap_or(old)
+            })
             .collect();
         // store back, in the same order
         let mut k = 0;
@@ -93,7 +102,7 @@ impl Design {
 }
 
 /// Calls `f` on each segment of `path` read from `scope` and returns the names after it: segment
-/// 0 is read in `scope`, each next in the body of the master of the instance the segment before
+/// 0 is read in `scope`'s name scope, each next in the body of the master of the instance the segment before
 /// names (found by its old name, else by the name `f` gave it); `NONE` after a non-instance, an
 /// unknown name or an unresolved master.
 pub(crate) fn walk_path(
@@ -102,7 +111,7 @@ pub(crate) fn walk_path(
     path: &[NameId],
     f: &mut dyn FnMut(ElementUse) -> Option<NameId>,
 ) -> Vec<NameId> {
-    let mut at = scope;
+    let mut at = design.name_scope(scope);
     let mut names = Vec::with_capacity(path.len());
     for &old in path {
         let new = f(ElementUse {
@@ -119,21 +128,33 @@ pub(crate) fn walk_path(
 
 // ---- private ----
 
-/// The body of the master of the instance `name` names in `scope`'s element list, if it is an
-/// instance of a resolved subcircuit.
+/// The body of the master of the first element `name` names in the name scope `scope`, if it is
+/// an instance of a resolved subcircuit.
 fn next_scope(design: &Design, scope: ScopeId, name: NameId) -> Option<ScopeId> {
     if scope.is_none() {
         return None;
     }
-    let index = design
-        .element_names
-        .get_or_init(|| crate::build::element_index(design));
+    let index = design.name_index.get_or_init(|| name_index(design));
     let item = *index.get(&(scope, name))?;
     let element: Element = design.row(item.index);
     let def = element.model.def.index_checked(design.defs.len())?;
     let def = design.defs[def];
     (def.kind == DefKind::Subckt && def.item.kind == ItemKind::Subckt)
         .then(|| design.row::<Subckt>(def.item.index).body)
+}
+
+/// The first element of each whole name in each name scope, in list order: `next_scope`'s
+/// index. O(items × scope depth).
+fn name_index(design: &Design) -> crate::names::FxMap<(ScopeId, NameId), ItemRef> {
+    let mut names = crate::names::FxMap::default();
+    for (s, items) in design.scope_items.iter().enumerate() {
+        let scope = design.name_scope(ScopeId(s as u32));
+        for &item in items.iter().filter(|i| i.kind == ItemKind::Element) {
+            let name = design.row::<Element>(item.index).name;
+            names.entry((scope, name)).or_insert(item);
+        }
+    }
+    names
 }
 
 /// The `Expr::I` rows of `item`'s expressions with the names they read, each row once, root by

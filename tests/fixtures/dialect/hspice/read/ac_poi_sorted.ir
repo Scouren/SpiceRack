@@ -1,0 +1,8 @@
+# codes:
+file "ac_poi_sorted.sp" deck
+  title "ac_poi_sorted"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): 1000, 2000, 3000: '.ac poi 3 1k 2k 3k'"
+  element vsource v1 (1 0) dc=0 ac_mag=1 ac_phase_deg=0
+  element resistor r1 (1 2) value=1k
+  element capacitor c1 (2 0) value=1u
+  analysis ac (list values=[1k, 2k, 3k])

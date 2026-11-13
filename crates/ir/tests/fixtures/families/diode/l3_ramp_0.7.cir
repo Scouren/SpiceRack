@@ -1,0 +1,12 @@
+sidewall charge through the forward knee: ramp to 0.7 V, charge on a 1 nF series capacitor
+.model dm d is=1e-20 cjo=0 cjsw=10p php=0.8 mjsw=0.33 fcs=0.5
+v1 s 0 pwl 0 0 1u 0.7 2u 0.7
+c0 s a 1n
+d1 a 0 dm pj=1
+.options reltol=1e-9
+.control
+set numdgt=12
+tran 1n 2u 0 1n
+print v(s,a)[length(v(s))-1]
+.endc
+.end

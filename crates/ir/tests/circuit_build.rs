@@ -506,7 +506,7 @@ mod tests {
         );
         let design = b.design();
         assert_eq!(item.kind, ItemKind::Model);
-        let defs = design.definitions();
+        let defs = design.definitions_all();
         assert_eq!(defs.len(), 1);
         assert_eq!(
             (defs[0].kind, defs[0].name, defs[0].item),
@@ -660,7 +660,7 @@ mod tests {
         let top = deck(&mut d);
         let mut b = d.builder();
         let (_, _body) = b.subckt(top, "div", &["a", "b"], &[], Span::NONE);
-        let def = b.design().definitions()[0];
+        let def = b.design().definitions_all()[0];
         let terminals = b.names(&["x", "y"]);
         let name = b.name("x1");
         let head = ElemHead {
@@ -703,12 +703,12 @@ mod tests {
         let m1 = b.semi(top, ElemKind::Mosfet, h, semi(), Span::NONE);
         let design = b.design();
         let names: Vec<&str> = design
-            .definitions()
+            .definitions_all()
             .iter()
             .map(|d| design.str(d.name))
             .collect();
         assert_eq!(names, ["nch.1", "nch", "nch.2"]);
-        let group = design.definitions()[1];
+        let group = design.definitions_all()[1];
         assert_eq!((group.kind, group.item), (DefKind::Model, first));
         let mut diags = spicerack_ir::Diags::new();
         spicerack_ir::link(&mut d, &mut diags);

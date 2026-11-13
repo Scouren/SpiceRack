@@ -1,0 +1,12 @@
+passive r_geometry nom (27 C, m=1), dc (1 V on a, 1 MHz)
+.model rm r rsh=100 narrow=0.1u short=0.2u tc1r=1e-3 tc2r=1e-5
+vd a 0 dc 1
+r1 a 0 rm l=10u w=2u
+.temp 27
+.options reltol=1e-9 abstol=1e-15
+.control
+set numdgt=12
+op
+print i(vd)
+.endc
+.end

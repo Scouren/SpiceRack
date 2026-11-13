@@ -10,22 +10,22 @@
 //!
 //! Contents: `pub(super) fn tag_reach(&ir::Design, Vec<ir::ExprId>) -> Vec<bool>`
 
-use super::nodes::{def_values, live};
+use super::nodes::def_values;
 use crate::ir;
 
 /// Per expression row: whether its tag may reach one of `seeds` (the operands of the nodes
 /// that read a tag), following the tag table's flow backwards. A worklist over rows and
 /// definitions; each row and each definition enters it once.
 pub(super) fn tag_reach(design: &ir::Design, seeds: Vec<ir::ExprId>) -> Vec<bool> {
-    let n = design.expr_count();
-    let defs = design.definitions();
+    let n = design.expr_count_all();
+    let defs = design.definitions_all();
     let values = def_values(design);
     let mut read = vec![false; n];
     let mut def_read = vec![false; defs.len()];
     let mut stack = seeds;
     // the live calls of each function, for its formals (a replaced row calls nothing)
     let mut calls: Vec<Vec<ir::ExprList>> = vec![Vec::new(); defs.len()];
-    for e in live(design) {
+    for e in design.live_exprs() {
         if let ir::Expr::UserCall(r, args) = design.expr(e)
             && r.is_resolved()
         {

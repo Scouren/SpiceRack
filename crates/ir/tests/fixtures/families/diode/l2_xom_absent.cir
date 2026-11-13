@@ -1,0 +1,11 @@
+level 3 metal capacitor wm=lm=100u, xom absent, AC current at 1 MHz
+.model dm d level=3 is=1e-20 cjo=0 wm=100u lm=100u
+v1 a 0 dc -1 ac 1
+d1 a 0 dm
+.options reltol=1e-9
+.control
+set numdgt=12
+ac lin 1 1meg 1meg
+print mag(i(v1))
+.endc
+.end

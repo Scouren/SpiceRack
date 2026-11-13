@@ -1,0 +1,12 @@
+transit time factor 1 - ttt1*100 at 127 C, ttt1=-0.005... forward 0.6 V, AC current at 100 MHz
+.model dm d is=1e-14 tt=1n ttt1=-0.005
+v1 a 0 dc 0.6 ac 1
+d1 a 0 dm
+.temp 127
+.options reltol=1e-9
+.control
+set numdgt=12
+ac lin 1 100meg 100meg
+print mag(i(v1))
+.endc
+.end

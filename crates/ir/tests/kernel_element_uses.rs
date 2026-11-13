@@ -8,7 +8,7 @@
 //!
 //! Contents: none (tests only).
 
-use spicerack_ir::{Design, Diags, ElementUse, dump, parse_unchecked};
+use spicerack_ir::{Design, Diags, ElementUse, ScopeId, dump, parse_unchecked};
 
 // ---- private ----
 
@@ -121,7 +121,7 @@ fn renaming_every_element_leaves_no_old_name_in_the_text() {
     // door lists that resolves to one; a reference some row forgot keeps its old name and is
     // found as a whole token, whichever row holds it
     use spicerack_ir::r#gen::{Size, generate};
-    use spicerack_ir::{Element, FeatureSet, ItemKind, NameId, ScopeId};
+    use spicerack_ir::{Element, FeatureSet, ItemKind, NameId};
     use std::collections::{HashMap, HashSet};
     let size = Size {
         items: 30,
@@ -148,7 +148,13 @@ fn renaming_every_element_leaves_no_old_name_in_the_text() {
             let marker = e.builder().name(&format!("zz{}", d.str(n)));
             fresh.insert(n, marker);
         }
-        let named: HashSet<(ScopeId, NameId)> = elements.iter().map(|&(_, s, n)| (s, n)).collect();
+        // R82: an element's name scope is its subcircuit or the deck, across sections, branches
+        // and includes; a use names every element of its name there (twins in exclusive
+        // branches included, each renamed with it)
+        let named: HashSet<(ScopeId, NameId)> = elements
+            .iter()
+            .map(|&(_, s, n)| (d.name_scope(s), n))
+            .collect();
         for &(item, scope) in &items {
             e.editor().map_element_uses(scope, item, &mut |u| {
                 let hit = named.contains(&(u.scope, u.name));
@@ -176,4 +182,73 @@ fn renaming_every_element_leaves_no_old_name_in_the_text() {
         renamed >= 1000 && uses >= 20,
         "{renamed} elements, {uses} uses renamed"
     );
+}
+
+#[test]
+fn a_use_reads_the_name_scope_across_sections_and_branches() {
+    // R82: an element inside a section or an `if` branch is named from the deck's top (runs:
+    // tests/fixtures/scope/runs.out, both simulators alter it by name from the top level); two
+    // exclusive branches may each hold one of a name, and the use names both
+    let d = read(
+        "file \"t.sp\" deck\n  section lib1\n    element resistor r2 (b 0) value=1\n  if (1)\n    element resistor r3 (b 0) value=1\n  else\n    element resistor r3 (b 0) value=2\n  alter (device_param r2 tc1) value=2\n  alter (device_param r3 tc1) value=2\n  loop sweep (temp) (list values=[1])\n    alter (device_param r2 tc1) value=3\n",
+    );
+    let top = d.file(d.entry()).top;
+    let uses: Vec<(String, ScopeId)> = d
+        .element_uses()
+        .into_iter()
+        .map(|(_, u)| (d.str(u.name).to_owned(), u.scope))
+        .collect();
+    // the third use stands in a loop body: still read in the deck's name scope
+    let want = [("r2", top), ("r3", top), ("r2", top)].map(|(n, s)| (n.to_owned(), s));
+    assert_eq!(uses, want);
+    let listed: Vec<ScopeId> = d
+        .reachable()
+        .into_iter()
+        .filter(|(i, _)| i.kind == spicerack_ir::ItemKind::Element)
+        .map(|(_, s)| d.name_scope(s))
+        .collect();
+    assert_eq!(
+        listed,
+        [top, top, top],
+        "each element's name scope is the deck"
+    );
+    let mut diags = Diags::new();
+    spicerack_ir::check(&d, &mut diags);
+    assert!(
+        diags.is_empty(),
+        "twins in exclusive branches are legal: {:?}",
+        diags.rows()
+    );
+}
+
+#[cfg(feature = "gen")]
+#[test]
+fn the_generator_draws_twins_in_exclusive_branches() {
+    // R82: the generator gives an element in an `if` branch the name of one in a sibling branch;
+    // the renaming property above then covers a use that names both. Twins need elements in two
+    // branches of one `if`, which is rare (about 3 designs in 1,000): floor 6 of 4,000
+    use spicerack_ir::r#gen::{Size, generate};
+    use spicerack_ir::{Element, FeatureSet, ItemKind, NameId};
+    use std::collections::HashMap;
+    let size = Size {
+        items: 30,
+        scope_depth: 3,
+        expr_depth: 4,
+        files: 1,
+    };
+    let mut designs = 0;
+    for seed in 0..4_000u64 {
+        let d = generate(seed, &FeatureSet::ALL, size);
+        let mut seen: HashMap<(ScopeId, NameId), ScopeId> = HashMap::new();
+        let twin = d.reachable().into_iter().any(|(i, s)| {
+            if i.kind != ItemKind::Element {
+                return false;
+            }
+            let n = d.row::<Element>(i.index).name;
+            seen.insert((d.name_scope(s), n), s)
+                .is_some_and(|other| other != s)
+        });
+        designs += usize::from(twin);
+    }
+    assert!(designs >= 6, "{designs} designs with twins");
 }

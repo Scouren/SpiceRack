@@ -1,0 +1,10 @@
+# codes:
+file "temp_list.sp" deck
+  title "temp_list"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): two plots (temp=27: -5.67034677e-03, temp=50: -2.18670282e-02): '.temp 27 50' runs the analysis at each"
+  element vsource v1 (1 0) dc=0.7
+  element diode d1 (1 0) model=dm
+  model dm diode params=(is=1e-14)
+  env tnom=27 whole_run
+  loop sweep (temp) (list values=[27, 50])
+    analysis dc (source_dc v1) (lin start=0.7 stop=0.7 step=1)

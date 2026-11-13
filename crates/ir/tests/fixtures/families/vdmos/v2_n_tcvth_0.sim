@@ -1,0 +1,12 @@
+vdmos nchan kp=20 vto=2 tcvth=0 at 100 C, vgs=4, vds=10
+load "spice/vdmos.osdi"
+model vs vsource
+model mn sp_vdmos type=1 kp=20 vto=2 tcvth=0
+vd (d 0) vs dc=10
+vg (g 0) vs dc=4
+m1 (d g 0 t tc) mn
+control
+  options rawfile="ascii" reltol=1e-9
+  options temp=100 tnom=27
+  analysis op1 op
+endc

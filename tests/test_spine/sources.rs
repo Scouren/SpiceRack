@@ -1,16 +1,74 @@
 //! `Sources::load`'s walk and `Reference::resolve`.
 //!
 //! Oracles: a hand-built include graph with its expected breadth-first order; paths resolved
-//! by hand.
+//! by hand; the start-up file's lookup order, ngspice-45's (R87a, settle `spiceinit/{a,b,c,d}`
+//! on `step2-ngspice`: the deck folder's `.spiceinit`, else the working directory's).
 //!
 //! Contents: tests only.
 
 use std::collections::HashMap;
 
-use spicerack::dialect::{self, Reference, Sources, irtext::IrText};
+use spicerack::dialect::{self, Read, Reference, Sources, irtext::IrText};
 use spicerack::ir;
 
+/// A reader that names a start-up file and reads nothing (the loader's test).
+struct WithInit;
+
+impl Read for WithInit {
+    fn references(&self, _: &str) -> Vec<Reference> {
+        Vec::new()
+    }
+    fn read(&self, _: &Sources, _: &mut ir::Builder<'_>, _: &mut ir::Diags) {}
+    fn environment(&self) -> Option<&'static str> {
+        Some(".spiceinit")
+    }
+}
+
 // ---- private ----
+
+#[test]
+fn a_deck_gets_its_folders_start_up_file_else_the_working_directorys() {
+    let files: HashMap<&str, &str> = HashMap::from([
+        ("a/sub/deck.sp", "t"),
+        ("a/sub/.spiceinit", "set ngbehavior=ps"),
+        ("w/.spiceinit", "set ngbehavior=lt"),
+        ("b/sub/deck.sp", "t"),
+    ]);
+    let mut loader = |p: &str| files.get(p).map(|t| t.to_string());
+    let load = |deck: &str, cwd: Option<&str>, loader: &mut dyn FnMut(&str) -> Option<String>| {
+        Sources::load(&[deck], ir::Role::Deck, &WithInit, cwd, loader)
+    };
+    // spiceinit/c and d: with both, the deck folder's wins
+    let both = load("a/sub/deck.sp", Some("w"), &mut loader);
+    assert_eq!(
+        both.environment(),
+        Some(("a/sub/.spiceinit", "set ngbehavior=ps"))
+    );
+    // spiceinit/b: the working directory's when the deck folder has none
+    let cwd = load("b/sub/deck.sp", Some("w"), &mut loader);
+    assert_eq!(
+        cwd.environment(),
+        Some(("w/.spiceinit", "set ngbehavior=lt"))
+    );
+    assert_eq!(load("b/sub/deck.sp", None, &mut loader).environment(), None);
+    // a library has no start-up file; a reader that names none gets none
+    let lib = Sources::load(
+        &["a/sub/deck.sp"],
+        ir::Role::Library,
+        &WithInit,
+        None,
+        &mut loader,
+    );
+    assert_eq!(lib.environment(), None);
+    let none = Sources::load(
+        &["a/sub/deck.sp"],
+        ir::Role::Deck,
+        &IrText,
+        None,
+        &mut loader,
+    );
+    assert_eq!(none.environment(), None);
+}
 
 #[test]
 fn sources_load_walks_references_breadth_first_once_each() {
@@ -32,7 +90,7 @@ fn sources_load_walks_references_breadth_first_once_each() {
         asked.push(p.to_string());
         files.get(p).map(|t| t.to_string())
     };
-    let src = Sources::load(&["top/deck.ir"], ir::Role::Deck, &IrText, &mut loader);
+    let src = Sources::load(&["top/deck.ir"], ir::Role::Deck, &IrText, None, &mut loader);
     let paths: Vec<&str> = src.files().iter().map(|(p, _)| p.as_str()).collect();
     assert_eq!(
         paths,
@@ -58,7 +116,7 @@ fn sources_load_stops_at_the_depth_cap() {
         let i: usize = p.strip_prefix('f')?.strip_suffix(".ir")?.parse().ok()?;
         texts.get(i).cloned()
     };
-    let src = Sources::load(&["f0.ir"], ir::Role::Library, &IrText, &mut loader);
+    let src = Sources::load(&["f0.ir"], ir::Role::Library, &IrText, None, &mut loader);
     assert_eq!(src.files().len(), usize::from(dialect::DEPTH_MAX) + 1);
     assert_eq!(src.form(), ir::Role::Library);
 }
@@ -87,7 +145,7 @@ fn a_parent_reference_above_the_root_is_a_missing_file_never_a_sibling() {
         asked.push(p.to_string());
         files.get(p).map(|t| t.to_string())
     };
-    let src = Sources::load(&["deck.ir"], ir::Role::Deck, &IrText, &mut loader);
+    let src = Sources::load(&["deck.ir"], ir::Role::Deck, &IrText, None, &mut loader);
     let paths: Vec<&str> = src.files().iter().map(|(p, _)| p.as_str()).collect();
     assert_eq!(paths, ["deck.ir"], "the sibling is not taken");
     assert_eq!(asked, ["deck.ir", "../lib.ir"]);

@@ -37,6 +37,7 @@ const READ: &[&str] = &[
     "keyword_params",
     "noise",
     "notes",
+    "numparam_round",
     "pulse",
     "pwl",
     "sffm",

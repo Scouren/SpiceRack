@@ -220,7 +220,7 @@ pub(super) fn spells_in(design: &ir::Design, e: ir::ExprId, eval: Eval) -> bool 
     let numparam = eval == Eval::Numparam;
     let mut stack = vec![e];
     let mut kids = Vec::new();
-    let mut seen = vec![false; design.expr_count()];
+    let mut seen = vec![false; design.expr_count_all()];
     // Bounded: each row is checked once.
     while let Some(x) = stack.pop() {
         if std::mem::replace(&mut seen[x.index()], true) {

@@ -1,4 +1,4 @@
 file "a.sp" deck
   element vsource v1 (in 0) dc=1
   element resistor r1 (in 0) value=1k
-  analysis dc (device_param r1 r) (lin start=1k stop=3k step=1k)
+  analysis dc (device_param r1 tc1) (lin start=1k stop=3k step=1k)
