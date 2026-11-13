@@ -1,0 +1,16 @@
+# Oracle: settle diode_area_zero (run115: area=0 is area 1 with a warning to VACASK, no device to
+# ngspice-45: kept as text, P2110; R91 F23). ikp, rsw, vp and qpscale are sp_diode's own: kept as
+# given on the family (R91a), the ngspice writer refuses what its diode lacks.
+# codes: P2110 P2110 S0002 S0002
+file "diode_vacask_only.sim" deck
+  title "diode parameters only VACASK has, and a zero area"
+  device_library diode
+  model da diode params=(is=1e-14)
+  model dk diode params=(is=1e-14 ikp=1m)
+  model dr diode params=(is=1e-14 rsw=1i)
+  model dv diode params=(is=1e-14 vp=1i)
+  model dq diode params=(is=1e-14 qpscale=2i)
+  element diode d1 (a 0) model=da
+  opaque vacask private "d2 (a 0) da area=0"
+  opaque vacask private "d3 (a 0) da area=0.0"
+  element diode d4 (a 0) model=dk

@@ -328,7 +328,12 @@ pub(super) fn model_name_in(word: &str, written: &str) -> Name {
     };
     let target = p.target(written);
     if p.model.contains(&target) {
-        let ir = written.strip_prefix("model_").unwrap_or(written);
+        // A model parameter that shares an instance parameter's name is renamed `model_x`, or
+        // `x_mod` on sp_mos6 (`ps_mod`: spice/mos6.va's header).
+        let ir = written
+            .strip_prefix("model_")
+            .or_else(|| written.strip_suffix("_mod"))
+            .unwrap_or(written);
         return Name::Ir(ir.to_string());
     }
     match p.instance.contains(&target) {
@@ -339,11 +344,11 @@ pub(super) fn model_name_in(word: &str, written: &str) -> Name {
 
 /// The name a `model` line of the module `word` spells the IR model parameter `ir` with.
 pub(super) fn model_name_out(word: &str, ir: &str) -> String {
-    let prefixed = format!("model_{ir}");
-    match params(word).is_some_and(|p| p.has(&prefixed)) {
-        true => prefixed,
-        false => ir.to_string(),
-    }
+    let p = params(word);
+    [format!("model_{ir}"), format!("{ir}_mod")]
+        .into_iter()
+        .find(|renamed| p.is_some_and(|p| p.has(renamed)))
+        .unwrap_or_else(|| ir.to_string())
 }
 
 /// The IR name of parameter `written` on an instance of a model of the module `word`.
