@@ -1,0 +1,3 @@
+file "a.sp" deck
+  option rel_tol value=1m whole_run
+  analysis ac (dec ng_decade start=1k stop=5k points=2)

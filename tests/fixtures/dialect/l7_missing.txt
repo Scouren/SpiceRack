@@ -102,8 +102,6 @@ ngspice Circuit(BjtBcSatAreabOnly) owed from=vacask
 ngspice Circuit(ModelSubSatEmissionNs) owed from=vacask
 ngspice Circuit(DiodeWlMultOnce) owed from=vacask
 ngspice Circuit(DiodeSidewallOwnF1) owed from=vacask
-ngspice Circuit(DiodeXomAbsent1e14) owed from=vacask
-ngspice Circuit(VdmosKpAbsent20) owed from=vacask
 ngspice Circuit(VdmosTcvthRaises) owed from=vacask
 ngspice Circuit(VdmosClampByFc) owed from=vacask
 ngspice Circuit(MosSmallSignalExact) owed from=vacask
@@ -135,8 +133,6 @@ ngspice Run(SweepLoopLog) unspoken
 ngspice Run(SweepFreqLinStep) owed from=vacask
 ngspice Run(SweepFreqLog) unspoken
 ngspice Run(SweepEndOnStop) unspoken
-ngspice Run(SweepEndStretch) unspoken
-ngspice Run(SweepEndNgDecade) unspoken
 ngspice Run(SweepCountNgLin) unspoken
 ngspice Run(SweepCenterSpan) unspoken
 ngspice Run(NoiseAcSweep) unspoken
@@ -426,8 +422,6 @@ vacask Circuit(BjtBcSatAreaTimesAreab) owed from=ngspice
 vacask Circuit(ModelSubSatLastFactor) owed from=ngspice
 vacask Circuit(DiodeWlMultTwice) owed from=ngspice
 vacask Circuit(DiodeSidewallBottomF1) owed from=ngspice
-vacask Circuit(DiodeXomAbsent1e4) owed from=ngspice
-vacask Circuit(VdmosKpAbsent35) owed from=ngspice
 vacask Circuit(VdmosTcvthLowers) owed from=ngspice
 vacask Circuit(VdmosClampByN) owed from=ngspice
 vacask Circuit(MosSmallSignalHand) owed from=ngspice
@@ -449,8 +443,6 @@ vacask Run(SweepDcLog) unspoken
 vacask Run(SweepLoopLog) unspoken
 vacask Run(SweepFreqLog) unspoken
 vacask Run(SweepEndOnStop) unspoken
-vacask Run(SweepEndStretch) unspoken
-vacask Run(SweepEndNgDecade) unspoken
 vacask Run(SweepCountNgLin) unspoken
 vacask Run(SweepCenterSpan) unspoken
 vacask Run(NoiseSummary) owed from=ngspice,hspice
@@ -787,10 +779,6 @@ hspice Circuit(DiodeWlMultTwice) owed from=ngspice
 hspice Circuit(DiodeWlMultOnce) owed from=vacask
 hspice Circuit(DiodeSidewallBottomF1) owed from=ngspice
 hspice Circuit(DiodeSidewallOwnF1) owed from=vacask
-hspice Circuit(DiodeXomAbsent1e4) owed from=ngspice
-hspice Circuit(DiodeXomAbsent1e14) owed from=vacask
-hspice Circuit(VdmosKpAbsent35) owed from=ngspice
-hspice Circuit(VdmosKpAbsent20) owed from=vacask
 hspice Circuit(VdmosTcvthLowers) owed from=ngspice
 hspice Circuit(VdmosTcvthRaises) owed from=vacask
 hspice Circuit(VdmosClampByN) owed from=ngspice
@@ -833,8 +821,6 @@ hspice Run(SweepLoopLog) unspoken
 hspice Run(SweepFreqLinStep) owed from=vacask
 hspice Run(SweepFreqLog) unspoken
 hspice Run(SweepEndOnStop) unspoken
-hspice Run(SweepEndStretch) unspoken
-hspice Run(SweepEndNgDecade) unspoken
 hspice Run(SweepCountNgLin) unspoken
 hspice Run(SweepCenterSpan) unspoken
 hspice Run(NoiseAcSweep) unspoken
