@@ -146,6 +146,8 @@ pub struct Design {
     /// `element_uses`' paths; built on demand, cleared with the derived caches and by every
     /// element push. Not part of equality.
     pub(crate) name_index: std::sync::OnceLock<crate::names::FxMap<(ScopeId, NameId), ItemRef>>,
+    /// Whether the design holds a linearised analysis or none (`analysis::small_signal_design`).
+    pub(crate) small_signal: std::sync::OnceLock<bool>,
     /// How many times the definition classes were computed (`class::def_classes`): a count a
     /// test reads instead of a clock (`Design::class_computes`). Not part of equality.
     #[cfg(any(test, feature = "gen"))]
@@ -251,6 +253,7 @@ impl Design {
             forms: std::sync::OnceLock::new(),
             element_names: std::sync::OnceLock::new(),
             name_index: std::sync::OnceLock::new(),
+            small_signal: std::sync::OnceLock::new(),
             #[cfg(any(test, feature = "gen"))]
             class_computes: crate::class::Computes::default(),
         }
@@ -569,6 +572,7 @@ impl Design {
         self.classes.take();
         self.forms.take();
         self.name_index.take();
+        self.small_signal.take();
     }
 }
 

@@ -274,3 +274,19 @@ class that holds it (or `gap: <why>`). A row with no home is a finding, not a fa
   - R88 `SubSatLastFactor` / `SubSatEmissionNs` (members `ModelSubSat…`): a Gummel-Poon model giving `iss`, `tlev` absent or literally 0/1, `ns` not literally the last-set exponent (1, or `nr` with both `ibe` and `ibc`; absent means 1, a read is not literal). No rewriting. Runs: `crates/ir/tests/fixtures/bjt_substrate/`.
   - R91 F20 `DiodeWlMultTwice` / `DiodeWlMultOnce`: a diode giving `w` and `l`, `m` given and not literally 1, on a `DiodeLevel3` model. ngspice-45 scales by m twice (-9.942e-06), VACASK once (-4.971e-06). No rewriting.
   - R91 F22 `DiodeSidewallBottomF1` / `DiodeSidewallOwnF1`: a diode with a perimeter (`pj` given and not literally 0, or `w` and `l` on a level-3 model) on a `Diode` or `DiodeLevel3` model whose `cjsw` is given and not literally 0. ngspice-45 uses the bottom F1 past the knee (4.436e-03), VACASK the sidewall's own (8.544e-03). No rewriting. Runs for both: `crates/ir/tests/fixtures/families/diode/`.
+- R92 (rulings 9f800958): each row also gives its point's exact rewriting, `Law::rewrite() -> Rewrite { None, Stated(&[Stated { names, absent: fn(&Model) -> f64 }]), Negated(&[names]) }`: what a rule needs (the rule bodies are the passes owner's). `Laws` is a `u32` (22 variants, 11 points). Points added:
+  - F21 `DiodeXomAbsent1e4` / `DiodeXomAbsent1e14` (stated, `xom` and `xoi`): a `Diode`/`DiodeLevel3` model giving `wm`, `lm`, `wp` or `lp` and lacking `xom` or `xoi`.
+  - F24 `VdmosKpAbsent35` / `VdmosKpAbsent20` (stated, `kp`: 25+10·type against 15+5·type): a `Vdmos` model lacking `kp`.
+  - F25 `VdmosTcvthLowers` / `VdmosTcvthRaises` (negated, `tcvth`/`vtotc`): an n-channel `Vdmos` model whose `tcvth` is given and not literally 0.
+  - F26 `VdmosClampByN` / `VdmosClampByFc` (none): a `Vdmos` model giving `cjo` whose fc·vj is not provably at most 2.5 (absent fc 0.5, vj 0.8).
+- R94/R94a (rulings 0f54bc45, c83fd9d1): three small-signal points, none rewritable, one carrier predicate (`laws_carry::small_signal`): an element of the family on a model of the family meeting its condition, or an unresolved model, in a design that holds an analysis `AnalysisKind::linearised` or no analysis at all (`analysis::small_signal_design`, cached until the next edit).
+  - F27 `MosSmallSignalHand` / `MosSmallSignalExact`: a MOSFET on `Mos2`, `Mos3`, `Mos9`.
+  - F28 `Mos6SmallSignalAbsent` / `Mos6SmallSignalExact`: a MOSFET on `Mos6`.
+  - F29 `BjtIrbSmallSignalFrozen` / `BjtIrbSmallSignalExact`: a BJT on `GummelPoon` whose `irb` is given and not literally 0.
+- R95/R96 (rulings db257325, b41f81d8): four more points; `Laws` holds 30 variants in 15 points (a `u32`). The rewriting kinds gain `Rewrite::Noted` (a difference under 1e-3 everywhere measured: the rule restates the variant and leaves one note per carrier).
+  - F30 `VdmosMultSmallSignalHand` / `…Exact` (none): the small-signal carrier, a MOSFET on `Vdmos` whose `m` is given and not literally 1.
+  - F31 `DiodeIsrReverseNone` / `…Present` (none): a diode on a `Diode`/`DiodeLevel3` model whose `isr` is given and not literally 0 (or unresolved), in any design.
+  - `DiodeIsrSmallSignalHand` / `…Exact` (noted): the small-signal carrier, a diode on a model whose `isr` is given and not literally 0.
+  - `DiodeTtFactorUnclamped` / `…Clamped` (noted, R91's clamp): a `Diode`/`DiodeLevel3` model whose `ttt1` or `ttt2` is given and not literally 0.
+  The small-signal points share one carrier shape (`laws_carry::small_signal`: element kind, a model condition, an instance condition, the design condition).
+- The predicates read parameters by the family's own names, ngspice-45's and the pinned VACASK module's alike for every name read (`cjsw`/`cjp` and `tcvth`/`vtotc` are aliases in both builds, so both spellings count; `laws_carry.rs` header).

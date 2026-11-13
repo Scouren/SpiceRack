@@ -79,24 +79,23 @@ impl R<'_, '_> {
                 value
             })
             .collect();
-        // R88: a Gummel-Poon model sometimes gives `iss` and `ns = 2`, where the two substrate
-        // laws differ (it reports a member only under a stated law, drawn from the set; A28
-        // item 5: `TypedOnly` draws no parameter list)
+        // R90: a model sometimes gives the parameters the law predicates read, where the laws
+        // differ (a member only under a stated law, drawn from the set; A28 item 5: `TypedOnly`
+        // draws no parameter list)
         let lists = r.g.params != Params::TypedOnly;
-        let substrate = family == ModelFamily::GummelPoon && lists && r.g.chance(2);
+        let named: &[&str] = match crate::laws_carry::GEN_PARAMS.iter().find(|p| p.0 == family) {
+            Some(&(_, names)) if lists && r.g.chance(2) => names,
+            _ => &[],
+        };
         let mut values = values;
-        if substrate {
-            values.push(r.ex());
-            values.push(r.b.num(2.0));
-        }
-        let fresh = values.len() - if substrate { 2 } else { 0 };
+        values.extend(named.iter().map(|_| r.ex()));
+        let fresh = values.len() - named.len();
         for &value in &values[..fresh] {
             let key = r.g.fresh_name(r.b);
             pairs.push((r.b.design().str(key).to_owned(), value));
         }
-        if substrate {
-            pairs.push(("iss".to_owned(), values[fresh]));
-            pairs.push(("ns".to_owned(), values[fresh + 1]));
+        for (k, name) in named.iter().enumerate() {
+            pairs.push(((*name).to_owned(), values[fresh + k]));
         }
         let params = if pairs.is_empty() {
             List::EMPTY

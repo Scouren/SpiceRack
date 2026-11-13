@@ -5,9 +5,12 @@
 //! no point is stated twice.
 //!
 //! Data (the six questions). *What*: a set of [`Law`] variants, each a variant of one law point
-//! (a question two builds answer differently); a point's variants exclude each other. *How
-//! many*: one set per design; `Law::COUNT` variants (8), one bit each in a `u8` (the
-//! compile-time assertion below fails the build when the enum outgrows it). *Who writes*: a
+//! (a question two builds answer differently); a point's variants exclude each other. Each row
+//! of the table (`Law::row`) gives the variant's point, the families whose models follow it, its
+//! member, its IR word and its point's exact rewriting (R92, R96: none, stated, negated, noted). *How
+//! many*: one set per design; `Law::COUNT` variants (30, two per point, 15 points), one bit each
+//! in a `u32` (16 bits would hold 16; the compile-time assertions below fail the build when the
+//! enum outgrows 32 or a point gains a third variant). *Who writes*: a
 //! reader, once per read, the constant of its simulator build (`Builder::set_laws`); the text's
 //! `laws` line; the generator; never a pass. *Who reads*: `features`, once per element or model
 //! row (O(the stated variants) ≤ `Law::COUNT`, each predicate O(the row's parameters and its one
@@ -17,32 +20,33 @@
 //! A built design states nothing, carries nothing and goes to any target under the target's law.
 //! Ceiling (R90): a design whose models follow two builds of one module cannot say so.
 //!
-//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91 (on the `rulings` branch); the runs in
-//! `crates/ir/tests/fixtures/bjt_substrate/` and `crates/ir/tests/fixtures/families/diode/`.
+//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R94, R94a, R95, R96 (on the `rulings`
+//! branch); the
+//! runs in `crates/ir/tests/fixtures/bjt_substrate/` and `crates/ir/tests/fixtures/families/`.
+//! The carrier predicates are `laws_carry.rs`, the table's rows `laws_table.rs`.
 //!
 //! Contents:
 //! - `pub enum Law` (`ALL`, `COUNT`), `Law::member(self) -> CircuitExtra`,
-//!   `Law::word(self) -> &'static str`
+//!   `Law::word(self) -> &'static str`, `Law::rewrite(self) -> Rewrite`
+//! - `pub enum Rewrite`, `pub struct Stated`
 //! - `pub struct Laws`, `Laws::EMPTY`, `Laws::of(&[Law]) -> Laws`, `Laws::with(self, Law) -> Laws`,
 //!   `Laws::contains(self, Law) -> bool`, `Laws::is_empty(self) -> bool`,
 //!   `Laws::iter(self) -> impl Iterator<Item = Law>`, `Laws::features(self) -> FeatureSet`
 //! - `Design::laws(&self) -> Laws`, `Builder::set_laws(&mut self, Laws)`
-//! - crate: `pub(crate) enum Carrier`, `pub(crate) fn carried(&Design, Carrier, &mut impl FnMut(CircuitExtra))`,
+//! - crate: `pub(crate) enum Carrier`, `pub(crate) enum Point`, `pub(crate) struct Row`,
+//!   (`Law::row(self) -> Row`: `laws_table.rs`), `pub(crate) fn carried(&Design, Carrier, &mut impl FnMut(CircuitExtra))`,
 //!   `pub(crate) fn conflicts(Laws) -> impl Iterator<Item = u32>`, `pub(crate) fn dump_line(&Design, FileId, &mut String)`,
 //!   `pub(crate) fn parse_line(&mut Words, &mut Builder) -> bool`, `pub(crate) fn draw(&mut Gen, &FeatureSet) -> Laws` (gen)
 
 use crate::build::Builder;
 use crate::circuit_extra::CircuitExtra as X;
-use crate::circuit_text::get_row;
 use crate::design::Design;
-use crate::element::{ElemKind, Element};
+use crate::element::Element;
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::Gen;
-use crate::id::{ExprId, FileId};
-use crate::item::ItemKind;
+use crate::id::FileId;
 use crate::model::{Model, ModelFamily};
-use crate::semi::Semi;
 use crate::text_words::Words;
 
 /// One variant of one law point: what a simulator build computes where another build of the
@@ -92,13 +96,120 @@ pub enum Law {
     DiodeSidewallBottomF1,
     /// Point R91 F22: the sidewall's own F1 (the VACASK module the flake pins, `diode.va:1112`).
     DiodeSidewallOwnF1,
+    /// Point R92 F21, a diode model's metal and poly oxide thicknesses `xom`, `xoi` when absent:
+    /// 1e4 Å (ngspice-45 `dio/diosetup.c:262, 265`, 1e-6 m). Run (`families/diode/runs.out`,
+    /// `l2_xom_absent`): 2.17e-06 here against 1.0e-12 under `DiodeXomAbsent1e14`; `xom=1e4`
+    /// given agrees (`l2_xom_given`). Carried by a `Diode` or `DiodeLevel3` model that gives
+    /// `wm`, `lm`, `wp` or `lp` and lacks `xom` or `xoi`. Stated: the rule writes the absent value.
+    DiodeXomAbsent1e4,
+    /// Point R92 F21: 1e14 Å (the VACASK module the flake pins, `diode.va:190-191`, 1e4 m).
+    DiodeXomAbsent1e14,
+    /// Point R92 F24, a VDMOS model's `kp` when absent: 25 + 10·type, 35 on an n-channel and 15
+    /// on a p-channel (ngspice-45 `vdmos/vdmosset.c:35`). Run (`families/vdmos/runs.out`,
+    /// `v1_kp_absent`): -157.5 A here against -90 under `VdmosKpAbsent20`. Carried by a `Vdmos`
+    /// model that lacks `kp`. Stated.
+    VdmosKpAbsent35,
+    /// Point R92 F24: 15 + 5·type, 20 and 10 (the VACASK module the flake pins, `vdmos.va:816`).
+    VdmosKpAbsent20,
+    /// Point R92 F25, a VDMOS threshold's temperature coefficient: vth0 − type·tcvth·ΔT, which an
+    /// n-channel's positive `tcvth` lowers (ngspice-45 `vdmos/vdmostemp.c:50`). Run (`v2_n_*`):
+    /// -40.35 A here against -19.28 under `VdmosTcvthRaises`; equal on a p-channel. Carried by an
+    /// n-channel `Vdmos` model whose `tcvth` (or `vtotc`) is given and not literally 0. Negated.
+    VdmosTcvthLowers,
+    /// Point R92 F25: vth0 + tcvth·ΔT (the VACASK module the flake pins, `vdmos.va:938`).
+    VdmosTcvthRaises,
+    /// Point R92 F26, the VDMOS body diode's junction-potential clamp when fc·vj > 2.5: 2.5/n
+    /// (ngspice-45 `vdmos/vdmostemp.c:123`). Run (`v3_vj_6`): 4.709e-03 here against 5.524e-03
+    /// under `VdmosClampByFc`; equal at vj = 1. Carried by a `Vdmos` model that gives `cjo` and
+    /// whose fc·vj is not provably at most 2.5 (absent `fc` 0.5 and `vj` 0.8 in both builds).
+    VdmosClampByN,
+    /// Point R92 F26: 2.5/fc (the VACASK module the flake pins, `vdmos.va:985`).
+    VdmosClampByFc,
+    /// Point R94 F27, the small-signal of MOS levels 2, 3 and 9: ngspice-45's hand-written
+    /// derivatives, not its DC law's (`families/mos{2,3,9}/runs.out`: in saturation gm 4.9e-2
+    /// and gds 1.7e-2 off the central differences of its own DC currents). Carried by a MOSFET
+    /// on a `Mos2`, `Mos3` or `Mos9` model (or an unresolved one) in a design that holds an
+    /// analysis linearised about an operating point, or no analysis (`analysis::linearised`).
+    MosSmallSignalHand,
+    /// Point R94 F27: the DC law's own derivatives (the VACASK modules the flake pins, 1e-9).
+    MosSmallSignalExact,
+    /// Point R94 F28, the small-signal of MOS level 6: none (ngspice-45 `mos6/mos6init.c:43`,
+    /// `.DEVacLoad = NULL`: every AC run stops with a singular matrix). Carried as F27, on a
+    /// `Mos6` model.
+    Mos6SmallSignalAbsent,
+    /// Point R94 F28: the DC law's own derivatives (the VACASK module the flake pins).
+    Mos6SmallSignalExact,
+    /// Point R94a F29, the small-signal of a Gummel-Poon BJT whose base resistance falls with the
+    /// base current: the resistance held at its operating value (ngspice-45;
+    /// `families/bjt/runs.out`: in saturation gm 1.47e-2, gds 3.22e-2 off its DC derivatives,
+    /// `bjt_rbconst` the control). Carried as F27, by a BJT on a `GummelPoon` model whose `irb`
+    /// is given and not literally 0 (or an unresolved model).
+    BjtIrbSmallSignalFrozen,
+    /// Point R94a F29: the DC law's own derivatives (the VACASK module the flake pins, 5e-9).
+    BjtIrbSmallSignalExact,
+    /// Point R95 F30, the small-signal of a VDMOS at a multiplier not 1: not m copies of one
+    /// (ngspice-45; `families/vdmos_load/runs.out`: m3/nom 2.63 to 8.15 where DC is 3). Carried as
+    /// F27, by a MOSFET on a `Vdmos` model (or an unresolved one) whose `m` is given and not
+    /// literally 1.
+    VdmosMultSmallSignalHand,
+    /// Point R95 F30: m copies, 3 to 1e-9 (the VACASK module the flake pins).
+    VdmosMultSmallSignalExact,
+    /// Point R95 F31, a diode's recombination current (`isr`) under reverse bias: none (ngspice-45;
+    /// `families/diode_load/runs.out`: 2.020e-12 A here against 3.679e-12 A at -2 V, the control
+    /// without `isr` equal). Carried by a diode on a `Diode` or `DiodeLevel3` model whose `isr` is
+    /// given and not literally 0 (or an unresolved model), in any design (the bias is the run's).
+    DiodeIsrReverseNone,
+    /// Point R95 F31: present (the VACASK module the flake pins).
+    DiodeIsrReversePresent,
+    /// Point R96, a diode's small-signal with `isr`: ngspice-45's conductance 7.7e-5 off the slope
+    /// of its own DC current (`diode_load`, nom_fwd at 0.6 V). Carried as F27, by a diode on a model
+    /// whose `isr` is given and not literally 0 (or an unresolved model). Noted: under 1e-3.
+    DiodeIsrSmallSignalHand,
+    /// Point R96: the DC law's own slope (the VACASK module the flake pins, 2e-8).
+    DiodeIsrSmallSignalExact,
+    /// Point R96 (R91's clamp), a diode's transit-time temperature factor 1 + ttt1·ΔT + ttt2·ΔT²
+    /// below 1e-3: taken as it is (ngspice-45; `families/diode/runs.out`, `l4_ttt1_0.01`:
+    /// 1.126195826779 here against 1.1261960490808718). Carried by a `Diode` or `DiodeLevel3`
+    /// model whose `ttt1` or `ttt2` is given and not literally 0. Noted: 2e-7 apart.
+    DiodeTtFactorUnclamped,
+    /// Point R96: clamped at 1e-3 (the VACASK module the flake pins, `diode.va`).
+    DiodeTtFactorClamped,
 }
 
 /// A set of stated laws, one bit per [`Law`]. Two variants of one point may stand in the set;
 /// `check` refuses that design (`Violation::LawConflict`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Laws {
-    bits: u8,
+    bits: u32,
+}
+
+/// The exact rewriting a law point has (R92, a closed set): what a rule needs and nothing more.
+/// The rule bodies are the passes owner's, one per kind.
+#[derive(Clone, Copy, Debug)]
+pub enum Rewrite {
+    /// None: a carrier of the point is refused across a pair whose laws differ.
+    None,
+    /// The variant names the value each absent parameter means; the rule writes it on each
+    /// carrier, after which nothing carries the point.
+    Stated(&'static [Stated]),
+    /// A sign convention: the rule negates the parameter (by any of these spellings) on every
+    /// carrier and restates the design's variant.
+    Negated(&'static [&'static str]),
+    /// A difference under the simulators' own relative tolerance (1e-3) everywhere it was
+    /// measured (R96): the rule restates the design's variant and leaves one note per carrier
+    /// naming the point.
+    Noted,
+}
+
+/// One parameter a stated variant fills in: its spellings in the family's own names (ngspice's
+/// and the pinned VACASK module's, which agree on every name below) and the value its absence
+/// means under the variant, as a function of the model's row.
+#[derive(Clone, Copy, Debug)]
+pub struct Stated {
+    /// The parameter's spellings; a model carries the point when it gives none of them.
+    pub names: &'static [&'static str],
+    /// The value an absent parameter means on `model`, in the parameter's deck unit.
+    pub absent: fn(&Model) -> f64,
 }
 
 /// Which row a law's predicate reads.
@@ -110,39 +221,61 @@ pub(crate) enum Carrier<'a> {
 
 /// A law point: the question its variants answer. `LawConflict`'s `arg` is its index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Point {
+pub(crate) enum Point {
     BcSatArea,
     SubSatTemp,
     DiodeWlMult,
     DiodeSidewallKnee,
+    DiodeXom,
+    VdmosKp,
+    VdmosTcvth,
+    VdmosClamp,
+    MosSmallSignal,
+    Mos6SmallSignal,
+    BjtIrbSmallSignal,
+    VdmosMultSmallSignal,
+    DiodeIsrReverse,
+    DiodeIsrSmallSignal,
+    DiodeTtFactor,
 }
 
-/// One variant's row: its point, the families whose models follow it, its member, its word.
-struct Row {
-    point: Point,
-    families: &'static [ModelFamily],
-    member: X,
-    word: &'static str,
+/// One variant's row: its point, the families whose models follow it, its member, its word,
+/// its rewriting.
+pub(crate) struct Row {
+    pub(crate) point: Point,
+    pub(crate) families: &'static [ModelFamily],
+    pub(crate) member: X,
+    pub(crate) word: &'static str,
+    pub(crate) rewrite: Rewrite,
 }
-
-const GP: &[ModelFamily] = &[ModelFamily::GummelPoon];
-const L3: &[ModelFamily] = &[ModelFamily::DiodeLevel3];
-const DIODES: &[ModelFamily] = &[ModelFamily::Diode, ModelFamily::DiodeLevel3];
 
 /// Every point, in declaration order.
-const POINTS: [Point; 4] = [
+const POINTS: [Point; 15] = [
     Point::BcSatArea,
     Point::SubSatTemp,
     Point::DiodeWlMult,
     Point::DiodeSidewallKnee,
+    Point::DiodeXom,
+    Point::VdmosKp,
+    Point::VdmosTcvth,
+    Point::VdmosClamp,
+    Point::MosSmallSignal,
+    Point::Mos6SmallSignal,
+    Point::BjtIrbSmallSignal,
+    Point::VdmosMultSmallSignal,
+    Point::DiodeIsrReverse,
+    Point::DiodeIsrSmallSignal,
+    Point::DiodeTtFactor,
 ];
 
-const _: () = assert!(Law::COUNT <= u8::BITS as usize);
-const _: () = assert!(size_of::<Laws>() == 1);
+// 30 variants: a `u32`, one bit each (the build fails here when the enum outgrows it)
+const _: () = assert!(Law::COUNT <= u32::BITS as usize);
+const _: () = assert!(size_of::<Laws>() == 4);
+const _: () = assert!(Law::COUNT == 2 * POINTS.len());
 
 impl Law {
     /// Every variant, in declaration order (its bit in [`Laws`]).
-    pub const ALL: [Law; 8] = [
+    pub const ALL: [Law; 30] = [
         Law::BcSatAreaTimesAreab,
         Law::BcSatAreabOnly,
         Law::SubSatLastFactor,
@@ -151,6 +284,28 @@ impl Law {
         Law::DiodeWlMultOnce,
         Law::DiodeSidewallBottomF1,
         Law::DiodeSidewallOwnF1,
+        Law::DiodeXomAbsent1e4,
+        Law::DiodeXomAbsent1e14,
+        Law::VdmosKpAbsent35,
+        Law::VdmosKpAbsent20,
+        Law::VdmosTcvthLowers,
+        Law::VdmosTcvthRaises,
+        Law::VdmosClampByN,
+        Law::VdmosClampByFc,
+        Law::MosSmallSignalHand,
+        Law::MosSmallSignalExact,
+        Law::Mos6SmallSignalAbsent,
+        Law::Mos6SmallSignalExact,
+        Law::BjtIrbSmallSignalFrozen,
+        Law::BjtIrbSmallSignalExact,
+        Law::VdmosMultSmallSignalHand,
+        Law::VdmosMultSmallSignalExact,
+        Law::DiodeIsrReverseNone,
+        Law::DiodeIsrReversePresent,
+        Law::DiodeIsrSmallSignalHand,
+        Law::DiodeIsrSmallSignalExact,
+        Law::DiodeTtFactorUnclamped,
+        Law::DiodeTtFactorClamped,
     ];
     /// Variant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -164,6 +319,11 @@ impl Law {
     /// Its spelling on the IR text's `laws` line.
     pub const fn word(self) -> &'static str {
         self.row().word
+    }
+
+    /// Its point's exact rewriting under this variant (R92).
+    pub const fn rewrite(self) -> Rewrite {
+        self.row().rewrite
     }
 }
 
@@ -185,13 +345,13 @@ impl Laws {
     /// The set with `law` added.
     pub const fn with(self, law: Law) -> Laws {
         Laws {
-            bits: self.bits | 1 << law as u8,
+            bits: self.bits | 1 << law as u32,
         }
     }
 
     /// Whether `law` is stated.
     pub const fn contains(self, law: Law) -> bool {
-        self.bits & 1 << law as u8 != 0
+        self.bits & 1 << law as u32 != 0
     }
 
     /// Whether nothing is stated.
@@ -237,7 +397,8 @@ impl Builder<'_> {
 }
 
 /// Reports, for each stated variant whose point `row` carries, the variant's member. O(stated
-/// variants × the row's parameters and its one model's).
+/// variants × the row's parameters and its one model's); the small-signal points read the
+/// design's analyses once per design (a cache).
 pub(crate) fn carried(design: &Design, row: Carrier<'_>, add: &mut impl FnMut(X)) {
     let laws = design.laws();
     if laws.is_empty() {
@@ -245,20 +406,7 @@ pub(crate) fn carried(design: &Design, row: Carrier<'_>, add: &mut impl FnMut(X)
     }
     for law in laws.iter() {
         let r = law.row();
-        let on = match (r.point, row) {
-            (Point::BcSatArea, Carrier::Element(e)) => bc_sat_area(design, e, r.families),
-            (Point::DiodeWlMult, Carrier::Element(e)) => diode_wl_mult(design, e, r.families),
-            (Point::DiodeSidewallKnee, Carrier::Element(e)) => {
-                diode_sidewall(design, e, r.families)
-            }
-            (Point::SubSatTemp, Carrier::Model(m)) => sub_sat_temp(design, m, r.families),
-            (
-                Point::BcSatArea | Point::DiodeWlMult | Point::DiodeSidewallKnee,
-                Carrier::Model(_),
-            )
-            | (Point::SubSatTemp, Carrier::Element(_)) => false,
-        };
-        if on {
+        if crate::laws_carry::carries(design, &r, row) {
             add(r.member);
         }
     }
@@ -330,189 +478,4 @@ pub(crate) fn draw(g: &mut Gen, features: &FeatureSet) -> Laws {
         "a drawn set states each point once"
     );
     set
-}
-
-// ---- private ----
-
-impl Law {
-    /// The table: exhaustive over the variants.
-    const fn row(self) -> Row {
-        let (point, families, member, word) = match self {
-            Law::BcSatAreaTimesAreab => (
-                Point::BcSatArea,
-                GP,
-                X::BjtBcSatAreaTimesAreab,
-                "bc_sat_area_times_areab",
-            ),
-            Law::BcSatAreabOnly => (
-                Point::BcSatArea,
-                GP,
-                X::BjtBcSatAreabOnly,
-                "bc_sat_areab_only",
-            ),
-            Law::SubSatLastFactor => (
-                Point::SubSatTemp,
-                GP,
-                X::ModelSubSatLastFactor,
-                "sub_sat_last_factor",
-            ),
-            Law::SubSatEmissionNs => (
-                Point::SubSatTemp,
-                GP,
-                X::ModelSubSatEmissionNs,
-                "sub_sat_emission_ns",
-            ),
-            Law::DiodeWlMultTwice => (
-                Point::DiodeWlMult,
-                L3,
-                X::DiodeWlMultTwice,
-                "diode_wl_mult_twice",
-            ),
-            Law::DiodeWlMultOnce => (
-                Point::DiodeWlMult,
-                L3,
-                X::DiodeWlMultOnce,
-                "diode_wl_mult_once",
-            ),
-            Law::DiodeSidewallBottomF1 => (
-                Point::DiodeSidewallKnee,
-                DIODES,
-                X::DiodeSidewallBottomF1,
-                "diode_sidewall_bottom_f1",
-            ),
-            Law::DiodeSidewallOwnF1 => (
-                Point::DiodeSidewallKnee,
-                DIODES,
-                X::DiodeSidewallOwnF1,
-                "diode_sidewall_own_f1",
-            ),
-        };
-        Row {
-            point,
-            families,
-            member,
-            word,
-        }
-    }
-}
-
-/// The model an element names: `Ok(None)` when unresolved (its law unknown: a carrier),
-/// `Ok(Some(m))` for a model row, `Err(())` when it names another kind of definition.
-fn model_of(design: &Design, e: &Element) -> Result<Option<Model>, ()> {
-    let Some(d) = e
-        .model
-        .def
-        .index_checked(design.defs.len())
-        .map(|k| design.defs[k])
-    else {
-        return Ok(None);
-    };
-    if d.item.kind != ItemKind::Model {
-        return Err(());
-    }
-    Ok(Some(design.row(d.item.index)))
-}
-
-/// A parameter's value by key, `None` when not given.
-fn param(design: &Design, list: crate::id::ParamList, key: &str) -> Option<ExprId> {
-    design
-        .params(list)
-        .iter()
-        .find(|p| design.str(p.0) == key)
-        .map(|p| p.1)
-}
-
-/// Whether `e` is given and not literally `v` (a parameter read is not literal).
-fn given_not(design: &Design, e: Option<ExprId>, v: f64) -> bool {
-    e.is_some_and(|e| literal(design, e) != Some(v))
-}
-
-/// R86's carrier: a BJT with an area not literally 1 on a model of `families` that does not
-/// give both `ibe` and `ibc`, or on an unresolved model.
-fn bc_sat_area(design: &Design, e: &Element, families: &[ModelFamily]) -> bool {
-    if e.kind != ElemKind::Bjt {
-        return false;
-    }
-    let Some(s) = get_row::<Semi>(design, e.detail) else {
-        return false;
-    };
-    if s.area.is_none() || crate::run_words::is_one(design, s.area) {
-        return false;
-    }
-    match model_of(design, e) {
-        Ok(None) => true,
-        Ok(Some(m)) => {
-            let given = |k: &str| param(design, m.params, k).is_some();
-            families.contains(&m.family) && !(given("ibe") && given("ibc"))
-        }
-        Err(()) => false,
-    }
-}
-
-/// R91 F20's carrier: a diode giving `w` and `l` with `m` given and not literally 1, on a model
-/// of `families` or an unresolved one.
-fn diode_wl_mult(design: &Design, e: &Element, families: &[ModelFamily]) -> bool {
-    let wl = param(design, e.params, "w").is_some() && param(design, e.params, "l").is_some();
-    if e.kind != ElemKind::Diode || !wl {
-        return false;
-    }
-    if e.mult.is_none() || crate::run_words::is_one(design, e.mult) {
-        return false;
-    }
-    match model_of(design, e) {
-        Ok(None) => true,
-        Ok(Some(m)) => families.contains(&m.family),
-        Err(()) => false,
-    }
-}
-
-/// R91 F22's carrier: a diode with a perimeter on a model of `families` whose `cjsw` is given
-/// and not literally 0, or on an unresolved model.
-fn diode_sidewall(design: &Design, e: &Element, families: &[ModelFamily]) -> bool {
-    if e.kind != ElemKind::Diode {
-        return false;
-    }
-    let pj = given_not(design, param(design, e.params, "pj"), 0.0);
-    let wl = param(design, e.params, "w").is_some() && param(design, e.params, "l").is_some();
-    match model_of(design, e) {
-        Ok(None) => pj || wl,
-        Ok(Some(m)) => {
-            let perimeter = pj || wl && m.family == ModelFamily::DiodeLevel3;
-            perimeter
-                && families.contains(&m.family)
-                && given_not(design, param(design, m.params, "cjsw"), 0.0)
-        }
-        Err(()) => false,
-    }
-}
-
-/// R88's carrier: a model of `families` giving `iss`, `tlev` absent or literally 0 or 1, and
-/// `ns` not literally the last-set factor's exponent.
-fn sub_sat_temp(design: &Design, m: &Model, families: &[ModelFamily]) -> bool {
-    if !families.contains(&m.family) {
-        return false;
-    }
-    let get = |key: &str| param(design, m.params, key);
-    let tlev_ok =
-        get("tlev").is_none_or(|e| literal(design, e).is_some_and(|v| v == 0.0 || v == 1.0));
-    if get("iss").is_none() || !tlev_ok {
-        return false;
-    }
-    // the exponent the last-set factor uses: nr with both currents, else 1; absent means 1
-    let both = get("ibe").is_some() && get("ibc").is_some();
-    let other = if both {
-        get("nr").map_or(Some(1.0), |e| literal(design, e))
-    } else {
-        Some(1.0)
-    };
-    let ns = get("ns").map_or(Some(1.0), |e| literal(design, e));
-    !matches!((ns, other), (Some(a), Some(b)) if a == b)
-}
-
-/// The value of a literal number; `None` for a parameter read or any other expression.
-fn literal(design: &Design, e: ExprId) -> Option<f64> {
-    match design.expr(e) {
-        crate::expr::Expr::Num(k) => Some(design.literal_value(design.num(k))),
-        _ => None,
-    }
 }

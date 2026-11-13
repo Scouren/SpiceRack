@@ -14,7 +14,8 @@
 //! `rewrite/INV-constructs.md` G1–G73; `rewrite/INV-semantics.md` 8.01–8.26.
 //!
 //! Contents:
-//! - `pub enum AnalysisKind` (`ALL`, `COUNT`, `AnalysisKind::has_detail(self) -> bool`),
+//! - `pub enum AnalysisKind` (`ALL`, `COUNT`, `AnalysisKind::has_detail(self) -> bool`,
+//!   `AnalysisKind::linearised(self) -> bool`),
 //!   `pub struct Analysis`, `pub struct RunDetails`
 //! - `pub struct AnalysisKinds` (`EMPTY`, `ALL`, `AnalysisKinds::of(&[AnalysisKind]) -> Self`,
 //!   `AnalysisKinds::contains(self, AnalysisKind) -> bool`, `AnalysisKinds::len(self) -> u32`,
@@ -24,7 +25,8 @@
 //!   kernel's `DetailRow` (A6) implemented for every analysis, loop and measure detail row
 //! - (`RowFacts` for `Analysis` and every detail row's facts: `analysis_facts.rs`); crate:
 //!   `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
-//!   `pub(crate) fn feature_items(&Design, &mut Vec<(Feature, ItemRef)>)`
+//!   `pub(crate) fn feature_items(&Design, &mut Vec<(Feature, ItemRef)>)`,
+//!   `pub(crate) fn small_signal_design(&Design) -> bool`
 
 use crate::dc_ac::{
     Ac, Dc, DcAxis, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf,
@@ -290,6 +292,39 @@ impl AnalysisKind {
     pub const fn has_detail(self) -> bool {
         !matches!(self, AnalysisKind::Op | AnalysisKind::DcInc)
     }
+
+    /// Whether the kind is linearised about an operating point (R94): its numbers are the
+    /// devices' small-signal (their derivatives), not their DC and charge laws alone. Large-signal
+    /// kinds (the operating point, DC sweeps, the transient and what reads it, harmonic balance,
+    /// the periodic steady state) are not.
+    pub const fn linearised(self) -> bool {
+        use AnalysisKind as K;
+        match self {
+            K::Ac | K::Noise | K::Tf | K::DcXf | K::Xf | K::Sens | K::SensAc | K::Pz | K::Sp => {
+                true
+            }
+            K::Net | K::Disto | K::Pac | K::Pnoise | K::Pxf | K::Pstb | K::Stb | K::DcInc => true,
+            K::Op | K::Dc | K::Tran | K::Four | K::Hb | K::Pss | K::TimedOp => false,
+        }
+    }
+}
+
+/// Whether `design` holds an analysis linearised about an operating point, or no analysis at
+/// all (a library: any may follow), R94's design condition. O(items) once per design state (a
+/// cache `derived_changed` clears). An `Opaque` analysis is not an analysis here.
+pub(crate) fn small_signal_design(design: &Design) -> bool {
+    *design.small_signal.get_or_init(|| {
+        let mut any = false;
+        for list in &design.scope_items {
+            for item in list.iter().filter(|i| i.kind == ItemKind::Analysis) {
+                any = true;
+                if design.row::<Analysis>(item.index).kind.linearised() {
+                    return true;
+                }
+            }
+        }
+        !any
+    })
 }
 
 impl AnalysisKinds {
