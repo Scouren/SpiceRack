@@ -1,4 +1,4 @@
-dc_device_param: a resistor and a diode from 1 V, the diode's area (an instance parameter, no element value) swept over listed values; v(out) falls as the area grows
+dc_device_param: a resistor and a diode from 1 V, the diode's area (an instance parameter, no element value) swept over listed values, each point from the initial guess (continuation=0); v(out) falls as the area grows
 load "spice/resistor.osdi"
 load "spice/diode.osdi"
 model vsource vsource
@@ -8,6 +8,6 @@ v1 (in 0) vsource dc=1.0
 r1 (in out) resistor r=1k
 d1 (out 0) dm area=1.0
 control
-  sweep sw instance="d1" parameter="area" values=[1.0, 2.0, 4.0]
+  sweep sw instance="d1" parameter="area" values=[1.0, 2.0, 4.0] continuation=0
     analysis dc1 op
 endc

@@ -102,7 +102,7 @@ ngspice Circuit(TcBaseTnom) unspoken
 ngspice Run(TranStartup) unspoken
 ngspice Run(TranNoise) owed from=vacask
 ngspice Run(TranSegments) unspoken
-ngspice Run(DcRestart) unspoken
+ngspice Run(DcRestart) owed from=vacask # R75a: VACASK reads continuation=0 on the inner sweep; ngspice has no every-point-afresh .dc (dc_axes_to_loops peels only the axes a loop can sweep)
 ngspice Run(DcAxisParam) owed from=vacask
 ngspice Run(DcAxisSubcktParam) unspoken
 ngspice Run(DcAxisOption) owed from=vacask
@@ -410,7 +410,6 @@ vacask Circuit(TcLawDirect) owed from=ngspice
 vacask Circuit(TcLawReciprocal) owed from=ngspice
 vacask Run(TranStartup) unspoken
 vacask Run(TranSegments) unspoken
-vacask Run(DcRestart) unspoken
 vacask Run(DcAxisSubcktParam) unspoken
 vacask Run(SweepDcLog) unspoken
 vacask Run(SweepLoopLog) unspoken
@@ -490,7 +489,6 @@ vacask Run(ResetTnom) owed from=ngspice
 vacask Run(AnalysisParamArgument) owed from=ngspice
 vacask Run(PssArgumentOmitted) unspoken
 vacask Run(AlterParamAtReset) owed from=ngspice
-vacask Run(DcOuterAfresh) owed from=ngspice
 vacask Option(PivTol) owed from=ngspice
 vacask Option(PivRel) owed from=ngspice
 vacask Option(MethodGear) owed from=ngspice
