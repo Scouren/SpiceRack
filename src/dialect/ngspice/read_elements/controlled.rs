@@ -296,6 +296,19 @@ fn behav(
 fn poly(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card, rest: &[Item], n: u8, letter: u8) {
     let voltage_ctl = matches!(letter, b'e' | b'g');
     let names = usize::from(n) * if voltage_ctl { 2 } else { 1 };
+    // a parenthesised list `(0,1,2)` is the same coefficients (settle poly_paren.sp)
+    // ponytail: one group only (every corpus deck has one); loop if a deck splits its list
+    let mut rest = rest.to_vec();
+    if let Some(at) = rest
+        .iter()
+        .position(|i| i.kind == Kind::Group)
+        .filter(|&k| k >= names)
+    {
+        let Some(inner) = super::items(&rest[at].text) else {
+            return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
+        };
+        rest.splice(at..=at, inner);
+    }
     let ok = n >= 1
         && rest.len() > names
         && rest[..names].iter().all(|i| i.kind == Kind::Word)

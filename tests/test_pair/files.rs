@@ -9,6 +9,8 @@
 //! - `pub fn pair_file(deck: &Path) -> Result<PairFile, String>`,
 //!   `pub fn pair_text(text: &str) -> Result<PairFile, String>`
 //! - `pub fn listed(cell: &str) -> BTreeMap<(String, u8), String>`
+//! - `pub fn relative(base: &Path, p: &str) -> Option<String>`
+//! - `pub fn absent_osdi(folder: &Path, text: &str) -> Option<String>`
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -90,4 +92,38 @@ pub fn listed(cell: &str) -> BTreeMap<(String, u8), String> {
         );
     }
     out
+}
+
+/// The first OSDI module `text` loads by a path (`pre_osdi ../osdi_libs/x.osdi`) that is not
+/// under `folder`: the deck cannot run as it stands (ngspice-45 reports only "incomplete or
+/// empty netlist" after it). A commented `* pre_osdi` counts: ngspice's examples name there the
+/// module their spinit is to load. A bare name is not one: `sim` links it from VACASK's modules.
+pub fn absent_osdi(folder: &Path, text: &str) -> Option<String> {
+    text.lines()
+        .filter_map(|l| {
+            l.trim()
+                .trim_start_matches(['*', ' '])
+                .strip_prefix("pre_osdi")
+        })
+        .map(|n| n.trim().trim_matches(['"', '\'']))
+        .find(|n| n.contains('/') && !folder.join(n).exists())
+        .map(str::to_string)
+}
+
+/// `p` (a written or source file, the same root as `base`) named from the folder `base`: the
+/// file name when beside it, `../…` when above it, `sub/…` in a subfolder; `None` for the
+/// folder itself.
+pub fn relative(base: &std::path::Path, p: &str) -> Option<String> {
+    let b: Vec<_> = base.components().collect();
+    let q: Vec<_> = std::path::Path::new(p).components().collect();
+    let common = b.iter().zip(&q).take_while(|(x, y)| x == y).count();
+    let ups = b.len() - common;
+    let rest: Vec<String> = q[common..]
+        .iter()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    if rest.is_empty() {
+        return None;
+    }
+    Some("../".repeat(ups) + &rest.join("/"))
 }

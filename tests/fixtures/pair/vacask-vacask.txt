@@ -1,0 +1,3 @@
+# The vacask-vacask cell's failing steps (`tests/test_pair.rs`, a same-dialect cell: `test_pair/same.rs`):
+# `<deck> <step 1..6> <class> <proof>`, compared by (deck, step) both ways. Its decks are the
+# authored decks of the cell whose source dialect it shares.

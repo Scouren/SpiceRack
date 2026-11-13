@@ -2,7 +2,7 @@ laws bc_sat_area_times_areab sub_sat_last_factor diode_wl_mult_twice diode_sidew
 # codes: P1101
 file "controlled.sp" deck
   title "controlled"
-  comment " oracle: ngspice-45 inp2e.c..inp2h.c, inpcom.c inp_compat (vcvs word, value=/vol=/cur= to B, table to XSPICE pwl input_domain=0.1), inp_poly_2g6_compat; run f5; settle table_brace_point.sp (a braced point is numparam's number, the IR's expression point is no writer's: Unread, R74 (4))"
+  comment " oracle: ngspice-45 inp2e.c..inp2h.c, inpcom.c inp_compat (vcvs word, value=/vol=/cur= to B, table to XSPICE pwl input_domain=0.1), inp_poly_2g6_compat; run f5; settle poly_paren.sp (coefficients in parentheses, comma-separated, are the same coefficients); settle table_brace_point.sp (a braced point is numparam's number, the IR's expression point is no writer's: Unread, R74 (4))"
   param k = 3
   element vcvs E1 (o 0 c 0) gain=2
   element vcvs E2 (o 0 c 0) gain=(k * 2)
@@ -11,6 +11,8 @@ file "controlled.sp" deck
   element ccvs H1 (o 0) gain=1k sense=vx
   element poly E3 (o 0) controls=(a 0 b 0) coeffs=[0, 1, 2] dimension=2
   element poly F2 (o 0) controls=(vx) coeffs=[0, 3] dimension=1 output=current control=current
+  element poly F3 (o 0) controls=(vx vy) coeffs=[0, 2.5, 3] dimension=2 output=current control=current
+  element poly E8 (o 0) controls=(c 0) coeffs=[1, 2] dimension=1
   element poly G2 (o 0) controls=(c 0) coeffs=[1, 2] dimension=1 output=current
   element behav E4 (o 0) expr=(v(c) * 4)
   element behav E5 (o 0) expr=(v(c) * 6)

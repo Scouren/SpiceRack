@@ -121,7 +121,9 @@ impl Write for Vacask {
             expr_write::admit(design, at, &mut handles, diags);
             folds.see(design, at, scope);
             match at.kind {
-                K::Load | K::DeviceLibrary => write_structure::admit(design, at, diags),
+                K::Load | K::DeviceLibrary | K::Include | K::Section => {
+                    write_structure::admit(design, at, diags);
+                }
                 K::Model => write_models::admit(design, &index.words, at, diags),
                 K::Element => {
                     write_elements::admit(design, &index, at, scope, diags);
@@ -134,11 +136,9 @@ impl Write for Vacask {
                 K::Save => write_outputs::admit(design, at, diags),
                 K::Title
                 | K::Comment
-                | K::Include
                 | K::Global
                 | K::Opaque
                 | K::Subckt
-                | K::Section
                 | K::If
                 | K::Param
                 | K::Func

@@ -1,0 +1,46 @@
+# The VACASK corpus through vacask-vacask (stage 1, R100): `<deck> <step> <class> <proof>`, compared both ways by (deck, step).
+# `owner=` a SpiceRack read or write loss for that owner; `upstream=` the simulator's own; `proof=corpus` a deck that
+# cannot run as it stands. Recorded on pair-test after e3d06b78.
+benchmark/c6288/vacask-ieb/runme.sim 1 quarantined proof=corpus # slow in the source list
+benchmark/c6288/vacask-nocb/runme.sim 1 quarantined proof=corpus # slow in the source list
+benchmark/c6288/vacask-nortc/runme.sim 1 quarantined proof=corpus # slow in the source list
+benchmark/c6288/vacask/hmax_test.sim 1 quarantined proof=corpus # slow in the source list
+benchmark/c6288/vacask/runme.sim 1 quarantined proof=corpus # slow in the source list
+benchmark/c6288/vacask/test_ivdd.sim 1 quarantined proof=corpus # slow in the source list
+benchmark/graetz/vacask/debug_graetz.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: vacask reported an error: Refactorization failed, size=9, rank=8. | Factorization failed, size=9, rank=8, zero pivot @ node 'outp'. | Solver failed, w
+demo/bsim3-ptm-amp/toplevel.sim 4 target-fails owner=vacask-writer # the lib cmos180n.lib written with `include "cmos180n.lib" section='model'` (the source: section=model, a keyword as the section name): VACASK "Syntax error, unexpected string in include directive"
+demo/bsim3-ptm/amp.sim 4 target-fails owner=vacask-writer # as demo/bsim3-ptm-amp/toplevel.sim
+demo/bsim3-ptm/characteristic.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: vacask reported an error: unknownparam = "error" | target: failed too: vacask reported an error: Syntax error, unexpected string in include directive.
+demo/bsim3-ptm/diffpair.sim 4 target-fails owner=vacask-writer # as demo/bsim3-ptm-amp/toplevel.sim
+demo/bsim3-ptm/mirror.sim 4 target-fails owner=vacask-writer # as demo/bsim3-ptm-amp/toplevel.sim
+demo/control/initfatal.sim 4 source-environment proof=corpus # no raw file tran1.raw: File 'initfatal.va' not found. | load "initfatal.va" | ^ | 3:1 (0x21) in .cross_sim_deck.sim | target: failed too: no raw file 
+demo/control/output.sim 4 source-environment proof=corpus # no raw file tran1.raw: File 'output.va' not found. | load "output.va" | ^ | 3:1 (0xd) in .cross_sim_deck.sim | target: failed too: no raw file tran1.r
+demo/control/runfatal.sim 4 source-environment proof=corpus # no raw file tran1.raw: File 'runfatal.va' not found. | load "runfatal.va" | ^ | 3:1 (0x1f) in .cross_sim_deck.sim | target: failed too: no raw file tr
+demo/control/runfinish.sim 4 source-environment proof=corpus # no raw file tran1.raw: File 'runfinish.va' not found. | load "runfinish.va" | ^ | 3:1 (0x20) in .cross_sim_deck.sim | target: failed too: no raw file 
+demo/control/runstop.sim 4 source-environment proof=corpus # no raw file tran1.raw: File 'runstop.va' not found. | load "runstop.va" | ^ | 3:1 (0x1e) in .cross_sim_deck.sim | target: failed too: no raw file tran
+demo/control/uncondfatal.sim 4 source-environment proof=corpus # no raw file tran1.raw: File 'initfatal.va' not found. | load "initfatal.va" | ^ | 3:1 (0x21) in .cross_sim_deck.sim | target: failed too: no raw file 
+demo/hierarchy/hier.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: no plot: Models: | x1:ressub2 (device=resistor) | sub1::sub1sub1 (device=__hierarchical__) | sub2::sub2sub1 (device=__hierarchical__) | target: failed
+demo/ihp-sg13g2/hbt.sim 1 environment proof=corpus # not found: demo/ihp-sg13g2/sg13g2_vacask_common.lib, demo/ihp-sg13g2/cornerHBT.lib
+demo/ihp-sg13g2/mos.sim 1 environment proof=corpus # not found: demo/ihp-sg13g2/sg13g2_vacask_common.lib, demo/ihp-sg13g2/cornerMOSlv.lib, demo/ihp-sg13g2/cornerMOShv.lib
+demo/ihp-sg13g2/stdcell.sim 1 environment proof=corpus # not found: demo/ihp-sg13g2/sg13g2_vacask_common.lib, demo/ihp-sg13g2/cornerMOSlv.lib, demo/ihp-sg13g2/sg13g2_stdcell.inc
+demo/limiting/builtin.sim 4 source-environment proof=corpus # no raw file op1.raw: File 'simdiob.va' not found. | load "simdiob.va" | ^ | 6:1 (0x55) in .cross_sim_deck.sim | target: failed too: no raw file op1.ra
+demo/limiting/custom.sim 4 source-environment proof=corpus # no raw file op1.raw: File 'simdioc.va' not found. | load "simdioc.va" | ^ | 6:1 (0x54) in .cross_sim_deck.sim | target: failed too: no raw file op1.ra
+demo/natures/ddt.sim 4 source-environment proof=corpus # no raw file ac1.raw: File 'ddtbr.va' not found. | load "ddtbr.va" | ^ | 15:1 (0x1ce) in .cross_sim_deck.sim | target: failed too: no raw file ac1.raw:
+demo/natures/ibrictl.sim 4 source-environment proof=corpus # no raw file ac1.raw: File 'ibrictl.va' not found. | load "ibrictl.va" | ^ | 10:1 (0x151) in .cross_sim_deck.sim | target: failed too: no raw file ac1.
+demo/natures/idt.sim 4 source-environment proof=corpus # no raw file ac1.raw: File 'idtbr.va' not found. | load "idtbr.va" | ^ | 15:1 (0x1b4) in .cross_sim_deck.sim | target: failed too: no raw file ac1.raw:
+demo/natures/switchbr.sim 4 source-environment proof=corpus # no raw file ac1.raw: File 'switchbr.va' not found. | load "switchbr.va" | ^ | 21:1 (0x2ee) in .cross_sim_deck.sim | target: failed too: no raw file ac
+demo/natures/vbr.sim 4 source-environment proof=corpus # no raw file ac1.raw: File 'vbr.va' not found. | load "vbr.va" | ^ | 13:1 (0x158) in .cross_sim_deck.sim | target: failed too: no raw file ac1.raw: Fil
+demo/rpn/parser.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: no plot: a&&b&&c&&d | short circuit and:  0 0 0 1 | a||b||c||d | short circuit or:  0 1 1 1 | target: failed too: no plot: a&&b&&c&&d | short circuit 
+demo/rpn/sipfx.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: no plot: m:  0.001 | M:  1e+06 | x:  1e+06 | X:  1e+06 | target: failed too: no plot: m:  0.001 | M:  1e+06 | x:  1e+06 | X:  1e+06
+demo/spice/vdmossh.sim 1 source-rejects proof=corpus # reader: line 41: P2320 a control statement VACASK rejects | vacask: vacask reported an error: Parser syntax error, unexpected ;, expecting ] or ","
+test/test_ac.sim 1 source-rejects proof=corpus # reader: line 9: P2103 a parameter the module does not have | vacask: no raw file ac1.raw: Parameter 'has_noise' not found. | model resistor resistor h
+test/test_acxf.sim 1 source-rejects proof=corpus # reader: line 9: P2103 a parameter the module does not have | vacask: no raw file acxf1.raw: Parameter 'has_noise' not found. | model resistor resistor
+test/test_hb1.sim 4 source-environment proof=corpus # no raw file dc1.raw: File 'nl3.va' not found. | load "nl3.va" | ^ | 5:1 (0x32) in .cross_sim_deck.sim | target: failed too: no raw file dc1.raw: File 
+test/test_hb2.sim 4 source-environment proof=corpus # no raw file dc1.raw: File 'nl2.va' not found. | load "nl2.va" | ^ | 5:1 (0x35) in .cross_sim_deck.sim | target: failed too: no raw file dc1.raw: File 
+test/test_hb3.sim 4 source-environment proof=corpus # no raw file dc1.raw: File 'lightbulb.va' not found. | load "lightbulb.va" | ^ | 5:1 (0x36) in .cross_sim_deck.sim | target: failed too: no raw file dc
+test/test_hb5.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: vacask reported an error: NR algorithm failed to converge in 100 iteration(s). | HB core algorithm failed to converge in 100 NR iteration(s). | target
+test/test_noise.sim 1 source-rejects proof=corpus # reader: line 9: P2103 a parameter the module does not have | vacask: no raw file op1.raw: Parameter 'has_noise' not found. | model resistor resistor h
+test/test_opnodeset.sim 1 source-rejects proof=corpus # reader: line 30: P2320 a control statement VACASK rejects | line 31: P2320 a control statement VACASK rejects | line 32: P2320 a control statement VAC
+test/test_opstore.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: vacask reported an error: Parser syntax error, unexpected ;, expecting ] or "," | target: failed too: vacask reported an error: Parser syntax error, u
+test/test_sweepvec.sim 4 source-fails upstream=vacask # VACASK fails its own corpus deck: vacask reported an error: Parser syntax error, unexpected ;, expecting ] or "," | target: failed too: vacask reported an error: Parser syntax error, u
+test/test_tranic.sim 1 source-rejects proof=corpus # reader: line 21: P2320 a control statement VACASK rejects | line 22: P2320 a control statement VACASK rejects | vacask: vacask reported an error: Pars
