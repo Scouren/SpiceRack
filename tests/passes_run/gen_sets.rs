@@ -2,10 +2,26 @@
 //! rules' own tests.
 //!
 //! Contents: `pub const fn dc_loops(ir::RunExtra) -> ir::FeatureSet`,
+//! `pub const PARAM_ARGS: ir::FeatureSet`,
 //! `pub const fn sources_only(&[ir::WaveKind], ir::Feature) -> ir::FeatureSet` (the waves
 //! rows' set, moved here from `pass_laws.rs` to keep it under 500 lines)
 
 use spicerack::ir;
+
+/// A deck of transients whose arguments read top-level parameters, nothing altering them: the
+/// designs `analysis_param_args_to_values` writes out (over every feature an alter, a loop or a
+/// statistics block always stands somewhere).
+pub const PARAM_ARGS: ir::FeatureSet = ir::FeatureSet::EMPTY
+    .with(ir::Feature::Item(ir::ItemKind::Title))
+    .with(ir::Feature::Item(ir::ItemKind::Param))
+    .with(ir::Feature::Item(ir::ItemKind::Analysis))
+    .with(ir::Feature::Expr(ir::ExprTag::Num))
+    .with(ir::Feature::Expr(ir::ExprTag::Param))
+    .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
+    .with(ir::Feature::Run(ir::RunExtra::TranCapNone))
+    .with(ir::Feature::Run(ir::RunExtra::TranPrintStep))
+    .with(ir::Feature::Run(ir::RunExtra::AnalysisUnnamed))
+    .with(ir::Feature::Run(ir::RunExtra::AnalysisParamArgument));
 
 /// A deck of restarting DC analyses with an axis of `axis` among source and list axes: the
 /// designs `dc_axes_to_loops` converts (over every feature a competing continued sweep wins).

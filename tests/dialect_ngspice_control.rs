@@ -253,7 +253,7 @@ fn a_written_card_deck_runs_on_ngspice_to_the_original_raw_file() {
 
 #[test]
 fn generated_script_plans_read_back_to_their_meaning() {
-    // Oracle: law L5 (`read(write(x)) ≅ x`, `eq_meaning`) on designs this test builds from a
+    // Oracle: law L5 (`read(write(x)) ≅ x`, `eq_meaning`, x the legalized design) on designs this test builds from a
     // seed, with literal loop values, which the shared generator never draws (its loop values
     // are expressions, which ngspice's `foreach` cannot spell: W1402). Every loop form the
     // writer spells (a named and an unnamed KeepLast list sweep, nested), every alter target,
@@ -273,8 +273,10 @@ fn generated_script_plans_read_back_to_their_meaning() {
         }
         let written = write_entry(&legal);
         let (back, _) = read_deck("g.sp", &written);
+        // the legalized design in normal form (its text read back): a pass appends rows
+        let legal = parse_ir("legal", &dump(&legal));
         assert!(
-            back.eq_meaning(&design),
+            back.eq_meaning(&legal),
             "seed {seed}:\n{text}\nwritten as\n{written}\nread back as\n{}",
             dump(&back)
         );

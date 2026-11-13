@@ -1,0 +1,13 @@
+f33_vacask_dec10_1_1meg: VACASK runs 61 frequencies 1 ... 1e6 on the 10^(1/10) grid, the same list as ngspice
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=1.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  options rawfile="ascii"
+  analysis ac1 ac from=1 to=1e6 mode="dec" points=10
+endc

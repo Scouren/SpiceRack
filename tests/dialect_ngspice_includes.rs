@@ -114,6 +114,16 @@ fn section_chains_of_one_file_are_no_cycle() {
     assert_eq!(master_file(&d, "x1"), Some("inc_lib_chain.lib".into()));
 }
 
+#[test]
+fn a_formal_binds_in_its_own_subckt_also_in_a_lib_section() {
+    // formal_scope_lib.sp: i(v1) = -0.5 (a's w = 1), i(v2) = -1/12 (b's w = 4 at x2), v(k) = 9
+    // (the top w): F34, the reader bound every subckt's formal w to the last subckt's
+    let (d, _) = read(&["formal_scope_lib.sp", "formal_scope.lib"]);
+    assert_eq!(read_owner(&d, "x"), Some("a".into()));
+    assert_eq!(read_owner(&d, "y"), Some("b".into()));
+    assert_eq!(read_owner(&d, "t"), None, "t reads the top w");
+}
+
 /// The files read (the first the deck) from the settle folder, leniently.
 fn read(files: &[&str]) -> (ir::Design, ir::Diags) {
     let mut src = Sources::new();
@@ -168,4 +178,29 @@ fn value_file(d: &ir::Design, name: &str) -> Option<String> {
         ir::Expr::Param(r) => def_file(d, r.def),
         other => panic!("{name}: a parameter read, not {other:?}"),
     }
+}
+
+/// The subcircuit whose formal the `.param name={w}` reads (its value one parameter read), or
+/// `None` when the bound definition stands outside every subcircuit.
+fn read_owner(d: &ir::Design, name: &str) -> Option<String> {
+    let item = d
+        .reachable()
+        .into_iter()
+        .map(|(i, _)| i)
+        .find(|i| {
+            i.kind == ir::ItemKind::Param
+                && d.str(d.row::<ir::item::Param>(i.index).name)
+                    .eq_ignore_ascii_case(name)
+        })
+        .unwrap_or_else(|| panic!("a .param {name}"));
+    let p: ir::item::Param = d.row(item.index);
+    let ir::Expr::Param(r) = d.expr(p.value) else {
+        panic!("{name}: a parameter read");
+    };
+    assert!(!r.def.is_none(), "{name}: bound");
+    let owner = d.scope(d.def(r.def).scope).owner;
+    (owner.kind == ir::ItemKind::Subckt).then(|| {
+        d.str(d.row::<ir::item::Subckt>(owner.index).name)
+            .to_string()
+    })
 }

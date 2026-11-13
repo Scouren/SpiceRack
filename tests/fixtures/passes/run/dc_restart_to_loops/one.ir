@@ -1,0 +1,5 @@
+file "a.sp" deck
+  element vsource v1 (in 0) dc=1
+  element vsource v2 (b 0) dc=1
+  element resistor r1 (in b) value=1k
+  analysis dc (source_dc v1) (lin start=0 stop=1 step=0.5) afresh

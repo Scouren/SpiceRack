@@ -1,0 +1,10 @@
+mos6_ac_nocap: F28's silent form (R94): one sp_mos6 NMOS whose model gives no junction or overlap capacitance, its gate driven at 1, 1.5 and 2 kHz: ngspice-45's level 6 has no AC load, and with nothing else on the internal nodes it does not stop, it prints an AC drain current of exactly 0 (rewrite/upstream/F28-ngspice-mos6-no-ac.md on the branch differences, 32381d1b)
+load "spice/mos6.osdi"
+model vs vsource
+model nm sp_mos6 type=1 vto=0.7 kv=2 nv=0.8 kc=5e-5 nc=1.2 lambda0=0.02
+vd (d 0) vs dc=3.0
+vg (g 0) vs dc=1.5 mag=1
+m1 (d g 0 0) nm w=10u l=2u
+control
+  analysis ac1 ac from=1e3 to=2e3 mode="lin" points=2
+endc

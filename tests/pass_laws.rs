@@ -149,6 +149,11 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
         gen_sets::dc_loops(ir::RunExtra::DcAxisModelParam),
     ),
     (
+        "dc_restart_to_loops",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
+    ),
+    ("analysis_param_args_to_values", gen_sets::PARAM_ARGS),
+    (
         "tran_cap_ngspice_to_given",
         tran_set(ir::RunExtra::TranCapNgspice),
     ),

@@ -2,9 +2,9 @@
 //! run on VACASK, against the loops of operating points the rule writes for ngspice, run on
 //! ngspice-45. Each op plot, in loop order, holds the source's DC point of the same index.
 //!
-//! The source's sweep continues from point to point (`Dc::restart` false) and the rule
-//! converts only a restarting one, so the test sets `restart` on the read design: the stand-in
-//! for a source that restarts. The axis is a diode's area, a device parameter by the reader's
+//! The source's sweep continues from point to point and the rule converts only a restarting
+//! one, so the test sets the axis afresh on the read design: a stand-in, removed when the VACASK
+//! reader reads `continuation=0` as `DcAxis::afresh` (the deck then says `continuation=0`). The axis is a diode's area, a device parameter by the reader's
 //! one kind per meaning (a resistor's `r` is an element value, which no row converts). The
 //! circuit (a resistor into a diode) has one operating point, the same however a point starts,
 //! so the two runs still compare. Tolerance: 2·(RELTOL·|v| + VNTOL) with RELTOL 1e-3, VNTOL
@@ -15,7 +15,7 @@
 //! give other numbers for one bistable circuit (-2 V and 0 V at v(in) = 0).
 //!
 //! Contents: `pub fn dc_loops_give_the_points_vacask_gives()`,
-//! `pub fn a_loop_of_ops_is_no_continued_sweep()`,
+//! `pub fn a_loop_of_ops_is_no_continued_sweep()`, `pub fn restart_loops_give_vacasks_afresh_points()`,
 //! `pub fn dc_axes_to_loops_convert_generated_designs(Range<u64>, Size)`
 
 use std::path::Path;
@@ -135,6 +135,7 @@ pub fn dc_axes_to_loops_convert_generated_designs(seeds: std::ops::Range<u64>, s
             "dc_axis_model_param_to_loop",
             ir::RunExtra::DcAxisModelParam,
         ),
+        ("dc_restart_to_loops", ir::RunExtra::DcAxisElementValue),
     ] {
         let pass = passes::all().find(|p| p.name == name).expect("registered");
         let set = crate::gen_sets::dc_loops(axis);
@@ -174,6 +175,107 @@ pub fn a_loop_of_ops_is_no_continued_sweep() {
         "the .dc holds -2 V: {swept:?}"
     );
     assert!(ops[4].abs() < 1e-3, "the op finds 0 V: {ops:?}");
+}
+
+/// `dc_restart_to_loops` on the latch (R75a): `latch.sim` read, every axis set afresh (the
+/// stand-in for VACASK's `continuation=0` on both levels, which its reader keeps `Private`),
+/// written for ngspice as loops of operating points and run on ngspice-45, against VACASK on
+/// `latch_c0_both.sim`: the fourteen v(c) points, in the same order, within 2·(RELTOL·|v| +
+/// VNTOL). A carried outer axis is the case the rule refuses (`latch.sim` as read).
+///
+/// Stand-in: the axes are set afresh by hand. What removes it: the VACASK reader reading
+/// `continuation=0` as `DcAxis::afresh` (the second VACASK agent's item after the IR round);
+/// then this test reads `latch_c0_both.sim` as written and converts it.
+pub fn restart_loops_give_vacasks_afresh_points() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
+    let text = std::fs::read_to_string(dir.join("latch.sim")).expect("the deck");
+    let (vacask, ngspice) = (
+        dialect::by_name("vacask").unwrap(),
+        dialect::by_name("ngspice").unwrap(),
+    );
+    let read = |afresh: bool| {
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        dialect::read(
+            &Sources::one("latch.sim", &text),
+            vacask,
+            Policy::Strict,
+            &mut design,
+            &mut diags,
+        );
+        assert!(
+            diags.rows().iter().all(|d| !dialect::refuses(d.code)),
+            "read: {:?}",
+            diags.rows()
+        );
+        let dc = design
+            .reachable()
+            .into_iter()
+            .map(|(i, _)| i)
+            .find(|i| {
+                i.kind == ir::ItemKind::Analysis
+                    && design.row::<ir::Analysis>(i.index).kind == ir::AnalysisKind::Dc
+            })
+            .expect("the DC analysis");
+        let detail = design.row::<ir::Analysis>(dc.index).detail;
+        let mut row = design.detail::<ir::dc_ac::Dc>(detail);
+        let mut axes = design.dc_axes(row.axes).to_vec();
+        assert_eq!(axes.len(), 2, "outer rin, inner vin");
+        for x in &mut axes {
+            x.afresh = afresh || x.afresh;
+        }
+        let mut editor = design.editor();
+        row.axes = editor.builder().dc_axes(&axes);
+        editor.set_detail(detail, row);
+        let n = diags.len();
+        dialect::legalize(&mut design, ngspice, &mut diags);
+        let new = diags.rows()[n..].to_vec();
+        (design, diags, new)
+    };
+    let (_, _, carried) = read(false);
+    assert!(
+        carried.iter().any(|d| dialect::refuses(d.code)),
+        "a carried outer axis is refused"
+    );
+    let (design, mut diags, new) = read(true);
+    assert!(
+        new.iter().all(|d| !dialect::refuses(d.code)),
+        "legalize: {new:?}"
+    );
+    assert_eq!(
+        new.iter().filter(|d| d.code == AS_LOOPS).count(),
+        2,
+        "two loops: {new:?}"
+    );
+    let written = dialect::write(&design, design.entry(), ngspice, &mut diags);
+    let both = dir.join("latch_c0_both.sim");
+    let source_text = std::fs::read_to_string(&both).expect("the deck");
+    let a = plots(sim::run(Sim::Vacask, &both, &source_text, &[], 60));
+    let b = plots(sim::run(
+        Sim::Ngspice,
+        &dir.join("latch_loops.sp"),
+        &written,
+        &[],
+        60,
+    ));
+    let source = column(&a[0], "c");
+    let target: Vec<f64> = b
+        .iter()
+        .filter(|p| p.plot_name.eq_ignore_ascii_case("operating point"))
+        .map(|p| column(p, "c")[0])
+        .collect();
+    assert_eq!(
+        (source.len(), target.len()),
+        (14, 14),
+        "fourteen points:\n{written}"
+    );
+    for (k, (x, y)) in source.iter().zip(&target).enumerate() {
+        let tol = 2.0 * (1e-3 * x.abs() + 1e-6);
+        assert!(
+            (x - y).abs() <= tol,
+            "point {k}: VACASK {x}, ngspice {y}\n{written}"
+        );
+    }
 }
 
 // ---- private ----
