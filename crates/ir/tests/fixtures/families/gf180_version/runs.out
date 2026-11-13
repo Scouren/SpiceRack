@@ -1,0 +1,17 @@
+BSIM4 version dispatch on both simulators (ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n, VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6
+spice/bsim4v8.osdi): the BSIM4 defaults and gf180's typical nfet_03v3.4 card at nom_sat (w=1u l=0.28u, vgs 1.5, vds 3.3,
+vbs -0.5, reltol 1e-9). Run: `nix develop .#testing -c tests/fixtures/families/gf180_version/run.sh`.
+Result: ngspice-45 runs a version=4.5 card with its BSIM4 4.5 code (defaults 1.3e-5 apart from 4.8, the gf180 card
+2.6e-4); VACASK has no 4.5: version="4.5" warns and runs 4.8.3, no version runs 4.8. At 4.8 (4.8.2 or 4.8.3) on both
+they agree to 3e-12.
+
+defaults   ngspice version=4.5    vacask (none)             ngspice=-8.103108296470e-04 vacask=-8.103215612944e-04 rel=1.32e-05 []
+defaults   ngspice version=4.5    vacask version="4.5"      ngspice=-8.103108296470e-04 vacask=-8.103215612944e-04 rel=1.32e-05 ['OSDI(warn) m1: unknown BSIM4 version. Working now with BSIM4.8.3.']
+defaults   ngspice version=4.5    vacask version="4.8.2"    ngspice=-8.103108296470e-04 vacask=-8.103215612944e-04 rel=1.32e-05 []
+defaults   ngspice version=4.8.2  vacask version="4.8.2"    ngspice=-8.103215612940e-04 vacask=-8.103215612944e-04 rel=4.95e-13 []
+defaults   ngspice version=4.8    vacask version="4.8.3"    ngspice=-8.103215612940e-04 vacask=-8.103215612944e-04 rel=4.95e-13 []
+gf180 card ngspice version=4.5    vacask (none)             ngspice=-1.192135995010e-04 vacask=-1.192449046714e-04 rel=2.63e-04 []
+gf180 card ngspice version=4.5    vacask version="4.5"      ngspice=-1.192135995010e-04 vacask=-1.192449046714e-04 rel=2.63e-04 ['OSDI(warn) m1: unknown BSIM4 version. Working now with BSIM4.8.3.']
+gf180 card ngspice version=4.5    vacask version="4.8.2"    ngspice=-1.192135995010e-04 vacask=-1.192449046714e-04 rel=2.63e-04 []
+gf180 card ngspice version=4.8.2  vacask version="4.8.2"    ngspice=-1.192449046710e-04 vacask=-1.192449046714e-04 rel=3.37e-12 []
+gf180 card ngspice version=4.8    vacask version="4.8.3"    ngspice=-1.192449046710e-04 vacask=-1.192449046714e-04 rel=3.37e-12 []

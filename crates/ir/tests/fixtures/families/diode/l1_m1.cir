@@ -1,0 +1,11 @@
+level 3 diode from w and l with m=1, forward 0.5 V
+.model dm d level=3 is=1e-4
+v1 a 0 0.5
+d1 a 0 dm w=10u l=10u m=1
+.options reltol=1e-9
+.control
+set numdgt=12
+op
+print i(v1)
+.endc
+.end

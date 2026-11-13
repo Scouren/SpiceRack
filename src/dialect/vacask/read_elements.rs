@@ -55,6 +55,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Elem(ir::ElemKind::Inductor))
     .with(ir::Feature::Elem(ir::ElemKind::Diode))
     .with(ir::Feature::Elem(ir::ElemKind::Mosfet))
+    .with(ir::Feature::Elem(ir::ElemKind::Bjt))
     .with(ir::Feature::Elem(ir::ElemKind::Jfet))
     .with(ir::Feature::Elem(ir::ElemKind::Mesfet))
     .with(ir::Feature::Elem(ir::ElemKind::ModuleModel))
@@ -271,6 +272,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an element whose kind is not its master's",
             cite: "VD cir-instance (an instance places its master); families::kind",
             explain: "VACASK knows an instance's kind only from its master's module; an element of another kind than its model's family gives has no VACASK spelling.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        write_models::VERSION,
+        ir::Info {
+            title: "a model version the VACASK module does not run",
+            cite: "F85; the version switch of spice/bsim4v8.va (pinned store); sp_bsim3v3 has no version parameter",
+            explain: "sp_bsim3v3 is BSIM3v3.3.0 alone and sp_bsim4v8 runs 4.8.0 to 4.8.3; another version (the gf180 cards' BSIM4 4.5) would run as 4.8.3 (\"unknown BSIM4 version. Working now with BSIM4.8.3.\"), up to 2.4 % off.",
             kind: ir::Kind::Refusal,
         },
     ),

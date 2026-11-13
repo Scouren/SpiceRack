@@ -173,6 +173,7 @@ pub(super) fn instance(l: &mut Lower<'_, '_, '_>, n: Node) {
         ("capacitor", _) => passive(l, n, ir::ElemKind::Capacitor, None, &fields),
         ("inductor", _) => passive(l, n, ir::ElemKind::Inductor, None, &fields),
         ("vsource" | "isource", _) => read_sources::source(l, n, &master, &fields),
+        ("tline", _) => read_sources::tline(l, n, &fields),
         ("vcvs" | "vccs" | "cccs" | "ccvs", _) => controlled(l, n, &master, &fields),
         ("bsource", _) => behav(l, n, &fields),
         (_, Some(Master::Model(word))) => match model_kind(&word) {
@@ -278,7 +279,8 @@ pub(super) fn value(l: &mut Lower<'_, '_, '_>, v: u32) -> ir::ExprId {
 
 // ---- private ----
 
-/// Whether `master`, looked up from the current scope, is a subcircuit whose body encloses it.
+/// Whether `master`, looked up from the current scope, is the subcircuit whose body holds the
+/// instance (directly or in its `if` branches): the instance instantiates its own subcircuit.
 fn recursive(l: &Lower<'_, '_, '_>, master: &str) -> bool {
     let d = l.b.design();
     let name = d.find_name(master);
@@ -299,6 +301,10 @@ fn recursive(l: &Lower<'_, '_, '_>, master: &str) -> bool {
         let s = d.scope(at);
         if s.owner == item {
             return true;
+        }
+        // across a nested subcircuit the instance is that subcircuit's, no cycle by itself
+        if s.kind != ir::ScopeKind::Branch {
+            return false;
         }
         at = s.parent;
     }

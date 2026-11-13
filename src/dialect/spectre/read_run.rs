@@ -6,7 +6,8 @@
 //!   param=dc` sweeps a source's DC value, `dc param=p` a netlist parameter, over `start= stop=
 //!   step=`, `lin=N` (N intervals: N + 1 points), `dec=N` or `values=[…]` (RUN-SP `p_dc_sweep`
 //!   and the sweep-grid runs);
-//! - `tran stop= [step=] [maxstep=] [skipdc=yes]`: `step` the output interval, the ceiling
+//! - `tran stop= [step=] [maxstep=] [skipdc=yes]`: `step` the output interval (absent: Spectre
+//!   chooses), the ceiling
 //!   `maxstep` or by default span/50, `skipdc=yes` starts from the initial conditions (RUN-SP:
 //!   `p_measure_save` undersampled at span/50; `p_charge_capacitor` with `skipdc`);
 //! - `xf (p n)` the transfer function to the output `v(p, n)` over `values=[…]` or a range of
@@ -48,6 +49,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(F::Run(R::SeveralAnalyses))
     .with(F::Run(R::AnalysisNamed))
     .with(F::Run(R::TranPrintStep))
+    .with(F::Run(R::TranSimulatorStep))
     .with(F::Run(R::TranMaxStep))
     .with(F::Run(R::TranCapSpan50))
     .with(F::Run(R::TranUic))

@@ -20,7 +20,7 @@
 //!
 //! Contents: `FEATURES`, `CODES`, the codes (`OPTION_PRIVATE`, `ANALYSIS_FIELD`, `ANALYSIS_HB_SMALL`, `PSS_PERIOD`,
 //! `OWN_PSS`, `HB_FORM`, `VARIABLE`, `MC_FIELD`, `CLEAR_STATE`, `ELABORATE_TOP`, `SWEEP_FORM`,
-//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `ARG_READS`, `TARGET_UNFOUND`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`), `bare_name`, `identifier`, `control`,
+//! `ALTER_TYPE`, `READS_VARIABLE`, `SWEEP_WAVE`, `SOURCE_SWEEP_WAVE`, `SOURCE_SWEEP_NAME`, `ARG_READS`, `TARGET_UNFOUND`, `OUTPUT_FORM`, `MC_NESTED`, `NODE_SET_PLACE`, `REJECTED`, `SAVE_CATEGORY`, `OPTION_ROW_PRIVATE`, `RESET_CLASS`, `NAME_SPELLING`, `LIN_COUNT`), `bare_name`, `identifier`, `control`,
 //! and the area's helpers `assign`, `string`, `field_text`, `push_opaque`, `head` (crate-private)
 
 mod analysis;
@@ -223,6 +223,10 @@ pub(super) const RESET_CLASS: ir::Code = ir::Code::new(b'W', 2305);
 /// in one analysis's chain (refused by `write_run::admits`; settle names_quoted, names_chain).
 pub(super) const NAME_SPELLING: ir::Code = ir::Code::new(b'W', 2306);
 
+/// A lin sweep whose count is a literal below one: VACASK's interval count would be negative
+/// (run132; refused by `write_run::admit`).
+pub(super) const LIN_COUNT: ir::Code = ir::Code::new(b'W', 2315);
+
 /// This area's rows (the writer's two notes too: `write_run` has no table of its own).
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
     row(
@@ -398,6 +402,13 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         "an analysis or sweep name VACASK cannot spell",
         "settle names_quoted, names_chain (VACASK 36be560)",
         "VACASK reads an analysis, sweep or mc name as a bare identifier only (a quoted name is \"Syntax error, unexpected string.\"), and the sweeps of one analysis must have distinct names (\"Sweep does not have a unique name.\").",
+        ir::Kind::Refusal,
+    ),
+    row(
+        LIN_COUNT,
+        "a lin sweep of fewer than one point",
+        "run132 (VACASK of .#testing)",
+        "VACASK's lin `points` is the interval count, one less than the IR's count; a negative one is \"Number of intervals (specified by points parameter) must be nonnegative.\" and the analysis does not run.",
         ir::Kind::Refusal,
     ),
     row(

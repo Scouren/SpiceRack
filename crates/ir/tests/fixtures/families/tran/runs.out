@@ -1,0 +1,289 @@
+Transients of the small-signal law families (R94's evidence owed): ../tran.py writes tran/ (step cap span/2000, 20 ps,
+R84) and tran_fine/ (5 ps); ../tran_run.sh DIR runs both simulators (../../checked.sh, R91b: a run that did not
+complete is refused; none was). Builds: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n,
+VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (vadng-pre-48). Each deck: the device on load.py's off-nominal cards (80 C, m=3,
+geometry; junctions and Meyer or diffusion capacitances), gate (base) driven by a pulse through 10 kohm (a time constant
+of a few ns against 1 ns edges, so the charges set the waveform), drain (collector) loaded by 2 kohm from 3 V. v(d) at
+nine times, |ngspice - VACASK| / 3 V. mos1 and bjt_rbconst are the controls (no small-signal law).
+vdmos_load (F30) is load.py's VDMOS card at 80 C, m=3, its gate through 10 ohm (cgs 1n: about 10 ns per copy), abstol
+1e-12 as in vdmos_load/; vdmos_m1 the same at m=1 (control); vdmos_x3 three copies at m=1 in parallel, each with its
+own thermal nodes: the m relation's oracle (m=3 must read as three copies, on each simulator against itself).
+Result, MOS and BJT: no difference beyond step control. Worst |d|/3V per deck, cap 20 ps -> 5 ps:
+  mos1 (control)   6.15e-05 -> 8.29e-06       mos2 2.09e-04 -> 2.64e-05      mos3 8.35e-05 -> 2.99e-05
+  mos6             1.27e-04 -> 1.03e-05       mos9 1.76e-04 -> 2.99e-05
+  bjt (irb)        2.69e-06 -> 2.67e-07       bjt_rbconst (control) 2.70e-06 -> 2.67e-07
+Every difference sits on a switching edge and shrinks with the step (4x to 12x for a 4x smaller cap), as the
+controls' do: the converged step uses the DC and charge laws, which agree; ngspice's Jacobian only steers Newton.
+F27, F28, F29 do not reach transients.
+Result, VDMOS: F30 reaches the transient. vdmos_load 2.68e-01 -> 2.69e-01 (t=30n: ngspice-45 2.4655 V, VACASK 3.2709 V),
+not shrinking with the step; the controls agree: vdmos_m1 1.05e-04 -> 2.59e-04, vdmos_x3 3.79e-05 -> 1.52e-05.
+The m relation accuses ngspice-45: its m=3 deck is not its own three copies (t=30n 2.465514 against 3.270829 V), while
+VACASK's is (3.270941728 against 3.270942842 V). DC at m=3 agrees on both (vdmos_load/), so the difference is in the
+charges or their time derivative at m != 1. Class: F30's point holds beyond linearised analyses (its carrier today
+requires a linearised analysis or none).
+Result, BSIM3v3 and BSIM4v8 (bsim3, bsim4, bsim4_nf: the corpus cards of ../cards/; the BSIM4 deck on a 1 V supply and
+drive, so |d|/3V reads a third of its relative size): no difference beyond step control. Worst |d|/3V, 20 ps -> 5 ps:
+  bsim3 1.08e-05 -> 8.59e-07    bsim4 3.08e-07 -> 7.85e-08    bsim4_nf 1.66e-06 -> 5.91e-08
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+## bjt 
+  t=2n   ngspice=3.024145e+00       vacask=3.024153077735622      |d|/3V=2.69e-06
+  t=3n   ngspice=3.063108e+00       vacask=3.063113248699421      |d|/3V=1.75e-06
+  t=4n   ngspice=3.092035e+00       vacask=3.0920388601265842     |d|/3V=1.29e-06
+  t=6n   ngspice=3.128074e+00       vacask=3.128076361522376      |d|/3V=7.87e-07
+  t=8n   ngspice=3.125133e+00       vacask=3.125127062652278      |d|/3V=1.98e-06
+  t=9n   ngspice=3.097339e+00       vacask=3.09733492713205       |d|/3V=1.36e-06
+  t=12n  ngspice=3.043534e+00       vacask=3.0435323652004653     |d|/3V=5.45e-07
+  t=20n  ngspice=2.997642e+00       vacask=2.9976421677676854     |d|/3V=5.59e-08
+  t=30n  ngspice=3.015764e+00       vacask=3.0157596310411527     |d|/3V=1.46e-06
+## bjt_rbconst 
+  t=2n   ngspice=3.024145e+00       vacask=3.024153089829564      |d|/3V=2.70e-06
+  t=3n   ngspice=3.063108e+00       vacask=3.0631131632542274     |d|/3V=1.72e-06
+  t=4n   ngspice=3.092035e+00       vacask=3.0920387942187784     |d|/3V=1.26e-06
+  t=6n   ngspice=3.128074e+00       vacask=3.128076321270692      |d|/3V=7.74e-07
+  t=8n   ngspice=3.125133e+00       vacask=3.125127141093671      |d|/3V=1.95e-06
+  t=9n   ngspice=3.097339e+00       vacask=3.09733498957075       |d|/3V=1.34e-06
+  t=12n  ngspice=3.043534e+00       vacask=3.0435323967312544     |d|/3V=5.34e-07
+  t=20n  ngspice=2.997642e+00       vacask=2.9976421725728213     |d|/3V=5.75e-08
+  t=30n  ngspice=3.015764e+00       vacask=3.0157596018459403     |d|/3V=1.47e-06
+## bsim3 
+  t=2n   ngspice=1.670223e-01       vacask=0.1670127931787087     |d|/3V=3.17e-06
+  t=3n   ngspice=1.296847e-01       vacask=0.12968515049355148    |d|/3V=1.50e-07
+  t=4n   ngspice=1.286855e-01       vacask=0.1286855239852195     |d|/3V=8.00e-09
+  t=6n   ngspice=1.286330e-01       vacask=0.12863296986427994    |d|/3V=1.00e-08
+  t=8n   ngspice=2.880635e-01       vacask=0.2880960246204        |d|/3V=1.08e-05
+  t=9n   ngspice=2.972061e+00       vacask=2.97207629991305       |d|/3V=5.10e-06
+  t=12n  ngspice=2.999882e+00       vacask=2.9998824601437057     |d|/3V=1.53e-07
+  t=20n  ngspice=2.999883e+00       vacask=2.999882515308099      |d|/3V=1.62e-07
+  t=30n  ngspice=2.999625e+00       vacask=2.9996252715653093     |d|/3V=9.05e-08
+## bsim4 
+  t=2n   ngspice=1.343494e-01       vacask=0.1343503228257055     |d|/3V=3.08e-07
+  t=3n   ngspice=1.165575e-01       vacask=0.11655747181284574    |d|/3V=9.40e-09
+  t=4n   ngspice=1.165575e-01       vacask=0.11655745813830015    |d|/3V=1.40e-08
+  t=6n   ngspice=1.165575e-01       vacask=0.11655745813616175    |d|/3V=1.40e-08
+  t=8n   ngspice=9.982073e-01       vacask=0.9982073104519892     |d|/3V=3.48e-09
+  t=9n   ngspice=9.999844e-01       vacask=0.9999843792937441     |d|/3V=6.90e-09
+  t=12n  ngspice=9.999844e-01       vacask=0.9999843792948062     |d|/3V=6.90e-09
+  t=20n  ngspice=9.999844e-01       vacask=0.9999843792973288     |d|/3V=6.90e-09
+  t=30n  ngspice=9.999844e-01       vacask=0.9999843793396918     |d|/3V=6.89e-09
+## bsim4_nf 
+  t=2n   ngspice=1.363536e-01       vacask=0.1363585686667668     |d|/3V=1.66e-06
+  t=3n   ngspice=1.185166e-01       vacask=0.11851655943893737    |d|/3V=1.35e-08
+  t=4n   ngspice=1.185165e-01       vacask=0.11851654891671466    |d|/3V=1.63e-08
+  t=6n   ngspice=1.185165e-01       vacask=0.11851654891927221    |d|/3V=1.63e-08
+  t=8n   ngspice=9.982439e-01       vacask=0.998243880477761      |d|/3V=6.51e-09
+  t=9n   ngspice=9.999847e-01       vacask=0.9999846947244232     |d|/3V=1.76e-09
+  t=12n  ngspice=9.999847e-01       vacask=0.9999846947233392     |d|/3V=1.76e-09
+  t=20n  ngspice=9.999847e-01       vacask=0.999984694720766      |d|/3V=1.76e-09
+  t=30n  ngspice=9.999847e-01       vacask=0.9999846947085739     |d|/3V=1.76e-09
+## mos1 
+  t=2n   ngspice=2.910894e+00       vacask=2.910709625356916      |d|/3V=6.15e-05
+  t=3n   ngspice=9.338034e-01       vacask=0.9336988339826379     |d|/3V=3.49e-05
+  t=4n   ngspice=6.747118e-01       vacask=0.6746954871380494     |d|/3V=5.44e-06
+  t=6n   ngspice=5.624724e-01       vacask=0.562469705645441      |d|/3V=8.98e-07
+  t=8n   ngspice=8.480059e-01       vacask=0.8480799194770722     |d|/3V=2.47e-05
+  t=9n   ngspice=2.957393e+00       vacask=2.9574440222842817     |d|/3V=1.70e-05
+  t=12n  ngspice=2.999237e+00       vacask=2.999237139502692      |d|/3V=4.65e-08
+  t=20n  ngspice=2.999999e+00       vacask=2.9999988422654775     |d|/3V=5.26e-08
+  t=30n  ngspice=2.995212e+00       vacask=2.9952125002476886     |d|/3V=1.67e-07
+## mos2 
+  t=2n   ngspice=2.809166e+00       vacask=2.808940259524611      |d|/3V=7.52e-05
+  t=3n   ngspice=9.786954e-01       vacask=0.9781128305174539     |d|/3V=1.94e-04
+  t=4n   ngspice=7.580835e-01       vacask=0.7580643052182237     |d|/3V=6.40e-06
+  t=6n   ngspice=6.793558e-01       vacask=0.6793528435419062     |d|/3V=9.85e-07
+  t=8n   ngspice=1.448343e+00       vacask=1.448968570848267      |d|/3V=2.09e-04
+  t=9n   ngspice=2.979843e+00       vacask=2.9798950560254207     |d|/3V=1.74e-05
+  t=12n  ngspice=2.999501e+00       vacask=2.9995010065719674     |d|/3V=2.19e-09
+  t=20n  ngspice=3.000000e+00       vacask=2.9999995740394167     |d|/3V=1.42e-07
+  t=30n  ngspice=2.996392e+00       vacask=2.9963928508967452     |d|/3V=2.84e-07
+## mos3 
+  t=2n   ngspice=2.794397e+00       vacask=2.794146457281302      |d|/3V=8.35e-05
+  t=3n   ngspice=1.156316e+00       vacask=1.1561775907789873     |d|/3V=4.61e-05
+  t=4n   ngspice=8.060411e-01       vacask=0.8060131062129082     |d|/3V=9.33e-06
+  t=6n   ngspice=6.988433e-01       vacask=0.6988392686963172     |d|/3V=1.34e-06
+  t=8n   ngspice=1.545630e+00       vacask=1.545815659924388      |d|/3V=6.19e-05
+  t=9n   ngspice=2.980608e+00       vacask=2.980634476487155      |d|/3V=8.83e-06
+  t=12n  ngspice=2.999496e+00       vacask=2.999496089665736      |d|/3V=2.99e-08
+  t=20n  ngspice=3.000000e+00       vacask=2.999999570025162      |d|/3V=1.43e-07
+  t=30n  ngspice=2.996439e+00       vacask=2.9964388741425076     |d|/3V=4.20e-08
+## mos6 
+  t=2n   ngspice=2.774645e+00       vacask=2.774264153722577      |d|/3V=1.27e-04
+  t=3n   ngspice=1.560597e+00       vacask=1.5605607629960965     |d|/3V=1.21e-05
+  t=4n   ngspice=1.378677e+00       vacask=1.3786649725825302     |d|/3V=4.01e-06
+  t=6n   ngspice=1.286001e+00       vacask=1.285998636240463      |d|/3V=7.88e-07
+  t=8n   ngspice=1.431136e+00       vacask=1.431252484238532      |d|/3V=3.88e-05
+  t=9n   ngspice=2.909930e+00       vacask=2.9102324838703373     |d|/3V=1.01e-04
+  t=12n  ngspice=2.999223e+00       vacask=2.999223634204226      |d|/3V=2.11e-07
+  t=20n  ngspice=2.999999e+00       vacask=2.9999988081384488     |d|/3V=6.40e-08
+  t=30n  ngspice=2.995332e+00       vacask=2.9953331875677995     |d|/3V=3.96e-07
+## mos9 
+  t=2n   ngspice=2.794397e+00       vacask=2.794141505289422      |d|/3V=8.52e-05
+  t=3n   ngspice=1.156316e+00       vacask=1.1561575164558402     |d|/3V=5.28e-05
+  t=4n   ngspice=8.060411e-01       vacask=0.806013274171101      |d|/3V=9.28e-06
+  t=6n   ngspice=6.988433e-01       vacask=0.6988392460304699     |d|/3V=1.35e-06
+  t=8n   ngspice=1.545630e+00       vacask=1.546157662403832      |d|/3V=1.76e-04
+  t=9n   ngspice=2.980608e+00       vacask=2.9806494397342873     |d|/3V=1.38e-05
+  t=12n  ngspice=2.999496e+00       vacask=2.9994961361061447     |d|/3V=4.54e-08
+  t=20n  ngspice=3.000000e+00       vacask=2.999999570062972      |d|/3V=1.43e-07
+  t=30n  ngspice=2.996439e+00       vacask=2.996438674438435      |d|/3V=1.09e-07
+## vdmos_load 
+  t=2n   ngspice=3.018030e+00       vacask=3.015975349219231      |d|/3V=6.85e-04
+  t=3n   ngspice=3.053456e+00       vacask=3.047200937384076      |d|/3V=2.09e-03
+  t=4n   ngspice=3.087944e+00       vacask=3.0780296337817035     |d|/3V=3.30e-03
+  t=6n   ngspice=3.154078e+00       vacask=3.1384950008966754     |d|/3V=5.19e-03
+  t=8n   ngspice=3.179150e+00       vacask=3.179815706151981      |d|/3V=2.22e-04
+  t=9n   ngspice=3.158261e+00       vacask=3.174444805761407      |d|/3V=5.39e-03
+  t=12n  ngspice=3.114866e+00       vacask=3.159303793129647      |d|/3V=1.48e-02
+  t=20n  ngspice=3.047015e+00       vacask=3.125171997524259      |d|/3V=2.61e-02
+  t=30n  ngspice=2.465514e+00       vacask=3.270941728468135      |d|/3V=2.68e-01
+## vdmos_m1 
+  t=2n   ngspice=3.044532e+00       vacask=3.044549071321317      |d|/3V=5.69e-06
+  t=3n   ngspice=3.130445e+00       vacask=3.130461120234636      |d|/3V=5.37e-06
+  t=4n   ngspice=3.213189e+00       vacask=3.213204896708245      |d|/3V=5.30e-06
+  t=6n   ngspice=3.369070e+00       vacask=3.3690842054416574     |d|/3V=4.74e-06
+  t=8n   ngspice=3.451163e+00       vacask=3.451169345388799      |d|/3V=2.12e-06
+  t=9n   ngspice=3.410366e+00       vacask=3.4103993028136177     |d|/3V=1.11e-05
+  t=12n  ngspice=3.312147e+00       vacask=3.312238009735347      |d|/3V=3.03e-05
+  t=20n  ngspice=3.151796e+00       vacask=3.1519564890865204     |d|/3V=5.35e-05
+  t=30n  ngspice=2.880667e+00       vacask=2.8809806982983095     |d|/3V=1.05e-04
+## vdmos_x3 
+  t=2n   ngspice=3.015969e+00       vacask=3.015975337631855      |d|/3V=2.11e-06
+  t=3n   ngspice=3.047195e+00       vacask=3.047200884972573      |d|/3V=1.96e-06
+  t=4n   ngspice=3.078023e+00       vacask=3.078029582034583      |d|/3V=2.19e-06
+  t=6n   ngspice=3.138483e+00       vacask=3.1384949504570177     |d|/3V=3.98e-06
+  t=8n   ngspice=3.179791e+00       vacask=3.179817636033565      |d|/3V=8.88e-06
+  t=9n   ngspice=3.174420e+00       vacask=3.174446650237172      |d|/3V=8.88e-06
+  t=12n  ngspice=3.159277e+00       vacask=3.159305471320374      |d|/3V=9.49e-06
+  t=20n  ngspice=3.125142e+00       vacask=3.125173338062034      |d|/3V=1.04e-05
+  t=30n  ngspice=3.270829e+00       vacask=3.2709428419240902     |d|/3V=3.79e-05
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+## bjt 
+  t=2n   ngspice=3.024145e+00       vacask=3.024145801903836      |d|/3V=2.67e-07
+  t=3n   ngspice=3.063108e+00       vacask=3.063108556447582      |d|/3V=1.85e-07
+  t=4n   ngspice=3.092035e+00       vacask=3.0920354238147625     |d|/3V=1.41e-07
+  t=6n   ngspice=3.128075e+00       vacask=3.128074708387544      |d|/3V=9.72e-08
+  t=8n   ngspice=3.125133e+00       vacask=3.125132525884813      |d|/3V=1.58e-07
+  t=9n   ngspice=3.097338e+00       vacask=3.0973381606418355     |d|/3V=5.35e-08
+  t=12n  ngspice=3.043534e+00       vacask=3.0435340573423835     |d|/3V=1.91e-08
+  t=20n  ngspice=2.997642e+00       vacask=2.997642522117579      |d|/3V=1.74e-07
+  t=30n  ngspice=3.015763e+00       vacask=3.0157634557691093     |d|/3V=1.52e-07
+## bjt_rbconst 
+  t=2n   ngspice=3.024145e+00       vacask=3.024145801568245      |d|/3V=2.67e-07
+  t=3n   ngspice=3.063108e+00       vacask=3.0631085168745793     |d|/3V=1.72e-07
+  t=4n   ngspice=3.092035e+00       vacask=3.092035392729065      |d|/3V=1.31e-07
+  t=6n   ngspice=3.128075e+00       vacask=3.128074689526776      |d|/3V=1.03e-07
+  t=8n   ngspice=3.125133e+00       vacask=3.125132507014915      |d|/3V=1.64e-07
+  t=9n   ngspice=3.097338e+00       vacask=3.097338145654858      |d|/3V=4.86e-08
+  t=12n  ngspice=3.043534e+00       vacask=3.043534049836556      |d|/3V=1.66e-08
+  t=20n  ngspice=2.997642e+00       vacask=2.997642521002808      |d|/3V=1.74e-07
+  t=30n  ngspice=3.015763e+00       vacask=3.015763445564895      |d|/3V=1.49e-07
+## bsim3 
+  t=2n   ngspice=1.670219e-01       vacask=0.1670209925171517     |d|/3V=3.02e-07
+  t=3n   ngspice=1.296852e-01       vacask=0.12968519450355587    |d|/3V=1.83e-09
+  t=4n   ngspice=1.286856e-01       vacask=0.12868557141634074    |d|/3V=9.53e-09
+  t=6n   ngspice=1.286330e-01       vacask=0.12863297021506798    |d|/3V=9.93e-09
+  t=8n   ngspice=2.880618e-01       vacask=0.2880592237038468     |d|/3V=8.59e-07
+  t=9n   ngspice=2.972051e+00       vacask=2.9720498792363257     |d|/3V=3.74e-07
+  t=12n  ngspice=2.999882e+00       vacask=2.999882459796131      |d|/3V=1.53e-07
+  t=20n  ngspice=2.999883e+00       vacask=2.999882515308098      |d|/3V=1.62e-07
+  t=30n  ngspice=2.999625e+00       vacask=2.999624819639841      |d|/3V=6.01e-08
+## bsim4 
+  t=2n   ngspice=1.343505e-01       vacask=0.1343502643858354     |d|/3V=7.85e-08
+  t=3n   ngspice=1.165575e-01       vacask=0.11655747238613286    |d|/3V=9.20e-09
+  t=4n   ngspice=1.165575e-01       vacask=0.11655745810460531    |d|/3V=1.40e-08
+  t=6n   ngspice=1.165575e-01       vacask=0.1165574581086105     |d|/3V=1.40e-08
+  t=8n   ngspice=9.982073e-01       vacask=0.9982073233244518     |d|/3V=7.77e-09
+  t=9n   ngspice=9.999844e-01       vacask=0.9999843793146732     |d|/3V=6.90e-09
+  t=12n  ngspice=9.999844e-01       vacask=0.999984379317708      |d|/3V=6.89e-09
+  t=20n  ngspice=9.999844e-01       vacask=0.9999843793209664     |d|/3V=6.89e-09
+  t=30n  ngspice=9.999844e-01       vacask=0.999984379302482      |d|/3V=6.90e-09
+## bsim4_nf 
+  t=2n   ngspice=1.363587e-01       vacask=0.1363585227510164     |d|/3V=5.91e-08
+  t=3n   ngspice=1.185166e-01       vacask=0.11851656000044514    |d|/3V=1.33e-08
+  t=4n   ngspice=1.185165e-01       vacask=0.11851654895577754    |d|/3V=1.63e-08
+  t=6n   ngspice=1.185165e-01       vacask=0.11851654895708785    |d|/3V=1.63e-08
+  t=8n   ngspice=9.982439e-01       vacask=0.9982438908060632     |d|/3V=3.06e-09
+  t=9n   ngspice=9.999847e-01       vacask=0.9999846946802974     |d|/3V=1.77e-09
+  t=12n  ngspice=9.999847e-01       vacask=0.999984694685842      |d|/3V=1.77e-09
+  t=20n  ngspice=9.999847e-01       vacask=0.9999846946918262     |d|/3V=1.77e-09
+  t=30n  ngspice=9.999847e-01       vacask=0.9999846946866136     |d|/3V=1.77e-09
+## mos1 
+  t=2n   ngspice=2.910912e+00       vacask=2.910887120727206      |d|/3V=8.29e-06
+  t=3n   ngspice=9.337726e-01       vacask=0.9337622439328923     |d|/3V=3.45e-06
+  t=4n   ngspice=6.747128e-01       vacask=0.6747101506942081     |d|/3V=8.83e-07
+  t=6n   ngspice=5.624735e-01       vacask=0.5624730267636866     |d|/3V=1.58e-07
+  t=8n   ngspice=8.479983e-01       vacask=0.8480096770669562     |d|/3V=3.79e-06
+  t=9n   ngspice=2.957482e+00       vacask=2.9574917164205887     |d|/3V=3.24e-06
+  t=12n  ngspice=2.999237e+00       vacask=2.999237017892402      |d|/3V=5.96e-09
+  t=20n  ngspice=2.999999e+00       vacask=2.999998841930828      |d|/3V=5.27e-08
+  t=30n  ngspice=2.995211e+00       vacask=2.9952114500933558     |d|/3V=1.50e-07
+## mos2 
+  t=2n   ngspice=2.809155e+00       vacask=2.80913009903564       |d|/3V=8.30e-06
+  t=3n   ngspice=9.782797e-01       vacask=0.9782040473941769     |d|/3V=2.52e-05
+  t=4n   ngspice=7.580772e-01       vacask=0.7580742185237778     |d|/3V=9.94e-07
+  t=6n   ngspice=6.793556e-01       vacask=0.6793551981625673     |d|/3V=1.34e-07
+  t=8n   ngspice=1.448398e+00       vacask=1.448477252409692      |d|/3V=2.64e-05
+  t=9n   ngspice=2.979878e+00       vacask=2.979881193631841      |d|/3V=1.06e-06
+  t=12n  ngspice=2.999501e+00       vacask=2.9995009010500846     |d|/3V=3.30e-08
+  t=20n  ngspice=3.000000e+00       vacask=2.9999995738820746     |d|/3V=1.42e-07
+  t=30n  ngspice=2.996392e+00       vacask=2.9963918349944376     |d|/3V=5.50e-08
+## mos3 
+  t=2n   ngspice=2.794377e+00       vacask=2.794346677961774      |d|/3V=1.01e-05
+  t=3n   ngspice=1.156270e+00       vacask=1.1562584759893668     |d|/3V=3.84e-06
+  t=4n   ngspice=8.060350e-01       vacask=0.8060317737090267     |d|/3V=1.08e-06
+  t=6n   ngspice=6.988434e-01       vacask=0.6988430108397973     |d|/3V=1.30e-07
+  t=8n   ngspice=1.545675e+00       vacask=1.545764612245539      |d|/3V=2.99e-05
+  t=9n   ngspice=2.980636e+00       vacask=2.980638540278681      |d|/3V=8.47e-07
+  t=12n  ngspice=2.999496e+00       vacask=2.9994960252058225     |d|/3V=8.40e-09
+  t=20n  ngspice=3.000000e+00       vacask=2.9999995699005537     |d|/3V=1.43e-07
+  t=30n  ngspice=2.996438e+00       vacask=2.996438350648058      |d|/3V=1.17e-07
+## mos6 
+  t=2n   ngspice=2.774547e+00       vacask=2.77451692977437       |d|/3V=1.00e-05
+  t=3n   ngspice=1.560600e+00       vacask=1.5605925508799607     |d|/3V=2.48e-06
+  t=4n   ngspice=1.378681e+00       vacask=1.378678273811237      |d|/3V=9.09e-07
+  t=6n   ngspice=1.286003e+00       vacask=1.2860020777569294     |d|/3V=3.07e-07
+  t=8n   ngspice=1.431139e+00       vacask=1.431146320053883      |d|/3V=2.44e-06
+  t=9n   ngspice=2.910082e+00       vacask=2.910112827494155      |d|/3V=1.03e-05
+  t=12n  ngspice=2.999223e+00       vacask=2.9992234693225743     |d|/3V=1.56e-07
+  t=20n  ngspice=2.999999e+00       vacask=2.9999988077365267     |d|/3V=6.41e-08
+  t=30n  ngspice=2.995332e+00       vacask=2.995331912448607      |d|/3V=2.92e-08
+## mos9 
+  t=2n   ngspice=2.794377e+00       vacask=2.794346485666044      |d|/3V=1.02e-05
+  t=3n   ngspice=1.156270e+00       vacask=1.1562621677441522     |d|/3V=2.61e-06
+  t=4n   ngspice=8.060350e-01       vacask=0.8060316334649078     |d|/3V=1.12e-06
+  t=6n   ngspice=6.988434e-01       vacask=0.6988429929343383     |d|/3V=1.36e-07
+  t=8n   ngspice=1.545675e+00       vacask=1.545764714032299      |d|/3V=2.99e-05
+  t=9n   ngspice=2.980636e+00       vacask=2.9806395051037353     |d|/3V=1.17e-06
+  t=12n  ngspice=2.999496e+00       vacask=2.9994960222169254     |d|/3V=7.41e-09
+  t=20n  ngspice=3.000000e+00       vacask=2.999999569898119      |d|/3V=1.43e-07
+  t=30n  ngspice=2.996438e+00       vacask=2.9964383458333765     |d|/3V=1.15e-07
+## vdmos_load 
+  t=2n   ngspice=3.018030e+00       vacask=3.015969542624291      |d|/3V=6.87e-04
+  t=3n   ngspice=3.053445e+00       vacask=3.0471952192950065     |d|/3V=2.08e-03
+  t=4n   ngspice=3.087915e+00       vacask=3.0780239885683054     |d|/3V=3.30e-03
+  t=6n   ngspice=3.154015e+00       vacask=3.138489501961591      |d|/3V=5.18e-03
+  t=8n   ngspice=3.179052e+00       vacask=3.179816996885344      |d|/3V=2.55e-04
+  t=9n   ngspice=3.158170e+00       vacask=3.174446004090093      |d|/3V=5.43e-03
+  t=12n  ngspice=3.114803e+00       vacask=3.159304846113512      |d|/3V=1.48e-02
+  t=20n  ngspice=3.046980e+00       vacask=3.1251727689473086     |d|/3V=2.61e-02
+  t=30n  ngspice=2.465014e+00       vacask=3.2709436182512066     |d|/3V=2.69e-01
+## vdmos_m1 
+  t=2n   ngspice=3.044521e+00       vacask=3.044533339718428      |d|/3V=4.11e-06
+  t=3n   ngspice=3.130402e+00       vacask=3.130445993708714      |d|/3V=1.47e-05
+  t=4n   ngspice=3.213116e+00       vacask=3.2131903392531735     |d|/3V=2.48e-05
+  t=6n   ngspice=3.368945e+00       vacask=3.369070806807716      |d|/3V=4.19e-05
+  t=8n   ngspice=3.451019e+00       vacask=3.451176201137515      |d|/3V=5.24e-05
+  t=9n   ngspice=3.410237e+00       vacask=3.4104041846069904     |d|/3V=5.57e-05
+  t=12n  ngspice=3.312055e+00       vacask=3.31224104446872       |d|/3V=6.20e-05
+  t=20n  ngspice=3.151748e+00       vacask=3.15195667806278       |d|/3V=6.96e-05
+  t=30n  ngspice=2.880123e+00       vacask=2.8808993227077906     |d|/3V=2.59e-04
+## vdmos_x3 
+  t=2n   ngspice=3.015968e+00       vacask=3.015969215370736      |d|/3V=4.05e-07
+  t=3n   ngspice=3.047189e+00       vacask=3.0471948960313604     |d|/3V=1.97e-06
+  t=4n   ngspice=3.078014e+00       vacask=3.078023669301941      |d|/3V=3.22e-06
+  t=6n   ngspice=3.138471e+00       vacask=3.1384891907183796     |d|/3V=6.06e-06
+  t=8n   ngspice=3.179794e+00       vacask=3.179816697970922      |d|/3V=7.57e-06
+  t=9n   ngspice=3.174423e+00       vacask=3.1744457255289675     |d|/3V=7.58e-06
+  t=12n  ngspice=3.159281e+00       vacask=3.159304623607355      |d|/3V=7.87e-06
+  t=20n  ngspice=3.125148e+00       vacask=3.1251726185201787     |d|/3V=8.21e-06
+  t=30n  ngspice=3.270898e+00       vacask=3.27094351003457       |d|/3V=1.52e-05

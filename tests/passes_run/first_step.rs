@@ -6,6 +6,11 @@
 //! point never past the print step); and sim(ngspice) on a moved deck (legalized for ngspice,
 //! written, run: its first step taken no larger than the source's).
 //!
+//! And `tran_simulator_step_to_print`'s stop as the print step: ngspice-45 runs the same raw
+//! file for every step at or past the stop (`decks/tss_*.sp`, each run in its title), and an
+//! LTspice-shaped transient (no print step, a given ceiling) legalized and written for ngspice
+//! runs the very file of the same deck with a step of 0.3 times its stop.
+//!
 //! Contents: tests only.
 
 use std::path::Path;
@@ -54,7 +59,7 @@ fn tran_first_step_to_print_moves_exactly_the_unread_first_steps() {
     let free = tran
         .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranPrintStep)))
         .minus(ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranCapSpan50)))
-        .with(ir::Feature::Run(ir::RunExtra::TranCapNone));
+        .with(ir::Feature::Run(ir::RunExtra::TranCapSpan10));
     let (mut moved, mut kept, mut none) = (0, 0, 0);
     // the free set over four times the seeds: a move takes a first step (one in three) and a
     // given ceiling (one in three)
@@ -148,8 +153,109 @@ fn a_moved_first_step_runs_on_ngspice_within_its_bound() {
     );
 }
 
+/// The settle decks `tss_*`: the groups whose raw files are byte for byte one (time and every
+/// vector), each with the point count its titles record, and the decks that differ from them.
+#[test]
+fn ngspice_steps_alike_for_every_print_step_at_or_past_the_stop() {
+    let groups: [(&[&str], usize); 2] = [
+        (&["tss_mid", "tss_stop", "tss_twice"], 136),
+        (&["tss_stop_uic", "tss_twice_uic"], 135),
+    ];
+    for (decks, points) in groups {
+        let first = raw(&deck(decks[0]));
+        assert_eq!(first.real_data[0].len(), points, "{}: points", decks[0]);
+        for d in &decks[1..] {
+            assert_eq!(
+                raw(&deck(d)).real_data,
+                first.real_data,
+                "{d} against {}",
+                decks[0]
+            );
+        }
+    }
+    // the step binds below the stop/100 bound, and under uic below the stop
+    for (d, like) in [
+        ("tss_span100", "tss_mid"),
+        ("tss_small", "tss_mid"),
+        ("tss_mid_uic", "tss_stop_uic"),
+    ] {
+        assert_ne!(
+            raw(&deck(d)).real_data,
+            raw(&deck(like)).real_data,
+            "{d} against {like}"
+        );
+    }
+}
+
+/// sim(ngspice): the settle deck read, its print step dropped (LTspice's shape: none, the ceiling
+/// given), legalized and written for ngspice, runs the raw file of the deck with step 0.3m.
+#[test]
+fn an_ltspice_shaped_transient_runs_on_ngspice_as_with_no_step() {
+    for (src, like) in [("tss_mid", "tss_mid"), ("tss_mid_uic", "tss_stop_uic")] {
+        let ngspice = dialect::by_name("ngspice").expect("the ngspice row");
+        let sources = dialect::Sources::one("deck.sp", &deck(src));
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        dialect::read(
+            &sources,
+            ngspice,
+            dialect::Policy::Lenient,
+            &mut design,
+            &mut diags,
+        );
+        let (item, mut t) = transients(&design)[0];
+        assert!(
+            matches!(t.ceiling, StepCeiling::Given(_)),
+            "{src}: the ceiling given"
+        );
+        t.print_step = ir::ExprId::NONE;
+        let detail = design.row::<ir::Analysis>(item.index).detail;
+        design.editor().set_detail(detail, t);
+        let read = diags.len();
+        dialect::legalize(&mut design, ngspice, &mut diags);
+        let new = &diags.rows()[read..];
+        assert!(
+            new.iter().all(|d| !dialect::refuses(d.code)),
+            "{src}: {new:?}"
+        );
+        assert!(
+            new.iter().any(|d| d.code.number == 428),
+            "{src}: the stop moved: {new:?}"
+        );
+        let written = dialect::write(&design, design.entry(), ngspice, &mut diags);
+        assert!(
+            written.contains(".tran 1m 1m"),
+            "{src}: the stop as the step\n{written}"
+        );
+        assert_eq!(
+            raw(&written).real_data,
+            raw(&deck(like)).real_data,
+            "{src}\n{written}"
+        );
+    }
+}
+
+/// A settle deck's text.
+fn deck(name: &str) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/passes_run/decks")
+        .join(format!("{name}.sp"));
+    std::fs::read_to_string(path).expect("the settle deck")
+}
+
 /// The second time point of `deck`'s transient, run by `ngspice -b -r` (an ASCII raw file).
 fn second_point(deck: &str) -> f64 {
+    let plot = raw(deck);
+    let time = plot
+        .variables
+        .iter()
+        .position(|v| v.name == "time")
+        .expect("a time vector");
+    plot.real_data[time][1]
+}
+
+/// `deck` run by `ngspice -b -r` (an ASCII raw file), its first plot.
+fn raw(deck: &str) -> spicerack::result::RawData {
     let dir = tempfile::tempdir().expect("a temp dir");
     let (cir, raw) = (dir.path().join("deck.cir"), dir.path().join("deck.raw"));
     std::fs::write(&cir, deck).expect("the deck is written");
@@ -166,13 +272,7 @@ fn second_point(deck: &str) -> f64 {
             String::from_utf8_lossy(&out.stdout)
         )
     });
-    let plot = parse_raw(&bytes).expect("a raw file");
-    let time = plot
-        .variables
-        .iter()
-        .position(|v| v.name == "time")
-        .expect("a time vector");
-    plot.real_data[time][1]
+    parse_raw(&bytes).expect("a raw file")
 }
 
 /// Every reachable transient with its detail, in listed order.

@@ -20,14 +20,27 @@
 //! It fires only where nothing else reads the new print step: the ceiling is given (the rows
 //! stand after the ceiling rows, so a `SpanOver50` is written out first) and no `$tstep` leaf
 //! stands in the design. Otherwise the transient stays, with `FIRST_STEP_KEPT`, as does a first
-//! step beside a given print step (no field takes it). A transient with neither a print step
-//! nor a first step gets `NO_STEP_VALUE`: nothing in the deck determines a value.
+//! step beside a given print step (no field takes it).
+//!
+//! A transient with neither (LTspice's: it has no output interval) gets, from the row
+//! `tran_simulator_step_to_print` only, its stop as its print step, with `STOP_AS_PRINT_STEP`
+//! (argument the stop's `ExprId`), under the same two conditions. Exact for ngspice-45: with the
+//! ceiling given its print step reads only the first step `min(stop/100, step)/10` and, under
+//! `uic`, a breakpoint at the step (`dctran.c` lines 134, 584; `traninit.c`), so every step at
+//! or past the stop runs the same points as no step would: the settle decks
+//! `tests/passes_run/decks/tss_*.sp` give identical raw files for a step of 0.3, 1 and 2 times
+//! the stop without `uic` and of 1 and 2 times with it, and other ones for 0.01 and 0.001 (and
+//! 0.3 under `uic`); the raw file holds the accepted steps (R49), not a resampling. Otherwise,
+//! or from the first-step row, it gets `NO_STEP_VALUE`: nothing in the deck determines a value.
+//! ponytail: an XSPICE `delay` code model sizes its buffer by the step (`cfunc.mod`); no reader
+//! produces one today, and the row's note names the fact if one appears.
 //!
 //! Cites: R73, R13, R67; `rewrite/AMEND-A12.md` A41, A24; `crates/ir/src/tran.rs` (`Tran`).
 //!
 //! Contents: `pub fn tran_first_step_to_print(&mut ir::Design, &mut ir::Diags)`,
 //! `pub const FIRST_STEP_MOVED: ir::Code`, `pub const FIRST_STEP_KEPT: ir::Code`,
-//! `pub const NO_STEP_VALUE: ir::Code`
+//! `pub const NO_STEP_VALUE: ir::Code`, `pub const STOP_AS_PRINT_STEP: ir::Code`,
+//! `pub fn tran_simulator_step_to_print(&mut ir::Design, &mut ir::Diags)`
 
 use super::names_dropped::of_kind;
 use crate::ir;
@@ -39,10 +52,25 @@ pub const FIRST_STEP_MOVED: ir::Code = ir::Code::new(b'U', 419);
 pub const FIRST_STEP_KEPT: ir::Code = ir::Code::new(b'U', 440);
 /// The note at a transient with neither a print step nor a first step.
 pub const NO_STEP_VALUE: ir::Code = ir::Code::new(b'U', 441);
+/// The note at a transient whose stop became its print step: `arg` is the stop's `ExprId`.
+pub const STOP_AS_PRINT_STEP: ir::Code = ir::Code::new(b'U', 428);
 
 /// Moves every reachable transient's first step into its absent print step where nothing else
 /// reads it; notes every other with a first step or no print step.
 pub fn tran_first_step_to_print(design: &mut ir::Design, diags: &mut ir::Diags) {
+    to_print(design, diags, false);
+}
+
+/// As [`tran_first_step_to_print`], and a transient with neither step gets its stop as its
+/// print step where nothing else reads it.
+pub fn tran_simulator_step_to_print(design: &mut ir::Design, diags: &mut ir::Diags) {
+    to_print(design, diags, true);
+}
+
+// ---- private ----
+
+/// The rows' body; `stop` lets a transient with neither step take its stop.
+fn to_print(design: &mut ir::Design, diags: &mut ir::Diags, stop: bool) {
     let tstep = ir::features_used(design).contains(ir::Feature::Expr(ir::ExprTag::TStep));
     for item in of_kind(design, ir::ItemKind::Analysis) {
         let a = design.row::<ir::Analysis>(item.index);
@@ -54,7 +82,17 @@ pub fn tran_first_step_to_print(design: &mut ir::Design, diags: &mut ir::Diags) 
         let given = matches!(t.ceiling, StepCeiling::Given(_));
         match (first, print) {
             (false, true) => continue,
-            (false, false) => diags.push_at(NO_STEP_VALUE, design, item, 0),
+            (false, false) if !stop || !given || tstep => {
+                diags.push_at(NO_STEP_VALUE, design, item, 0)
+            }
+            (false, false) => {
+                diags.push_at(STOP_AS_PRINT_STEP, design, item, t.stop.0);
+                t.print_step = t.stop;
+                design.editor().set_detail(a.detail, t);
+                let set = design.detail::<Tran>(a.detail);
+                assert!(set.print_step == set.stop, "the stop is the print step");
+                assert!(set.initial_step.is_none(), "no first step");
+            }
             (true, true) => diags.push_at(FIRST_STEP_KEPT, design, item, 0),
             (true, false) if !given || tstep => diags.push_at(FIRST_STEP_KEPT, design, item, 0),
             (true, false) => {

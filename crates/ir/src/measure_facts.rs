@@ -41,21 +41,20 @@ use crate::item::DefKind;
 #[cfg(any(test, feature = "gen"))]
 use crate::measure::gen_event;
 use crate::measure::{
-    MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg,
-    MeasureWhen, Stat, dump_event, event_features, event_handles, event_valid, parse_event, point,
+    Event, MeasureDeriv, MeasureFind, MeasureKind, MeasureParam, MeasureStat, MeasureTrigTarg,
+    MeasureWhen, Stat, event_features, event_valid, point,
 };
 use crate::output::Measure;
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
-use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles, probe_valid};
-use crate::run_exprs::Roots;
+use crate::probe::{probe_features, probe_valid};
 use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
-use crate::run_names::Names;
+use crate::run_fields::{N, PROBE};
 use crate::run_names::names_of;
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
-use crate::run_words::{domain_unless, flag, put_expr, put_word, take_enum, take_expr, word};
+use crate::run_words::{domain_unless, flag, put_word, take_enum, word};
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
 use crate::text::Words;
@@ -199,43 +198,27 @@ impl RowFacts for Measure {
     }
 }
 
+run_choices!(Stat);
+
+run_fields! {
+    MeasureTrigTarg { trig: Event("") = Event::BOUND, targ: Event("") = Event::BOUND }
+    MeasureWhen { at: Event("") = Event::BOUND }
+    MeasureFind { find: Probe("") = PROBE, at: Event("") = Event::BOUND }
+    MeasureDeriv { signal: Probe("") = PROBE, at: Event("") = Event::BOUND }
+    MeasureStat {
+        stat: Choice("") = Stat::Avg, signal: Probe("") = PROBE, from: Event("") = Event::BOUND,
+        to: Event("") = Event::BOUND,
+    }
+    MeasureParam { value: Expr = N }
+}
+
 impl DetailFacts for MeasureTrigTarg {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        event_handles(&self.trig, out);
-        event_handles(&self.targ, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.event(&mut self.trig);
-        r.event(&mut self.targ);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.event(&self.trig);
-        r.event(&self.targ);
-    }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         event_features(design, &self.trig, set);
         event_features(design, &self.targ, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(point(&self.trig) && point(&self.targ))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_event(design, ctx, &self.trig, out);
-        dump_event(design, ctx, &self.targ, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let trig = parse_event(words, scope, b, diags)?;
-        Some(MeasureTrigTarg {
-            trig,
-            targ: parse_event(words, scope, b, diags)?,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -256,35 +239,11 @@ impl DetailFacts for MeasureTrigTarg {
 }
 
 impl DetailFacts for MeasureWhen {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        event_handles(&self.at, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.event(&mut self.at);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.event(&self.at);
-    }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         event_features(design, &self.at, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(point(&self.at))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_event(design, ctx, &self.at, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        Some(MeasureWhen {
-            at: parse_event(words, scope, b, diags)?,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -300,42 +259,12 @@ impl DetailFacts for MeasureWhen {
 }
 
 impl DetailFacts for MeasureFind {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.find, out);
-        event_handles(&self.at, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.find);
-        r.event(&mut self.at);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.find);
-        r.event(&self.at);
-    }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         probe_features(&self.find, set);
         event_features(design, &self.at, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(probe_valid(&self.find) && point(&self.at))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.find, out);
-        dump_event(design, ctx, &self.at, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let find = parse_probe(words, scope, b, diags)?;
-        Some(MeasureFind {
-            find,
-            at: parse_event(words, scope, b, diags)?,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -356,42 +285,12 @@ impl DetailFacts for MeasureFind {
 }
 
 impl DetailFacts for MeasureDeriv {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.signal, out);
-        event_handles(&self.at, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.signal);
-        r.event(&mut self.at);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.signal);
-        r.event(&self.at);
-    }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         probe_features(&self.signal, set);
         event_features(design, &self.at, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(probe_valid(&self.signal) && point(&self.at))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.signal, out);
-        dump_event(design, ctx, &self.at, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let signal = parse_probe(words, scope, b, diags)?;
-        Some(MeasureDeriv {
-            signal,
-            at: parse_event(words, scope, b, diags)?,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -412,23 +311,6 @@ impl DetailFacts for MeasureDeriv {
 }
 
 impl DetailFacts for MeasureStat {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.signal, out);
-        event_handles(&self.from, out);
-        event_handles(&self.to, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.signal);
-        r.event(&mut self.from);
-        r.event(&mut self.to);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.signal);
-        r.event(&self.from);
-        r.event(&self.to);
-    }
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(
             set,
@@ -441,28 +323,6 @@ impl DetailFacts for MeasureStat {
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(probe_valid(&self.signal) && event_valid(&self.from) && event_valid(&self.to))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_word(out, &word(self.stat));
-        dump_probe(design, ctx, &self.signal, out);
-        dump_event(design, ctx, &self.from, out);
-        dump_event(design, ctx, &self.to, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let stat = take_enum(words, &Stat::ALL, diags)?;
-        let signal = parse_probe(words, scope, b, diags)?;
-        let from = parse_event(words, scope, b, diags)?;
-        Some(MeasureStat {
-            stat,
-            signal,
-            from,
-            to: parse_event(words, scope, b, diags)?,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -492,33 +352,9 @@ impl DetailFacts for MeasureStat {
 }
 
 impl DetailFacts for MeasureParam {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        out.push(Handle::Expr(self.value));
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.expr(&mut self.value);
-    }
-
-    fn map_names(&mut self, _r: &mut Names<'_>) {
-        // no element name
-    }
     fn features(&self, _design: &Design, _set: &mut FeatureSet) {}
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(!self.value.is_none())
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_expr(out, design, ctx, "value", self.value);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        Some(MeasureParam {
-            value: take_expr(words, "value", scope, b, diags),
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(

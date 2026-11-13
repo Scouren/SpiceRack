@@ -1,4 +1,4 @@
 file "a.sp" deck
   option four_grid_size value=300 whole_run
-  analysis tran stop=1u print_step=1n cap=none
+  analysis tran stop=1u print_step=1n cap=span_over10
   analysis four fundamental=1k harmonics=9 periods=1 (v (out))

@@ -8,12 +8,34 @@
 //! the exact grid; VACASK ceiling-stretches both), from `decks/f33_*`; VACASK's `values=[…]`
 //! returns its values exactly; ngspice's `.ac` has no list form.
 //!
+//! And a non-integer literal count (R99a), from `decks/f33_frac_*`: ngspice-45 rounds it half
+//! up (`dec 2.5` is `dec 3`, `lin 2.5` is `lin 3`), VACASK truncates `points` (`2.5` is `2`),
+//! neither says a word. A count given by an expression (an ngspice `.param`, `{5/2}`; a
+//! VACASK control `var`, `5.0/2`) behaves as its value written literally (R99b).
+//!
+//! And the F33 rows' proof (`sweep_end_list.rs`): a sweep stated with each end law, legalized for
+//! VACASK (which writes it as a list of values) and run, gives the frequencies and the response
+//! the source simulator gives on its own deck (`f33_*`), point for point.
+//!
+//! The last two tests are this module's own `#[test]`s (`passes_run.rs` is at its size bound).
+//!
 //! Contents: `pub fn linear_frequency_sweeps_run_what_each_simulator_counts()`,
-//! `pub fn log_frequency_sweeps_run_each_simulators_law()`
+//! `pub fn end_law_lists_run_the_source_simulators_points()`,
+//! `pub fn log_frequency_sweeps_run_each_simulators_law()`,
+//! `pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask()`
 
 use std::path::Path;
 
+use spicerack::{dialect, ir};
+
 use crate::sim::{self, Ran, Sim};
+
+/// A frequency sweep's spacing, for the reference grid.
+#[derive(Clone, Copy)]
+enum Law {
+    Dec,
+    Lin,
+}
 
 /// Each deck's frequency count on its simulator, as its title records.
 pub fn linear_frequency_sweeps_run_what_each_simulator_counts() {
@@ -138,7 +160,176 @@ pub fn log_frequency_sweeps_run_each_simulators_law() {
     );
 }
 
+/// Each `f33_frac_*` deck runs the exact grid of the integer count its title records: the
+/// decade grid `1k * 10^(k/n)` to 100k, the linear grid `1k + 1k*k/(n-1)` to 2k.
+#[test]
+pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask() {
+    // (simulator, deck, the law, the integer count it runs as)
+    let cases = [
+        (Sim::Ngspice, "f33_frac_ac_dec2p4.sp", Law::Dec, 2),
+        (Sim::Ngspice, "f33_frac_ac_dec2p5.sp", Law::Dec, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec2p6.sp", Law::Dec, 3),
+        (Sim::Ngspice, "f33_frac_ac_lin2p5.sp", Law::Lin, 3),
+        (Sim::Ngspice, "f33_frac_ac_lin3p5.sp", Law::Lin, 4),
+        (Sim::Ngspice, "f33_frac_ac_lin3p6.sp", Law::Lin, 4),
+        (Sim::Vacask, "f33_frac_vacask_dec2p4.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec2p5.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec2p6.sim", Law::Dec, 2),
+        // VACASK's linear `points` counts intervals: points=1 runs two frequencies
+        (Sim::Vacask, "f33_frac_vacask_lin1p5.sim", Law::Lin, 2),
+        (Sim::Vacask, "f33_frac_vacask_lin1p6.sim", Law::Lin, 2),
+        (Sim::Vacask, "f33_frac_vacask_lin2p5.sim", Law::Lin, 3),
+        // a count given by an expression behaves as its value written literally (R99b)
+        (Sim::Ngspice, "f33_frac_ac_dec_param2p5.sp", Law::Dec, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec_param2p4.sp", Law::Dec, 2),
+        (Sim::Ngspice, "f33_frac_ac_lin_param2p5.sp", Law::Lin, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec_5by2.sp", Law::Dec, 3),
+        (Sim::Vacask, "f33_frac_vacask_dec_var2p5.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec_var2p6.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_lin_var1p5.sim", Law::Lin, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec_5p0by2.sim", Law::Dec, 2),
+    ];
+    for (simulator, deck, law, n) in cases {
+        let want: Vec<f64> = match law {
+            Law::Dec => (0..=2 * n)
+                .map(|k| 1e3 * 10f64.powf(k as f64 / n as f64))
+                .collect(),
+            Law::Lin => (0..n)
+                .map(|k| 1e3 + 1e3 * k as f64 / (n - 1) as f64)
+                .collect(),
+        };
+        let axis = sweep(simulator, deck);
+        assert_eq!(
+            axis.len(),
+            want.len(),
+            "{deck}: {axis:?}, recorded {want:?}"
+        );
+        for (got, rec) in axis.iter().zip(&want) {
+            assert!(
+                (got - rec).abs() <= 1e-9 * rec,
+                "{deck}: {axis:?}, recorded {want:?}"
+            );
+        }
+    }
+}
+
+/// Each end law's sweep as IR, legalized for VACASK by the F33 rows and run there, against the
+/// source simulator's own deck: the same number of frequencies, each within 1e-9 relative, and
+/// the same `v(out)` within 1e-6 relative (the RC's response is the same function on both).
+#[test]
+pub fn end_law_lists_run_the_source_simulators_points() {
+    let vacask = dialect::by_name("vacask").expect("vacask");
+    let cases = [
+        (
+            "dec ng_decade start=10 stop=20k points=10",
+            Sim::Ngspice,
+            "f33_ac_dec10_10_20k.sp",
+        ),
+        (
+            "dec ng_decade start=1k stop=5k points=2",
+            Sim::Ngspice,
+            "f33_ac_dec2_1k_5k.sp",
+        ),
+        (
+            "dec stretch start=10 stop=20k points=10",
+            Sim::Vacask,
+            "f33_vacask_dec10_10_20k.sim",
+        ),
+        (
+            "dec stretch start=1k stop=5k points=2",
+            Sim::Vacask,
+            "f33_vacask_dec2_1k_5k.sim",
+        ),
+        (
+            "oct stretch start=1k stop=5k points=3",
+            Sim::Vacask,
+            "f33_vacask_oct3_1k_5k.sim",
+        ),
+    ];
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
+    for (spec, source, deck) in cases {
+        let text = format!(
+            "file \"a.sim\" deck\n  title \"rc\"\n  element vsource v1 (in 0) dc=0 ac_mag=1 ac_phase_deg=0\n  element resistor r1 (in out) value=1k\n  element capacitor c1 (out 0) value=1u\n  analysis ac ({spec})\n"
+        );
+        let mut design = ir::Design::new();
+        let mut diags = ir::Diags::new();
+        ir::parse(&text, &mut design.builder(), &mut diags);
+        assert!(diags.is_empty(), "{spec}: {:?}", diags.rows());
+        dialect::legalize(&mut design, vacask, &mut diags);
+        let refused: Vec<_> = diags
+            .rows()
+            .iter()
+            .filter(|d| dialect::refuses(d.code))
+            .collect();
+        assert!(refused.is_empty(), "{spec}: {refused:?}");
+        let written = dialect::write(&design, design.entry(), vacask, &mut diags)
+            .replace("control\n", "control\n  options rawfile=\"ascii\"\n");
+        assert!(
+            written.contains("values=["),
+            "{spec}: written as a list\n{written}"
+        );
+        let theirs = response(source, &dir.join(deck), None);
+        let ours = response(
+            Sim::Vacask,
+            &dir.join(deck).with_extension("conv.sim"),
+            Some(&written),
+        );
+        assert_eq!(
+            ours.0.len(),
+            theirs.0.len(),
+            "{spec}: {:?} against {deck}'s {:?}",
+            ours.0,
+            theirs.0
+        );
+        for k in 0..ours.0.len() {
+            let (f, g) = (ours.0[k], theirs.0[k]);
+            assert!(
+                (f - g).abs() <= 1e-9 * g,
+                "{spec}: frequency {k}: {f} against {g}"
+            );
+            let (v, w) = (ours.1[k], theirs.1[k]);
+            assert!(
+                (v - w).abs() <= 1e-6 * w,
+                "{spec}: |v(out)| at {g}: {v} against {w}"
+            );
+        }
+        eprintln!("{spec}: {} points as {deck}", ours.0.len());
+    }
+}
+
 // ---- private ----
+
+/// The first plot's frequencies and `|v(out)|`, from `deck` run on `simulator` (its own text, or
+/// `text` when given).
+fn response(simulator: Sim, deck: &Path, text: Option<&str>) -> (Vec<f64>, Vec<f64>) {
+    let own;
+    let text = match text {
+        Some(t) => t,
+        None => {
+            own = std::fs::read_to_string(deck).expect("the deck");
+            &own
+        }
+    };
+    let plots = match sim::run(simulator, deck, text, &[], 60) {
+        Ran::Plots(p) => p,
+        Ran::Timeout => panic!("{deck:?}: past the CPU budget"),
+        Ran::Failed(why) => panic!("{deck:?}: {why}\n{text}"),
+    };
+    let p = &plots[0];
+    let out = p
+        .variables
+        .iter()
+        .position(|v| v.name.eq_ignore_ascii_case("out") || v.name.eq_ignore_ascii_case("v(out)"))
+        .unwrap_or_else(|| {
+            panic!(
+                "{deck:?}: no out in {:?}",
+                p.variables.iter().map(|v| &v.name).collect::<Vec<_>>()
+            )
+        });
+    let freq = p.complex_data[0].iter().map(|z| z.re).collect();
+    let mag = p.complex_data[out].iter().map(|z| z.norm()).collect();
+    (freq, mag)
+}
 
 /// The first plot's sweep vector (its first column), real part.
 fn sweep(simulator: Sim, deck: &str) -> Vec<f64> {

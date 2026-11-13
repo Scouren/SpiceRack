@@ -523,6 +523,18 @@ fn dispatch(lw: &mut Lower<'_, '_>, st: Stmt) {
     {
         return lw.framing();
     }
+    // HSPICE has no braces (settle expr_braces.sp; the suite's invalid/hspice_brace_*.sp:
+    // ESPice stops, "a braced expression"); a block's body is its statements'
+    let text = match lw.ast.tag(st.node) {
+        Tag::Title | Tag::End => String::new(),
+        Tag::Subckt | Tag::Section | Tag::If | Tag::Else | Tag::Data | Tag::Control => {
+            lw.rest(st.node)
+        }
+        _ => lw.raw(st.node),
+    };
+    if text.contains(['{', '}']) {
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, codes::WRAP);
+    }
     if lw.ast.tag(st.node) == Tag::Instance {
         let name = name::key(&lw.card_head(st.node).0);
         if !lw.elements.insert((st.scope, name)) {

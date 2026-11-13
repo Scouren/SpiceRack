@@ -43,6 +43,8 @@
 use crate::build::Builder;
 use crate::design::Design;
 use crate::diag::Diags;
+#[cfg(any(test, feature = "gen"))]
+use crate::element::ElemKind;
 use crate::facts::Handle;
 use crate::feature::{Feature, FeatureSet};
 #[cfg(any(test, feature = "gen"))]
@@ -517,7 +519,9 @@ pub(crate) fn parse_target(
 }
 
 /// A random valid target for `used` whose features are all in `features`, or `None` when the
-/// set allows none. Names are fresh; references are left unresolved.
+/// set allows none. Names are fresh, but an element target names, three times in four, an element
+/// its item finds by name (`link::scope_element`; never with a path); references are left
+/// unresolved.
 #[cfg(any(test, feature = "gen"))]
 pub(crate) fn gen_target(
     g: &mut Gen,
@@ -538,6 +542,24 @@ pub(crate) fn gen_target(
         kind,
         ..Target::TEMP
     };
+    // three times in four an element target names an element its item finds: a source's dc, a
+    // passive's value, any element's parameter (a fresh name: never `TargetAlias`); decided
+    // before any name is interned, so the names table holds only names the text spells
+    let real = if kind.has_path() && !g.chance(4) {
+        let fits = |k: ElemKind| match kind {
+            TargetKind::SourceDc => matches!(k, ElemKind::VSource | ElemKind::ISource),
+            TargetKind::ElementValue => {
+                matches!(
+                    k,
+                    ElemKind::Resistor | ElemKind::Capacitor | ElemKind::Inductor
+                )
+            }
+            _ => true,
+        };
+        crate::link::scope_element(g, b.design(), g.scope, &fits)
+    } else {
+        None
+    };
     if kind == TargetKind::Option {
         t.option = keys[g.below(keys.len() as u32) as usize];
         if t.option == OptionKey::Private {
@@ -545,12 +567,18 @@ pub(crate) fn gen_target(
             t.b = g.fresh_name(b);
         }
     } else if kind != TargetKind::Temp {
-        t.a = gen_ref(g, b, kind.def_kind());
+        t.a = match real {
+            Some(name) => Ref::unresolved(name),
+            None => gen_ref(g, b, kind.def_kind()),
+        };
         if kind.reads_b() {
             t.b = g.fresh_name(b);
         }
     }
-    if kind.has_path() && features.contains(Feature::Run(RunExtra::TargetInInstance)) && g.chance(3)
+    if real.is_none()
+        && kind.has_path()
+        && features.contains(Feature::Run(RunExtra::TargetInInstance))
+        && g.chance(3)
     {
         let x = g.fresh_name(b);
         t.path = b.name_ids(&[x]);
@@ -578,7 +606,9 @@ pub(crate) fn target_kinds(features: &FeatureSet, used: TargetUse) -> Vec<Target
                 .iter()
                 .any(|&x| features.contains(Feature::Run(x)));
             let effect = used != TargetUse::Alter || !k.is_parameter() || effect;
-            ok && !state && effect && (k != TargetKind::Option || any_key)
+            // R100: no simulator loops over a subcircuit's default (the loop rows' `fault`)
+            let pruned = used == TargetUse::Loop && k == TargetKind::SubcktParam;
+            ok && !state && !pruned && effect && (k != TargetKind::Option || any_key)
         })
         .collect()
 }
@@ -620,7 +650,7 @@ const fn target_extra(used: TargetUse, kind: TargetKind) -> Option<RunExtra> {
         (TargetUse::Dc, K::Option) => Some(X::DcAxisOption),
         (TargetUse::Loop, K::Temp) => Some(X::LoopTemp),
         (TargetUse::Loop, K::Param) => Some(X::LoopParam),
-        (TargetUse::Loop, K::SubcktParam) => Some(X::LoopSubcktParam),
+        (TargetUse::Loop, K::SubcktParam) => None, // refused by `check` (R100)
         (TargetUse::Loop, K::SourceDc) => Some(X::LoopSourceDc),
         (TargetUse::Loop, K::ElementValue) => Some(X::LoopElementValue),
         (TargetUse::Loop, K::DeviceParam) => Some(X::LoopDeviceParam),

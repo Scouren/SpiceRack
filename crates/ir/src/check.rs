@@ -121,6 +121,40 @@ pub enum Violation {
     /// An instance on a cycle of subcircuits (no finite elaboration; ngspice-45 and VACASK
     /// refuse it: `hierarchy.rs`). The circuit owner's. `arg`: the instance's row.
     InstanceCycle,
+    /// A device-parameter target that provably names an element's value or a source's DC
+    /// value, which `ElementValue` and `SourceDc` state (one meaning, one form: its text reads
+    /// back as the other kind; `link::target_aliases`). The run owner's. `arg`: the element name.
+    TargetAlias,
+    /// Two variants of one law point stated (R90: a point's variants exclude each other;
+    /// `laws.rs`). The circuit owner's. `arg`: the point's index.
+    LawConflict,
+    /// A reference bound to a definition that lives in a subcircuit's body (a formal, a body
+    /// parameter, function, model or subcircuit) from outside that body: neither from a scope
+    /// inside it (an included file or a called section counts as inside its includer) nor from
+    /// the subcircuit's own head; or a read of a function's formal outside that function (F34:
+    /// a reader bound a read of one subcircuit's `w` to another's `w`; no simulator lets a body
+    /// see a sibling's names). `arg`: the definition.
+    RefScope,
+    /// A run item whose effect depends on its place in the run order (an alter, a loop, a
+    /// reset, a print, a measure, or an option, environment value, node set or save that holds
+    /// from where it stands) inside a subcircuit body (R98: a subcircuit is instantiated, not executed; no
+    /// simulator gives such an item a meaning). Whole-run items there are placements (R27). The
+    /// run owner's (`state_order::order_in_subckt`). `arg`: the item's row.
+    RunOrderInSubckt,
+    /// A string operand of an operator other than `==` and `!=`, a function's, a user call's or
+    /// a draw's argument, or a conditional's condition (VACASK: "Operation not supported for
+    /// string and real."; ngspice-45 has no string parameter: `tests/fixtures/strings/`). A
+    /// string root, a list element and a conditional's branch are values (A25 item 4); under
+    /// `==`/`!=` it is `Extra::StringCompare`. `arg`: the string's expression.
+    StringOperand,
+    /// An item of a kind no dialect expresses inside a scope of a given kind, at any depth (the
+    /// lead's ruling on the census's placements, 2026-11-13; `check_scopes::misplaced` holds the
+    /// table and `rewrite/IR-PRUNE.md` group 6 each row's evidence): a title anywhere but a deck's
+    /// top; a section in any body; a load, device library, statistics block or elaborate in a
+    /// subcircuit; a function, global, device library, statistics block, option, save, print or
+    /// script item (alter, loop, reset, elaborate) in a conditional branch; anything but a run
+    /// item in a loop body. `arg`: the item's row.
+    Misplaced,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -131,7 +165,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::InstanceCycle as usize + 1] = [
+    pub const ALL: [Violation; Violation::Misplaced as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -156,6 +190,12 @@ impl Violation {
         Violation::InstancePortCount,
         Violation::RunArgumentClass,
         Violation::InstanceCycle,
+        Violation::TargetAlias,
+        Violation::LawConflict,
+        Violation::RefScope,
+        Violation::RunOrderInSubckt,
+        Violation::StringOperand,
+        Violation::Misplaced,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -175,6 +215,9 @@ pub fn check(design: &Design, diags: &mut Diags) {
     items(&mut out, &bad);
     // the circuit owner's design-level invariants (A13: element names unique in a scope)
     crate::element::design_check(design, out.diags);
+    for point in crate::laws::conflicts(design.laws()) {
+        out.report(Violation::LawConflict, ItemRef::NONE, point);
+    }
     // the run owner's: a Fourier count's option in force, the node-set mix (A16, A28)
     crate::state_order::design_check(design, out.diags);
     // the class table reads definitions through their rows, so it runs on a design whose
@@ -186,6 +229,13 @@ pub fn check(design: &Design, diags: &mut Diags) {
         }
         for at in crate::hierarchy::cycle_instances(design) {
             out.report(Violation::InstanceCycle, at, at.index);
+        }
+        crate::check_scopes::reference_scopes(&mut out);
+        crate::check_scopes::dynamic_conditions(&mut out);
+        crate::state_order::order_in_subckt(design, out.diags);
+        crate::check_scopes::placements(&mut out);
+        for (at, element) in crate::link::target_aliases(design) {
+            out.report(Violation::TargetAlias, at, element.0);
         }
         probe_classes(&mut out);
     }
@@ -215,13 +265,6 @@ fn formal_count(d: &Design, def: DefId) -> Option<usize> {
         d.names(d.row::<crate::item::Func>(row.item.index).args)
             .len()
     })
-}
-
-/// Whether the definition index holds `def` under its own key (round 7b: a definition a pass
-/// removed through `Editor::remove_item` is not held).
-fn in_index(d: &Design, def: DefId) -> bool {
-    let row = d.defs[def.index()];
-    d.def_index.get(&(row.scope, row.kind, row.name)) == Some(&def)
 }
 
 /// `ProbeContext` through reads (A15 K3): a constant-in-time field (`Handle::Expr`, a list or
@@ -407,7 +450,7 @@ fn items(out: &mut Out<'_>, bad: &[bool]) {
                 out.report(Violation::HandleRange, item, r.def.0);
             } else if d.defs[r.def.index()].kind != kind || d.defs[r.def.index()].name != r.name {
                 out.report(Violation::RefTarget, item, r.def.0);
-            } else if !in_index(d, r.def) {
+            } else if !d.def_is_live(r.def) {
                 out.report(Violation::StaleDefinition, item, r.def.0);
             }
         }
@@ -487,7 +530,7 @@ fn typed_roots(out: &mut Out<'_>, item: ItemRef, h: Handle, strings: &[ExprId]) 
         return; // a value of any type (`Extra::StringValue`, `ListValue`)
     }
     for &e in roots {
-        if e.is_none() || e.index() >= d.expr_count() {
+        if e.is_none() || e.index() >= d.expr_count_all() {
             continue;
         }
         let (string, list) = match d.expr(e) {
@@ -535,6 +578,9 @@ fn expression(
         if bad[node.index()] {
             continue;
         }
+        for s in crate::check_scopes::misplaced_strings(d, node) {
+            out.report(Violation::StringOperand, item, s.0);
+        }
         match d.expr(node) {
             Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq if !dynamic => {
                 out.report(Violation::ProbeContext, item, node.0)
@@ -554,7 +600,7 @@ fn expression(
                 out.report(Violation::RefTarget, item, r.def.0)
             }
             Expr::Param(r) | Expr::UserCall(r, _)
-                if r.is_resolved() && def_ok(d, r.def) && !in_index(d, r.def) =>
+                if r.is_resolved() && def_ok(d, r.def) && !d.def_is_live(r.def) =>
             {
                 out.report(Violation::StaleDefinition, item, r.def.0)
             }

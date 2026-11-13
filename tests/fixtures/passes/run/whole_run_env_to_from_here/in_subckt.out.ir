@@ -1,0 +1,7 @@
+file "a.sp" deck
+  subckt s (a)
+    env temp=50 whole_run
+    element resistor r1 (a 0) value=1k
+  element instance x1 (n) model=s
+  env tnom=30
+  analysis op

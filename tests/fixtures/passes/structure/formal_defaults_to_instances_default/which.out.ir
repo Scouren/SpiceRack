@@ -1,0 +1,11 @@
+file "a.sp" deck
+  param u = 2k
+  subckt s (a b) w=1 t=0
+    element resistor r1 (a b) value=t
+  subckt wrap (a b)
+    param u = 8k
+    element instance x1 (a b) model=s params=(t=(1 * u))
+    element instance x4 (a b) model=s params=(w=3 t=(3 * u))
+  element instance x2 (n 0) model=s params=(t=5)
+  element instance x3 (n 0) model=wrap
+  element instance x5 (n 0) model=s params=(t=(1 * u))

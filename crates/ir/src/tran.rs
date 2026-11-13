@@ -24,39 +24,30 @@
 //! `StepCap::ALL`, `StepCap::COUNT`; `DetailFacts` for `Tran` and `Four`
 
 use crate::analysis_facts::DetailFacts;
+#[cfg(any(test, feature = "gen"))]
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
 #[cfg(any(test, feature = "gen"))]
 use crate::design::ItemRow;
-use crate::diag::Diags;
-use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
-use crate::id::List;
-use crate::id::{ExprId, ExprList, ScopeId};
+use crate::id::ScopeId;
+use crate::id::{ExprId, ExprList, List};
 #[cfg(any(test, feature = "gen"))]
 use crate::item::ItemKind;
 #[cfg(any(test, feature = "gen"))]
 use crate::option::OptionRow;
 #[cfg(any(test, feature = "gen"))]
 use crate::option_key::OptionKey;
-use crate::probe::{
-    AcPart, Probe, ProbeList, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
-};
-use crate::run_exprs::Roots;
+use crate::probe::{AcPart, Probe, ProbeList, probe_features, probe_valid};
 use crate::run_extra::RunExtra;
-use crate::run_names::Names;
+use crate::run_fields::{EL, N};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
-use crate::run_words::{
-    domain_unless, flag, get, is_one, is_zero, put_expr, put_exprs, put_flag, put_word, take_enum,
-    take_expr, take_exprs, take_key, take_word, word,
-};
-use crate::text::Words;
-use crate::text_expr::Ctx;
+use crate::run_words::{domain_unless, flag, get, is_one, is_zero};
 
 /// A transient analysis's detail. Every field is named and none is inferred from another;
 /// `NONE` is "not given", never 0.
@@ -113,14 +104,21 @@ pub enum StepCeiling {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum StepCap {
-    /// No ceiling beyond the span.
-    None,
     /// `min(print_step, span/50)` (ngspice).
     NgspiceRule,
-    /// `span/50` (Spectre, VACASK).
+    /// `span/50` (Spectre).
     SpanOver50,
     /// `span/10` (Xyce).
     SpanOver10,
+    /// VACASK's default: min(span/50, 1/(8·f)) with `f` the highest frequency of the design's
+    /// sine sources (only `type="sine"` sets it; none, or a frequency of 0, leaves span/50).
+    /// VACASK-36be560 `lib/coretran.cpp:1020-1040` (`tran_minpts` 50, `tran_ffmax` 0.25 over
+    /// `2·maxFreq`), `lib/devvisrc.cpp:688-691`; runs in `tests/fixtures/vacask_step/`: a
+    /// resistor driven at 10 kHz steps at most 12.5 µs over 1 ms, at 100 kHz 1.25 µs, at 1 kHz
+    /// and at DC 20 µs. Its first step is 0.25·min(`step`, 1/(8·f)), not bounded by span/50
+    /// (25 µs for `step=100u` at DC). Where the sine frequencies are literals a rule may state it
+    /// exactly as a given ceiling; it is not `SpanOver50` once a sine is faster than 50/(8·span).
+    VacaskRule,
 }
 
 /// A Fourier analysis of the preceding transient's last periods (`.four`, Spectre `fourier`).
@@ -152,56 +150,28 @@ const _: () = assert!(size_of::<Four>() == 24);
 impl StepCap {
     /// Every rule, in declaration order.
     pub const ALL: [StepCap; 4] = [
-        StepCap::None,
         StepCap::NgspiceRule,
         StepCap::SpanOver50,
         StepCap::SpanOver10,
+        StepCap::VacaskRule,
     ];
     /// Rule count.
     pub const COUNT: usize = Self::ALL.len();
 }
 
+run_fields! {
+    Tran {
+        stop: Expr = N, record_start: Expr = N, print_step: Expr = N, initial_step: Expr = N,
+        noise_fmax: Expr = N, noise_fmin: Expr = N, noise_seed: Expr = N, segments: Exprs = EL,
+        ceiling: Ceiling("") = StepCeiling::Given(N), uic: Word = false, startup: Word = false,
+    }
+    Four {
+        fundamental: Expr = N, harmonics: Expr = N, periods: Expr = N, grid: Expr = N,
+        outputs: Probes("") = List::EMPTY,
+    }
+}
+
 impl DetailFacts for Tran {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        for e in [
-            self.stop,
-            self.record_start,
-            self.print_step,
-            self.initial_step,
-            self.noise_fmax,
-            self.noise_fmin,
-            self.noise_seed,
-        ] {
-            out.push(Handle::Expr(e));
-        }
-        out.push(Handle::Exprs(self.segments));
-        if let StepCeiling::Given(e) = self.ceiling {
-            out.push(Handle::Expr(e));
-        }
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        for e in [
-            &mut self.stop,
-            &mut self.record_start,
-            &mut self.print_step,
-            &mut self.initial_step,
-            &mut self.noise_fmax,
-            &mut self.noise_fmin,
-            &mut self.noise_seed,
-        ] {
-            r.expr(e);
-        }
-        r.exprs(self.segments);
-        if let StepCeiling::Given(e) = &mut self.ceiling {
-            r.expr(e);
-        }
-    }
-
-    fn map_names(&mut self, _r: &mut Names<'_>) {
-        // no element name
-    }
-
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         // R67/A41: exactly one of the twins
         flag(set, self.print_step.is_none(), RunExtra::TranSimulatorStep);
@@ -237,63 +207,6 @@ impl DetailFacts for Tran {
                 && ceiling
                 && start,
         )
-    }
-
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_expr(out, design, ctx, "stop", self.stop);
-        put_expr(out, design, ctx, "record_start", self.record_start);
-        put_expr(out, design, ctx, "print_step", self.print_step);
-        put_expr(out, design, ctx, "initial_step", self.initial_step);
-        put_expr(out, design, ctx, "noise_fmax", self.noise_fmax);
-        put_expr(out, design, ctx, "noise_fmin", self.noise_fmin);
-        put_expr(out, design, ctx, "noise_seed", self.noise_seed);
-        put_exprs(out, design, ctx, "segments", self.segments);
-        match self.ceiling {
-            StepCeiling::Given(e) => put_expr(out, design, ctx, "max_step", e),
-            StepCeiling::Rule(cap) => put_word(out, &format!("cap={}", word(cap))),
-        }
-        put_flag(out, self.uic, "uic");
-        put_flag(out, self.startup, "startup");
-    }
-
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let stop = take_expr(words, "stop", scope, b, diags);
-        let record_start = take_expr(words, "record_start", scope, b, diags);
-        let print_step = take_expr(words, "print_step", scope, b, diags);
-        let initial_step = take_expr(words, "initial_step", scope, b, diags);
-        let noise_fmax = take_expr(words, "noise_fmax", scope, b, diags);
-        let noise_fmin = take_expr(words, "noise_fmin", scope, b, diags);
-        let noise_seed = take_expr(words, "noise_seed", scope, b, diags);
-        let segments = take_exprs(words, "segments", scope, b, diags);
-        let given = take_expr(words, "max_step", scope, b, diags);
-        let ceiling = if !given.is_none() {
-            StepCeiling::Given(given)
-        } else if take_key(words, "cap") {
-            StepCeiling::Rule(take_enum(words, &StepCap::ALL, diags)?)
-        } else {
-            words.error(diags);
-            return None;
-        };
-        let uic = take_word(words, "uic");
-        let startup = take_word(words, "startup");
-        Some(Tran {
-            stop,
-            record_start,
-            print_step,
-            initial_step,
-            noise_fmax,
-            noise_fmin,
-            noise_seed,
-            segments,
-            ceiling,
-            uic,
-            startup,
-        })
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -371,31 +284,6 @@ impl DetailFacts for Tran {
 }
 
 impl DetailFacts for Four {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
-        for e in [self.fundamental, self.harmonics, self.periods, self.grid] {
-            out.push(Handle::Expr(e));
-        }
-        for p in get(&design.run.probes, self.outputs).unwrap_or(&[]) {
-            probe_handles(p, out);
-        }
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        for e in [
-            &mut self.fundamental,
-            &mut self.harmonics,
-            &mut self.periods,
-            &mut self.grid,
-        ] {
-            r.expr(e);
-        }
-        r.probes(self.outputs);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probes(self.outputs);
-    }
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         flag(set, !is_one(design, self.periods), RunExtra::FourPeriods);
         flag(set, !self.grid.is_none(), RunExtra::FourGrid);
@@ -415,40 +303,6 @@ impl DetailFacts for Four {
         // R68/A42: an output is a transient vector, so it carries no part (ruled for Fourier)
         let plain = |p: &Probe| probe_valid(p) && p.part == AcPart::None;
         domain_unless(given && !outputs.is_empty() && outputs.iter().all(plain))
-    }
-
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        put_expr(out, design, ctx, "fundamental", self.fundamental);
-        put_expr(out, design, ctx, "harmonics", self.harmonics);
-        put_expr(out, design, ctx, "periods", self.periods);
-        put_expr(out, design, ctx, "grid", self.grid);
-        for p in design.probes(self.outputs) {
-            dump_probe(design, ctx, p, out);
-        }
-    }
-
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let fundamental = take_expr(words, "fundamental", scope, b, diags);
-        let harmonics = take_expr(words, "harmonics", scope, b, diags);
-        let periods = take_expr(words, "periods", scope, b, diags);
-        let grid = take_expr(words, "grid", scope, b, diags);
-        let mut probes = Vec::new();
-        while words.peek() == Some("(") {
-            probes.push(parse_probe(words, scope, b, diags)?);
-        }
-        let outputs = b.probes(&probes);
-        Some(Four {
-            fundamental,
-            harmonics,
-            periods,
-            grid,
-            outputs,
-        })
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -504,10 +358,10 @@ impl DetailFacts for Four {
 
 fn cap_feature(cap: StepCap) -> RunExtra {
     match cap {
-        StepCap::None => RunExtra::TranCapNone,
         StepCap::NgspiceRule => RunExtra::TranCapNgspice,
         StepCap::SpanOver50 => RunExtra::TranCapSpan50,
         StepCap::SpanOver10 => RunExtra::TranCapSpan10,
+        StepCap::VacaskRule => RunExtra::TranCapVacask,
     }
 }
 

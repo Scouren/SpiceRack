@@ -25,7 +25,8 @@
 //! Cites: `rewrite/DIALECT-NGSPICE.md`; `REWRITE-PLAN.md` §2–§4; `rewrite/SPINE.md`.
 //!
 //! Contents: `pub struct Ngspice`, `pub struct Flavour`, `pub static NGSPICE: Ngspice`,
-//! `pub const FEATURES: ir::FeatureSet`, `pub use codes::info`; `impl Read for Ngspice`,
+//! `pub const LAWS: ir::Laws`, `pub const FEATURES: ir::FeatureSet`, `pub use codes::info`;
+//! `impl Read for Ngspice`,
 //! `impl Write for Ngspice`
 
 mod bind;
@@ -83,6 +84,37 @@ pub static NGSPICE: Ngspice = Ngspice {
     flavour: Flavour {},
 };
 
+/// The laws ngspice-45 computes by: one variant of each of the IR's law points (devices
+/// R90–R96, functions R93a, defaults R102), each variant's doc in `crates/ir/src/laws.rs`
+/// naming the run; R102's 27 °C and BSIM4 4.5's hand small-signal (F86) by
+/// `crates/ir/tests/fixtures/default_temp/` and `families/gf180_n1/`. Every read states them (`Builder::set_laws`), so [`FEATURES`] holds
+/// their members.
+pub const LAWS: ir::Laws = ir::Laws::of(&[
+    ir::Law::BcSatAreaTimesAreab,
+    ir::Law::SubSatLastFactor,
+    ir::Law::DiodeWlMultTwice,
+    ir::Law::DiodeSidewallBottomF1,
+    ir::Law::DiodeXomAbsent1e4,
+    ir::Law::VdmosKpAbsent35,
+    ir::Law::VdmosTcvthLowers,
+    ir::Law::VdmosClampByN,
+    ir::Law::MosSmallSignalHand,
+    ir::Law::Mos6SmallSignalAbsent,
+    ir::Law::BjtIrbSmallSignalFrozen,
+    ir::Law::VdmosMultChargesOff,
+    ir::Law::DiodeIsrReverseNone,
+    ir::Law::DiodeIsrSmallSignalHand,
+    ir::Law::DiodeTtFactorUnclamped,
+    ir::Law::TrigReduceCast,
+    ir::Law::ExpClamp1e99,
+    ir::Law::LogZeroMinus1e99,
+    ir::Law::DivGminGuard,
+    ir::Law::AsinEdgeZero,
+    ir::Law::DefaultTemp27,
+    ir::Law::DefaultTnom27,
+    ir::Law::Bsim4v45SmallSignalHand,
+]);
+
 /// What ngspice-45 spells natively: the union of the areas' sets, each the image of its reader
 /// (law L5) and nothing more.
 pub const FEATURES: ir::FeatureSet = write_structure::FEATURES
@@ -98,7 +130,8 @@ pub const FEATURES: ir::FeatureSet = write_structure::FEATURES
     .union(read_models::FEATURES)
     .union(read_run::FEATURES)
     .union(read_outputs::FEATURES)
-    .union(read_control::FEATURES);
+    .union(read_control::FEATURES)
+    .union(LAWS.features());
 
 impl Read for Ngspice {
     /// Each `.include` path and `.lib` call's file, in text order, as written.
@@ -108,6 +141,7 @@ impl Read for Ngspice {
 
     /// Every file of `src`, in its order (entries in `src.form()`, the rest libraries).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
     }
 

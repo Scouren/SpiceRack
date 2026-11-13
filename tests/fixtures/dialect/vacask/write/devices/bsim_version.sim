@@ -1,0 +1,7 @@
+bsim versions
+load "spice/bsim3v3.osdi"
+load "spice/bsim4v8.osdi"
+model n3 sp_bsim3v3 type=1 vth0=0.6
+model n4 sp_bsim4v8 type=1 version="4.8.2" vth0=0.4
+m3 (d g 0 0) n3 w=1u l=1u
+m4 (d g 0 0) n4 w=1u l=1u

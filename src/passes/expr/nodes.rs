@@ -10,7 +10,7 @@
 //! `pub(super) fn plain(&mut ir::Builder<'_>, i64, u8) -> ir::ExprId`,
 //! `pub(super) fn def_values(&ir::Design) -> Vec<Vec<ir::ExprId>>`,
 //! `pub(super) fn instance(&ir::Design, ir::ItemRef) -> Option<(ir::ItemRef, ir::ParamList)>`,
-//! `pub(super) fn live(&ir::Design) -> Vec<ir::ExprId>`, `pub(super) fn reads_tags(&ir::Design) -> bool`,
+//! `pub(super) fn reads_tags(&ir::Design) -> bool`,
 //! `pub(super) fn note_left(&ir::Design, &mut ir::Diags, ir::Feature, ir::Code)`,
 //! `pub(super) fn both_forms(&ir::Design, ir::ItemRef) -> bool`,
 //! `pub(super) fn carrying(&ir::Design, ir::Feature) -> Vec<ir::ItemRef>`,
@@ -85,7 +85,7 @@ impl Draws {
     /// default's, an instance's actual for it, a function's body) does; a fixpoint over the
     /// definitions, bounded by their count.
     pub(super) fn new(design: &ir::Design) -> Draws {
-        let defs = design.definitions();
+        let defs = design.definitions_all();
         let mut table = Draws {
             defs: vec![false; defs.len()],
         };
@@ -111,7 +111,7 @@ impl Draws {
         let mut stack = vec![e];
         let mut seen = std::collections::HashSet::new();
         let mut out = Vec::new();
-        for _ in 0..=2 * design.expr_count() + 1 {
+        for _ in 0..=2 * design.expr_count_all() + 1 {
             let Some(e) = stack.pop() else { return false };
             if e.is_none() || !seen.insert(e) {
                 continue;
@@ -136,7 +136,7 @@ impl Draws {
 /// Every expression that gives each definition its value, by `DefId`: a parameter's value, a
 /// head default and each instance's actual for that formal, a function's body.
 pub(super) fn def_values(design: &ir::Design) -> Vec<Vec<ir::ExprId>> {
-    let defs = design.definitions();
+    let defs = design.definitions_all();
     let mut out = vec![Vec::new(); defs.len()];
     for (d, def) in defs.iter().enumerate() {
         match (def.kind, def.item.kind) {
@@ -187,45 +187,11 @@ pub(super) fn instance(
     (def.kind == ir::DefKind::Subckt).then_some((def.item, el.params))
 }
 
-/// Every expression row reachable from a root of a reachable item, each once, roots first.
-/// O(live rows).
-pub(super) fn live(design: &ir::Design) -> Vec<ir::ExprId> {
-    let mut seen = vec![false; design.expr_count()];
-    let mut out = Vec::new();
-    let mut handles = Vec::new();
-    let mut stack = Vec::new();
-    for (item, _) in design.reachable() {
-        handles.clear();
-        design.item_handles(item, &mut handles);
-        for h in &handles {
-            match *h {
-                ir::Handle::Expr(e) | ir::Handle::ExprDyn(e) => stack.push(e),
-                ir::Handle::Exprs(l) => stack.extend_from_slice(design.exprs(l)),
-                ir::Handle::Params(l) => stack.extend(design.params(l).iter().map(|p| p.1)),
-                ir::Handle::Branches(l) => stack.extend(design.branches(l).iter().map(|b| b.cond)),
-                ir::Handle::Name(_)
-                | ir::Handle::Ref(..)
-                | ir::Handle::Names(_)
-                | ir::Handle::Scope(_)
-                | ir::Handle::Text(_) => {}
-            }
-        }
-        while let Some(e) = stack.pop() {
-            if e.is_none() || seen[e.index()] {
-                continue;
-            }
-            seen[e.index()] = true;
-            out.push(e);
-            kids(design, e, &mut stack);
-        }
-    }
-    out
-}
-
 /// Whether a typed division stands anywhere in the design: then a value's tag is observable
 /// (A12 K1: only `DivTyped` reads a tag), else a rewrite may drop it.
 pub(super) fn reads_tags(design: &ir::Design) -> bool {
-    live(design)
+    design
+        .live_exprs()
         .into_iter()
         .any(|e| matches!(design.expr(e), ir::Expr::Binary(ir::BinOp::DivTyped, ..)))
 }
@@ -301,7 +267,7 @@ pub(super) fn paths(design: &ir::Design, e: ir::ExprId) -> u32 {
         kids(design, r, &mut out);
         stack.extend_from_slice(&out);
     }
-    assert!(rows.len() <= design.expr_count(), "each row once");
+    assert!(rows.len() <= design.expr_count_all(), "each row once");
     rows.sort_unstable();
     let mut size: std::collections::HashMap<ir::ExprId, u32> = std::collections::HashMap::new();
     for &r in &rows {
@@ -409,7 +375,7 @@ pub(super) fn never_negative(d: &ir::Design, x: ir::ExprId) -> bool {
         ir::Expr::Num(n) => d.literal_value(d.num(n)).is_sign_positive(),
         ir::Expr::Call(f, _) => matches!(
             f,
-            ir::Func::Abs | ir::Func::SqrtAbs | ir::Func::Exp | ir::Func::Sqr | ir::Func::PowAbs
+            ir::Func::Abs | ir::Func::Exp | ir::Func::Sqr | ir::Func::PowAbs
         ),
         _ => false,
     }
@@ -419,7 +385,7 @@ pub(super) fn never_negative(d: &ir::Design, x: ir::ExprId) -> bool {
 pub(super) fn literal(design: &ir::Design, e: ir::ExprId) -> Option<f64> {
     let mut sign = 1.0;
     let mut at = e;
-    for _ in 0..=design.expr_count() {
+    for _ in 0..=design.expr_count_all() {
         match design.expr(at) {
             ir::Expr::Num(n) => return Some(sign * design.literal_value(design.num(n))),
             ir::Expr::Unary(ir::UnOp::Neg, a) => (sign, at) = (-sign, a),

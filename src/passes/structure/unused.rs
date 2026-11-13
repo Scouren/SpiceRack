@@ -12,7 +12,8 @@
 //! subcircuit's item carries), and device libraries (a library row is used exactly when a used
 //! model is of its family). **Roots**: under `Roots::Every` (a kit) every definition, so
 //! nothing is dropped; under `Roots::Entry` every item no definition holds, in every file and
-//! section, whether an include names it or not: such an item stays, so what it binds must too
+//! section, whether an include names it or not, and every definition that holds an `Env`
+//! (R102: it states the run's temperature): such an item stays, so what it binds must too
 //! (a library's corners are sections of definitions and includes, and an include binds no
 //! definition). **Edges**: from a used item, every reference its row holds and every parameter
 //! or function an expression of it reads, to that definition's item; a used item uses its
@@ -225,7 +226,7 @@ fn used(
     reach: &[(ir::ItemRef, ir::ScopeId)],
     body: &HashMap<ir::ItemRef, Vec<ir::ItemRef>>,
 ) -> HashSet<ir::ItemRef> {
-    let defs = design.definitions();
+    let defs = design.definitions_all();
     let mut stack = roots(design, reach);
     let mut used = HashSet::new();
     let (mut names, mut bases, mut families) = (HashSet::new(), HashSet::new(), HashSet::new());
@@ -333,7 +334,7 @@ fn follow(
 
 /// `item`'s edges, into `out` (cleared first).
 fn edges(design: &ir::Design, item: ir::ItemRef, out: &mut Edges) {
-    let defs = design.definitions();
+    let defs = design.definitions_all();
     out.defs.clear();
     out.names.clear();
     out.bases.clear();
@@ -409,11 +410,27 @@ fn roots(design: &ir::Design, reach: &[(ir::ItemRef, ir::ScopeId)]) -> Vec<ir::I
         false
     };
     let kind = |i: ir::ItemRef| !is_def(i.kind) && i.kind != ir::ItemKind::Section;
-    reach
+    let mut out: Vec<ir::ItemRef> = reach
         .iter()
         .filter(|&&(i, s)| kind(i) && !held(s))
         .map(|p| p.0)
-        .collect()
+        .collect();
+    // R102: an `Env` states the run's temperature wherever it stands, so the definitions that
+    // hold one are used (dropping it would make the design carry the default temperature)
+    for &(i, mut at) in reach {
+        if i.kind != ir::ItemKind::Env {
+            continue;
+        }
+        // bounded by the scope tree's depth: each step goes to a parent
+        while !at.is_none() {
+            let s = design.scope(at);
+            if s.owner != ir::ItemRef::NONE && is_def(s.owner.kind) {
+                out.push(s.owner);
+            }
+            at = s.parent;
+        }
+    }
+    out
 }
 
 /// The expression roots `item`'s row holds, into `out`.

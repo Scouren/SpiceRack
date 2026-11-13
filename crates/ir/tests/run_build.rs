@@ -67,7 +67,6 @@ fn pools_give_back_what_was_appended() {
         param: Ref::unresolved(b.name("vth")),
         dist: VaryDist::Gauss,
         percent: false,
-        mean: ExprId::NONE,
         spread,
     }];
     let varies = b.varies(&v);
@@ -414,7 +413,7 @@ fn a_measure_is_a_definition() {
     assert_eq!(d.detail::<MeasureTrigTarg>(h.detail), row);
     assert_eq!(d.row::<Measure>(p.index).kind, MeasureKind::Param);
     let defs: Vec<(DefKind, &str, ItemRef)> = d
-        .definitions()
+        .definitions_all()
         .iter()
         .map(|x| (x.kind, d.str(x.name), x.item))
         .collect();
@@ -453,7 +452,6 @@ fn statistics_and_dc_hold_their_lists() {
         param: Ref::unresolved(b.name("vth")),
         dist: VaryDist::LogNormal,
         percent: true,
-        mean: ExprId::NONE,
         spread,
     }];
     let process = b.varies(&v);

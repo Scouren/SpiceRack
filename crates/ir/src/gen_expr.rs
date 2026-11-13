@@ -82,7 +82,26 @@ impl Gen {
         // depth-first, building each row after its children, left to right: a caller's order
         loop {
             let depth = stack.len();
-            let here = if depth == 0 { &at_root } else { features };
+            // a string below the root only where it is a value or `==`/`!=`'s operand under
+            // `StringCompare` (`Violation::StringOperand`)
+            let string_ok = stack.last().is_none_or(|f| match f.node {
+                Node::List => true,
+                Node::Ternary => !f.kids.is_empty(),
+                Node::Binary(BinOp::Eq | BinOp::Ne) => {
+                    features.contains(Feature::Extra(crate::feature::Extra::StringCompare))
+                }
+                Node::Unary(_)
+                | Node::Binary(_)
+                | Node::Call(_)
+                | Node::User(..)
+                | Node::Draw(..) => false,
+            });
+            let below = if string_ok {
+                *features
+            } else {
+                features.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::Str)))
+            };
+            let here = if depth == 0 { &at_root } else { &below };
             // a slot the class skips cannot hold the tree's probe: a dynamic tree whose only
             // dynamic leaf sits in an unread argument is constant, and its operators' form wrong
             let unread = stack
@@ -442,7 +461,6 @@ fn typed(node: &Node) -> bool {
         node,
         Node::Binary(
             BinOp::DivTyped
-                | BinOp::IntDiv
                 | BinOp::BitAnd
                 | BinOp::BitOr
                 | BinOp::BitXor

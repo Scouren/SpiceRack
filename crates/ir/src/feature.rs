@@ -126,11 +126,6 @@ pub enum Extra {
     /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
     /// empty one are the same text there).
     DeckWithoutTitle,
-    /// A `Subckt` head parameter with no default (A15 K2: an instance must pass it).
-    FormalWithoutDefault,
-    /// An `If` condition of class `Temp` or `Circuit` (A15 K2: a netlist chosen by a value no
-    /// constant fold decides).
-    IfConditionDynamic,
     /// A literal of form `Long` anywhere in the design (A18, R37): its digits outlive the
     /// mantissa. A writer that spells them verbatim lists it; another target gets the pass that
     /// writes the correctly rounded shortest double.
@@ -150,6 +145,10 @@ pub enum Extra {
     /// A `Subckt` head default holding an unbound read whose name is no sibling formal's: looked
     /// up from each instance's scope (R62, A37, A29).
     FormalUnboundRead,
+    /// A string operand of `==` or `!=` (VACASK computes `s == "tt"` in a value and in a
+    /// conditional; ngspice-45 has no string parameter: `tests/fixtures/strings/runs.out`). A
+    /// string under any other operator is `Violation::StringOperand`.
+    StringCompare,
 }
 
 /// A fixed set of features: one bit per `Feature::index`. `Copy`, built in `const` context
@@ -301,7 +300,7 @@ impl Feature {
 
 impl Extra {
     /// Every member, in declaration order.
-    pub const ALL: [Extra; Extra::FormalUnboundRead as usize + 1] = [
+    pub const ALL: [Extra; Extra::StringCompare as usize + 1] = [
         Extra::IncludeSection,
         Extra::SectionLibrary,
         Extra::CaseSensitiveNames,
@@ -309,14 +308,13 @@ impl Extra {
         Extra::EnclosingRef,
         Extra::FormalNotConstant,
         Extra::DeckWithoutTitle,
-        Extra::FormalWithoutDefault,
-        Extra::IfConditionDynamic,
         Extra::LongLiteral,
         Extra::SubcktConstantParam,
         Extra::StringValue,
         Extra::ListValue,
         Extra::FormalOuterRead,
         Extra::FormalUnboundRead,
+        Extra::StringCompare,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
@@ -525,6 +523,14 @@ pub(crate) fn item_features(
                     NumForm::Plain | NumForm::Exponent | NumForm::Scale | NumForm::Mil => {}
                 }
             }
+            // a string compared for equality (the strings runs: VACASK computes it)
+            if let Expr::Binary(BinOp::Eq | BinOp::Ne, a, b) = design.expr(e)
+                && [a, b]
+                    .iter()
+                    .any(|&k| matches!(design.expr(k), Expr::Str(_)))
+            {
+                *set = set.with(Feature::Extra(Extra::StringCompare));
+            }
             if let Expr::Draw(_, when, per, _) = design.expr(e) {
                 *set = set
                     .with(Feature::DrawWhen(when))
@@ -538,6 +544,13 @@ pub(crate) fn item_features(
                     *set = set.with(f);
                 }
             }
+            // R93a: a function point's member at a node of dynamic form, under a stated law
+            if forms[1] {
+                let node = crate::laws::Carrier::Node(design.expr(e));
+                crate::laws::carried(design, node, &mut |x| {
+                    *set = set.with(Feature::Circuit(x));
+                });
+            }
         }
     }
 }
@@ -546,7 +559,7 @@ impl ExprWalk {
     /// A walker sized for `design`'s expression rows.
     pub(crate) fn new(design: &Design) -> ExprWalk {
         ExprWalk {
-            stamp: vec![0; design.expr_count()],
+            stamp: vec![0; design.expr_count_all()],
             epoch: 0,
             nodes: Vec::new(),
             stack: Vec::new(),

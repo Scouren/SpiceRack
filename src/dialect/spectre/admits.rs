@@ -10,8 +10,10 @@
 //!   `write_elements::own_keys`), or a key with an upper-case letter on a primitive or a model
 //!   (the reader refuses it: SFE-102); a model key `type`, `level` or `version`;
 //! - a private option of another dialect;
+//! - an AM whose modulation runs from the delay (Spectre's runs from the carrier phase), or
+//!   whose offset and index are both other than 1 (RUN-SP P4-055);
 //! - a function whose body reads the circuit (MAN: SR p.870, no `v()` in a body), and a MOSFET's
-//!   area (Spectre's MOS has none), an inductance that reads the circuit and a
+//!   area (Spectre's MOS has none), a line naming a model (`tline` has none here), an inductance that reads the circuit and a
 //!   `bsource` temperature offset (no evidence);
 //! - a subcircuit instance inside its own subcircuit's body (the reader's `RECURSION`);
 //! - an element whose master no definition binds, of a kind the master decides (a device, a
@@ -21,7 +23,7 @@
 //! Contents: `admits` (crate-private)
 
 use super::codes;
-use super::write_elements::own_keys;
+use super::write_elements::{is_one, own_keys};
 use crate::ir;
 
 /// The statement keywords of the lexicon (CODE: `syntax/dialects/spectre.rs` KEYWORDS).
@@ -95,8 +97,9 @@ pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
                     && d.names(row.args).iter().all(|&a| param(d.str(a)))
                     && !reads_circuit(d, row.body)
             }
-            K::Analysis => head(d.str(d.row::<ir::Analysis>(at.index).name)),
-            K::Loop => head(d.str(d.row::<ir::Loop>(at.index).name)),
+            // an unnamed one is a feature's (AnalysisUnnamed, LoopUnnamed), not this check's
+            K::Analysis => named(d, d.row::<ir::Analysis>(at.index).name),
+            K::Loop => named(d, d.row::<ir::Loop>(at.index).name),
             K::Option => {
                 let row: ir::OptionRow = d.row(at.index);
                 row.key != ir::OptionKey::Private
@@ -134,6 +137,11 @@ fn name(s: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'!')
 }
 
+/// Whether `id` is no name, or one that heads a statement.
+fn named(d: &ir::Design, id: ir::NameId) -> bool {
+    id.is_none() || head(d.str(id))
+}
+
 /// A name that heads a statement: a `name` and no keyword.
 fn head(s: &str) -> bool {
     name(s) && !KEYWORDS.contains(&s)
@@ -149,8 +157,8 @@ fn lower(s: &str) -> bool {
     !s.bytes().any(|b| b.is_ascii_uppercase())
 }
 
-/// Whether subcircuit instance `row`, listed in `scope`, stands inside its own master's body
-/// (the reader refuses it: `codes::RECURSION`).
+/// Whether subcircuit instance `row`, listed in `scope`, stands in its own master's body,
+/// directly or in its `if` branches (the reader refuses it: `codes::RECURSION`).
 fn inside_master(d: &ir::Design, row: &ir::Element, scope: ir::ScopeId) -> bool {
     if row.kind != ir::ElemKind::Instance || row.model.def.is_none() {
         return false;
@@ -163,9 +171,26 @@ fn inside_master(d: &ir::Design, row: &ir::Element, scope: ir::ScopeId) -> bool 
         if s.owner == item {
             return true;
         }
+        if s.kind != ir::ScopeKind::Branch {
+            return false;
+        }
         at = s.parent;
     }
     false
+}
+
+/// Whether wave `w` is no AM, or one Spectre's `type=sine` spells.
+fn am_ok(d: &ir::Design, w: ir::WaveRef) -> bool {
+    if w.is_none() {
+        return true;
+    }
+    match d.wave(w) {
+        ir::Wave::Am(a) => {
+            a.mod_time == ir::wave::AmModTime::CarrierPhase
+                && (is_one(d, a.mod_offset) || is_one(d, a.mod_index))
+        }
+        _ => true,
+    }
 }
 
 /// Whether the tree under `e` reads the circuit.
@@ -216,6 +241,9 @@ fn element(d: &ir::Design, row: &ir::Element, kept: &[String]) -> bool {
     };
     let typed_by_master = !matches!(row.kind, K::Unresolved) && !row.model.name.is_none();
     let area = row.kind != K::Mosfet || d.semi(row).area.is_none();
+    // an AM Spectre spells: its modulation timed from the carrier phase, and an offset of 1 or
+    // an index of 1 (RUN-SP P4-055)
+    let am = !matches!(row.kind, K::VSource | K::ISource) || am_ok(d, d.source(row).wave);
     // a bsource's temperature offset: no run settled a `trise` there
     let behav = !matches!(row.kind, K::Behav | K::ChargeCapacitor) || d.behav(row).dtemp.is_none();
     // an inductance that reads the circuit: no run settled Spectre's `l=` there
@@ -225,6 +253,8 @@ fn element(d: &ir::Design, row: &ir::Element, kept: &[String]) -> bool {
     let bound = || !row.model.def.is_none() || kept.iter().any(|k| k == d.str(row.model.name));
     (!typed_by_master || bound())
         && area
+        && (row.kind != K::LosslessLine || row.model.name.is_none())
+        && am
         && behav
         && inductance
         && head(d.str(row.name))

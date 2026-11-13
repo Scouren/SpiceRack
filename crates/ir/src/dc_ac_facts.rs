@@ -24,41 +24,34 @@
 //! `pub(crate) fn output_valid`, `pub(crate) fn gen_output` (gen)
 
 use crate::analysis_facts::DetailFacts;
+#[cfg(any(test, feature = "gen"))]
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::dc_ac::{Ac, Dc, DcAxis, Noise, NoiseRef, Tf};
 use crate::design::Design;
-use crate::diag::Diags;
-use crate::facts::Handle;
 use crate::feature::FeatureSet;
 #[cfg(any(test, feature = "gen"))]
 use crate::r#gen::{Gen, Reads};
 #[cfg(any(test, feature = "gen"))]
 use crate::id::ExprId;
+use crate::id::List;
+#[cfg(any(test, feature = "gen"))]
 use crate::id::ScopeId;
+use crate::plan::Target;
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::gen_target;
-use crate::plan::{
-    TargetUse, dump_target, parse_target, target_features, target_handles, target_valid,
-};
+use crate::plan::{TargetUse, target_features, target_valid};
 #[cfg(any(test, feature = "gen"))]
 use crate::probe::gen_probe;
-use crate::probe::{
-    AcPart, Probe, ProbeKind, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
-};
-use crate::run_exprs::Roots;
+use crate::probe::{AcPart, Probe, ProbeKind, probe_features, probe_valid};
 use crate::run_extra::RunExtra;
-use crate::run_names::Names;
+use crate::run_fields::{N, NN, PROBE, SWEEP};
 #[cfg(any(test, feature = "gen"))]
 use crate::run_words::has;
-use crate::run_words::{
-    domain_unless, flag, get, put_expr, put_flag, put_name, take_expr, take_name, take_word,
-};
+use crate::run_words::{domain_unless, flag, get};
 #[cfg(any(test, feature = "gen"))]
 use crate::sweep::gen_sweep;
-use crate::sweep::{SweepUse, dump_sweep, parse_sweep, sweep_features, sweep_handles, sweep_valid};
-use crate::text::Words;
-use crate::text_expr::Ctx;
+use crate::sweep::{SweepUse, sweep_features, sweep_valid};
 
 /// Whether `p` is a valid analysis output: a node voltage, a voltage between nodes or a branch
 /// current, with no part (R68/A42: the dB of a noise or transfer output means nothing on any
@@ -78,23 +71,20 @@ pub(crate) fn gen_output(g: &mut Gen, b: &mut Builder<'_>, features: &FeatureSet
     p
 }
 
+run_choices!(NoiseRef);
+
+run_fields! {
+    Dc { axes: DcAxes("") = List::EMPTY }
+    DcAxis { target: Target("") = Target::TEMP, sweep: Sweep("") = SWEEP, name: Name = NN, afresh: Word = false }
+    Ac { sweep: Sweep("") = SWEEP }
+    Noise {
+        output: Probe("") = PROBE, source: Element = NN, sweep: Sweep("") = SWEEP,
+        points_per_summary: Expr = N, ac_sweep: Word = false, input_ref: Optional("") = NoiseRef::Unit,
+    }
+    Tf { output: Probe("") = PROBE, source: Element = NN }
+}
+
 impl DetailFacts for Dc {
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
-        for axis in get(&design.run.dc_axes, self.axes).unwrap_or(&[]) {
-            target_handles(&axis.target, out);
-            sweep_handles(&axis.sweep, out);
-            out.push(Handle::Name(axis.name));
-        }
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.dc_axes(self.axes);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.dc_axes(self.axes);
-    }
-
     fn features(&self, design: &Design, set: &mut FeatureSet) {
         let axes = get(&design.run.dc_axes, self.axes).unwrap_or(&[]);
         flag(set, axes.len() > 1, RunExtra::DcNested);
@@ -120,41 +110,8 @@ impl DetailFacts for Dc {
         let ok = !axes.is_empty()
             && axes
                 .iter()
-                .all(|a| target_valid(&a.target) && sweep_valid(&a.sweep));
+                .all(|a| target_valid(&a.target) && sweep_valid(design, &a.sweep, SweepUse::Dc));
         domain_unless(ok)
-    }
-
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        for axis in design.dc_axes(self.axes) {
-            dump_target(design, ctx, &axis.target, out);
-            dump_sweep(design, ctx, &axis.sweep, out);
-            put_name(out, design, "name", axis.name);
-            put_flag(out, axis.afresh, "afresh");
-        }
-    }
-
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let mut axes = Vec::new();
-        while words.peek() == Some("(") {
-            let target = parse_target(words, b, diags)?;
-            let sweep = parse_sweep(words, scope, b, diags)?;
-            let name = take_name(words, "name", b, diags);
-            let afresh = take_word(words, "afresh");
-            axes.push(DcAxis {
-                target,
-                sweep,
-                name,
-                afresh,
-            });
-        }
-        Some(Dc {
-            axes: b.dc_axes(&axes),
-        })
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -202,35 +159,11 @@ impl DetailFacts for Dc {
 }
 
 impl DetailFacts for Ac {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        sweep_handles(&self.sweep, out);
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.sweep(&mut self.sweep);
-    }
-
-    fn map_names(&mut self, _r: &mut Names<'_>) {
-        // no element name
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(sweep_valid(&self.sweep))
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_sweep(design, ctx, &self.sweep, out);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        Some(Ac {
-            sweep: parse_sweep(words, scope, b, diags)?,
-        })
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(sweep_valid(design, &self.sweep, SweepUse::Freq))
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -246,23 +179,6 @@ impl DetailFacts for Ac {
 }
 
 impl DetailFacts for Noise {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-        out.push(Handle::Name(self.source));
-        sweep_handles(&self.sweep, out);
-        out.push(Handle::Expr(self.points_per_summary));
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-        r.sweep(&mut self.sweep);
-        r.expr(&mut self.points_per_summary);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-        r.one(&mut self.source);
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
@@ -283,49 +199,12 @@ impl DetailFacts for Noise {
             RunExtra::NoiseCurrentOutput,
         );
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
+    fn fault(&self, design: &Design) -> Option<Violation> {
         domain_unless(
-            output_valid(&self.output) && !self.source.is_none() && sweep_valid(&self.sweep),
+            output_valid(&self.output)
+                && !self.source.is_none()
+                && sweep_valid(design, &self.sweep, SweepUse::Freq),
         )
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-        put_name(out, design, "source", self.source);
-        dump_sweep(design, ctx, &self.sweep, out);
-        put_expr(
-            out,
-            design,
-            ctx,
-            "points_per_summary",
-            self.points_per_summary,
-        );
-        put_flag(out, self.ac_sweep, "ac_sweep");
-        put_flag(out, self.input_ref == NoiseRef::SourceAc, "source_ac");
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let output = parse_probe(words, scope, b, diags)?;
-        let source = take_name(words, "source", b, diags);
-        let sweep = parse_sweep(words, scope, b, diags)?;
-        let points_per_summary = take_expr(words, "points_per_summary", scope, b, diags);
-        let ac_sweep = take_word(words, "ac_sweep");
-        let input_ref = if take_word(words, "source_ac") {
-            NoiseRef::SourceAc
-        } else {
-            NoiseRef::Unit
-        };
-        Some(Noise {
-            output,
-            source,
-            sweep,
-            points_per_summary,
-            ac_sweep,
-            input_ref,
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -364,40 +243,11 @@ impl DetailFacts for Noise {
 }
 
 impl DetailFacts for Tf {
-    fn handles(&self, _design: &Design, out: &mut Vec<Handle>) {
-        probe_handles(&self.output, out);
-        out.push(Handle::Name(self.source));
-    }
-
-    fn map_exprs(&mut self, r: &mut Roots<'_>) {
-        r.probe(&mut self.output);
-    }
-
-    fn map_names(&mut self, r: &mut Names<'_>) {
-        r.probe(&self.output);
-        r.one(&mut self.source);
-    }
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         probe_features(&self.output, set);
     }
     fn fault(&self, _design: &Design) -> Option<Violation> {
         domain_unless(output_valid(&self.output) && !self.source.is_none())
-    }
-    fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
-        dump_probe(design, ctx, &self.output, out);
-        put_name(out, design, "source", self.source);
-    }
-    fn parse(
-        words: &mut Words<'_>,
-        scope: ScopeId,
-        b: &mut Builder<'_>,
-        diags: &mut Diags,
-    ) -> Option<Self> {
-        let output = parse_probe(words, scope, b, diags)?;
-        Some(Tf {
-            output,
-            source: take_name(words, "source", b, diags),
-        })
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(

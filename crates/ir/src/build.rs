@@ -28,7 +28,7 @@
 //! let rval = b.param_ref("rval");
 //! let (_, body) = b.subckt(top, "div", &["in", "out", "gnd"], &[("r", rval)], Span::NONE);
 //! let half = { let two = b.num(2.0); let r = b.param_ref("r"); b.binary(BinOp::Div, r, two) };
-//! let ok = { let t = b.temp(); let lim = b.num(125.0); b.binary(BinOp::Lt, t, lim) };
+//! let ok = { let r = b.param_ref("rval"); let lim = b.num(1e4); b.binary(BinOp::Lt, r, lim) };
 //! let (_, branches) = b.if_(body, &[ok, ExprId::NONE], Span::NONE);
 //! b.param(body, "w", half, Span::NONE);
 //! // circuit and run methods (`build_circuit.rs`, `build_run.rs`) push elements and analyses.
@@ -215,7 +215,10 @@ impl<'d> Builder<'d> {
             index,
         };
         self.design.scope_items[scope.index()].push(item);
-        // the element-name index, when built, keeps up (R23)
+        // the element-name index, when built, keeps up (R23); the name-scope index is rebuilt
+        if R::KIND == ItemKind::Element {
+            self.design.name_index.take();
+        }
         if R::KIND == ItemKind::Element && self.design.element_names.get().is_some() {
             let name = self.design.row::<crate::element::Element>(index).name;
             if let Some(names) = self.design.element_names.get_mut() {

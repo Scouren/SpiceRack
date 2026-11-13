@@ -181,8 +181,10 @@ pub(in super::super) fn read(
             // `dot_noise`: the output is `V(…)` (inp2dot.c:48), else ngspice's error
             let first = w.first().ok_or_else(invalid)?;
             let v = first.len() > 2 && first[..2].eq_ignore_ascii_case("v(");
+            // HSPICE's `.noise ov src inter` takes the `.ac` sweep (the suite's
+            // noise_ac_sweep.sp): no rule yet
             if !v || w.len() < 6 {
-                return Err(invalid());
+                return Err(no_field());
             }
             let out = read_outputs::probe(lw, st, first, ir::AnalysisKind::Noise)?;
             let source = lw.names.fold(&w[1]);
@@ -223,6 +225,8 @@ pub(in super::super) fn read(
                 _ => return Err(no_field()),
             }
         }
+        // HSPICE's `.pz ov src` (the suite's pz_source.sp): no rule yet
+        "pz" if w.len() == 2 => return Err(no_field()),
         "pz" if w.len() == 6 => {
             let transfer = match w[4].to_ascii_lowercase().as_str() {
                 "vol" => PzTransfer::Voltage,

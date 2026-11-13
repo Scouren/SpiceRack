@@ -20,7 +20,7 @@
 //!
 //! Contents: `Module`, `FAMILIES`, `PROVEN`, `Params`, `Name`, `module`, `file_word`, `default_word`,
 //! `Words` (`Words::of`, `Words::get`), `params`, `kind`, `has_polarity`, `model_name_in`, `model_name_out`, `instance_name_in`,
-//! `canonical`, `instance_name_out`, `proven_families` (crate-private)
+//! `canonical`, `instance_name_out`, `proven_families`, `Versions`, `versions` (crate-private)
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -143,8 +143,7 @@ pub(super) const PROVEN: &[&str] = &[
     "capacitor",
     "inductor",
     // settle devices_semi (run semi): sp_diode (level 1) and sp_mos1, n and p, equal to
-    // ngspice-45's D and level-1 M. Not sp_bjt: with area 1.5 and no `ibc` it differs by 0.2 %
-    // (run semi_bjt; VD dev-spice "Known differences", base-collector saturation current).
+    // ngspice-45's D and level-1 M.
     "sp_diode",
     "sp_mos1",
     // F11: each a pair deck at step 4 (tests/fixtures/pair/vacask-ngspice/sp_*inv.sim).
@@ -157,7 +156,32 @@ pub(super) const PROVEN: &[&str] = &[
     // oracle agrees at span/2000).
     "sp_jfet2",
     "sp_mes1",
+    // Gummel-Poon by pair deck sp_bjtinv (area 1, all six steps); where the two builds differ
+    // (R86: base-collector saturation current under an area, run semi_bjt's 0.2 %; R94a: irb in
+    // small signal) the design states this build's law (`LAWS`) and legalize keeps them apart.
+    "sp_bjt",
+    // By pair deck sp_vdmosinv; F24-F26 (kp default, tcvth sign, body-diode clamp) and the
+    // multiplicity of charges are law points the design states (LAWS).
+    "sp_vdmos",
+    // By pair decks sp_bsim3v3_tran, sp_bsim3v3_acg: ir-2's load decks (fca01394) through the
+    // spine, all six steps.
+    "sp_bsim3v3",
+    // By pair decks sp_bsim4v8_tran, sp_bsim4v8_acg (ir-2's fca01394 load decks); a version it
+    // does not run as written is refused (F85, `versions`).
+    "sp_bsim4v8",
 ];
+
+/// A versioned family's versions in its VACASK module (A19): the version a silent card means,
+/// the spellings the module runs as written, and whether `version=` is a parameter of it.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Versions {
+    /// What a card without `version=` computes.
+    pub(super) default: &'static str,
+    /// Every `version=` value the module runs as itself.
+    pub(super) runs: &'static [&'static str],
+    /// The module has a `version` parameter (sp_bsim3v3 has none: it is BSIM3v3.3.0 alone).
+    pub(super) given: bool,
+}
 
 /// A shipped module's parameter names, as `params.txt` lists them.
 #[derive(Debug, Default)]
@@ -385,6 +409,29 @@ pub(super) fn instance_name_out(word: &str, ir: &str) -> String {
     match params(word).is_some_and(|p| p.has(&prefixed)) {
         true => prefixed,
         false => ir.to_string(),
+    }
+}
+
+/// `family`'s versions, for each proven versioned family (else `None`). Sources (leads; the
+/// pair decks decide): spice/bsim3v3.va of the pinned store has no `version` parameter (b3*.c of
+/// BSIM3v3.3.0); spice/bsim4v8.va's `version = "4.8.3"` and its version switch (4.8.3, 4.83 and
+/// 4.8 are 483; 4.8.2, 4.82; 4.8.1, 4.81; 4.8.0, 4.80; anything else "unknown BSIM4 version.
+/// Working now with BSIM4.8.3.", F85: the gf180 cards' 4.5 runs as 4.8.3).
+pub(super) fn versions(family: ir::ModelFamily) -> Option<Versions> {
+    match family {
+        ir::ModelFamily::Bsim3 => Some(Versions {
+            default: "3.3.0",
+            runs: &["3.3.0"],
+            given: false,
+        }),
+        ir::ModelFamily::Bsim4 => Some(Versions {
+            default: "4.8.3",
+            runs: &[
+                "4.8.3", "4.83", "4.8", "4.8.2", "4.82", "4.8.1", "4.81", "4.8.0", "4.80",
+            ],
+            given: true,
+        }),
+        _ => None,
     }
 }
 

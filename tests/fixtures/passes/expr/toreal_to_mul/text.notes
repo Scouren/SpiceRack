@@ -1,3 +1,4 @@
-U0117  # s: a string has no numeric tag
+# a string or a list is an operand only through a parameter read (X0029: a string operand
+# written in place is no design)
 U0117  # u: t holds a string
-U0117  # v: a list has none
+U0117  # v: l holds a list

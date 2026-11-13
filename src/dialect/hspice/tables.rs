@@ -130,7 +130,7 @@ pub(super) const fn level(op: BinOp) -> Option<u8> {
         B::Eq | B::Ne => 6,
         B::And => 7,
         B::Or => 8,
-        B::IntDiv | B::DivTyped | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
+        B::DivTyped | B::Xor | B::BitAnd | B::BitOr | B::BitXor | B::Shl | B::Shr => {
             return None;
         }
     })

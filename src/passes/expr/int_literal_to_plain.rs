@@ -4,7 +4,7 @@
 //! tag of every node the literal's tag flows into.
 //!
 //! A tag is read by: the typed division `DivTyped` (Int operands truncate), and the rules that
-//! judge their operands by the tag table: `IntDiv`, the bit operators, `ToInt`, `ToReal`,
+//! judge their operands by the tag table: the bit operators, `ToInt`, `ToReal`,
 //! `SgnZeroPos` (A21, A25; their own rules run first, and `legalize`'s fixed point comes back
 //! here once they are gone). A literal is left when its tag can reach an operand of one of
 //! them, following the tag table's flow backwards: through `+ - *`, `/:`, `-x`, both branches
@@ -25,7 +25,7 @@
 //! Contents: `pub fn int_literal_to_plain(&mut ir::Design, &mut ir::Diags)`
 
 use super::INT_TAG_READ;
-use super::nodes::{kids, live, note_left};
+use super::nodes::{kids, note_left};
 use super::reach::tag_reach;
 use crate::ir;
 
@@ -33,7 +33,7 @@ use crate::ir;
 /// left holding one.
 pub fn int_literal_to_plain(design: &mut ir::Design, diags: &mut ir::Diags) {
     let read = tag_read(design);
-    assert_eq!(read.len(), design.expr_count(), "one mark per row");
+    assert_eq!(read.len(), design.expr_count_all(), "one mark per row");
     ir::rewrite_exprs(design, &mut |b, e| {
         let ir::Expr::Num(n) = b.design().expr(e) else {
             return None;
@@ -66,7 +66,7 @@ pub fn int_literal_to_plain(design: &mut ir::Design, diags: &mut ir::Diags) {
 /// division another rule replaced reads nothing any more.
 fn tag_read(design: &ir::Design) -> Vec<bool> {
     let mut seeds = Vec::new();
-    for e in live(design) {
+    for e in design.live_exprs() {
         if reads_tag(design.expr(e)) {
             kids(design, e, &mut seeds);
         }
@@ -80,7 +80,6 @@ fn reads_tag(e: ir::Expr) -> bool {
         e,
         ir::Expr::Binary(
             ir::BinOp::DivTyped
-                | ir::BinOp::IntDiv
                 | ir::BinOp::BitAnd
                 | ir::BinOp::BitOr
                 | ir::BinOp::BitXor

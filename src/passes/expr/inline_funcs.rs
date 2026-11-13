@@ -26,7 +26,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::nodes::{Draws, keep_bounded, kids, live, note_left, note_left_copying};
+use super::nodes::{Draws, keep_bounded, kids, note_left, note_left_copying};
 use super::{CALL_LEFT, FUNC_CALLED};
 use crate::ir;
 
@@ -34,7 +34,7 @@ use crate::ir;
 /// substituted, over rounds; notes each item left holding a call.
 pub fn inline_funcs(design: &mut ir::Design, diags: &mut ir::Diags) {
     let funcs = design
-        .definitions()
+        .definitions_all()
         .iter()
         .filter(|d| d.kind == ir::DefKind::Func)
         .count();
@@ -80,7 +80,7 @@ pub fn inline_funcs(design: &mut ir::Design, diags: &mut ir::Diags) {
 /// Takes every function no live expression calls out of its scope's item list (until none is
 /// left: a function only a dropped one called goes too).
 pub fn drop_unused_funcs(design: &mut ir::Design, diags: &mut ir::Diags) {
-    let all = vec![true; design.definitions().len()];
+    let all = vec![true; design.definitions_all().len()];
     drop_uncalled(design, &all);
     note_left(
         design,
@@ -94,8 +94,8 @@ pub fn drop_unused_funcs(design: &mut ir::Design, diags: &mut ir::Diags) {
 
 /// By `DefId`: whether a live expression calls the definition.
 fn called(design: &ir::Design) -> Vec<bool> {
-    let mut out = vec![false; design.definitions().len()];
-    for e in live(design) {
+    let mut out = vec![false; design.definitions_all().len()];
+    for e in design.live_exprs() {
         if let ir::Expr::UserCall(r, _) = design.expr(e)
             && r.is_resolved()
         {
@@ -108,9 +108,9 @@ fn called(design: &ir::Design) -> Vec<bool> {
 /// Takes out of its scope every reachable function that `may[def]` allows and nothing calls,
 /// again while one goes (a function only a dropped one called), bounded by the function count.
 fn drop_uncalled(design: &mut ir::Design, may: &[bool]) {
-    for _ in 0..=design.definitions().len() {
+    for _ in 0..=design.definitions_all().len() {
         let calls = called(design);
-        let defs = design.definitions();
+        let defs = design.definitions_all();
         let unused: Vec<(ir::ItemRef, ir::ScopeId)> = design
             .reachable()
             .into_iter()
@@ -265,7 +265,7 @@ fn rebuild(b: &mut ir::Builder<'_>, e: ir::ExprId, new: &[ir::ExprId]) -> ir::Ex
 /// By `DefId`: whether a function definition is off every call cycle and calls none on one (its
 /// copy is finite). Kahn's order over the bodies' calls, leaves first.
 fn acyclic(design: &ir::Design) -> Vec<bool> {
-    let defs = design.definitions();
+    let defs = design.definitions_all();
     let mut calls: Vec<Vec<usize>> = vec![Vec::new(); defs.len()];
     let mut out = Vec::new();
     for (d, def) in defs.iter().enumerate() {

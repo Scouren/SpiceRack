@@ -1,0 +1,13 @@
+an element in a library section, altered by name from the top level
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+include "sec.inc" section=sec
+v1 (a 0) vsource dc=1
+r1 (a b) res r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+  alter instance("r2") r=3k
+  analysis op2 op
+endc

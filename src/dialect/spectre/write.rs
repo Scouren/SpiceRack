@@ -288,7 +288,6 @@ fn statistics(w: &mut Writer<'_, '_>, row: ir::Statistics) {
         w.line();
         w.out.push_str(&format!("  {word} {{\n"));
         for v in d.varies(list) {
-            assert!(v.mean.is_none(), "FEATURES lacks VaryMean");
             let (dist, key) = match v.dist {
                 ir::VaryDist::Gauss => ("gauss", "std"),
                 ir::VaryDist::Unif => ("unif", "N"),

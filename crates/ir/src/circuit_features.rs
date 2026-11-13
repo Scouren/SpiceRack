@@ -182,6 +182,7 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
             if e.kind == ElemKind::Diode && e.terminals.len() == 3 {
                 add(X::DiodeThermal);
             }
+            crate::laws::carried(design, crate::laws::Carrier::Element(e), &mut add);
         }
         DetailKind::Switch => {
             if let Some(s) = get_row::<Switch>(design, e.detail) {
@@ -215,7 +216,9 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
 }
 
 /// Adds the model's family (`Feature::Family`) and its circuit extras.
-pub(crate) fn model_features(m: &Model, set: &mut FeatureSet) {
+pub(crate) fn model_features(m: &Model, design: &Design, set: &mut FeatureSet) {
+    let mut add = |x: X| *set = set.with(Feature::Circuit(x));
+    crate::laws::carried(design, crate::laws::Carrier::Model(m), &mut add);
     // A15 K5 (R32): every model is a feature of its family
     *set = set.with(Feature::Family(m.family));
     if m.bin_of != NameId::NONE {
@@ -366,10 +369,11 @@ fn behav(b: Behav, add: &mut impl FnMut(X)) {
     }
 }
 
-fn pre(p: PreDelay, offset: X, hold: X, zero: X) -> X {
+/// The member a wave's pre-delay rule sets; `None` for a rule no simulator gives that wave (the
+/// row check refuses it, R100: a sine's `Zero`).
+fn pre(p: PreDelay, hold: X, zero: Option<X>) -> Option<X> {
     match p {
-        PreDelay::Offset => offset,
-        PreDelay::HoldDelayValue => hold,
+        PreDelay::HoldDelayValue => Some(hold),
         PreDelay::Zero => zero,
     }
 }
@@ -413,7 +417,9 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
         }
         WaveKind::Sin => {
             if let Some(s) = get_row::<Sin>(design, w.index) {
-                add(pre(s.pre, X::SinPreOffset, X::SinPreHold, X::SinPreZero));
+                if let Some(x) = pre(s.pre, X::SinPreHold, None) {
+                    add(x);
+                }
                 if some(s.cycles) {
                     add(X::SinCycles);
                 }
@@ -433,12 +439,16 @@ fn wave(design: &Design, w: WaveRef, add: &mut impl FnMut(X)) {
                     SffmLaw::Spice3 => X::SffmSpice3,
                     SffmLaw::Ngspice => X::SffmNgspice,
                 });
-                add(pre(s.pre, X::SffmPreOffset, X::SffmPreHold, X::SffmPreZero));
+                if let Some(x) = pre(s.pre, X::SffmPreHold, Some(X::SffmPreZero)) {
+                    add(x);
+                }
             }
         }
         WaveKind::Am => {
             if let Some(a) = get_row::<Am>(design, w.index) {
-                add(pre(a.pre, X::AmPreOffset, X::AmPreHold, X::AmPreZero));
+                if let Some(x) = pre(a.pre, X::AmPreHold, Some(X::AmPreZero)) {
+                    add(x);
+                }
                 // A31: VACASK's AM has the modulating offset 1 only, as the real literal (an Int
                 // 1 reads back real there)
                 let one = a.mod_offset == ExprId::NONE

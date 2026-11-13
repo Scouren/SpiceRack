@@ -12,7 +12,8 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §1–§4, §7; `REWRITE-PLAN.md` §4.1, §4.3.
 //!
 //! Contents: `pub struct Vacask` (`impl Read`, `impl Write`), `pub static VACASK: Vacask`,
-//! `pub static FEATURES: ir::FeatureSet`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
+//! `pub const LAWS: ir::Laws`, `pub static FEATURES: ir::FeatureSet`,
+//! `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
 mod atan2;
 mod bind;
@@ -51,6 +52,38 @@ pub struct Vacask;
 /// The one value the `vacask` row of `dialect::BUILTIN` points at.
 pub static VACASK: Vacask = Vacask;
 
+/// The laws the VACASK modules the flake pins compute by: one variant of each of the IR's law
+/// points (devices R90–R96, functions R93a, defaults R102), each variant's doc in
+/// `crates/ir/src/laws.rs` naming the run; R102's 27 °C by
+/// `crates/ir/tests/fixtures/default_temp/`, BSIM4 4.5's exact small-signal (VACASK runs 4.8, F85)
+/// by `families/gf180_n1/`. Every read states them (`Builder::set_laws`), so
+/// [`FEATURES`] holds their members.
+pub const LAWS: ir::Laws = ir::Laws::of(&[
+    ir::Law::BcSatAreabOnly,
+    ir::Law::SubSatEmissionNs,
+    ir::Law::DiodeWlMultOnce,
+    ir::Law::DiodeSidewallOwnF1,
+    ir::Law::DiodeXomAbsent1e14,
+    ir::Law::VdmosKpAbsent20,
+    ir::Law::VdmosTcvthRaises,
+    ir::Law::VdmosClampByFc,
+    ir::Law::MosSmallSignalExact,
+    ir::Law::Mos6SmallSignalExact,
+    ir::Law::BjtIrbSmallSignalExact,
+    ir::Law::VdmosMultChargesCopies,
+    ir::Law::DiodeIsrReversePresent,
+    ir::Law::DiodeIsrSmallSignalExact,
+    ir::Law::DiodeTtFactorClamped,
+    ir::Law::TrigExact,
+    ir::Law::ExpExact,
+    ir::Law::LogZeroError,
+    ir::Law::DivExact,
+    ir::Law::AsinEdgeFails,
+    ir::Law::DefaultTemp27,
+    ir::Law::DefaultTnom27,
+    ir::Law::Bsim4v45SmallSignalExact,
+]);
+
 /// What VACASK spells: the union of every area's part, and exactly the reader's image (law L5).
 pub static FEATURES: ir::FeatureSet = expr_read::FEATURES
     .union(read_structure::FEATURES)
@@ -58,7 +91,8 @@ pub static FEATURES: ir::FeatureSet = expr_read::FEATURES
     .union(read_models::FEATURES)
     .union(read_sources::FEATURES)
     .union(read_run::FEATURES)
-    .union(read_outputs::FEATURES);
+    .union(read_outputs::FEATURES)
+    .union(LAWS.features());
 
 impl Read for Vacask {
     /// The files `text` names: each `include "path"` (`Reference::File`) and each `load` of a
@@ -70,6 +104,7 @@ impl Read for Vacask {
 
     /// Every file of `src`, in `src`'s order (`read.rs`).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
     }
 }

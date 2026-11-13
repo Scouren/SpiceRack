@@ -1,0 +1,7 @@
+// a matched tline given by z0 and td is an ideal delay (RUN-SP P5-028: out = 0.5*src(t-2n) to 1.8e-13)
+simulator lang=spectre
+v1 (in 0) vsource type=pulse val0=0 val1=1 delay=1n rise=100p fall=100p width=5n period=20n
+rs (in a) resistor r=50
+t1 (a 0 out 0) tline z0=50 td=2n
+rl (out 0) resistor r=50
+tran1 tran stop=20n maxstep=10p

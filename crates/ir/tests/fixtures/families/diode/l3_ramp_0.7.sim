@@ -1,0 +1,13 @@
+sidewall charge through the forward knee: ramp to 0.7 V, charge on a 1 nF series capacitor
+load "spice/diode.osdi"
+load "spice/capacitor.osdi"
+model vs vsource
+model c sp_capacitor
+model dm sp_diode is=1e-20 cjo=0 cjsw=10p php=0.8 mjsw=0.33 fcs=0.5
+v1 (s 0) vs type="pwl" wave=[0, 0, 1u, 0.7, 2u, 0.7]
+c0 (s a) c c=1n
+d1 (a 0) dm pj=1
+control
+  options rawfile="ascii" reltol=1e-9
+  analysis tr1 tran stop=2u step=1n maxstep=1n
+endc

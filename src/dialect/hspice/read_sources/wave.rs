@@ -160,7 +160,9 @@ pub(super) fn push(lw: &mut Lower<'_, '_>, st: Stmt, wave: &Wave) -> ir::WaveRef
             phase_m_deg: none,
             law: w::SffmLaw::Spice3,
             given_zero: gz,
-            pre: w::PreDelay::Offset,
+            // no delay, so what stands before it never shows (`SffmPreOffset` deleted,
+            // `rewrite/IR-PRUNE.md` group 4)
+            pre: w::PreDelay::HoldDelayValue,
         }),
         // `AM(SA OC FM FC TD)`: SA·(OC + sin(2π·FM·τ))·sin(2π·FC·τ), τ = t − TD (settle
         // am_form.sp: 2.5133e-4 at 20 ns for am(2 1 100 1k 0); ESPice only); before TD the

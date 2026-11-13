@@ -299,6 +299,8 @@ pub struct CircuitDetails {
     pub(crate) trnoises: Vec<TrNoise>,
     pub(crate) trrandoms: Vec<TrRandom>,
     pub(crate) patterns: Vec<Pattern>,
+    /// The laws the design states (R90, `laws.rs`): one set, not a table.
+    pub(crate) laws: crate::laws::Laws,
 }
 
 const _: () = assert!(size_of::<ElemKind>() == 1);
@@ -657,6 +659,10 @@ impl RowFacts for Element {
 pub(crate) fn design_features(design: &Design, set: &mut FeatureSet) {
     // one design-level circuit feature: a model with no library of its family (A12 C5)
     crate::circuit_features::library_features(design, set);
+    // R102: the default temperatures, a law point of the whole design
+    crate::laws::carried(design, crate::laws::Carrier::Design, &mut |x| {
+        *set = set.with(crate::feature::Feature::Circuit(x));
+    });
 }
 
 /// The circuit owner's design-level invariants, which no single row can see (A13): appends one

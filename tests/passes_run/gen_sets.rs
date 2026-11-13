@@ -2,9 +2,10 @@
 //! rules' own tests.
 //!
 //! Contents: `pub const fn dc_loops(ir::RunExtra) -> ir::FeatureSet`,
-//! `pub const PARAM_ARGS: ir::FeatureSet`,
+//! `pub const PARAM_ARGS: ir::FeatureSet`, `pub const fn one_kind_without(ir::ElemKind, ir::Law) -> ir::FeatureSet`, `pub const fn behav_reads() -> ir::FeatureSet`,
 //! `pub const fn sources_only(&[ir::WaveKind], ir::Feature) -> ir::FeatureSet` (the waves
-//! rows' set, moved here from `pass_laws.rs` to keep it under 500 lines)
+//! rows' set, moved here from `pass_laws.rs` to keep it under 500 lines),
+//! `pub const fn one_option(ir::OptionKey) -> ir::FeatureSet`
 
 use spicerack::ir;
 
@@ -18,10 +19,61 @@ pub const PARAM_ARGS: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Expr(ir::ExprTag::Num))
     .with(ir::Feature::Expr(ir::ExprTag::Param))
     .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
-    .with(ir::Feature::Run(ir::RunExtra::TranCapNone))
+    .with(ir::Feature::Run(ir::RunExtra::TranCapSpan10))
     .with(ir::Feature::Run(ir::RunExtra::TranPrintStep))
     .with(ir::Feature::Run(ir::RunExtra::AnalysisUnnamed))
     .with(ir::Feature::Run(ir::RunExtra::AnalysisParamArgument));
+
+/// Every feature but the element kinds other than the behavioural source and the items that
+/// give a parameter a value the tag table cannot fix (a loop, an alter, a subcircuit's actuals,
+/// a statistics block, a function's formal) or hide a read's definition (an include, a section,
+/// an `if`): the designs `param_reads_to_typed` rewrites (over every feature the generator
+/// reaches few behavioural sources; measured: 16 of 200 seeds changed, against 0 with the
+/// element kinds alone).
+pub const fn behav_reads() -> ir::FeatureSet {
+    let mut set = ir::FeatureSet::ALL;
+    let mut i = 0;
+    while i < ir::ElemKind::ALL.len() {
+        let k = ir::ElemKind::ALL[i];
+        if k as u8 != ir::ElemKind::Behav as u8 {
+            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)));
+        }
+        i += 1;
+    }
+    let items = [
+        ir::ItemKind::Loop,
+        ir::ItemKind::Alter,
+        ir::ItemKind::Subckt,
+        ir::ItemKind::Statistics,
+        ir::ItemKind::Func,
+        ir::ItemKind::Include,
+        ir::ItemKind::Section,
+        ir::ItemKind::If,
+    ];
+    let mut j = 0;
+    while j < items.len() {
+        set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(items[j])));
+        j += 1;
+    }
+    set
+}
+
+/// Every feature but the element kinds other than `kind` and the law variant `other`: the
+/// designs a stated rule of `other`'s point rewrites (the diode's `xom`: over every feature no
+/// seed of 96 carried either variant, with the diode alone 5 each).
+pub const fn one_kind_without(kind: ir::ElemKind, other: ir::Law) -> ir::FeatureSet {
+    let mut set =
+        ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Circuit(other.member())));
+    let mut i = 0;
+    while i < ir::ElemKind::ALL.len() {
+        let k = ir::ElemKind::ALL[i];
+        if k as u8 != kind as u8 {
+            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)));
+        }
+        i += 1;
+    }
+    set
+}
 
 /// A deck of restarting DC analyses with an axis of `axis` among source and list axes: the
 /// designs `dc_axes_to_loops` converts (over every feature a competing continued sweep wins).
@@ -74,6 +126,22 @@ pub const fn sources_only(waves: &[ir::WaveKind], without: ir::Feature) -> ir::F
             set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Wave(w)));
         }
         j += 1;
+    }
+    set
+}
+
+/// Every feature but the option keys other than `key`: a rare key's row runs on designs whose
+/// options are all `key` (the inert rows; `drop_option_nomod` drew none over every feature once
+/// the placements moved the generator's draws, `Misplaced`).
+pub const fn one_option(key: ir::OptionKey) -> ir::FeatureSet {
+    let mut set = ir::FeatureSet::ALL;
+    let mut k = 0;
+    while k < ir::OptionKey::COUNT {
+        let other = ir::OptionKey::ALL[k];
+        if other as u8 != key as u8 {
+            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Option(other)));
+        }
+        k += 1;
     }
     set
 }

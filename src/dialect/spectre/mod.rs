@@ -18,6 +18,7 @@
 //! Cites: `rewrite/DIALECT-SPECTRE.md`; `REWRITE-PLAN.md` §4.1, §4.3.
 //!
 //! Contents: `pub struct Spectre` (`impl Read`, `impl Write`), `pub static SPECTRE: Spectre`,
+//! `pub const LAWS: ir::Laws`,
 //! `pub static FEATURES: ir::FeatureSet`, `pub fn info(code: ir::Code) -> Option<ir::Info>`
 
 mod admits;
@@ -45,12 +46,19 @@ pub struct Spectre;
 /// The one value the `spectre` row of `dialect::BUILTIN` points at.
 pub static SPECTRE: Spectre = Spectre;
 
+/// The laws Spectre 25.1 computes by (R90): R102's default temperature and nominal temperature,
+/// 27 °C (RUN-SP: a source's and a resistor's temperature coefficients count ΔT from 27, the
+/// `t_m1` decks ran at 60 against tnom 27). No device law point is settled for Spectre (no
+/// run here); a design read here states only these.
+pub const LAWS: ir::Laws = ir::Laws::of(&[ir::Law::DefaultTemp27, ir::Law::DefaultTnom27]);
+
 /// What Spectre spells: the union of every area's part, and exactly the reader's image (law L5).
 pub static FEATURES: ir::FeatureSet = expr_read::FEATURES
     .union(read_structure::FEATURES)
     .union(read_elements::FEATURES)
     .union(read_sources::FEATURES)
-    .union(read_run::FEATURES);
+    .union(read_run::FEATURES)
+    .union(LAWS.features());
 
 impl Read for Spectre {
     /// The files `text` names: each `include "path"` (`Reference::File`) and each
@@ -61,6 +69,7 @@ impl Read for Spectre {
 
     /// Every file of `src`, in `src`'s order (`read.rs`).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
     }
 }

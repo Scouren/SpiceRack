@@ -1,5 +1,6 @@
-# tests/spectre/p_behavioural.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# tests/spectre/p_behavioural.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).
 # codes: S0003 P6008
+laws default_temp_27 default_tnom_27
 file "p_behavioural.scs" deck
   title "// t"
   opaque spectre inert "simulator lang=spectre"

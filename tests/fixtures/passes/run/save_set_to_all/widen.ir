@@ -5,4 +5,4 @@ file "a.sp" deck
   element resistor r2 (out 0) value=1k
   save analysis=(op dc tran) from_here (v (out))
   analysis op
-  analysis tran stop=1u print_step=1n cap=none
+  analysis tran stop=1u print_step=1n cap=span_over10

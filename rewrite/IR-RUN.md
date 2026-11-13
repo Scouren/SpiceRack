@@ -25,6 +25,12 @@ meaning: an `Alter` changes the circuit for every run item after it. This is the
 | `Target` | a small row `{ kind, a: NameId, b: NameId }` | `Temp`, `Param(name)`, `SourceDc(element)`, `ElementValue(element)`, `DeviceParam(element, param)`, `ModelParam(model, param)`, `Option(key)`. Temperature is its own kind on every simulator, never a parameter named `temp` |
 | `SweepSpec` | `{ kind: Lin \| Dec \| Oct \| List, start, stop, step, points, values: ExprList, end: SweepEnd }` | a set of values with one pinned reading: `Lin` by `step` or by `points` = the number of values (Spectre's `lin=4` is 5 values: its reader adds one, its writer subtracts: spelling, not conversion); `Dec`/`Oct`: `points` per decade or octave; `end: Grid \| OnStop` (LTspice ends a log sweep on the stop value even off the grid, `INV-semantics.md` 8.06, 8.07). Shared by `Loop`, DC axes, AC, noise |
 
+**R99 (2026-11-13): a sweep states its law (the IR owner's choice: the end field, not the law set).** `SweepEnd` already answers "where a range ends when stepping misses stop", so R99's laws are members of it, not law points (one meaning, one row): `Grid` (law G, the exact grid: ngspice `oct`, Xyce, Spectre), `OnStop` (LTspice), `Stretch` (law C, the interval count rounded up and stretched to end on the stop: VACASK `dec`/`oct`, AC and DC; only on `Dec`/`Oct`), `NgDecade` (ngspice's `dec`, one rule: law F at one decade or more, G under it, so a span that is not a literal is still exact; only on `Dec`). `SweepSpec.count: SweepCount { Plain, NgLin }`: `NgLin` is ngspice's AC/SP `lin` reading of a count that is not a literal (2 runs one value, 0 runs ten; R97a), only on a frequency sweep's `Lin` by count. One function decides "on its grid" for every reader and rule: `ir::on_grid(&Design, &SweepSpec)` (a `Dec`/`Oct` by start and stop, both positive literals whose ratio is an exact integer power of the base, in integer arithmetic on the digits; the count does not enter). A sweep on its grid states `Grid` (R47: `Stretch`/`NgDecade` there are `FieldDomain`). Features `RunExtra::SweepEndStretch`, `SweepEndNgDecade`, `SweepCountNgLin`; IR text flags `stretch`, `ng_decade`, `ng_lin`.
+
+**R98 (2026-11-13): no run-order item in a subcircuit.** `Violation::RunOrderInSubckt` (X0028, `state_order::order_in_subckt`, on a design whose handles hold): an `Alter`, a `Loop`, a `Reset`, a `Print`, a `Measure` (no reader produces either there; the lead on R98), or an `OptionRow`, `Env`, `NodeSet` or `Save` whose `holds` is `FromHere`, listed anywhere inside a subcircuit body. An `Analysis` there stays a placement: the ngspice reader reads `.op` in a `.subckt` as the deck's (R26, `run_in_subckt.sp`). A subcircuit is instantiated, not executed. Whole-run items there stay placements (R27). The generator draws none (`candidates`, `gen_holds`), so `Placed(Subckt, Loop | Alter | Reset | Print | Measure)` is unreachable by design.
+
+**VACASK's step ceiling (2026-11-13, the lead's item).** `StepCap::VacaskRule`: with no `maxstep` VACASK steps at most min(span/50, 1/(8·f)), `f` the highest frequency of a sine source (VACASK-36be560 `lib/coretran.cpp:1020-1040`, `lib/devvisrc.cpp:688-691`; runs `crates/ir/tests/fixtures/vacask_step/`). `SpanOver50` is now Spectre's alone. Feature `RunExtra::TranCapVacask`, IR text `cap=vacask_rule`. A rule may state it as a given ceiling where the sine frequencies are literals. `StepCap::None` was removed (R100: no simulator leaves the step uncapped).
+
 **Order (A14, R25).** Run items are listed in the order their source lists them; no reader
 permutes them and no writer reorders them. Analyses with no `Alter`, no loop boundary and no
 `FromHere` state item between them are independent: their order changes no number, only the
@@ -82,6 +88,19 @@ Decisions:
   `RunExtra::DcRestart` (was `Dc::restart`); each axis above it is `DcOuterAfresh` (ngspice's
   nested `.dc`) or `DcOuterCarries` (VACASK's default; `continuation=0` is afresh), exactly one.
   Runs: step3-runrules 8379e74f, `tests/passes_run/decks/latch*`.)
+  (One meaning, one form: a `DeviceParam` target whose element provably is a resistor,
+  capacitor or inductor with parameter `r`/`c`/`l`, or an independent source with `dc`, is
+  `Violation::TargetAlias` (X0025): `ElementValue` and `SourceDc` state those. The lookup is
+  `unbound_targets`'; an element it cannot find is not flagged; names compare exactly.)
+  (Not an invariant, declined by the lead: a node set or initial condition that no analysis
+  follows in its walk. ngspice-45, a bistable of two behavioural inverters: without a node set
+  the `.op` fails ("Timestep too small; trouble with node a"); `.nodeset v(a)=5 v(b)=0` on the
+  line after the only `.op` gives v(a)=5, v(b)=9.6e-22, flipped 9.6e-22 and 5. So (1) a
+  `WholeRun` node set's position means nothing, its mode says who reads it; (2) a `FromHere` or
+  `next_only` one with nothing after it is legal user text, and `check` refuses only a
+  producer's bug; (3) a target that cannot place it refuses it by its own features
+  (`IcNextOnly`/`IcBeyondNext`, `NodeSetFromHere`/`NodeSetWholeRun`). A pass may drop dead
+  state; `check` does not.)
   (`INV-semantics.md` 8.01–8.03): every field named, none inferred from another, `NONE` is not 0.
   Each simulator reads the positional `.tran` fields differently (Xyce's first is an initial-step
   guess, ngspice's a print step that also caps the step, HSPICE's extra fields are segments): the

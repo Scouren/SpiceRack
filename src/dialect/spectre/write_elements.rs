@@ -4,7 +4,7 @@
 //! `bsource`), the element's model, or its subcircuit; each typed field by Spectre's key, then
 //! the untyped parameters in order. `model name master [type=…] k=v …`.
 //!
-//! Contents: `element`, `model`, `own_keys` (crate-private)
+//! Contents: `element`, `model`, `own_keys`, `is_one` (crate-private)
 
 use super::write::Writer;
 use crate::ir;
@@ -44,6 +44,7 @@ pub(super) fn element(w: &mut Writer<'_, '_>, row: &ir::Element) {
         K::Cccs => "cccs",
         K::Ccvs => "ccvs",
         K::Behav | K::ChargeCapacitor => "bsource",
+        K::LosslessLine => "tline",
         _ => d.str(row.model.name),
     };
     w.line();
@@ -85,6 +86,22 @@ pub(super) fn element(w: &mut Writer<'_, '_>, row: &ir::Element) {
             }
             if !s.dtemp.is_none() {
                 w.value("trise", s.dtemp);
+            }
+        }
+        K::LosslessLine => {
+            let x = d.line(row);
+            let fields = [
+                ("z0", x.z0),
+                ("td", x.td),
+                ("f", x.freq),
+                ("nl", x.nl),
+                ("len", x.length),
+                ("vel", x.vel),
+            ];
+            for (k, e) in fields {
+                if !e.is_none() {
+                    w.value(k, e);
+                }
             }
         }
         K::Instance | K::Unresolved => {}
@@ -129,6 +146,11 @@ pub(super) fn model(w: &mut Writer<'_, '_>, row: ir::Model) {
         w.value(d.str(k), v);
     }
     w.out.push('\n');
+}
+
+/// Whether `e` is a literal of value 1.
+pub(super) fn is_one(d: &ir::Design, e: ir::ExprId) -> bool {
+    matches!(d.expr(e), ir::Expr::Num(n) if d.literal_value(d.num(n)) == 1.0)
 }
 
 // ---- private ----
@@ -185,6 +207,26 @@ fn source(w: &mut Writer<'_, '_>, row: &ir::Element) {
             ];
             for (k, e) in fields {
                 w.value(k, e);
+            }
+        }
+        ir::Wave::Am(x) => {
+            w.out.push_str(" type=sine");
+            let fields = [
+                ("sinedc", x.offset),
+                ("ampl", x.amplitude),
+                ("freq", x.carrier_freq),
+                ("delay", x.delay),
+                ("sinephase", x.phase_c_deg),
+                ("ammodfreq", x.mod_freq),
+                ("ammodphase", x.phase_m_deg),
+            ];
+            for (k, e) in fields {
+                w.value(k, e);
+            }
+            // `admits`: the offset is 1, or the index is (RUN-SP P4-055)
+            match is_one(d, x.mod_offset) {
+                true => w.value("ammodindex", x.mod_index),
+                false => w.value("ammodoffset", x.mod_offset),
             }
         }
         ir::Wave::Pulse(x) => {

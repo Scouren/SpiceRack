@@ -10,7 +10,9 @@
 //!   with the codes its `# codes:` line lists. The IR text was checked by hand against the deck
 //!   and the values its run printed (the RUN-SP status lines); `SPICERACK_BLESS=1` rewrites the
 //!   files from the reader, for a reviewed diff.
-//! - Each recorded deck is a fixpoint of read → write → read (the same-dialect cell, text level:
+//! - The same for the decks authored from a RUN-SP record's or a manual's form
+//!   (`tests/fixtures/dialect/spectre/authored/`: AM, `tline`), each citing its evidence on line 1.
+//! - Each deck is a fixpoint of read → write → read (the same-dialect cell, text level:
 //!   no simulator), and its read uses only `FEATURES` (the reader's image is the writer's set).
 //! - Cross: each SPICE source the recorded decks were written from (`tests/test_pending_real_run.rs`),
 //!   read as ngspice and written as Spectre, reads back to the meaning of the deck Spectre ran
@@ -79,18 +81,27 @@ fn the_read_fixture_list_is_the_recorded_decks() {
         );
     }
     assert!(decks().len() >= 20, "the recorded decks");
+    if std::env::var_os("SPICERACK_BLESS").is_none() {
+        assert_eq!(
+            stems(authored(), "scs"),
+            stems(authored(), "ir"),
+            "a .ir per authored deck"
+        );
+    }
 }
 
 #[test]
 fn each_recorded_deck_reads_to_its_ir_with_its_codes() {
     // Oracle: the IR text, checked by hand against the deck and its RUN-SP outcome.
     let bless = std::env::var_os("SPICERACK_BLESS").is_some();
-    for name in decks() {
-        let (got, diags) = read_deck(&name);
-        let path = fixtures().join(format!("{name}.ir"));
+    for (name, deck, path) in cases() {
+        let (got, diags) = read_text(&format!("{name}.scs"), &read(&deck));
         if bless {
             let mut text = format!(
-                "# tests/spectre/{name}.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).\n# codes: {}\n",
+                "# {} read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).\n# codes: {}\n",
+                deck.strip_prefix(env!("CARGO_MANIFEST_DIR"))
+                    .unwrap_or(&deck)
+                    .display(),
                 codes(&diags).join(" ")
             );
             for f in got.files() {
@@ -117,8 +128,8 @@ fn each_recorded_deck_reads_to_its_ir_with_its_codes() {
 fn each_recorded_deck_is_a_fixpoint_of_read_write_read() {
     // Oracle: the round trip (law L6 on these decks): the written text reads back to the same
     // design, and writing that again gives the same text.
-    for name in decks() {
-        let (first, _) = read_deck(&name);
+    for (name, deck, _) in cases() {
+        let (first, _) = read_text(&format!("{name}.scs"), &read(&deck));
         let once = write(&first);
         let (second, _) = read_text(&format!("{name}.scs"), &once);
         assert!(
@@ -133,8 +144,8 @@ fn each_recorded_deck_is_a_fixpoint_of_read_write_read() {
 fn each_recorded_deck_reads_into_the_writers_features() {
     // Oracle: `FEATURES` is the reader's image (law L5's premise): nothing read from a recorded
     // deck is outside it.
-    for name in decks() {
-        let (design, _) = read_deck(&name);
+    for (name, deck, _) in cases() {
+        let (design, _) = read_text(&format!("{name}.scs"), &read(&deck));
         let outside = ir::features_used(&design).minus(dialect::spectre::FEATURES);
         assert!(
             outside.is_empty(),
@@ -167,7 +178,18 @@ fn spice_sources_convert_to_the_meaning_spectre_ran() {
                 }
                 same
             }
-            Err(_) => false,
+            Err(d) => {
+                if std::env::var_os("SPECTRE_SHOW").is_some() {
+                    eprintln!(
+                        "== {name} refused {:?}",
+                        d.rows()
+                            .iter()
+                            .map(|r| (r.code.to_string(), r.arg))
+                            .collect::<Vec<_>>()
+                    );
+                }
+                false
+            }
         };
         if !same {
             differ.push(name);
@@ -209,6 +231,32 @@ fn stems(dir: PathBuf, ext: &str) -> Vec<String> {
     out
 }
 
+/// `tests/fixtures/dialect/spectre/authored`: decks written here from a RUN-SP record's form
+/// or a manual's, each citing its evidence on line 1.
+fn authored() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/dialect/spectre/authored")
+}
+
+/// Every deck with its IR fixture: (name, deck, .ir), the recorded ones then the authored.
+fn cases() -> Vec<(String, PathBuf, PathBuf)> {
+    let recorded = decks().into_iter().map(|n| {
+        let deck = recorded().join(format!("{n}.scs"));
+        let ir = fixtures().join(format!("{n}.ir"));
+        (n, deck, ir)
+    });
+    let written = stems(authored(), "scs").into_iter().map(|n| {
+        let deck = authored().join(format!("{n}.scs"));
+        let ir = authored().join(format!("{n}.ir"));
+        (n, deck, ir)
+    });
+    recorded.chain(written).collect()
+}
+
+/// The text at `path`.
+fn read(path: &std::path::Path) -> String {
+    std::fs::read_to_string(path).expect("a deck")
+}
+
 /// The recorded decks' names.
 fn decks() -> Vec<String> {
     stems(recorded(), "scs")
@@ -225,11 +273,6 @@ fn irs() -> Vec<String> {
 /// Recorded deck `name`'s text.
 fn deck_text(name: &str) -> String {
     std::fs::read_to_string(recorded().join(format!("{name}.scs"))).expect("a recorded deck")
-}
-
-/// Recorded deck `name`, read.
-fn read_deck(name: &str) -> (ir::Design, ir::Diags) {
-    read_text(&format!("{name}.scs"), &deck_text(name))
 }
 
 /// `text` read as the one file `path`, leniently.

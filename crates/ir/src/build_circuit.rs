@@ -46,7 +46,7 @@
 //!
 //! // `X1 in out div m=2`: the reader binds `div` by its own rule; `m` is the multiplicity
 //! b.subckt(top, "div", &["p", "n"], &[], span);
-//! let div_def = b.design().definitions()[0];
+//! let div_def = b.design().definitions_all()[0];
 //! let two = b.num(2.0);
 //! let terminals = b.names(&["in", "out"]);
 //! let name = b.name("x1");

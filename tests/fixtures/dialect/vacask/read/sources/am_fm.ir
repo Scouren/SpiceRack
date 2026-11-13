@@ -1,3 +1,4 @@
+laws bc_sat_areab_only sub_sat_emission_ns diode_wl_mult_once diode_sidewall_own_f1 diode_xom_absent_1e14 vdmos_kp_absent_20 vdmos_tcvth_raises vdmos_clamp_by_fc mos_small_signal_exact mos6_small_signal_exact bjt_irb_small_signal_exact vdmos_mult_charges_copies diode_isr_reverse_present diode_isr_small_signal_exact diode_tt_factor_clamped trig_exact exp_exact log_zero_error div_exact asin_edge_fails default_temp_27 default_tnom_27 bsim4v45_small_signal_exact
 # Oracle: VD dev-builtin-src (AM, FM: sinedc 0, ampl 1, freq 1k, tdphase 0, delay 0, modfreq
 # 1k, modphase 0, modindex 0.5) and run src-amfm (VD's two formulas, every parameter off its
 # default, at six times to 9 digits; before delay the value at delay). AM: the general Am with

@@ -205,9 +205,9 @@ pub(super) const CODES: &[Row] = &[
     ),
     note(
         NO_SUCH_CARD,
-        "a dot card ngspice-45 does not have",
-        "ngspice-45 inp2dot.c:962 (unimplemented dot command)",
-        "ngspice stops before the run (.step, .hb, .sens2, .dcvolt are not its cards); kept as text (InvalidInSource).",
+        "a dot card the HSPICE reader has no rule for",
+        "rewrite/DIALECT-HSPICE.md §9; the VAMS conformance suite's HSPICE decks (ESPice runs them)",
+        "an HSPICE card with no IR member or rule yet (.hb, .lin, .fft, .net, .check…); kept as text (Unread).",
     ),
     note(
         RUN_DEFAULTS,
@@ -249,8 +249,7 @@ pub(super) const CODES: &[Row] = &[
 
 /// A run card ngspice rejects (a missing or unknown word, a zero DC step): `InvalidInSource`.
 const RUN_INVALID: ir::Code = ir::Code::new(b'P', 4300);
-/// A dot card ngspice-45 does not have ("unimplemented dot command": `.step`, `.hb`, `.sens2`):
-/// `InvalidInSource`.
+/// A dot card this reader has no rule for (`.hb`, `.lin`, `.fft`…, which ESPice runs): `Unread`.
 const NO_SUCH_CARD: ir::Code = ir::Code::new(b'P', 4301);
 /// An `.ac` whose numbers ngspice replaces with defaults (`np < 1`, `fstop < fstart`): `Unread`.
 const RUN_DEFAULTS: ir::Code = ir::Code::new(b'P', 4302);
@@ -297,7 +296,9 @@ pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt) {
         "temp" => state::temp(lw, st),
         // frontend cards of compatibility modes, and `.opts` (accepted, its reading unknown)
         "opts" | "backanno" | "distribution" | "incpslt" | "cmodel" | "libsave" => lw.unread(st),
-        _ => lw.opaque(st, ir::OpaqueClass::InvalidInSource, NO_SUCH_CARD),
+        // HSPICE has many cards this reader has no rule for (`.hb`, `.lin`, `.fft`, `.net`,
+        // `.ptdnoise`…: the conformance suite's decks run on ESPice)
+        _ => lw.opaque(st, ir::OpaqueClass::Unread, NO_SUCH_CARD),
     }
 }
 

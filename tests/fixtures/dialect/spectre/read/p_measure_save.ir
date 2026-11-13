@@ -1,9 +1,10 @@
-# tests/spectre/p_measure_save.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# tests/spectre/p_measure_save.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (the recorded decks: tests/spectre/pending.json, expected.json; an authored deck: its first line).
 # codes: S0003 P6008 S0002 P6009
+laws default_temp_27 default_tnom_27
 file "p_measure_save.scs" deck
   title "// t"
   opaque spectre inert "simulator lang=spectre"
-  element vsource v1 (a 0) dc=0 wave=sin(offset=0 amplitude=1 freq=1k delay=0 damping=0 phase_deg=0 pre=hold_delay_value)
+  element vsource v1 (a 0) dc=0 wave=sin(offset=0 amplitude=1 freq=1k delay=0 damping=0 phase_deg=0)
   element resistor r1 (a 0) value=1k
   option rel_tol value=100u whole_run
   save (v (a))

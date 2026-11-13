@@ -103,7 +103,7 @@ pub(super) fn load(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     // ponytail: decides from the whole definition table, dead rows included (the class of the
     // expression table's replaced rows); a live-definitions view replaces it in the `…_all()` round.
     let modules: Vec<ir::NameId> = d
-        .definitions()
+        .definitions_all()
         .iter()
         .filter(|def| def.kind == ir::DefKind::Module && def.item == at)
         .map(|def| def.name)
@@ -292,10 +292,11 @@ mod tests {
             admit(&design, at, &mut diags);
             diags.rows().iter().any(|d| d.code == NO_LIBRARY)
         };
-        assert!(refused(ir::ModelFamily::GummelPoon));
+        assert!(refused(ir::ModelFamily::Psp103));
         assert!(refused(ir::ModelFamily::Vbic));
         assert!(!refused(ir::ModelFamily::Diode));
         assert!(!refused(ir::ModelFamily::JfetShichman));
         assert!(!refused(ir::ModelFamily::JfetParkerSkellern));
+        assert!(!refused(ir::ModelFamily::GummelPoon));
     }
 }

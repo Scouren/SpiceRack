@@ -6,7 +6,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §4; VD cir-masters; R21 (`admits`).
 //!
-//! Contents: `UNSPELLED`, `LIBRARIES`, `UNPROVEN`, `LACKED` (their rows are in `read_elements::CODES`), `admit`, `model`, `word` (crate-private)
+//! Contents: `UNSPELLED`, `LIBRARIES`, `UNPROVEN`, `VERSION`, `LACKED` (their rows are in `read_elements::CODES`), `admit`, `model`, `word` (crate-private)
 
 use super::expr_write::write_expr;
 use super::families::{self, Name};
@@ -20,6 +20,8 @@ pub(super) const UNSPELLED: ir::Code = ir::Code::new(b'W', 2101);
 pub(super) const LIBRARIES: ir::Code = ir::Code::new(b'W', 2103);
 /// A model of a family no run proved a VACASK module implements.
 pub(super) const UNPROVEN: ir::Code = ir::Code::new(b'W', 2107);
+/// A model version VACASK's module does not run as written (F85).
+pub(super) const VERSION: ir::Code = ir::Code::new(b'W', 2111);
 /// A parameter the target module does not have.
 pub(super) const LACKED: ir::Code = ir::Code::new(b'W', 2102);
 
@@ -41,7 +43,10 @@ pub(super) fn model(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
         ir::Polarity::P => w.out.push_str(" type=-1"),
         ir::Polarity::None => {}
     }
-    if !row.version.is_none() {
+    // sp_bsim3v3 has no `version` parameter: it is 3.3.0, which the reader states (`admit`
+    // refuses another).
+    let given = families::versions(row.family).is_none_or(|v| v.given);
+    if !row.version.is_none() && given {
         w.out.push_str(" version=");
         write_expr(d, row.version, w.out);
     }
@@ -105,8 +110,20 @@ pub(super) fn admit(
     });
     // A user module's `version=` is one of its parameters to the reader.
     lacked |= !row.version.is_none() && module_family;
+    let versions = families::versions(row.family);
     lacked |= !row.version.is_none()
+        && versions.is_none()
         && families::model_name_in(&module, "version") != Name::Ir("version".into());
+    // F85: a version the module does not run as written (BSIM4 4.5 runs as 4.8.3).
+    if let Some(v) = versions {
+        let runs = match design.expr(row.version) {
+            ir::Expr::Str(s) => v.runs.contains(&design.str(s)),
+            _ => false,
+        };
+        if !runs {
+            diags.push_at(VERSION, design, at, 0);
+        }
+    }
     if lacked {
         diags.push_at(LACKED, design, at, 0);
     }

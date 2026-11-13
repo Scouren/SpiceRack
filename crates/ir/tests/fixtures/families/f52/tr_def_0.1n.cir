@@ -1,0 +1,12 @@
+tr_def_0.1n
+.model d d rs=1.0 is=1e-9 tt=1e-6 cjo=50n bv=5 ibv=1e-6
+v1 1 0 pulse(1 -1 0.2u 1n 1n 1 2)
+d1 1 0 d
+
+.control
+set numdgt=12
+tran 0.1u 1u 0 0.1n
+meas tran i50 find i(v1) at=0.5u
+meas tran i40 find i(v1) at=0.4u
+.endc
+.end

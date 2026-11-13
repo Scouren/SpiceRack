@@ -257,7 +257,7 @@ fn outputs_measures_and_statistics() {
   measure p1 tran param value=(tdel * 2)
   measure s1 tran stat max_at (v (out)) (bound) (bound)
   measure w2 tran when (cross rise skip_initial (v (a)) value=0.5 until=1u)
-  statistics process (vth gauss spread=1m) (tox unif percent mean=1n spread=10) mismatch (vth log_normal spread=1m) process_correlate (vth tox cc=0.5) truncate=4
+  statistics process (vth gauss spread=1m) (tox unif percent spread=10) mismatch (vth log_normal spread=1m) process_correlate (vth tox cc=0.5) truncate=4
 ";
     case(text, |b, top| {
         let p = [
@@ -397,16 +397,14 @@ fn outputs_measures_and_statistics() {
             param: vth,
             dist: VaryDist::Gauss,
             percent: false,
-            mean: NO,
             spread: s,
         };
         let tox = Ref::unresolved(b.name("tox"));
-        let (mean, s) = (n(b, "1n"), n(b, "10"));
+        let s = n(b, "10");
         let v2 = Vary {
             param: tox,
             dist: VaryDist::Unif,
             percent: true,
-            mean,
             spread: s,
         };
         let process = b.varies(&[v1, v2]);
@@ -415,7 +413,6 @@ fn outputs_measures_and_statistics() {
             param: vth,
             dist: VaryDist::LogNormal,
             percent: false,
-            mean: NO,
             spread: s,
         };
         let mismatch = b.varies(&[v3]);

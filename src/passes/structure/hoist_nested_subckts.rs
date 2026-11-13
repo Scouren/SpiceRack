@@ -1,4 +1,5 @@
-//! Pass `hoist_nested_subckts` (rows `hoist_nested_subckts` and `hoist_enclosing_refs`): a
+//! Pass `hoist_nested_subckts` (rows `hoist_nested_subckts_default` and
+//! `hoist_enclosing_refs_default`): a
 //! design in, the same design out with every subcircuit listed in another subcircuit's body
 //! moved one level out per step (into the scope listing its enclosing subcircuit, right after
 //! it) until none is nested. It removes `Placed(Subckt, Subckt)` and, with it,
@@ -8,22 +9,20 @@
 //! definition; a name taken where the subcircuit lands is renamed (`<name>_<n>`), its
 //! instances following.
 //!
-//! The added formal's default (R13: no invented value): the rows `hoist_nested_subckts` and
-//! `hoist_enclosing_refs` leave it without one and require `Extra(FormalWithoutDefault)`, the
-//! exact statement that every instance passes it; their `_default` twins, for a target without
-//! that feature, give it the literal `0` and put a `HOIST_DEFAULT` note at the subcircuit
-//! saying the default is the hoist's and no instance reads it. `legalize` takes the first
-//! usable row, so a target that can say "no default" gets the clean form.
+//! The added formal's default (R13: no invented value): the literal `0`, with a `HOIST_DEFAULT`
+//! note at the subcircuit saying the default is the hoist's and no instance reads it. (The
+//! twins that left it without one went with `Extra(FormalWithoutDefault)`, a violation now:
+//! `rewrite/IR-PRUNE.md` group 3.)
 //!
 //! Left with a note: a subcircuit whose body reads an enclosing model, function or subcircuit,
-//! or an enclosing parameter one of its own formals is named as (`READS_ENCLOSING`), or one defined in a branch, loop or section inside a subcircuit
+//! names an enclosing parameter in a row (a statistics block varying it, a target: the
+//! parameter itself, which a formal's copy is not), or reads an enclosing parameter one of its
+//! own formals is named as (`READS_ENCLOSING`), or one defined in a branch, loop or section inside a subcircuit
 //! (`NOT_IN_BODY`).
 //!
 //! Cites: `rewrite/AMEND-A12.md` K2, A15 K1, A32; R27; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub fn hoist_nested_subckts(design: &mut ir::Design, diags: &mut ir::Diags)`,
-//! `pub fn hoist_nested_subckts_default(design: &mut ir::Design, diags: &mut ir::Diags)`,
-//! `pub fn hoist_enclosing_refs(design: &mut ir::Design, diags: &mut ir::Diags)`,
+//! Contents: `pub fn hoist_nested_subckts_default(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub fn hoist_enclosing_refs_default(design: &mut ir::Design, diags: &mut ir::Diags)`,
 //! `pub const READS_ENCLOSING: ir::Code`, `pub const NOT_IN_BODY: ir::Code`,
 //! `pub const HOIST_DEFAULT: ir::Code`
@@ -41,25 +40,14 @@ pub const NOT_IN_BODY: ir::Code = ir::Code::new(b'U', 304);
 /// The note at a hoisted subcircuit whose added formals got the literal default `0`.
 pub const HOIST_DEFAULT: ir::Code = ir::Code::new(b'U', 307);
 
-/// Hoists every nested subcircuit one level per step until none is nested; added formals have
-/// no default.
-pub fn hoist_nested_subckts(design: &mut ir::Design, diags: &mut ir::Diags) {
-    hoist(design, diags, false, false);
-}
-
-/// As [`hoist_nested_subckts`], the added formals defaulting to `0`, with a `HOIST_DEFAULT` note.
+/// Hoists every nested subcircuit one level per step until none is nested; the added formals
+/// default to `0`, with a `HOIST_DEFAULT` note.
 pub fn hoist_nested_subckts_default(design: &mut ir::Design, diags: &mut ir::Diags) {
     hoist(design, diags, true, false);
 }
 
-/// As [`hoist_nested_subckts`], only the subcircuits whose subtree reads an enclosing body
-/// (`EnclosingRef`); every item still reading one gets a `READS_ENCLOSING` note.
-pub fn hoist_enclosing_refs(design: &mut ir::Design, diags: &mut ir::Diags) {
-    hoist(design, diags, false, true);
-}
-
-/// As [`hoist_enclosing_refs`], the added formals defaulting to `0`, with a `HOIST_DEFAULT`
-/// note.
+/// As [`hoist_nested_subckts_default`], only the subcircuits whose subtree reads an enclosing
+/// body (`EnclosingRef`); every item still reading one gets a `READS_ENCLOSING` note.
 pub fn hoist_enclosing_refs_default(design: &mut ir::Design, diags: &mut ir::Diags) {
     hoist(design, diags, true, true);
 }
@@ -182,15 +170,23 @@ fn subtree(design: &ir::Design, s2: ir::ItemRef) -> Vec<(ir::ItemRef, ir::ScopeI
 }
 
 /// The parameters of `l2` (the enclosing body) that `s2`'s subtree reads, in first-read order,
-/// or `None` when it reads any other definition there (a model, function, subcircuit).
+/// or `None` when it reads any other definition there (a model, function, subcircuit) or names
+/// one in a row reference.
 fn plan(design: &ir::Design, s2: ir::ItemRef, l2: ir::ScopeId) -> Option<Vec<ir::DefId>> {
     let mut formals: Vec<ir::DefId> = Vec::new();
     for (item, _) in subtree(design, s2) {
         let mut refs = Vec::new();
         design.item_refs(item, &mut refs);
-        let mut defs: Vec<ir::DefId> = refs.iter().map(|r| r.0.def).collect();
-        defs.extend(expr_reads(design, item));
-        for def in defs.into_iter().filter(|d| !d.is_none()) {
+        // a row reference names the definition itself (a statistics block's or a target's
+        // parameter), not its value: a formal holding a copy is another parameter
+        let named = refs.iter().map(|r| r.0.def).filter(|d| !d.is_none());
+        if named.into_iter().any(|d| design.def(d).scope == l2) {
+            return None;
+        }
+        for def in expr_reads(design, item)
+            .into_iter()
+            .filter(|d| !d.is_none())
+        {
             let d = design.def(def);
             if d.scope != l2 {
                 continue;
@@ -363,13 +359,13 @@ fn hoist_one(
     }
     // a name the landing scope already defines (in any case) is renamed, its references follow
     let taken = |d: &ir::Design, n: &str| {
-        d.definitions().iter().any(|x| {
+        d.definitions_all().iter().any(|x| {
             x.scope == l && x.kind == ir::DefKind::Subckt && d.str(x.name).eq_ignore_ascii_case(n)
         })
     };
     let base = editor.design().str(row.name).to_string();
     if taken(editor.design(), &base) {
-        let bound = editor.design().definitions().len() + 1;
+        let bound = editor.design().definitions_all().len() + 1;
         let fresh = (1..=bound)
             .map(|n| format!("{base}_{n}"))
             .find(|n| !taken(editor.design(), n))

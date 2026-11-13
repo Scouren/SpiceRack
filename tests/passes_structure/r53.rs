@@ -152,7 +152,9 @@ pub fn keeps_every_instances_values(
         assert_eq!(after, before, "seed {seed}\n{text}");
         designs += 1;
         points += before.iter().flatten().count();
-        passed += diags.rows().is_empty() as usize;
+        // the pass's own default note (`PASS_DEFAULT`) aside, nothing is left with a note
+        let pass_default = spicerack::passes::structure::formal_defaults_to_instances::PASS_DEFAULT;
+        passed += diags.rows().iter().all(|d| d.code == pass_default) as usize;
     }
     assert!(
         designs == 200 && points > 1000 && passed == 200 && changed > 100,

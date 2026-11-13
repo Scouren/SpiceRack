@@ -1,3 +1,3 @@
 U0440  # a ceiling rule still stands: tran_cap_span50_to_given first
 U0440  # a print step beside: no field takes the first step
-U0441  # neither: nothing determines a value
+U0441  # neither, and a ceiling rule reads the print step: nothing determines a value

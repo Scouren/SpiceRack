@@ -44,7 +44,7 @@
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
 //!   `ProbeKind`, `ProbeList`, `Statistics`, `Vary`, `VaryDist`, `SweepBounds`, `SweepEnd`,
-//!   `SweepKind`, `SweepSpec`
+//!   `SweepKind`, `SweepSpec`, `SweepCount`, `on_grid`
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -78,6 +78,7 @@ mod item_facts_scopes;
 pub mod item_text;
 pub mod link;
 pub mod literal;
+mod live;
 pub mod mark;
 pub mod names;
 pub mod rewrite;
@@ -104,6 +105,9 @@ mod circuit_text;
 pub mod controlled;
 pub mod element;
 mod hierarchy;
+pub mod laws;
+mod laws_carry;
+mod laws_table;
 pub mod letter;
 pub mod library;
 pub mod line;
@@ -117,6 +121,7 @@ pub mod wave_eval;
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
+pub use laws::{LTSPICE_EXP_KNEE, Law, Laws, Rewrite, Stated};
 pub use letter::{spice_letter, spice_letters};
 pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};
@@ -126,6 +131,9 @@ pub use wave_eval::{At, WaveDomain, source_value, wave_value};
 // run owner
 #[macro_use]
 pub mod analysis;
+// before the detail rows' facts: its `run_fields!`, `run_choices!`
+#[macro_use]
+mod run_fields;
 mod analysis_facts;
 pub mod build_run;
 pub mod dc_ac;
@@ -189,7 +197,7 @@ pub use run_extra::RunExtra;
 pub use span::Span;
 pub use state_order::{Listed, Setting, in_force, listed, run_walks};
 pub use stats::{Statistics, Vary, VaryDist};
-pub use sweep::{SweepBounds, SweepEnd, SweepKind, SweepSpec};
+pub use sweep::{SweepBounds, SweepCount, SweepEnd, SweepKind, SweepSpec, on_grid};
 pub use table::Table;
 pub use text::{dump, parse, parse_unchecked};
 

@@ -1,3 +1,0 @@
-file "d.sp" deck
-  param a = 2
-  param r = step(a)

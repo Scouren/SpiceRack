@@ -54,12 +54,11 @@ pub enum WaveKind {
 }
 
 /// What a delayed waveform is before its delay (IR-CIRCUIT §1; INV-semantics 5.03, 5.06,
-/// 5.25).
+/// 5.25). No simulator holds the offset alone (diffs-2's runs, differences f78efcca: Xyce and
+/// ESPice hold the sine's t = delay value; `Offset` removed by R100).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum PreDelay {
-    /// The offset alone (xy, hs SIN: VO before TD; their slices confirm).
-    Offset,
     /// The waveform's value at t = delay, held (ng SIN, `vsrcload.c`, AMEND-A12 A17; lt SIN:
     /// VO + VA·sin(φ); sp, va: the value at t = delay, also at the operating point).
     HoldDelayValue,
@@ -521,7 +520,7 @@ impl WaveKind {
 
 impl PreDelay {
     /// Every member, in declaration order.
-    pub const ALL: [PreDelay; 3] = [PreDelay::Offset, PreDelay::HoldDelayValue, PreDelay::Zero];
+    pub const ALL: [PreDelay; 2] = [PreDelay::HoldDelayValue, PreDelay::Zero];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
 }

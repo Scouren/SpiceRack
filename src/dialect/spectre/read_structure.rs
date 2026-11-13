@@ -340,7 +340,6 @@ pub(super) fn statistics(l: &mut Lower<'_, '_, '_>, n: Node) {
                 param: ir::Ref::unresolved(name),
                 dist: *dist,
                 percent: *percent,
-                mean: ir::ExprId::NONE,
                 spread,
             });
         }

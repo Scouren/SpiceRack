@@ -1,0 +1,11 @@
+vdmos body diode vj=1 cjo=1n, off, drain 5 V, AC 1 MHz
+load "spice/vdmos.osdi"
+model vs vsource
+model mn sp_vdmos type=1 kp=20 vto=2 cjo=1n vj=1 fc=0.5
+vd (d 0) vs dc=5 mag=1
+vg (g 0) vs dc=0
+m1 (d g 0 t tc) mn
+control
+  options rawfile="ascii" reltol=1e-9
+  analysis ac1 ac from=1meg to=1meg mode="lin" points=1
+endc

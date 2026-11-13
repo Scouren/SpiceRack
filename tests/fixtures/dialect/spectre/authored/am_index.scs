@@ -1,0 +1,5 @@
+// AM without ammodoffset (RUN-SP P4-055: v = sinedc + ampl*(1 + mi*sin(2*pi*fm*tau + phm))*sin(2*pi*f*(t-delay) + phc), tau = t - delay + phc/(360*f), fitted to 7.4e-13)
+simulator lang=spectre
+v1 (a 0) vsource type=sine sinedc=0.5 ampl=1 freq=1M delay=0 sinephase=30 ammodindex=0.3 ammodfreq=100k ammodphase=10
+r1 (a 0) resistor r=1k
+tran1 tran stop=20u maxstep=1n

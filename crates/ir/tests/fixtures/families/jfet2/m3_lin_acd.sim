@@ -1,0 +1,11 @@
+jfet2 m3 (27 C, m=3), lin (vgs=0.0, vds=0.2), acd
+load "spice/jfet2.osdi"
+model vs vsource
+model nm sp_jfet2 type=1 vt0=-2 beta=1e-4 lambda=0.02 rd=10 rs=10 cgs=2p cgd=1p is=1e-14 n=1 fc=0.5 delta=0.1 xi=1000 p=2 q=2 z=1 vbi=1 hfeta=0.05
+vd (d 0) vs dc=0.2 mag=1
+vg (g 0) vs dc=0.0
+j1 (d g 0) nm area=2 $mfactor=3
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis ac1 ac from=1e9 to=1e9 mode="lin" points=1
+endc

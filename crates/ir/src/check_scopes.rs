@@ -6,15 +6,22 @@
 //! Cites: `rewrite/IR-KERNEL.md` §9, C5; `rewrite/AMEND-A12.md` A28.
 //!
 //! Contents: crate: `pub(crate) fn files_and_scopes(&mut Out<'_>)`,
-//! `pub(crate) fn live_scopes(&Design) -> Vec<bool>`, `pub(crate) fn stale_definitions(&mut Out<'_>)`
+//! `pub(crate) fn live_scopes(&Design) -> Vec<bool>`, `pub(crate) fn stale_definitions(&mut Out<'_>)`,
+//! `pub(crate) fn reference_scopes(&mut Out<'_>)` (F34),
+//! `pub(crate) fn misplaced_strings(&Design, ExprId) -> Vec<ExprId>` (`StringOperand`),
+//! `pub(crate) fn dynamic_conditions(&mut Out<'_>)` (R100),
+//! `pub(crate) fn placements(&mut Out<'_>)` (`Misplaced`),
+//! `pub(crate) fn misplaced_in(&Design, ScopeId, ItemKind) -> bool`
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::check::{Out, Violation, table_len};
 use crate::design::Design;
+use crate::expr::{BinOp, Expr};
 use crate::facts::{Handle, RowFacts};
-use crate::id::{ItemRef, ScopeId};
-use crate::item::{ItemKind, ScopeKind};
+use crate::feature::{ExprWalk, expr_roots};
+use crate::id::{ExprId, ItemRef, Ref, ScopeId};
+use crate::item::{DefKind, Include, ItemKind, ScopeKind, Section};
 
 /// Files, scopes and item lists: handle ranges, the tree's shape, each scope's owner.
 pub(crate) fn files_and_scopes(out: &mut Out<'_>) {
@@ -136,7 +143,199 @@ pub(crate) fn stale_definitions(out: &mut Out<'_>) {
     }
 }
 
+/// `RefScope` (F34): every resolved reference of every reachable item, a row's own `Ref` or a
+/// read or call in its expressions, bound to a definition inside a subcircuit's body stands
+/// inside that body (`reaches`) or is the subcircuit's own head; a read bound to a function's
+/// formal stands in that function. Run on a design whose handles hold. O(references × scope
+/// depth), more only through includes.
+pub(crate) fn reference_scopes(out: &mut Out<'_>) {
+    let d = out.design;
+    let includers = includers(d);
+    let mut walk = ExprWalk::new(d);
+    let mut handles = Vec::new();
+    let mut refs: Vec<(Ref, bool)> = Vec::new();
+    for (item, scope) in d.reachable() {
+        handles.clear();
+        refs.clear();
+        for_kind!(item.kind, R => d.row::<R>(item.index).handles(d, &mut handles));
+        for h in &handles {
+            if let Handle::Ref(r, _) = *h {
+                refs.push((r, false));
+            }
+        }
+        for root in expr_roots(d, &handles) {
+            for &node in walk.tree(d, root) {
+                match d.expr(node) {
+                    Expr::Param(r) => refs.push((r, true)),
+                    Expr::UserCall(r, _) => refs.push((r, false)),
+                    _ => {}
+                }
+            }
+        }
+        for &(r, read) in &refs {
+            if !r.is_resolved() {
+                continue;
+            }
+            let def = d.defs[r.def.index()];
+            let ok = if read && def.kind == DefKind::Func {
+                def.item == item
+            } else {
+                match enclosing_body(d, def.scope) {
+                    None => true,
+                    Some(body) => {
+                        d.scopes[body.index()].owner == item || reaches(d, &includers, scope, body)
+                    }
+                }
+            };
+            if !ok {
+                out.report(Violation::RefScope, item, r.def.0);
+            }
+        }
+    }
+}
+
+/// The string operands of `node` that stand where a string has no meaning: under an operator
+/// other than `==`/`!=`, as a function's, a user call's or a draw's argument, or as a
+/// conditional's condition (`Violation::StringOperand`). A list's elements and a conditional's
+/// branches are values.
+pub(crate) fn misplaced_strings(d: &Design, node: ExprId) -> Vec<ExprId> {
+    let operands: Vec<ExprId> = match d.expr(node) {
+        Expr::Binary(BinOp::Eq | BinOp::Ne, ..) | Expr::List(_) => return Vec::new(),
+        Expr::Binary(_, a, b) => vec![a, b],
+        Expr::Unary(_, a) | Expr::Ternary(a, ..) => vec![a],
+        Expr::Call(_, l) | Expr::UserCall(_, l) | Expr::Draw(.., l) => d.exprs(l).to_vec(),
+        Expr::Num(_)
+        | Expr::Str(_)
+        | Expr::Param(_)
+        | Expr::V(..)
+        | Expr::I(_)
+        | Expr::Time
+        | Expr::Temp
+        | Expr::Freq
+        | Expr::TStep
+        | Expr::TStop
+        | Expr::Tnom => return Vec::new(),
+    };
+    operands
+        .into_iter()
+        .filter(|&k| matches!(d.expr(k), Expr::Str(_)))
+        .collect()
+}
+
+/// R100: `FieldDomain` at every `If` a condition of which is of class `Temp` or above (no
+/// simulator decides a netlist by the temperature or the circuit; INV-semantics 11.08: `.if` is
+/// decided once from parameters). Run on a design whose handles hold, with the class table.
+pub(crate) fn dynamic_conditions(out: &mut Out<'_>) {
+    let d = out.design;
+    let table = crate::class::def_classes(d);
+    for (item, _) in d.reachable() {
+        if item.kind != ItemKind::If {
+            continue;
+        }
+        let row: crate::item::If = d.row(item.index);
+        let dynamic = d.branches(row.branches).iter().any(|br| {
+            !br.cond.is_none()
+                && crate::class::tree_class(d, br.cond, table) >= crate::class::ExprClass::Temp
+        });
+        if dynamic {
+            out.report(Violation::FieldDomain, item, item.index);
+        }
+    }
+}
+
+/// `Misplaced` at every reachable item that `misplaced_in` its scope. O(items × scope depth). Run
+/// on a design whose handles hold.
+pub(crate) fn placements(out: &mut Out<'_>) {
+    let d = out.design;
+    for (item, scope) in d.reachable() {
+        if misplaced_in(d, scope, item.kind) {
+            out.report(Violation::Misplaced, item, item.index);
+        }
+    }
+}
+
+/// Whether an item of `kind` listed in `scope` stands inside a scope of a kind that no dialect
+/// lets hold it (`misplaced`), at any depth. For `check` and the generator.
+pub(crate) fn misplaced_in(d: &Design, scope: ScopeId, kind: ItemKind) -> bool {
+    let chain = crate::feature::chain_kinds(d, scope);
+    ScopeKind::ALL
+        .into_iter()
+        .any(|s| chain[s as usize] && misplaced(s, kind))
+}
+
 // ---- private ----
+
+/// The nearest subcircuit body at or above `scope`, `None` outside every subcircuit.
+fn enclosing_body(d: &Design, scope: ScopeId) -> Option<ScopeId> {
+    let mut at = scope;
+    // bounded by the scope count: each step moves to a parent
+    for _ in 0..=d.scopes.len() {
+        if at.is_none() {
+            return None;
+        }
+        let s = d.scopes[at.index()];
+        if s.kind == ScopeKind::Subckt {
+            return Some(at);
+        }
+        at = s.parent;
+    }
+    unreachable!("the scope tree is acyclic")
+}
+
+/// Each included scope (a file's top, a called section's body) → the scopes of the includes
+/// that read it.
+fn includers(d: &Design) -> HashMap<ScopeId, Vec<ScopeId>> {
+    let mut out: HashMap<ScopeId, Vec<ScopeId>> = HashMap::new();
+    for (item, scope) in d.reachable() {
+        if item.kind != ItemKind::Include {
+            continue;
+        }
+        let inc: Include = d.row(item.index);
+        let file = d.find_file(d.str(inc.path));
+        if file.is_none() {
+            continue;
+        }
+        let top = d.file(file).top;
+        let target = if inc.section.is_none() {
+            top
+        } else {
+            let def = d.lookup(top, DefKind::Section, inc.section);
+            if def.is_none() {
+                continue;
+            }
+            d.row::<Section>(d.defs[def.index()].item.index).body
+        };
+        out.entry(target).or_default().push(scope);
+    }
+    out
+}
+
+/// Whether `body` encloses `from`: on its parent chain, or on the chain of an include that
+/// reads a scope of that chain (ngspice reads an included text where the include stands). A
+/// worklist over scopes, each visited once.
+fn reaches(
+    d: &Design,
+    includers: &HashMap<ScopeId, Vec<ScopeId>>,
+    from: ScopeId,
+    body: ScopeId,
+) -> bool {
+    let mut seen: HashSet<ScopeId> = HashSet::new();
+    let mut work = vec![from];
+    // bounded: each scope enters the worklist once
+    while let Some(at) = work.pop() {
+        if at.is_none() || !seen.insert(at) {
+            continue;
+        }
+        if at == body {
+            return true;
+        }
+        work.push(d.scopes[at.index()].parent);
+        if let Some(by) = includers.get(&at) {
+            work.extend_from_slice(by);
+        }
+    }
+    false
+}
 
 /// Whether the parent chain of a valid-ranged scope ends at a file scope with no parent, owner
 /// `NONE` and its file's top, without a cycle.
@@ -179,4 +378,53 @@ fn owner_matches(
     let mut handles = Vec::new();
     for_kind!(s.owner.kind, R => d.row::<R>(s.owner.index).handles(d, &mut handles));
     handles.contains(&Handle::Scope(scope))
+}
+
+/// The ruling's table (the census's placements, 2026-11-13; evidence per row in
+/// `rewrite/IR-PRUNE.md` group 6): an item of `kind` inside a scope of kind `scope` no dialect
+/// expresses. A title outside a deck's top is the builder's assertion, not a row here; the
+/// run-order kinds in a subcircuit are `RunOrderInSubckt`.
+fn misplaced(scope: ScopeKind, kind: ItemKind) -> bool {
+    use ItemKind as K;
+    match scope {
+        ScopeKind::File => false,
+        // VACASK's `@if` holds instances, models, includes, subckts and nested chains; Spectre's
+        // adds parameters and loads; ngspice-45 keeps these as if unconditional
+        ScopeKind::Branch => matches!(
+            kind,
+            K::Section
+                | K::Func
+                | K::Global
+                | K::DeviceLibrary
+                | K::Statistics
+                | K::Option
+                | K::Save
+                | K::Print
+                | K::Alter
+                | K::Loop
+                | K::Reset
+                | K::Elaborate
+        ),
+        // a loop body holds run items only (`plan::Loop`)
+        ScopeKind::Loop => matches!(
+            kind,
+            K::Section
+                | K::Subckt
+                | K::If
+                | K::Include
+                | K::Load
+                | K::DeviceLibrary
+                | K::Global
+                | K::Param
+                | K::Func
+                | K::Model
+                | K::Statistics
+                | K::Element
+        ),
+        ScopeKind::Section => matches!(kind, K::Section | K::Elaborate),
+        ScopeKind::Subckt => matches!(
+            kind,
+            K::Section | K::Load | K::DeviceLibrary | K::Statistics | K::Elaborate
+        ),
+    }
 }

@@ -1,0 +1,9 @@
+placed br_print sel=1
+.param sel=1
+v1 a 0 1
+r1 a 0 1k
+.if (sel==1)
+.print dc v(a)
+.endif
+.dc v1 0 1 0.5
+.end

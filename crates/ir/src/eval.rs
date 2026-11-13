@@ -70,7 +70,7 @@ pub struct Value {
 /// Why an expression has no value. Each carries the row where evaluation stopped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Domain {
-    /// A division (`Div`, `IntDiv`, `Fmod`) by zero.
+    /// A division (`Div`, `Fmod`) by zero.
     DivideByZero(ExprId),
     /// An argument outside the domain its `Func` or operator states, or a non-finite result.
     OutOfDomain(ExprId),
@@ -142,7 +142,7 @@ impl Value {
 /// `Ddt` and `Idt` need a time history no `Bindings` gives: they are [`Domain::Unbound`].
 pub fn eval_typed(design: &Design, e: ExprId, env: &dyn Bindings) -> Result<Value, Domain> {
     assert!(
-        !e.is_none() && e.index() < design.expr_count(),
+        !e.is_none() && e.index() < design.expr_count_all(),
         "an expression id in range"
     );
     let mut m = Machine {
@@ -399,9 +399,9 @@ impl Machine<'_> {
 fn binary_int(op: BinOp, both_int: bool) -> bool {
     match op {
         BinOp::Add | BinOp::Sub | BinOp::Mul => both_int,
-        BinOp::Div | BinOp::IntDiv => false,
+        BinOp::Div => false,
         BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => true,
-        BinOp::And | BinOp::Or => true,
+        BinOp::And | BinOp::Or | BinOp::Xor => true,
         BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr => true,
         BinOp::DivTyped => both_int,
     }
@@ -433,8 +433,6 @@ fn binary(e: ExprId, op: BinOp, a: f64, b: f64) -> Result<f64, Domain> {
         BinOp::Mul => Ok(a * b),
         BinOp::Div if b == 0.0 => Err(Domain::DivideByZero(e)),
         BinOp::Div => Ok(a / b),
-        BinOp::IntDiv if b == 0.0 => Err(Domain::DivideByZero(e)),
-        BinOp::IntDiv => Ok((a / b).trunc()),
         BinOp::Eq => Ok(bool(a == b)),
         BinOp::Ne => Ok(bool(a != b)),
         BinOp::Lt => Ok(bool(a < b)),
@@ -442,6 +440,7 @@ fn binary(e: ExprId, op: BinOp, a: f64, b: f64) -> Result<f64, Domain> {
         BinOp::Gt => Ok(bool(a > b)),
         BinOp::Ge => Ok(bool(a >= b)),
         BinOp::And | BinOp::Or => unreachable!("And and Or short-circuit"),
+        BinOp::Xor => Ok(bool((a != 0.0) != (b != 0.0))),
         BinOp::BitAnd => bits(|a, b| a & b),
         BinOp::BitOr => bits(|a, b| a | b),
         BinOp::BitXor => bits(|a, b| a ^ b),
@@ -460,15 +459,12 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Abs => x.abs(),
         Func::Sqrt if x < 0.0 => return Err(out),
         Func::Sqrt => x.sqrt(),
-        Func::SqrtAbs => x.abs().sqrt(),
         Func::Exp => x.exp(),
         Func::ExpLin14 if x <= 14.0 => x.exp(),
         Func::ExpLin14 => 14f64.exp() * (1.0 + x - 14.0),
         Func::Ln | Func::Log10 if x <= 0.0 => return Err(out),
         Func::Ln => x.ln(),
         Func::Log10 => x.log10(),
-        Func::LnAbs if x == 0.0 => return Err(out),
-        Func::LnAbs => x.abs().ln(),
         Func::Pow | Func::PowAbs | Func::PowRe if x == 0.0 && y() < 0.0 => return Err(out),
         Func::Pow if x < 0.0 && y().fract() != 0.0 => return Err(out),
         Func::Pow => x.powf(y()),
@@ -527,13 +523,6 @@ fn call(e: ExprId, f: Func, xs: &[f64]) -> Result<f64, Domain> {
         Func::Fmod => x % y(),
         Func::Clamp if xs[1] > xs[2] => return Err(out),
         Func::Clamp => x.max(xs[1]).min(xs[2]),
-        Func::Step => {
-            if x > 0.0 {
-                1.0
-            } else {
-                0.0
-            }
-        }
         Func::Ramp => {
             if x > 0.0 {
                 x

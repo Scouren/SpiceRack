@@ -1,0 +1,10 @@
+default temp: tnom27, 1 mA into a diode
+load "spice/diode.osdi"
+model is isource
+model dm sp_diode is=1e-14
+i1 (0 a) is dc=1m
+d1 (a 0) dm
+control
+  options rawfile="ascii" reltol=1e-12 tnom=27
+  analysis op1 op
+endc

@@ -1,0 +1,6 @@
+// a tline given by f, its nl 0.25 when absent (MAN only: no run settled the default)
+simulator lang=spectre
+v1 (in 0) vsource dc=0 mag=1
+t1 (in 0 out 0) tline z0=50 f=100M
+rl (out 0) resistor r=50
+xf1 (out 0) xf values=[100M]

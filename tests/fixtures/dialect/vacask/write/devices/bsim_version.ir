@@ -1,0 +1,11 @@
+# Oracle: A19, F85 (the pinned store's spice/bsim3v3.va has no `version` parameter, spice/bsim4v8.va
+# runs 4.8.0 to 4.8.3 as written): BSIM3's 3.3.0 is the module itself and is not spelled; a BSIM4
+# version is spelled as given.
+file "bsim_version.ir" deck
+  title "bsim versions"
+  device_library bsim3
+  device_library bsim4
+  model n3 bsim3 polarity=n params=(vth0=0.6) version="3.3.0"
+  model n4 bsim4 polarity=n params=(vth0=0.4) version="4.8.2"
+  element mosfet m3 (d g 0 0) model=n3 params=(w=1u l=1u)
+  element mosfet m4 (d g 0 0) model=n4 params=(w=1u l=1u)

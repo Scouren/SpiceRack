@@ -1,0 +1,7 @@
+// a tline given by len and vel (RUN-SP P4-086 ran this form with dcr/g; here lossless; vel relative to c, MAN)
+simulator lang=spectre
+v1 (in 0) vsource dc=0 mag=1
+rs (in a) resistor r=50
+t1 (a 0 out 0) tline z0=50 vel=0.667128 len=2
+rl (out 0) resistor r=50
+xf1 (out 0) xf start=1M stop=300M dec=10

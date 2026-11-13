@@ -19,8 +19,8 @@ mod plan;
 
 pub(super) use super::expr_write::string as quote;
 use super::read_run::{
-    MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM, RESET_CLASS,
-    SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, TARGET_UNFOUND, identifier,
+    LIN_COUNT, MC_NESTED, NAME_SPELLING, NODE_SET_PLACE, OPTION_ROW_PRIVATE, OUTPUT_FORM,
+    RESET_CLASS, SOURCE_SWEEP_NAME, SOURCE_SWEEP_WAVE, TARGET_UNFOUND, identifier,
 };
 use super::write::Writer;
 use super::{fold, write_outputs, write_structure};
@@ -149,6 +149,12 @@ pub(super) fn admit(
     }
     if !names_spelled(design, at) {
         diags.push_at(NAME_SPELLING, design, at, 0);
+    }
+    if analyses::sweeps(design, at)
+        .iter()
+        .any(|&s| analyses::below_one(design, s))
+    {
+        diags.push_at(LIN_COUNT, design, at, 0);
     }
     let epoch = epoch_before(design, at);
     for t in swept_targets(design, at) {

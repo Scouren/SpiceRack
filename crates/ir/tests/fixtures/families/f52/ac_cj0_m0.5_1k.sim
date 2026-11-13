@@ -1,0 +1,10 @@
+ac_cj0_m0.5_1k
+load "spice/diode.osdi"
+model v vsource
+model d sp_diode rs=1.0 is=1e-9 tt=1e-6 bv=5 ibv=1e-6
+v1 (1 0) v dc=-0.5 mag=1
+d1 (1 0) d
+control
+  options rawfile="ascii" reltol=1e-9 abstol=1e-15 vntol=1e-12
+  analysis ac1 ac from=1k to=1k mode="lin" points=1
+endc

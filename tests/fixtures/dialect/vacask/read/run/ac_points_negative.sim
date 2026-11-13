@@ -1,0 +1,5 @@
+a negative lin interval count
+control
+  analysis a0 ac from=1k to=2k mode="lin" points=0
+  analysis a1 ac from=1k to=2k mode="lin" points=-1
+endc

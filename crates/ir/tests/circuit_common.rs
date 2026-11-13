@@ -104,7 +104,7 @@ pub fn sin(v: ExprId) -> Sin {
         cycles: ExprId::NONE,
         amplitude2: ExprId::NONE,
         freq2: ExprId::NONE,
-        pre: PreDelay::Offset,
+        pre: PreDelay::HoldDelayValue,
         given_zero: spicerack_ir::wave::GivenZero::AsGiven,
     }
 }

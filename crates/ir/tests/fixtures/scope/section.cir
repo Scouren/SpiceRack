@@ -1,0 +1,12 @@
+an element in a library section, altered by name from the top level
+.lib 'sec.lib' sec
+v1 a 0 1
+r1 a b 1k
+.control
+op
+print v(b)
+alter r2 3k
+op
+print v(b)
+.endc
+.end

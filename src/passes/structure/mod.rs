@@ -20,7 +20,7 @@
 //! Contents: `pub mod constant_param_to_formal`, `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
 //! `pub mod drop_device_libraries`, `pub mod drop_unread_source_models`, `pub mod explicit_family_models`,
 //! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`, `pub mod name_with_letter`,
-//! `pub mod splice_elaborate`, `pub mod unused`,
+//! `pub mod splice_elaborate`, `pub mod stated`, `pub mod unused`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod constant_param_to_formal;
@@ -34,6 +34,7 @@ pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
 pub mod name_with_letter;
 pub mod splice_elaborate;
+pub mod stated;
 pub mod unused;
 
 use super::Pass;
@@ -50,16 +51,6 @@ pub(super) const PASSES: &[Pass] = &[
     },
     // first: the passes after it place models and libraries by the scopes it settles
     Pass {
-        name: "hoist_nested_subckts",
-        removes: ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
-        notes: &[
-            hoist_nested_subckts::READS_ENCLOSING,
-            hoist_nested_subckts::NOT_IN_BODY,
-        ],
-        run: hoist_nested_subckts::hoist_nested_subckts,
-    },
-    Pass {
         name: "hoist_nested_subckts_default",
         removes: ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt),
         requires: ir::FeatureSet::EMPTY,
@@ -69,16 +60,6 @@ pub(super) const PASSES: &[Pass] = &[
             hoist_nested_subckts::HOIST_DEFAULT,
         ],
         run: hoist_nested_subckts::hoist_nested_subckts_default,
-    },
-    Pass {
-        name: "hoist_enclosing_refs",
-        removes: ir::Feature::Extra(ir::Extra::EnclosingRef),
-        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault)),
-        notes: &[
-            hoist_nested_subckts::READS_ENCLOSING,
-            hoist_nested_subckts::NOT_IN_BODY,
-        ],
-        run: hoist_nested_subckts::hoist_enclosing_refs,
     },
     Pass {
         name: "hoist_enclosing_refs_default",
@@ -106,18 +87,6 @@ pub(super) const PASSES: &[Pass] = &[
         run: splice_elaborate::splice_elaborate,
     },
     Pass {
-        name: "formal_defaults_to_instances",
-        removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
-        requires: ir::FeatureSet::EMPTY
-            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
-        notes: &[
-            formal_defaults_to_instances::DRAW_IN_DEFAULT,
-            formal_defaults_to_instances::UNKNOWN_INSTANCES,
-        ],
-        run: formal_defaults_to_instances::formal_defaults_to_instances,
-    },
-    Pass {
         name: "formal_defaults_to_instances_default",
         removes: ir::Feature::Extra(ir::Extra::FormalNotConstant),
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
@@ -131,24 +100,22 @@ pub(super) const PASSES: &[Pass] = &[
     Pass {
         name: "formal_defaults_to_instances_outer",
         removes: ir::Feature::Extra(ir::Extra::FormalOuterRead),
-        requires: ir::FeatureSet::EMPTY
-            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
         notes: &[
             formal_defaults_to_instances::DRAW_IN_DEFAULT,
             formal_defaults_to_instances::UNKNOWN_INSTANCES,
+            formal_defaults_to_instances::PASS_DEFAULT,
         ],
         run: formal_defaults_to_instances::formal_defaults_to_instances_outer,
     },
     Pass {
         name: "formal_defaults_to_instances_unbound",
         removes: ir::Feature::Extra(ir::Extra::FormalUnboundRead),
-        requires: ir::FeatureSet::EMPTY
-            .with(ir::Feature::Extra(ir::Extra::FormalWithoutDefault))
-            .with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Extra(ir::Extra::EnclosingRef)),
         notes: &[
             formal_defaults_to_instances::DRAW_IN_DEFAULT,
             formal_defaults_to_instances::UNKNOWN_INSTANCES,
+            formal_defaults_to_instances::PASS_DEFAULT,
         ],
         run: formal_defaults_to_instances::formal_defaults_to_instances_unbound,
     },
@@ -208,6 +175,48 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[],
         run: drop_device_libraries::drop_device_libraries,
     },
+    // R92's stated law points, one row per variant (stated.rs)
+    stated::row(
+        ir::Law::DiodeXomAbsent1e4,
+        "stated_xom_1e4",
+        stated::stated_xom_1e4,
+    ),
+    stated::row(
+        ir::Law::DiodeXomAbsent1e14,
+        "stated_xom_1e14",
+        stated::stated_xom_1e14,
+    ),
+    stated::row(
+        ir::Law::VdmosKpAbsent35,
+        "stated_kp_35",
+        stated::stated_kp_35,
+    ),
+    stated::row(
+        ir::Law::VdmosKpAbsent20,
+        "stated_kp_20",
+        stated::stated_kp_20,
+    ),
+    // R102's defaults, carried by the design: a run-wide `Env` written in the entry's top
+    stated::env_row(
+        ir::Law::DefaultTemp27,
+        "stated_temp_27",
+        stated::stated_temp_27,
+    ),
+    stated::env_row(
+        ir::Law::DefaultTemp25,
+        "stated_temp_25",
+        stated::stated_temp_25,
+    ),
+    stated::env_row(
+        ir::Law::DefaultTnom27,
+        "stated_tnom_27",
+        stated::stated_tnom_27,
+    ),
+    stated::env_row(
+        ir::Law::DefaultTnom25,
+        "stated_tnom_25",
+        stated::stated_tnom_25,
+    ),
 ];
 
 /// The group's catalogue rows (`U0300..=U0399`).
@@ -344,6 +353,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an unused definition dropped for a refusal it held",
             cite: "rewrite/RULINGS.md R80",
             explain: "Nothing the deck runs uses this definition (no element, analysis, statement or used definition names it, reads it or calls it, and no unresolved name or opaque statement spells it), and it holds an item the target refuses (a feature the target lacks, or the target writer's own refusal), or it names a definition dropped for one, so it is dropped rather than refused. The note's argument packs the refusal's code and argument; a kit conversion keeps every definition.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        stated::STATED_KEPT,
+        ir::Info {
+            title: "a carrier of a stated law point that is no model",
+            cite: "rewrite/RULINGS.md R90, R92",
+            explain: "The design's simulator build gives this parameter a value when it is absent, and the target's build another; the rule writes the design's value on each model that carries the point. This carrier is no model row, so there is nothing to write it on, and the item is refused.",
             kind: ir::Kind::Note,
         },
     ),

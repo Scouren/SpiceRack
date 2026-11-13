@@ -7,9 +7,7 @@
 //!
 //! Contents: none (tests only).
 
-use spicerack_ir::{
-    BinOp, DefKind, Design, ExprId, Extra, Feature, FeatureSet, Role, Span, features_used,
-};
+use spicerack_ir::{BinOp, DefKind, Design, Extra, Feature, FeatureSet, Role, Span, features_used};
 
 // ---- private ----
 
@@ -138,31 +136,6 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
             },
         ),
         (
-            Extra::FormalWithoutDefault,
-            |b, top| {
-                b.subckt(top, "s", &[], &[("w", ExprId::NONE)], Span::NONE);
-            },
-            |b, top| {
-                let one = b.num(1.0);
-                b.subckt(top, "s", &[], &[("w", one)], Span::NONE);
-            },
-        ),
-        (
-            Extra::IfConditionDynamic,
-            |b, top| {
-                let t = b.temp();
-                let lim = b.num(100.0);
-                let hot = b.binary(BinOp::Gt, t, lim);
-                b.if_(top, &[hot], Span::NONE);
-            },
-            |b, top| {
-                let one = b.num(1.0);
-                let zero = b.literal(spicerack_ir::Literal::ZERO);
-                let yes = b.binary(BinOp::Gt, one, zero);
-                b.if_(top, &[yes], Span::NONE);
-            },
-        ),
-        (
             Extra::LongLiteral,
             |b, top| {
                 let v =
@@ -261,6 +234,20 @@ fn each_kernel_extra_has_a_row_and_a_neighbour() {
                 let outer = b.param_ref("w0");
                 b.resolve(outer, w0);
                 b.subckt(top, "t", &[], &[("w", outer)], Span::NONE);
+            },
+        ),
+        (
+            // `"tt" == "tt"`; the neighbour: the same strings as a list
+            Extra::StringCompare,
+            |b, top| {
+                let (x, y) = (b.string("tt"), b.string("tt"));
+                let eq = b.binary(BinOp::Eq, x, y);
+                b.param(top, "c", eq, Span::NONE);
+            },
+            |b, top| {
+                let (x, y) = (b.string("tt"), b.string("tt"));
+                let l = b.list(&[x, y]);
+                b.param(top, "c", l, Span::NONE);
             },
         ),
     ];

@@ -223,16 +223,16 @@ fn vacask_corpus_to_ngspice() {
 
 #[cfg(feature = "corpus")]
 #[test]
-fn ngspice_examples_to_ngspice() {
-    // The same-dialect cell over spice-bench's ngspice examples (the cross-sim keep rule, under
-    // `ngspice/examples/`).
-    let examples = corpus::Corpus {
+fn spice_bench_to_ngspice() {
+    // The same-dialect cell over every spice-bench deck the cross-sim cell keeps (as
+    // `spice_bench_to_vacask`): stage 1 of the IR's set (R100).
+    let spice_bench = corpus::Corpus {
         var: "SPICE_BENCH",
-        keep: |p| p.contains("/ngspice/examples/") && !p.contains("/src") && !p.contains("/."),
+        keep: |p| !p.contains("/src") && !p.contains("/."),
         source_list: "spice-bench",
-        list: "ngspice-ngspice-corpus",
+        list: "ngspice-ngspice-bench",
     };
-    let wrong = corpus::census(&CELLS[2], &examples);
+    let wrong = corpus::census(&CELLS[2], &spice_bench);
     assert!(
         wrong.is_empty(),
         "{} differ:\n{}",

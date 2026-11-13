@@ -117,9 +117,9 @@ arguments), `List` (a vector of values). Each tag's doc says how to read `a` and
 
 `Func` is closed and every member has one meaning, stated in its doc with its domain: `Abs Sqrt
 Exp Ln Log10 Pow PowAbs Min Max Floor Ceil Trunc RoundHalfAway RoundHalfEven Sgn Sin Cos Tan Asin
-Acos Atan Atan2 Sinh Cosh Tanh Asinh Acosh Atanh Hypot Fmod Clamp Step Ramp Ddt Idt Pwl`. Add a
+Acos Atan Atan2 Sinh Cosh Tanh Asinh Acosh Atanh Hypot Fmod Clamp Ramp Ddt Idt Pwl`. Add a
 member only for a meaning some dialect has natively and no tree of the others states exactly
-(`INV-constructs.md` §C, `INV-semantics.md` categories 1–2). `BinOp`: arithmetic, `IntDiv`,
+(`INV-constructs.md` §C, `INV-semantics.md` categories 1–2). `BinOp`: arithmetic,
 comparisons, logical and bitwise, shifts. `UnOp`: `Neg`, `Not`, `BitNot`.
 
 `eval.rs`: the reference evaluator `eval(&Design, ExprId, &dyn Bindings) -> Result<f64, Domain>`
@@ -134,7 +134,8 @@ fixes four things:
 
 1. **One member per native meaning; never an idiom.** ngspice's B-source `ln` is `|x|`'s
    logarithm. Encoding it as the tree `Ln(Abs(x))` breaks the law (written `ln(abs(x))`, it reads
-   back as `LnAbs(Abs(x))`). So it is its own member. A reader may still expand *sugar* into a
+   back as `LnAbs(Abs(x))`). So it is its own member. (2026-11-13: `LnAbs` and `SqrtAbs` removed
+   by R100's pruning, no reader produced either: ngspice-45's B-source `ln`, `sqrt` are not `|x|`'s, A11.) A reader may still expand *sugar* into a
    tree when its own writer spells that tree back to the same tree (Xyce `sign(x, y)` →
    `Mul(Abs(x), Sgn(y))`; LTspice's boolean `a ^ b` → `Ne(Gt(a, 0.5), Gt(b, 0.5))`).
 2. **`Func` members this adds** (evidence: `rewrite/INV-semantics.md` 2.04–2.10, when it lands;
@@ -145,15 +146,16 @@ fixes four things:
    - `PowRe`: the real part of the complex power, `|x|^y·cos(πy)` for `x < 0` (Xyce `**`, `pow`,
      `pwr`); equal to `Pow` wherever `Pow` is defined.
    - `Ln`, `Log10`, `Sqrt`, `Exp`: real functions, domain errors outside their domains.
-   - `LnAbs`, `SqrtAbs`: of `|x|` (ngspice B source `ln`/`log`, `sqrt`).
    - `ExpLin14`: `exp(x)` up to 14, the tangent line beyond (ngspice B source `exp`).
    - `RoundHalfEven` (ngspice `nint`), `RoundHalfAway` (Xyce, HSPICE, LTspice, Spectre, VACASK),
      `Trunc`, `Floor`, `Ceil`; `Fmod` takes the dividend's sign; `Clamp(x, lo, hi)`.
    There is no `limit`, `pwr`, `pwrs`, `if`, `nint`, `log` or named constant in the IR: readers
    map each to the member (or draw, or literal) its own simulator means.
-3. **Operators.** `And`, `Or`, `Not` read "nonzero is true" and yield 0 or 1. There is no logical
-   XOR (each reader expands it with its own truth rule). `BitAnd`, `BitOr`, `BitXor`, `BitNot`,
-   `Shl`, `Shr` are VACASK's integer operators. `IntDiv` truncates toward zero (ngspice `\`).
+3. **Operators.** `And`, `Or`, `Xor`, `Not` read "nonzero is true" and yield 0 or 1 (`Xor`, added
+   2026-11-13 for Xyce's `^`: `0.4^0.7` = 0, `DIALECT-XYCE.md`; LTspice's `^` thresholds at 0.5 and
+   its reader expands it). `BitAnd`, `BitOr`, `BitXor`, `BitNot`,
+   `Shl`, `Shr` are VACASK's integer operators. (`IntDiv` removed 2026-11-13, R100: no speaker;
+   ngspice's `\` is `Trunc(Abs(Div))`.)
 4. **Leaves for what a dialect leaves to the analysis.** `TStep` and `TStop` (the transient's
    step and stop: ngspice's meaning of a given-zero PULSE rise or a defaulted SFFM carrier) and
    `Tnom`, beside `Time`, `Temp`, `Freq`. A pass substitutes numbers when the design has one
@@ -549,6 +551,20 @@ every `Expr::Param` row no definition is bound to, item by item in `reachable` o
 right, each `UnboundRead { item, expr, name, held }`. `held` marks a `Subckt` head default's read,
 which each instance's scope looks up (A29, IR text `name?`). The spine's strict read refuses
 the others.
+
+**F34 (2026-11-13): a reference stays inside its definition's subcircuit.** `Violation::RefScope`
+(X0027, `check_scopes::reference_scopes`): a resolved reference (a row's `Ref`, an expression's
+read or call) bound to a definition that lives in a subcircuit's body (a formal, a body
+parameter, function, model or subcircuit) stands in a scope inside that body, or in a file or
+section an include inside it reads (ngspice reads the included text where the include stands), or
+is the subcircuit's own head (a default reading a sibling formal); a read bound to a function's
+formal stands in that function. The trunk's ngspice reader bound `.subckt a w=1 / .param x='w*2'`
+to another subcircuit's `w`, invisible to every law that compares text. The IR text reader
+refuses such a row like every other `check` row (`refuse_invalid`).
+
+**Strings as operands (2026-11-13, the lead's rule on the runs in `crates/ir/tests/fixtures/strings/`).** VACASK computes a string parameter under `==` and `!=` in a value and in `@if`, and refuses one under `+` ("Operation not supported for string and real."); ngspice-45 refuses a string `.param` itself ("Undefined parameter [s]"). So a string operand of `==`/`!=` is `Extra::StringCompare`, and a string under any other operator, as a function's, user call's or draw's argument, or as a conditional's condition is `Violation::StringOperand` (X0029). A string root, a list element and a conditional's branch stay values (A25 item 4). The generator draws a string below the root only in those places.
+
+**Placements no dialect expresses (2026-11-13, the lead's ruling on the census's placements).** `Violation::Misplaced` (X0030, `check_scopes::placements`, on a design whose handles hold): an item of a kind inside a scope of a kind (at any depth) that no dialect lets hold it: in a conditional branch a section, function, global, device library, statistics block, option, save, print, alter, loop, reset or elaborate; in a loop body anything but a run item; in a section a section or an elaborate; in a subcircuit a section, load, device library, statistics block or elaborate. The table and each row's evidence (spec rows, the ngspice-45 runs in `crates/ir/tests/fixtures/placed/`) are `rewrite/IR-PRUNE.md` group 6; the generator draws none (`gen::placeable`).
 
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by

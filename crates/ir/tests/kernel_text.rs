@@ -30,7 +30,7 @@ const DECK: &str = r#"file "top.sp" deck
   global vdd vss
   load osdi "psp.osdi" modules=(psp103va)
   opaque ngspice private ".stateye x"
-  subckt div (in out gnd) r=rval w
+  subckt div (in out gnd) r=rval w=1
     param j = r * 2
     if (r > 1)
       param k = 1
@@ -124,14 +124,9 @@ fn deck_by_hand() -> Design {
             Span::NONE,
         );
         let rv = b.param_ref("rval");
+        let w1 = b.num(1.0);
         let ports = ["in", "out", "gnd"];
-        let (_, body) = b.subckt(
-            top,
-            "div",
-            &ports,
-            &[("r", rv), ("w", ExprId::NONE)],
-            Span::NONE,
-        );
+        let (_, body) = b.subckt(top, "div", &ports, &[("r", rv), ("w", w1)], Span::NONE);
         let r = b.param_ref("r");
         let two = b.literal(plain(2));
         let j = b.binary(BinOp::Mul, r, two);
@@ -262,8 +257,9 @@ fn expressions_spell_with_the_fewest_parentheses() {
         "(a ? b : c) ? d : e",
         "a ? (b ? c : d) : e",
         "a & b | c ^ d",
+        "a ^^ b || c",
         "a << 2 >> 1",
-        "a // 2 + a / 2",
+        "a /: 2 + a / 2",
         "a == b",
         "a == b == c",
         "a < b",
@@ -300,8 +296,9 @@ fn expressions_spell_with_the_fewest_parentheses() {
         "(a ? b : c) ? d : e",
         "a ? (b ? c : d) : e",
         "((a&b)|(c^d))",
+        "(a^^b)||c",
         "(a<<2)>>1",
-        "(a//2)+(a/2)",
+        "(a/:2)+(a/2)",
         "(a==b)",
         "(a==b)==c",
         "((a)<(b))",

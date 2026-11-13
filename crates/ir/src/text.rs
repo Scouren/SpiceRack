@@ -16,6 +16,8 @@
 //! line     = indent ( block | item | branch ) NL | indent "#" any NL | NL
 //! indent   = "  " × depth            (a file's items at depth 1, a body's one deeper)
 //! block    = "file" string role      (depth 0; the items below belong to it)
+//!          | "laws" law { law }      (depth 0, before the entry file: the stated laws, R90;
+//!                                    absent when none; `Law::word`)
 //! role     = "deck" | "library" | "veriloga" | "missing"
 //! item     = keyword { " " field }
 //! field    = name | ref | "(" [ name { " " name } ] ")" | key "=" value
@@ -36,7 +38,7 @@
 //! ref      = name                    bound by `link` after the whole text (exact name, from the
 //!                                    item's scope outward); unresolved if nothing matches
 //!          | name "?"                deliberately unresolved (def NONE)
-//!          | name "#" digits         bound to that definition (only when lookup binds elsewhere)
+//!          | name "#" digits         bound to the k-th definition in item order (only when lookup binds elsewhere)
 //! ```
 //!
 //! Kernel items (owners' items follow the same shape: keyword, then the row's fields in
@@ -69,7 +71,7 @@
 //! shift   = add { (" << " | " >> ") add }
 //! add     = mul { (" + " | " - ") mul }
 //! mul     = unary { (" * " | " / " | " // " | " /: ") unary }
-//!           (`//` is IntDiv, `/:` is DivTyped, A12 K1)
+//!           (`/:` is DivTyped, A12 K1)
 //! unary   = ("-" | "!" | "~") unary | primary
 //!           (a "-" glued to a digit where a unary may stand is a negative literal's sign; the
 //!           `Neg` of a literal is written "-(…)": `-1.5` and `-(1.5)` are two trees)
@@ -195,6 +197,7 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
         },
     }
     let f = design.file(file);
+    crate::laws::dump_line(design, file, out);
     out.push_str("file ");
     write_string(design.str(f.path), out);
     out.push_str(match f.role {
@@ -206,7 +209,7 @@ pub fn dump(design: &Design, file: FileId, out: &mut String) {
     let bodies = design.bodies();
     let mut modules: HashMap<ItemRef, Vec<NameId>> = HashMap::new();
     for def in design
-        .definitions()
+        .definitions_all()
         .iter()
         .filter(|def| def.kind == DefKind::Module)
     {
@@ -475,7 +478,7 @@ fn file_line(
     stack.clear();
     chains.clear();
     if kw != "file" {
-        return false;
+        return kw == "laws" && crate::laws::parse_line(w, b);
     }
     let Some(path) = w.path(diags) else {
         return false;

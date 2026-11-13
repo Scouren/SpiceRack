@@ -1,0 +1,15 @@
+placed br_options sel=1
+.param sel=1
+v1 a 0 dc 1
+r1 a b 1k
+r2 b 0 1k
+d1 b 0 dm
+.model dm d is=1e-14
+.if (sel==1)
+.options temp=150
+.endif
+.control
+op
+print v(b)
+.endc
+.end

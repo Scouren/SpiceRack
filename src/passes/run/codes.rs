@@ -8,7 +8,7 @@
 use super::{
     alter_at_reset, dc_axes_to_loops, device_ic, device_ic_in_op, drop_print, fs, ic_next_only,
     inert_options, loop_end, names_dropped, names_given, noise_ref_unit, param_arguments,
-    run_items_together, save_set_to_all, sweep_forms, tc, tran_print_step, wr,
+    run_items_together, save_set_to_all, sweep_end_list, sweep_forms, tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -47,6 +47,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a whole-run state item a positional one sets the same thing as",
             cite: "rewrite/AMEND-A12.md A14",
             explain: "The deck sets this quantity both for the whole run and from a point on; which of the two holds after that point is not stated, so the item keeps its mode and is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        wr::IN_SUBCKT,
+        ir::Info {
+            title: "a whole-run state item inside a subcircuit body",
+            cite: "R98 (X0028); R27",
+            explain: "The target holds state from where it stands, and no positional state item may stand in a subcircuit body: a body is instantiated, not run. Moving the item to the deck's top would change what it holds for (a body holds per instance and names its own nodes, which the top cannot say for a subcircuit used twice or never), so it is refused.",
             kind: ir::Kind::Note,
         },
     ),
@@ -101,6 +110,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a transient with neither a print step nor a first step",
             cite: "rewrite/RULINGS.md R73",
             explain: "The target needs a print step, and nothing in the deck determines one: no print step and no first step to move into it (R13: no invented value). The item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        fs::STOP_AS_PRINT_STEP,
+        ir::Info {
+            title: "a transient's stop given as its print step",
+            cite: "rewrite/AMEND-A12.md A41; ngspice-45 dctran.c, traninit.c",
+            explain: "The source gives no output interval, and the target's transient needs one. With its step ceiling given, ngspice reads the interval only for its first step and, under uic, a breakpoint; at the stop or past it neither changes a point, so the stop is written and the results are the target's own accepted steps.",
             kind: ir::Kind::Note,
         },
     ),
@@ -182,6 +200,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a frequency list other than one value of an AC analysis",
             cite: "rewrite/IR-RUN.md §1; ngspice-45 acan.c",
             explain: "The target sweeps frequency by decade, octave or a linear count. One listed frequency of an AC analysis is a linear sweep of one point; two or more are not exact (ngspice's linear sweep of two points runs one, and its end test scales with reltol), and another analysis's list is not rewritten. The analysis is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        sweep_end_list::SWEEP_END_KEPT,
+        ir::Info {
+            title: "a logarithmic frequency sweep whose end law is not written as a list",
+            cite: "rewrite/IR-RUN.md R99; ngspice-45 acan.c; VACASK lib/answeep.cpp",
+            explain: "The deck's sweep follows its simulator's own end law (VACASK stretches the count up, ngspice's decade sweep stretches it down at a decade or more), which the target spells only as a list of values. This one has a start, stop or count that is no literal, does not rise from a positive start, belongs to an analysis the rule does not rewrite, has more values than a list holds, or stands in a design that sets reltol, which ngspice's end test reads. The analysis is refused.",
             kind: ir::Kind::Note,
         },
     ),

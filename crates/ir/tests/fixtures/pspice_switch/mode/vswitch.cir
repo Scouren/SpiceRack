@@ -1,0 +1,11 @@
+PSpice VSWITCH under ngbehavior=ltpsa: the same switch
+vc ctl 0 dc 0
+vo out 0 dc 1
+s1 out 0 ctl 0 sw
+.model sw VSWITCH(Von=1 Voff=0 Ron=1 Roff=1meg)
+.control
+set numdgt=15
+dc vc -0.2 1.2 0.1
+print -1/i(vo)
+.endc
+.end

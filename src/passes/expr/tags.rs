@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use super::nodes::{def_values, live};
+use super::nodes::def_values;
 use crate::ir;
 
 /// The set holding Int.
@@ -47,9 +47,9 @@ pub(super) struct Tags {
 impl Tags {
     /// The table of `design`. O(expressions × rounds), rounds bounded by the definitions.
     pub(super) fn new(design: &ir::Design) -> Tags {
-        let defs = design.definitions();
+        let defs = design.definitions_all();
         let mut t = Tags {
-            exprs: vec![0; design.expr_count()],
+            exprs: vec![0; design.expr_count_all()],
             defs: vec![0; defs.len()],
             formals: defs
                 .iter()
@@ -76,7 +76,8 @@ impl Tags {
         }
         let values = def_values(design);
         // the live calls only: a rewritten call stays in the table (rows are appended)
-        let calls: Vec<(ir::Ref, ir::ExprList)> = live(design)
+        let calls: Vec<(ir::Ref, ir::ExprList)> = design
+            .live_exprs()
             .into_iter()
             .filter_map(|e| match design.expr(e) {
                 ir::Expr::UserCall(r, args) if r.is_resolved() => Some((r, args)),
@@ -170,7 +171,7 @@ impl Tags {
                 ir::BinOp::Add | ir::BinOp::Sub | ir::BinOp::Mul | ir::BinOp::DivTyped => {
                     arith(get(a), get(b))
                 }
-                ir::BinOp::Div | ir::BinOp::IntDiv => REAL,
+                ir::BinOp::Div => REAL,
                 ir::BinOp::Eq
                 | ir::BinOp::Ne
                 | ir::BinOp::Lt
@@ -179,6 +180,7 @@ impl Tags {
                 | ir::BinOp::Ge
                 | ir::BinOp::And
                 | ir::BinOp::Or
+                | ir::BinOp::Xor
                 | ir::BinOp::BitAnd
                 | ir::BinOp::BitOr
                 | ir::BinOp::BitXor
@@ -339,7 +341,7 @@ mod tests {
                 design: &design,
                 depth: Cell::new(0),
             };
-            for i in 0..design.expr_count() {
+            for i in 0..design.expr_count_all() {
                 let e = ir::ExprId(i as u32);
                 let Ok(v) = ir::eval_typed(&design, e, &env) else {
                     continue;

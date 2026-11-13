@@ -68,8 +68,10 @@ pub fn identical(a: &[RawData], b: &[RawData]) -> Result<(), String> {
             // (Tschebyschef-LP.sp: 4.63557106232844e-310 against …765e-310).
             let scale = i == 0;
             for (p, (x, y)) in ya.iter().zip(&yb).enumerate() {
-                let im_same = scale || x.1.to_bits() == y.1.to_bits();
-                if x.0.to_bits() == y.0.to_bits() && im_same {
+                // The same number: the same bits, or -0 against +0 (gf180's `.dc vds -0 …`
+                // written `0`: one value, two spellings).
+                let same = |u: f64, v: f64| u.to_bits() == v.to_bits() || (u == 0.0 && v == 0.0);
+                if same(x.0, y.0) && (scale || same(x.1, y.1)) {
                     continue;
                 }
                 differ += 1;

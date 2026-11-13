@@ -20,17 +20,11 @@
 //! `InvalidInSource`; A19 keeps a typed field's name out of the parameters); every other `k=v` is
 //! an instance parameter by its own name.
 //!
-//! `S n+ n- c+ c- model [on|off]` (`inp2s.c`: the fifth token is the model; an unlabeled number
-//! is ignored, `Unread`); `W n+ n- vctl model [on|off]` (`inp2w.c`). Neither takes `m`.
-//!
-//! Contents: `pub(super) fn semi`, `pub(super) fn switch` (each
-//! `(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[Item])`)
+//! Contents: `pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[Item])`
 
 use super::super::number;
 use super::super::read::{Lower, Stmt};
-use super::{
-    Card, Item, Kind, MALFORMED, UNREAD_FORM, Val, emit, head, number_word, push_done, val,
-};
+use super::{Card, Item, Kind, MALFORMED, UNREAD_FORM, Val, emit, head, push_done, val};
 use crate::ir::{self, ElemKind as K};
 
 /// A D, Q, M, J or Z card.
@@ -156,50 +150,6 @@ pub(super) fn semi(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
     };
     let span = lw.span(st.node);
     let item = lw.b.semi(st.scope, kind, h, row, span);
-    push_done(lw, st, item, &card);
-}
-
-/// An S or W card.
-pub(super) fn switch(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]) {
-    let current = card.name.as_bytes()[0].eq_ignore_ascii_case(&b'w');
-    let (n, kind) = if current {
-        (3, K::ISwitch)
-    } else {
-        (4, K::VSwitch)
-    };
-    let words = items.len() > n && items[..=n].iter().all(|i| i.kind == Kind::Word);
-    if !words {
-        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
-    }
-    let mut initial = ir::semi::InitialState::Unset;
-    for it in &items[n + 1..] {
-        initial = match it.text.to_ascii_lowercase().as_str() {
-            "on" if it.kind == Kind::Word => ir::semi::InitialState::On,
-            "off" if it.kind == Kind::Word => ir::semi::InitialState::Off,
-            _ if number_word(&it.text).is_some() => {
-                // an unlabeled number: inp2s.c ignores it
-                return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
-            }
-            _ => return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED),
-        };
-    }
-    let nodes = if current { 2 } else { 4 };
-    card.nodes = items[..nodes].iter().map(|i| i.text.clone()).collect();
-    card.model = Some(items[n].text.clone());
-    let h = head(lw, st, &card);
-    let sense = if current {
-        let s = lw.names.fold(&items[2].text);
-        lw.b.name(&s)
-    } else {
-        ir::NameId::NONE
-    };
-    let row = ir::semi::Switch {
-        sense,
-        control: ir::ExprId::NONE,
-        initial,
-    };
-    let span = lw.span(st.node);
-    let item = lw.b.switch(st.scope, kind, h, row, span);
     push_done(lw, st, item, &card);
 }
 

@@ -22,7 +22,7 @@
 //!
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.2 (model); VD cir-masters, dev-builtin, dev-spice.
 //!
-//! Contents: `FEATURES`, `CODES`, `LIBRARY`, `MISPLACED`, `UNKNOWN`, `POLARITY`, `model` (crate-private)
+//! Contents: `FEATURES`, `CODES`, `VERSION`, `LIBRARY`, `MISPLACED`, `UNKNOWN`, `POLARITY`, `model` (crate-private)
 
 use super::expr_read::{self, Context};
 use super::families::{self, Name};
@@ -30,6 +30,9 @@ use super::read::{self, Lower};
 use super::read_structure;
 use crate::ir;
 use crate::syntax::ast::{Node, Tag};
+
+/// A `version=` the VACASK module does not run as written (BSIM4 4.5 runs as 4.8.3: F85).
+pub(super) const VERSION: ir::Code = ir::Code::new(b'P', 2111);
 
 /// What this area's rows use: a model of a proven module's family or a user module.
 pub(super) const FEATURES: ir::FeatureSet = families::proven_families(
@@ -50,6 +53,15 @@ pub(super) const POLARITY: ir::Code = ir::Code::new(b'P', 2105);
 
 /// This area's rows.
 pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
+    (
+        VERSION,
+        ir::Info {
+            title: "a model version the VACASK module does not run as written",
+            cite: "F85; A19; the version switch of spice/bsim4v8.va (pinned store)",
+            explain: "sp_bsim4v8 runs 4.8.0 to 4.8.3; any other `version=` (the gf180 cards' 4.5) is \"unknown BSIM4 version. Working now with BSIM4.8.3.\", so the card is not the version it names. The line is kept as text.",
+            kind: ir::Kind::Note,
+        },
+    ),
     (
         LIBRARY,
         ir::Info {
@@ -182,9 +194,23 @@ pub(super) fn model(l: &mut Lower<'_, '_, '_>, n: Node) {
         let e = expr_read::expr(l, *value, Context::Param).expect("checked");
         params.push((key.as_str(), e));
     }
-    let version = version.map_or(ir::ExprId::NONE, |v| {
-        expr_read::expr(l, v, Context::Param).expect("checked")
-    });
+    // A19, F85: a silent card states the version VACASK's module computes; a given one it does
+    // not run as written is kept as text.
+    let versions = families::versions(family);
+    if let (Some(v), Some(given)) = (versions, version)
+        && !v.runs.contains(
+            &super::read_run::string(l, given)
+                .unwrap_or_default()
+                .as_str(),
+        )
+    {
+        return read::opaque(l, n, ir::OpaqueClass::Private, Some(VERSION));
+    }
+    let version = match (version, versions) {
+        (Some(v), _) => expr_read::expr(l, v, Context::Param).expect("checked"),
+        (None, Some(v)) => l.b.string(v.default),
+        (None, None) => ir::ExprId::NONE,
+    };
     let module = match family {
         ir::ModelFamily::Module => {
             let m = l.b.name(&word);

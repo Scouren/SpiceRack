@@ -236,16 +236,16 @@ mod tests {
         let sine = |pre: &str| {
             format!("sin(offset=1 amplitude=2 freq=1 delay=1 damping=0 phase_deg=90 pre={pre})")
         };
-        for (pre, before) in [("offset", 1.0), ("hold_delay_value", 3.0), ("zero", 0.0)] {
-            assert_eq!(at(&sine(pre), 0.5), Ok(before), "{pre}");
-            assert_eq!(at(&sine(pre), 1.0), Ok(before), "{pre} at τ = 0");
-        }
+        // (no simulator holds a sine at 0 before its delay: `PreDelay::Zero` is refused there, R100)
+        let held = sine("hold_delay_value");
+        assert_eq!(at(&held, 0.5), Ok(3.0), "before the delay");
+        assert_eq!(at(&held, 1.0), Ok(3.0), "at τ = 0");
         let near = |text: &str, t: f64, want: f64| {
             let got = at(text, t).expect("a value");
             assert!((got - want).abs() < 1e-12, "{text} at {t}: {got}");
         };
         near(
-            &sine("zero"),
+            &sine("hold_delay_value"),
             1.25,
             1.0 + 2.0 * (std::f64::consts::PI).sin(),
         );
