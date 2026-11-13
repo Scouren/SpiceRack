@@ -25,7 +25,7 @@
 
 use super::expr_read::{self, Context};
 use super::read::{self, Lower};
-use super::{codes, tables};
+use super::{codes, families, tables};
 use crate::dialect::Reference;
 use crate::ir;
 use crate::syntax::ast::{Name, Node, Tag};
@@ -37,7 +37,7 @@ pub(super) use if_chain::if_chain;
 pub(super) use load::load;
 
 /// What this area's rows use.
-pub(super) const FEATURES: ir::FeatureSet = families(PLACEMENTS)
+pub(super) const FEATURES: ir::FeatureSet = families::proven_families(PLACEMENTS)
     .with(ir::Feature::Item(ir::ItemKind::Title))
     .with(ir::Feature::Item(ir::ItemKind::Comment))
     .with(ir::Feature::Item(ir::ItemKind::Include))
@@ -370,23 +370,6 @@ pub(super) fn embed(l: &mut Lower<'_, '_, '_>, n: Node) {
 }
 
 // ---- private ----
-
-/// `set` with the family of every library file VACASK ships (A15 `Family`; a device library of
-/// another family is a feature VACASK lacks).
-const fn families(set: ir::FeatureSet) -> ir::FeatureSet {
-    let mut out = set;
-    let mut i = 0;
-    while i < tables::SPICE_FILES.len() {
-        out = out.with(ir::Feature::Family(tables::SPICE_FILES[i].1));
-        i += 1;
-    }
-    let mut k = 0;
-    while k < tables::OWN_FILES.len() {
-        out = out.with(ir::Feature::Family(tables::OWN_FILES[k].1));
-        k += 1;
-    }
-    out
-}
 
 /// `key = value` field `f`: the key's name and the value's node.
 fn assign(l: &Lower<'_, '_, '_>, f: u32) -> Option<(String, u32)> {

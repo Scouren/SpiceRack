@@ -34,6 +34,10 @@ pub(super) fn analysis(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
             name::spell(d.str(axis.name), Place::Other, w.out);
             target(d, w.epoch, axis.target, w.out);
             range(d, axis.sweep, w.out);
+            // the level starts each step afresh (R75a: tests/passes_run/decks/latch_c0_*.sim)
+            if axis.afresh {
+                w.out.push_str(" continuation=0");
+            }
             w.out.push('\n');
         }
         w.depth += 1;

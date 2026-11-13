@@ -1,0 +1,8 @@
+b_strict_sel_a: a library section read by section=a
+load "spice/resistor.osdi"
+model rm sp_resistor
+include "sel.lib" section=a
+r1 (n 0) rm r=1k
+control
+  analysis op1 op
+endc

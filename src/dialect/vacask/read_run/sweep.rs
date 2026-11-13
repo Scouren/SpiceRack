@@ -6,8 +6,9 @@
 //! split at `:`; an instance no file declares is VACASK's error, settle run/nosuch_sweep;
 //! `instance="__topinst__"` is the top-level parameter `parameter=`, R70; `parameter="dc"` of an independent source of type dc is its DC value, R64, and
 //! of a waveform source, whose `dc` VACASK ignores, Private: settle run/sweep_source), `model=`/`parameter=` (bound to the top level's model), `option="temp"` (the
-//! temperature), `option=` a typed key or VACASK's own option by name. The principal parameter,
-//! `continuation=0`, values by a variable's name and a sweep of a variable are Private (R43).
+//! temperature), `option=` a typed key or VACASK's own option by name. `continuation=0` starts
+//! the level's steps afresh (R75a); another `continuation=` value, the principal parameter,
+//! values by a variable's name and a sweep of a variable are Private (R43).
 //!
 //! Contents: `Why`, `Spec`, `Aim`, `Sweep`, `BAD`, `private`, `pairs`, `get`, `check`, `check_arg`,
 //! `vector`, `range`, `sweep`, `value`, `spec`, `target` (crate-private)
@@ -56,6 +57,8 @@ pub(super) struct Sweep {
     pub(super) aim: Aim,
     pub(super) spec: Spec,
     pub(super) span: ir::Span,
+    /// `continuation=0`: the first solve after this level steps starts from the initial guess.
+    pub(super) afresh: bool,
 }
 
 /// A refusal: VACASK rejects the statement.
@@ -229,9 +232,13 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
     if given != 1 {
         return Err(BAD);
     }
-    if get(&pairs, "continuation") != NONE {
-        return Err(private(SWEEP_FORM));
-    }
+    // `continuation=0` starts exactly this level's steps afresh (R75a, latch_c0_*.sim); any
+    // other value is unsettled
+    let afresh = match get(&pairs, "continuation") {
+        NONE => false,
+        c if zero(l, c) => true,
+        _ => return Err(private(SWEEP_FORM)),
+    };
     let aim = match (instance, model, option, parameter) {
         (Some(i), _, _, Some(p)) => {
             let mut path: Vec<String> = i.split(':').map(str::to_string).collect();
@@ -243,6 +250,7 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
                         aim: Aim::Param(p),
                         spec: range(l, &pairs, SWEEP_FORM)?,
                         span: l.span(s),
+                        afresh,
                     }),
                     false => Err(BAD),
                 };
@@ -271,6 +279,7 @@ pub(super) fn sweep(l: &mut Lower<'_, '_, '_>, s: Node) -> Result<Sweep, Why> {
         aim,
         spec,
         span: l.span(s),
+        afresh,
     })
 }
 
@@ -390,6 +399,14 @@ fn plus_one(l: &mut Lower<'_, '_, '_>, node: u32) -> ir::ExprId {
     }
     let one = l.b.literal(int_one());
     l.b.binary(ir::BinOp::Add, e, one)
+}
+
+/// Whether `node` is the literal `0`.
+fn zero(l: &Lower<'_, '_, '_>, node: u32) -> bool {
+    let ast = &l.cst.ast;
+    ast.tag(Node(node)) == Tag::Num
+        && number::lex(l.cst.tokens.text(ast.main_token(Node(node))))
+            .is_ok_and(|x| x.int && x.literal.mantissa == 0)
 }
 
 /// The integer literal 1.

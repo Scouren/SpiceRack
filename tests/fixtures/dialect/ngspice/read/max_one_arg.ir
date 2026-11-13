@@ -1,0 +1,6 @@
+# codes:
+file "max_one_arg.sp" deck
+  title "max_one_arg"
+  comment " oracle: settle/max_one_arg.sp (numparam's max of one argument is that argument: its first and its last, xpressn.c formula)"
+  func f(A, B, C, D) = 2 * A * sqrt(B * C * D)
+  param C = @f(1, 2, 3, 4)

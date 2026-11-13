@@ -88,7 +88,9 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   `Kind::Refusal` row refuses the deck, and a step is not run after a refusal. `Policy::Strict`
   turns an `Opaque` of class `Unread` into a refusal (`S0101`) and refuses, at its item, each
   parameter read no definition binds (`S0104`, the name as the argument; `ir::unbound_reads`,
-  a formal default's held read aside: R63, A38) and each run item (alter, loop, analysis,
+  a formal default's held read aside: R63, A38; and a read standing in a library section no
+  include of the design selects, directly or through a selected section: R63a) and each run
+  item (alter, loop, analysis,
   elaborate) whose target nothing defines (`S0105`, the name as the argument: R70, A43);
   `Lenient` keeps them all (a writer of the same
   text family copies the opaque; the read stays unresolved).
