@@ -1,0 +1,6 @@
+# Oracle: spice/mos6.va (VACASK on PATH, dhxz6l3…): the model parameter `ps` is spelled `ps_mod`
+# ("renamed due to conflict" with the instance's `ps`; params.txt), R92.
+file "mos6_names.sim" deck
+  title "mos6 model"
+  device_library mos6
+  model m6 mos6 polarity=n params=(vto=0.7 ps=0.1)

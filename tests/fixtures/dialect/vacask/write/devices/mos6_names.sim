@@ -1,0 +1,3 @@
+mos6 model
+load "spice/mos6.osdi"
+model m6 sp_mos6 type=1 vto=0.7 ps_mod=0.1

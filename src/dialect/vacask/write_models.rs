@@ -111,3 +111,48 @@ pub(super) fn admit(
         diags.push_at(LACKED, design, at, 0);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Oracle: R91a and `families/params.txt` (sp_diode has no `rth0` or `cth0`, ngspice-45's
+    /// self-heating parameters): a diode model giving one is refused, the rest is spelled.
+    #[test]
+    fn a_parameter_the_module_lacks_is_refused() {
+        let lacked = |key: &str| {
+            let mut design = ir::Design::new();
+            let at = {
+                let mut b = design.builder();
+                let (_, top) = b.file("t.sim", ir::Role::Deck);
+                let lib = ir::DeviceLibrary {
+                    path: ir::NameId::NONE,
+                    family: ir::ModelFamily::Diode,
+                };
+                b.device_library(top, lib, ir::Span::NONE);
+                let value = b.num(1.0);
+                let params = b.params(&[(key, value)]);
+                let row = ir::Model {
+                    name: b.name("d"),
+                    params,
+                    bin_of: ir::NameId::NONE,
+                    ako: ir::Ref::unresolved(ir::NameId::NONE),
+                    module: ir::Ref::unresolved(ir::NameId::NONE),
+                    version: ir::ExprId::NONE,
+                    word: ir::NameId::NONE,
+                    family: ir::ModelFamily::Diode,
+                    polarity: ir::Polarity::None,
+                };
+                b.model(top, row, ir::Span::NONE)
+            };
+            let index = super::super::write_elements::Index::of(&design);
+            let mut diags = ir::Diags::new();
+            admit(&design, &index.words, at, &mut diags);
+            diags.rows().iter().any(|d| d.code == LACKED)
+        };
+        assert!(lacked("rth0"));
+        assert!(lacked("cth0"));
+        assert!(!lacked("is"));
+        assert!(!lacked("ikp"));
+    }
+}

@@ -1,0 +1,6 @@
+# codes: P1354 P1354
+file "save_no_vector.sp" deck
+  title "save_no_vector"
+  comment " oracle: settle/device_outputs.sp (@i1[i] is an empty vector, @i1[c] one of 59), outputs.txt (the bjt has gm and go, no pi); the 38 decks' various/bjt_ac_par.sp"
+  save (param (q1) (gm)) (param (q1) (go))
+  opaque ngspice inert ".save @i1[i]"

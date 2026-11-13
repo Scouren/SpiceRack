@@ -325,8 +325,10 @@ fn dynamic(
     rest: &[Item],
     charge: bool,
 ) {
+    // a value key's `(…)` holding braces counts too: numparam replaces them first (settle
+    // ternary_braces.sp, the 38 decks' vdmos/dcdc.sp: `R = (time<1u ? {Rl} : {2*Rl})` runs)
     let braces = |i: &Item| {
-        i.kind == Kind::Brace || (i.kind == Kind::Assign && i.value.starts_with(['{', '\'']))
+        i.kind == Kind::Brace || (i.kind == Kind::Assign && i.value.contains(['{', '\'']))
     };
     let Some(first) = rest.iter().position(braces) else {
         // "mal formed … instance": ngspice exits

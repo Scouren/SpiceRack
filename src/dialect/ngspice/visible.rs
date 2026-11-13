@@ -2,8 +2,8 @@
 //! is expanded (ruling R71): a scope sees its own definitions and the top-level definitions of
 //! each file it includes (`.include`, and the named section of a `.lib file section`), the
 //! included file's own includes too, in the expanded text's order; then its enclosing scope's,
-//! outward. Where one name is defined twice in that order, a `.param` keeps the last and every
-//! other kind the first ("redefinition of .subckt sub, ignored"). The IR's own `Design::lookup`
+//! outward. Where one name is defined twice in that order, a `.param` and a `.func` keep the last
+//! and every other kind the first ("redefinition of .subckt sub, ignored"). The IR's own `Design::lookup`
 //! stays neutral; the reader's bind step asks this table.
 //!
 //! Cites: ngspice-45 runs, settle `include_subckt_ok.sp`, `inc_after.sp` (an X card before or
@@ -11,7 +11,7 @@
 //! to it), `inc_section_{named,other}.sp` (only the named section), `inc_twice_{before,after}.sp`
 //! (first subcircuit, last parameter), `inc_model_param.sp`, `inc_nested.sp`,
 //! `formal_scope.sp`, `formal_scope_lib.sp` (a subcircuit's formal is seen from its own body
-//! only, F34); INV 3.01.
+//! only, F34), `dup_func_inc_{before,after}.sp` (the last `.func`); INV 3.01.
 //!
 //! Contents: `pub(super) struct Visible`, `Visible::new(&ir::Design) -> Visible`,
 //! `Visible::lookup(&self, &ir::Design, ir::ScopeId, ir::DefKind, ir::NameId) -> ir::DefId`
@@ -57,7 +57,8 @@ impl Visible {
             for def in expanded(d, scope, &defs_of) {
                 let row = d.def(def);
                 let key = (scope, row.kind, row.name);
-                if row.kind == ir::DefKind::Param || !seen.contains_key(&key) {
+                let last = matches!(row.kind, ir::DefKind::Param | ir::DefKind::Func);
+                if last || !seen.contains_key(&key) {
                     seen.insert(key, def);
                 }
             }

@@ -18,7 +18,7 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes as constants (`pub(super) const MALFORMED`, `UNREAD_FORM`, `DROPPED`, `TC_BASE`,
-//! `FIRST_BRACE`, `PRIVATE_FORM`, `DUPLICATE_KEY`, `PORT_COUNT`, `MODEL_ORDER`, `INSTANCE_CYCLE`), `pub(super) struct Item`, `pub(super) enum Kind`,
+//! `FIRST_BRACE`, `PRIVATE_FORM`, `DUPLICATE_KEY`, `PORT_COUNT`, `MODEL_ORDER`, `INSTANCE_CYCLE`, `TERMINALS`), `pub(super) struct Item`, `pub(super) enum Kind`,
 //! `pub(super) struct Card`, `Card::param(&mut self, &str, Val)`, `Item::as_value(&self) -> String`,
 //! `pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt)`, `pub(super) fn val`, `b_tree`,
 //! `head`, `push_done`, `number_word`, `literal`,
@@ -157,6 +157,8 @@ pub(super) const MODEL_ORDER: ir::Code = ir::Code::new(b'P', 1109);
 /// (an IR invariant, X0024): ngspice stops ("unknown subckt: x1.xw.xw…", settle
 /// `instance_self.sp`, `instance_cycle.sp`): `InvalidInSource`.
 pub(super) const INSTANCE_CYCLE: ir::Code = ir::Code::new(b'P', 1110);
+/// An X, N or A card with more terminals than an IR row holds (255): `Unread`.
+pub(super) const TERMINALS: ir::Code = ir::Code::new(b'P', 1111);
 
 /// An instance `temp=`/`dtemp=` on an element whose bound model's family has none on ngspice
 /// ("unknown parameter": runs fam, `instance_temp`): the deck is invalid in its source.
@@ -172,6 +174,7 @@ pub(super) const CODES: &[Row] = &[
     row(FIRST_BRACE, "an R, C or L whose first braced expression is not its value", "ngspice-45 frontend/inpcom.c inp_compat; rewrite/INV-semantics.md 14.13", "ngspice runs the first {...} on the line as the value; kept as ngspice text (Private)."),
     row(DUPLICATE_KEY, "a parameter given twice on an element card", "ngspice-45 INPdevParse (each value set in turn); runs", "ngspice keeps the last value; the earlier ones are left out."),
     row(PORT_COUNT, "a subcircuit instance whose node count is not its subcircuit's port count", "ngspice-45 frontend/subckt.c; settle instance_ports_short.sp, instance_ports_long.sp", "ngspice rejects the deck; kept as text (InvalidInSource)."),
+    row(TERMINALS, "an instance with more terminals than the IR holds", "crates/ir element.rs (0 to 255 terminals)", "ngspice runs it; the IR row cannot state it; kept as ngspice text (Unread)."),
     row(INSTANCE_CYCLE, "a subcircuit instance that closes a cycle of instances", "ngspice-45 runs (settle instance_self.sp, instance_cycle.sp: 'unknown subckt: x1.xw.xw…', exit 1)", "a subcircuit that instantiates itself, directly or through others; ngspice stops; kept as text (InvalidInSource)."),
     row(MODEL_ORDER, "an R, C or L value where ngspice does not take it beside a model", "ngspice-45 inp2r.c, inp2c.c, inp2l.c; settle passive_model_order.sp", "before the model only an R's number is taken, and an L with a model takes no l=; ngspice stops on 'unknown parameter'; kept as text (InvalidInSource)."),
     row(TEMP_FAMILY, "an instance temperature on a model family that has none", "ngspice-45 device IFparm tables (bsim3/4, b3soi, b4soi, mes: no temp or dtemp; hicum2, soi3: no dtemp; hisimhv, mesa: no temp); runs", "ngspice rejects the card (unknown parameter); the deck is invalid in its source."),
@@ -225,8 +228,7 @@ pub(super) struct Card {
 
 /// An element card (the spine's dispatch: every letter but `V` and `I`).
 pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt) {
-    let name = lw.toks.text(lw.ast.main_token(st.node)).to_string();
-    let text = lw.rest(st.node);
+    let (name, text) = lw.card_head(st.node);
     let Some(items) = items(&text) else {
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     };

@@ -177,8 +177,8 @@ pub struct Written {
 pub const STRICT_UNREAD: ir::Code = ir::Code::new(b'S', 101);
 
 /// The refusal a strict read adds at each item holding a parameter read no definition is bound
-/// to (`ir::unbound_reads`, a held formal-default read aside): `S0104`, `arg` the read's
-/// `NameId` (R63, A38).
+/// to (`ir::unbound_reads`, a held formal-default read and a read in a library section the
+/// design never selects aside): `S0104`, `arg` the read's `NameId` (R63, A38, R63a).
 pub const STRICT_UNBOUND: ir::Code = ir::Code::new(b'S', 104);
 
 /// The refusal a strict read adds at each run item (an alter, a loop, an analysis, an
@@ -265,7 +265,8 @@ pub fn by_name(name: &str) -> Option<&'static DialectRow> {
 /// `src` read by `from` into `design`, then checked. A check violation is a bug in the
 /// reader: an `X` row, and a debug assertion. Under [`Policy::Strict`] each `Unread` item
 /// gets a [`STRICT_UNREAD`] row, and each item holding a parameter read no definition binds
-/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38), and
+/// one [`STRICT_UNBOUND`] row per such read (a formal default's held read aside: R63, A38; and
+/// a read in a library section no include of the design selects: R63a), and
 /// each run item whose target nothing defines one [`STRICT_UNBOUND_TARGET`] row per name (R70).
 ///
 /// # Panics
@@ -299,8 +300,11 @@ pub fn read(
                 diags.push_at(STRICT_UNREAD, design, item, 0);
             }
         }
-        // a complete program: a read no definition binds is one its simulator rejects (R63)
-        for read in ir::unbound_reads(design).into_iter().filter(|r| !r.held) {
+        // a complete program: a read no definition binds is one its simulator rejects (R63),
+        // unless it stands in a library section the program never selects (R63a)
+        let unselected = unselected(design);
+        let reads = ir::unbound_reads(design).into_iter();
+        for read in reads.filter(|r| !r.held && !unselected.contains(&r.item)) {
             diags.push_at(STRICT_UNBOUND, design, read.item, read.name.0);
         }
         // a run item whose target provably names nothing (R70, A43): the IR's list, which
@@ -466,6 +470,58 @@ fn foreign(design: &ir::Design, to: &DialectRow) -> Vec<(ir::ItemRef, ir::ScopeI
 }
 
 /// A table position as the IR's `u32` row index.
+/// The items that stand in a library section no include of the design selects, directly or
+/// through a selected section (R63a): text no simulator reads as part of the program. A section
+/// is named by its file and name; an include outside every section selects, one inside a
+/// section selects once that section is selected (a fixpoint, one round per include at most).
+fn unselected(design: &ir::Design) -> std::collections::HashSet<ir::ItemRef> {
+    let listed = design.reachable();
+    let includes: Vec<(ir::ScopeId, ir::FileId, ir::NameId)> = listed
+        .iter()
+        .filter(|(item, _)| item.kind == ir::ItemKind::Include)
+        .filter_map(|&(item, scope)| {
+            let row: ir::item::Include = design.row(item.index);
+            let file = design.find_file(design.str(row.path));
+            (!row.section.is_none()).then_some((scope, file, row.section))
+        })
+        .collect();
+    let mut selected = std::collections::HashSet::new();
+    // whether every section around `scope` is selected; a scope chain is at most every scope
+    let open = |selected: &std::collections::HashSet<(ir::FileId, ir::NameId)>, scope| {
+        let mut at: ir::ScopeId = scope;
+        for _ in 0..=listed.len() {
+            if at.is_none() {
+                return true;
+            }
+            let s = design.scope(at);
+            if s.kind == ir::ScopeKind::Section {
+                let row: ir::item::Section = design.row(s.owner.index);
+                if !selected.contains(&(s.file, row.name)) {
+                    return false;
+                }
+            }
+            at = s.parent;
+        }
+        unreachable!("unselected: a scope chain longer than the design")
+    };
+    for _ in 0..=includes.len() {
+        let before = selected.len();
+        for &(scope, file, section) in &includes {
+            if open(&selected, scope) {
+                selected.insert((file, section));
+            }
+        }
+        if selected.len() == before {
+            break;
+        }
+    }
+    listed
+        .iter()
+        .filter(|&&(_, scope)| !open(&selected, scope))
+        .map(|&(item, _)| item)
+        .collect()
+}
+
 fn index(i: usize) -> u32 {
     u32::try_from(i).expect("an IR table holds fewer than 2^32 rows (ROWS_MAX)")
 }

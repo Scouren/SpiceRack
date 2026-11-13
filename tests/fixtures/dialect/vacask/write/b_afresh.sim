@@ -1,0 +1,12 @@
+written continuation per level
+model vsource vsource
+v1 (a 0) vsource dc=1
+v2 (b 0) vsource dc=1
+control
+  sweep outer instance="v2" parameter="dc" values=[1, 2] continuation=0
+  sweep inner instance="v1" parameter="dc" values=[0, 1]
+    analysis dc1 op
+  sweep outer instance="v2" parameter="dc" values=[1, 2]
+  sweep inner instance="v1" parameter="dc" values=[0, 1] continuation=0
+    analysis dc2 op
+endc
