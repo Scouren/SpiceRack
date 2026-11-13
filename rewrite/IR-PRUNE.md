@@ -103,3 +103,19 @@ text reader refuses it like every row `check` names), and the generator draws no
 | `Run(LoopSubcktParam)` | a sweep or table loop over `TargetKind::SubcktParam` (the loop rows' `fault`) | no row; the DC axis keeps it (Xyce) and the alter keeps it (ng G72) |
 
 A goal-2 spec that shows one of these brings it back as a member.
+
+## Group 4: the five unsure members, settled by diffs-2's runs (differences f78efcca)
+
+Runs on ngspice-45, VACASK, Xyce 7.10 and ESPice in HSPICE mode (decks:
+`rewrite/upstream/decks/members/` and `rewrite/DIALECT-HSPICE.md` §10 on `differences`).
+
+| member | decision | the runs |
+|---|---|---|
+| `Circuit(FreqComplexLinear)` | kept | ngspice speaks it (XSPICE `xfer`: 1∠0° at 1k, 1∠−90° at 3k give −3.01 dB, −45° at 2k); its `E … FREQ` applies a tenth of the phase (F69, an ngspice bug) |
+| `Circuit(SinPreOffset)` | deleted, with `PreDelay::Offset` | all four hold the t = delay value (`sin(1 2 1k 0.3m 0 90)` reads 3 at 0.1 ms); a sine now has only `HoldDelayValue` (`Zero` and `Offset` refused) |
+| `Circuit(SffmPreOffset)` | deleted | ngspice and ESPice 0, VACASK's fm the held value, Xyce has no delay |
+| `Run(McNominal)` | kept | ESPice-HSPICE `sweep monte=3` gives a nominal plot and three drawn |
+| `Run(TranCapNone)` | deleted, with `StepCap::None` | ngspice and ESPice min(print step, span/50), Xyce span/10, VACASK about span/50 |
+
+`PreDelay::Offset` had no wave left (AM's and SFFM's offset refused in groups 3 and 4), so the
+member is gone; every wave's IR-text default `pre` is now `hold_delay_value`.

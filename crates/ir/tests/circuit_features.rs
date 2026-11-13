@@ -822,24 +822,14 @@ mod tests {
             let w = b.wave(spicerack_ir::wave::Sin { cycles, ..sin(one) });
             with_wave(b, t, w)
         }),
-        (X::SinPreOffset, |b, t, on| {
-            let one = n(b, 1);
-            let pre = if on {
-                PreDelay::Offset
-            } else {
-                PreDelay::HoldDelayValue
-            };
-            let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
-            with_wave(b, t, w)
-        }),
+        // a sine holds its t = delay value (the only rule, R100); the neighbour is a pulse
         (X::SinPreHold, |b, t, on| {
-            let one = n(b, 1);
-            let pre = if on {
-                PreDelay::HoldDelayValue
+            let w = if on {
+                let one = n(b, 1);
+                b.wave(sin(one))
             } else {
-                PreDelay::Offset
+                wave_of(b, WaveKind::Pulse)
             };
-            let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
             with_wave(b, t, w)
         }),
         (X::SinSecondTone, |b, t, on| {
@@ -1332,9 +1322,6 @@ mod tests {
         (X::ExpTd2FromTd1, |b, t, on| {
             exp_from(b, t, if on { TdFrom::Td1 } else { TdFrom::Zero })
         }),
-        (X::SffmPreOffset, |b, t, on| {
-            sffm_pre(b, t, if on { PreDelay::Offset } else { PreDelay::Zero })
-        }),
         (X::SffmPreHold, |b, t, on| {
             sffm_pre(
                 b,
@@ -1347,7 +1334,15 @@ mod tests {
             )
         }),
         (X::SffmPreZero, |b, t, on| {
-            sffm_pre(b, t, if on { PreDelay::Zero } else { PreDelay::Offset })
+            sffm_pre(
+                b,
+                t,
+                if on {
+                    PreDelay::Zero
+                } else {
+                    PreDelay::HoldDelayValue
+                },
+            )
         }),
         (X::DcGivenWithWave, |b, t, on| {
             let dc = n(b, 0);
@@ -1910,7 +1905,7 @@ mod tests {
                     noise_seed: ExprId::NONE,
                     segments: spicerack_ir::List::EMPTY,
                     ceiling: spicerack_ir::tran::StepCeiling::Rule(
-                        spicerack_ir::tran::StepCap::None,
+                        spicerack_ir::tran::StepCap::NgspiceRule,
                     ),
                     uic: false,
                     startup: false,

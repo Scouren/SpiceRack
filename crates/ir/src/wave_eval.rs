@@ -362,7 +362,6 @@ fn sine(design: &Design, s: Sin, t: f64, env: &dyn Bindings) -> Result<f64, Wave
     let phase = rad(f.omit(s.phase_deg, |_| Ok(0.0))?);
     if tau <= 0.0 {
         return Ok(match s.pre {
-            PreDelay::Offset => offset,
             PreDelay::HoldDelayValue => offset + amplitude * phase.sin(),
             PreDelay::Zero => 0.0,
         });
@@ -516,11 +515,8 @@ fn fm(design: &Design, s: Sffm, t: f64, env: &dyn Bindings) -> Result<f64, WaveD
     let f = Fields::new(design, env, s.given_zero);
     let offset = f.get(s.offset)?;
     let tau = t - f.omit(s.delay, |_| Ok(0.0))?;
-    if tau <= 0.0 && s.pre != PreDelay::HoldDelayValue {
-        return Ok(match s.pre {
-            PreDelay::Offset => offset,
-            PreDelay::HoldDelayValue | PreDelay::Zero => 0.0,
-        });
+    if tau <= 0.0 && s.pre == PreDelay::Zero {
+        return Ok(0.0);
     }
     let tau = tau.max(0.0);
     let amplitude = f.get(s.amplitude)?;
@@ -547,11 +543,8 @@ fn am(design: &Design, a: Am, t: f64, env: &dyn Bindings) -> Result<f64, WaveDom
     let f = Fields::new(design, env, a.given_zero);
     let offset = f.get(a.offset)?;
     let tau = t - f.omit(a.delay, |_| Ok(0.0))?;
-    if tau <= 0.0 && a.pre != PreDelay::HoldDelayValue {
-        return Ok(match a.pre {
-            PreDelay::Offset => offset,
-            PreDelay::HoldDelayValue | PreDelay::Zero => 0.0,
-        });
+    if tau <= 0.0 && a.pre == PreDelay::Zero {
+        return Ok(0.0);
     }
     let tau = tau.max(0.0);
     let amplitude = f.get(a.amplitude)?;

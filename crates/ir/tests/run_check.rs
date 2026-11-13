@@ -292,7 +292,7 @@ fn tran(b: &mut Builder<'_>) -> Tran {
         noise_fmin: NO,
         noise_seed: NO,
         segments: List::EMPTY,
-        ceiling: StepCeiling::Rule(StepCap::None),
+        ceiling: StepCeiling::Rule(StepCap::NgspiceRule),
         uic: false,
         startup: false,
     }

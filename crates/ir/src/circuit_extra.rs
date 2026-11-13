@@ -105,8 +105,6 @@ pub enum CircuitExtra {
     PulseCycles,
     /// A sine cycle count (`Sin::cycles`, lt, 5.06).
     SinCycles,
-    /// A sine that is its offset before the delay (`PreDelay::Offset`).
-    SinPreOffset,
     /// A sine that holds its t = delay value before the delay (`PreDelay::HoldDelayValue`).
     SinPreHold,
     /// A sine's second tone (`Sin::amplitude2`, sp, 5.07).
@@ -209,8 +207,6 @@ pub enum CircuitExtra {
     ExpTd2FromZero,
     /// An exponential whose `td2` counts from `td1` (`TdFrom::Td1`, va; A12 C2).
     ExpTd2FromTd1,
-    /// An SFFM that is its offset before the delay (A12 C3).
-    SffmPreOffset,
     /// An SFFM that holds its t = delay value before the delay (va; A12 C3).
     SffmPreHold,
     /// An SFFM that is 0 before the delay (ng; A12 C3).
@@ -355,7 +351,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 147] = [
+    pub const ALL: [CircuitExtra; 145] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -392,7 +388,6 @@ impl CircuitExtra {
         CircuitExtra::PortPower,
         CircuitExtra::PulseCycles,
         CircuitExtra::SinCycles,
-        CircuitExtra::SinPreOffset,
         CircuitExtra::SinPreHold,
         CircuitExtra::SinSecondTone,
         CircuitExtra::SffmSpice3,
@@ -440,7 +435,6 @@ impl CircuitExtra {
         CircuitExtra::PulseVacask,
         CircuitExtra::ExpTd2FromZero,
         CircuitExtra::ExpTd2FromTd1,
-        CircuitExtra::SffmPreOffset,
         CircuitExtra::SffmPreHold,
         CircuitExtra::SffmPreZero,
         CircuitExtra::DcGivenWithWave,

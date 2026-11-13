@@ -104,8 +104,6 @@ pub enum StepCeiling {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum StepCap {
-    /// No ceiling beyond the span.
-    None,
     /// `min(print_step, span/50)` (ngspice).
     NgspiceRule,
     /// `span/50` (Spectre, VACASK).
@@ -142,8 +140,7 @@ const _: () = assert!(size_of::<Four>() == 24);
 
 impl StepCap {
     /// Every rule, in declaration order.
-    pub const ALL: [StepCap; 4] = [
-        StepCap::None,
+    pub const ALL: [StepCap; 3] = [
         StepCap::NgspiceRule,
         StepCap::SpanOver50,
         StepCap::SpanOver10,
@@ -351,7 +348,6 @@ impl DetailFacts for Four {
 
 fn cap_feature(cap: StepCap) -> RunExtra {
     match cap {
-        StepCap::None => RunExtra::TranCapNone,
         StepCap::NgspiceRule => RunExtra::TranCapNgspice,
         StepCap::SpanOver50 => RunExtra::TranCapSpan50,
         StepCap::SpanOver10 => RunExtra::TranCapSpan10,

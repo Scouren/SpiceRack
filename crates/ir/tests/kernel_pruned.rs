@@ -4,7 +4,8 @@
 //! (ngspice 0, VACASK the t = delay value); an `if` whose condition reads the temperature or
 //! the circuit (decided once from parameters everywhere, INV-semantics 11.08); a subcircuit
 //! formal with no default (every row names a default); a loop over a subcircuit's default (no
-//! row; Xyce's `.dc X1:…` keeps the DC axis).
+//! row; Xyce's `.dc X1:…` keeps the DC axis); diffs-2's runs (f78efcca): a sine or an SFFM that
+//! is its offset before its delay, and a transient with no step ceiling.
 //!
 //! Oracle: the inventories' rows the prune file cites, each deck read by hand.
 //!
@@ -51,13 +52,32 @@ fn each_combination_no_simulator_has_is_refused() {
             "sin(offset=0 amplitude=1 freq=1 delay=1 damping=0 phase_deg=0 pre={pre})"
         ))
     };
+    let sffm = |pre: &str| {
+        source(&format!(
+            "sffm(offset=0 amplitude=1 carrier_freq=10 mod_index=2 signal_freq=1 delay=1 phase_c_deg=0 phase_m_deg=0 law=spice3 pre={pre})"
+        ))
+    };
     let am = |pre: &str| {
         source(&format!(
             "am(offset=0 amplitude=1 mod_offset=1 mod_index=1 mod_freq=1 carrier_freq=4 delay=0 phase_m_deg=0 phase_c_deg=90 mod_time=carrier_phase pre={pre})"
         ))
     };
     let cases = [
-        ("sine zero before its delay", sin("zero"), sin("offset")),
+        ("sine zero before its delay", sin("zero"), sin("hold_delay_value")),
+        // diffs-2's runs (f78efcca): every simulator holds a sine's t = delay value
+        (
+            "sine offset before its delay",
+            sin("offset"),
+            sin("hold_delay_value"),
+        ),
+        // ngspice and ESPice 0, VACASK the held value, Xyce no delay
+        ("SFFM offset before its delay", sffm("offset"), sffm("zero")),
+        // ngspice and ESPice min(print step, span/50), Xyce span/10, VACASK about span/50
+        (
+            "transient with no step ceiling",
+            "  analysis tran stop=1u print_step=1n cap=none".to_owned(),
+            "  analysis tran stop=1u print_step=1n cap=ngspice_rule".to_owned(),
+        ),
         ("AM offset before its delay", am("offset"), am("zero")),
         (
             "if on the temperature",

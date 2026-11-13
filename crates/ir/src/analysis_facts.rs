@@ -529,7 +529,6 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
             (has(RunExtra::TranSimulatorStep) || has(RunExtra::TranPrintStep))
                 && (has(RunExtra::TranMaxStep)
                     || [
-                        RunExtra::TranCapNone,
                         RunExtra::TranCapNgspice,
                         RunExtra::TranCapSpan50,
                         RunExtra::TranCapSpan10,
