@@ -18,6 +18,7 @@
 //! `pub(super) fn leaf_literal(&ir::Design, ir::ExprId) -> Option<ir::Literal>`,
 //! `pub(super) fn binary_form(ir::BinOp, bool) -> ir::Feature`, `pub(super) fn func_form(ir::Func, bool) -> ir::Feature`,
 //! `pub(super) fn literal(&ir::Design, ir::ExprId) -> Option<f64>`,
+//! `pub(super) fn never_negative(&ir::Design, ir::ExprId) -> bool`,
 //! `pub(super) fn form(bool) -> ir::Form`, `pub(super) const ROOT_PATHS_MAX`,
 //! `pub(super) fn keep_bounded(&mut ir::Design, &mut dyn FnMut(&mut ir::Design)) -> Vec<ir::ItemRef>`,
 //! `pub(super) fn paths(&ir::Design, ir::ExprId) -> u32`,
@@ -399,6 +400,18 @@ pub(super) fn func_form(f: ir::Func, dynamic: bool) -> ir::Feature {
     match dynamic {
         true => ir::Feature::FuncDyn(f),
         false => ir::Feature::Func(f),
+    }
+}
+
+/// Whether `x` is `>= +0` on every evaluation (never negative, never `-0`).
+pub(super) fn never_negative(d: &ir::Design, x: ir::ExprId) -> bool {
+    match d.expr(x) {
+        ir::Expr::Num(n) => d.literal_value(d.num(n)).is_sign_positive(),
+        ir::Expr::Call(f, _) => matches!(
+            f,
+            ir::Func::Abs | ir::Func::SqrtAbs | ir::Func::Exp | ir::Func::Sqr | ir::Func::PowAbs
+        ),
+        _ => false,
     }
 }
 

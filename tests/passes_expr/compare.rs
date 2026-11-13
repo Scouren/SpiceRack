@@ -410,10 +410,14 @@ fn differ(
     let same = match (a, b) {
         (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits() && (!typed || x.int == y.int),
         (Err(ir::Domain::OutOfDomain(e)), _) if !typed && int_capable(after.expr(e)) => true,
-        // R12: `pow` of a negative base and a fractional exponent is outside its domain, and
-        // `pow_to_powabs` is exact on the domain only (the one rule stated so)
+        // R12: `pow` of a negative base and a fractional exponent, and `clamp` with `lo > hi`,
+        // are outside their domains, and `pow_to_powabs` and `clamp_to_min_max` are exact on
+        // the domain only (the rules stated so)
         (Err(ir::Domain::OutOfDomain(e)), _)
-            if matches!(after.expr(e), ir::Expr::Call(ir::Func::Pow, _)) =>
+            if matches!(
+                after.expr(e),
+                ir::Expr::Call(ir::Func::Pow | ir::Func::Clamp, _)
+            ) =>
         {
             true
         }
