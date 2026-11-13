@@ -1,0 +1,10 @@
+b_redef_mixed: a subcircuit in the deck, a model of its name in an included section (VACASK exits 1)
+load "spice/resistor.osdi"
+subckt rm (x y)
+ends
+include "rlib.lib" section=a
+model vsource vsource
+v1 (n 0) vsource dc=1
+control
+  analysis op1 op
+endc

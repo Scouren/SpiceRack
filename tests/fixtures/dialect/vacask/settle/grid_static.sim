@@ -1,0 +1,2148 @@
+functions on a grid, parameter evaluator
+model vsource vsource
+parameters g0=sin(-2.5) h0=(sin(-2.5))/2
+vg0 (g0 0) vsource dc=g0
+vh0 (h0 0) vsource dc=h0
+parameters g1=sin(-1.0) h1=(sin(-1.0))/2
+vg1 (g1 0) vsource dc=g1
+vh1 (h1 0) vsource dc=h1
+parameters g2=sin(-0.5) h2=(sin(-0.5))/2
+vg2 (g2 0) vsource dc=g2
+vh2 (h2 0) vsource dc=h2
+parameters g3=sin(-0.0) h3=(sin(-0.0))/2
+vg3 (g3 0) vsource dc=g3
+vh3 (h3 0) vsource dc=h3
+parameters g4=sin(0.0) h4=(sin(0.0))/2
+vg4 (g4 0) vsource dc=g4
+vh4 (h4 0) vsource dc=h4
+parameters g5=sin(0.5) h5=(sin(0.5))/2
+vg5 (g5 0) vsource dc=g5
+vh5 (h5 0) vsource dc=h5
+parameters g6=sin(1.0) h6=(sin(1.0))/2
+vg6 (g6 0) vsource dc=g6
+vh6 (h6 0) vsource dc=h6
+parameters g7=sin(2.5) h7=(sin(2.5))/2
+vg7 (g7 0) vsource dc=g7
+vh7 (h7 0) vsource dc=h7
+parameters g8=sin(1e-3) h8=(sin(1e-3))/2
+vg8 (g8 0) vsource dc=g8
+vh8 (h8 0) vsource dc=h8
+parameters g9=sin(1e3) h9=(sin(1e3))/2
+vg9 (g9 0) vsource dc=g9
+vh9 (h9 0) vsource dc=h9
+parameters g10=sin(-3) h10=(sin(-3))/2
+vg10 (g10 0) vsource dc=g10
+vh10 (h10 0) vsource dc=h10
+parameters g11=sin(0) h11=(sin(0))/2
+vg11 (g11 0) vsource dc=g11
+vh11 (h11 0) vsource dc=h11
+parameters g12=sin(3) h12=(sin(3))/2
+vg12 (g12 0) vsource dc=g12
+vh12 (h12 0) vsource dc=h12
+parameters g13=cos(-2.5) h13=(cos(-2.5))/2
+vg13 (g13 0) vsource dc=g13
+vh13 (h13 0) vsource dc=h13
+parameters g14=cos(-1.0) h14=(cos(-1.0))/2
+vg14 (g14 0) vsource dc=g14
+vh14 (h14 0) vsource dc=h14
+parameters g15=cos(-0.5) h15=(cos(-0.5))/2
+vg15 (g15 0) vsource dc=g15
+vh15 (h15 0) vsource dc=h15
+parameters g16=cos(-0.0) h16=(cos(-0.0))/2
+vg16 (g16 0) vsource dc=g16
+vh16 (h16 0) vsource dc=h16
+parameters g17=cos(0.0) h17=(cos(0.0))/2
+vg17 (g17 0) vsource dc=g17
+vh17 (h17 0) vsource dc=h17
+parameters g18=cos(0.5) h18=(cos(0.5))/2
+vg18 (g18 0) vsource dc=g18
+vh18 (h18 0) vsource dc=h18
+parameters g19=cos(1.0) h19=(cos(1.0))/2
+vg19 (g19 0) vsource dc=g19
+vh19 (h19 0) vsource dc=h19
+parameters g20=cos(2.5) h20=(cos(2.5))/2
+vg20 (g20 0) vsource dc=g20
+vh20 (h20 0) vsource dc=h20
+parameters g21=cos(1e-3) h21=(cos(1e-3))/2
+vg21 (g21 0) vsource dc=g21
+vh21 (h21 0) vsource dc=h21
+parameters g22=cos(1e3) h22=(cos(1e3))/2
+vg22 (g22 0) vsource dc=g22
+vh22 (h22 0) vsource dc=h22
+parameters g23=cos(-3) h23=(cos(-3))/2
+vg23 (g23 0) vsource dc=g23
+vh23 (h23 0) vsource dc=h23
+parameters g24=cos(0) h24=(cos(0))/2
+vg24 (g24 0) vsource dc=g24
+vh24 (h24 0) vsource dc=h24
+parameters g25=cos(3) h25=(cos(3))/2
+vg25 (g25 0) vsource dc=g25
+vh25 (h25 0) vsource dc=h25
+parameters g26=tan(-2.5) h26=(tan(-2.5))/2
+vg26 (g26 0) vsource dc=g26
+vh26 (h26 0) vsource dc=h26
+parameters g27=tan(-1.0) h27=(tan(-1.0))/2
+vg27 (g27 0) vsource dc=g27
+vh27 (h27 0) vsource dc=h27
+parameters g28=tan(-0.5) h28=(tan(-0.5))/2
+vg28 (g28 0) vsource dc=g28
+vh28 (h28 0) vsource dc=h28
+parameters g29=tan(-0.0) h29=(tan(-0.0))/2
+vg29 (g29 0) vsource dc=g29
+vh29 (h29 0) vsource dc=h29
+parameters g30=tan(0.0) h30=(tan(0.0))/2
+vg30 (g30 0) vsource dc=g30
+vh30 (h30 0) vsource dc=h30
+parameters g31=tan(0.5) h31=(tan(0.5))/2
+vg31 (g31 0) vsource dc=g31
+vh31 (h31 0) vsource dc=h31
+parameters g32=tan(1.0) h32=(tan(1.0))/2
+vg32 (g32 0) vsource dc=g32
+vh32 (h32 0) vsource dc=h32
+parameters g33=tan(2.5) h33=(tan(2.5))/2
+vg33 (g33 0) vsource dc=g33
+vh33 (h33 0) vsource dc=h33
+parameters g34=tan(1e-3) h34=(tan(1e-3))/2
+vg34 (g34 0) vsource dc=g34
+vh34 (h34 0) vsource dc=h34
+parameters g35=tan(1e3) h35=(tan(1e3))/2
+vg35 (g35 0) vsource dc=g35
+vh35 (h35 0) vsource dc=h35
+parameters g36=tan(-3) h36=(tan(-3))/2
+vg36 (g36 0) vsource dc=g36
+vh36 (h36 0) vsource dc=h36
+parameters g37=tan(0) h37=(tan(0))/2
+vg37 (g37 0) vsource dc=g37
+vh37 (h37 0) vsource dc=h37
+parameters g38=tan(3) h38=(tan(3))/2
+vg38 (g38 0) vsource dc=g38
+vh38 (h38 0) vsource dc=h38
+parameters g40=asin(-1.0) h40=(asin(-1.0))/2
+vg40 (g40 0) vsource dc=g40
+vh40 (h40 0) vsource dc=h40
+parameters g41=asin(-0.5) h41=(asin(-0.5))/2
+vg41 (g41 0) vsource dc=g41
+vh41 (h41 0) vsource dc=h41
+parameters g42=asin(-0.0) h42=(asin(-0.0))/2
+vg42 (g42 0) vsource dc=g42
+vh42 (h42 0) vsource dc=h42
+parameters g43=asin(0.0) h43=(asin(0.0))/2
+vg43 (g43 0) vsource dc=g43
+vh43 (h43 0) vsource dc=h43
+parameters g44=asin(0.5) h44=(asin(0.5))/2
+vg44 (g44 0) vsource dc=g44
+vh44 (h44 0) vsource dc=h44
+parameters g45=asin(1.0) h45=(asin(1.0))/2
+vg45 (g45 0) vsource dc=g45
+vh45 (h45 0) vsource dc=h45
+parameters g47=asin(1e-3) h47=(asin(1e-3))/2
+vg47 (g47 0) vsource dc=g47
+vh47 (h47 0) vsource dc=h47
+parameters g50=asin(0) h50=(asin(0))/2
+vg50 (g50 0) vsource dc=g50
+vh50 (h50 0) vsource dc=h50
+parameters g53=acos(-1.0) h53=(acos(-1.0))/2
+vg53 (g53 0) vsource dc=g53
+vh53 (h53 0) vsource dc=h53
+parameters g54=acos(-0.5) h54=(acos(-0.5))/2
+vg54 (g54 0) vsource dc=g54
+vh54 (h54 0) vsource dc=h54
+parameters g55=acos(-0.0) h55=(acos(-0.0))/2
+vg55 (g55 0) vsource dc=g55
+vh55 (h55 0) vsource dc=h55
+parameters g56=acos(0.0) h56=(acos(0.0))/2
+vg56 (g56 0) vsource dc=g56
+vh56 (h56 0) vsource dc=h56
+parameters g57=acos(0.5) h57=(acos(0.5))/2
+vg57 (g57 0) vsource dc=g57
+vh57 (h57 0) vsource dc=h57
+parameters g58=acos(1.0) h58=(acos(1.0))/2
+vg58 (g58 0) vsource dc=g58
+vh58 (h58 0) vsource dc=h58
+parameters g60=acos(1e-3) h60=(acos(1e-3))/2
+vg60 (g60 0) vsource dc=g60
+vh60 (h60 0) vsource dc=h60
+parameters g63=acos(0) h63=(acos(0))/2
+vg63 (g63 0) vsource dc=g63
+vh63 (h63 0) vsource dc=h63
+parameters g65=atan(-2.5) h65=(atan(-2.5))/2
+vg65 (g65 0) vsource dc=g65
+vh65 (h65 0) vsource dc=h65
+parameters g66=atan(-1.0) h66=(atan(-1.0))/2
+vg66 (g66 0) vsource dc=g66
+vh66 (h66 0) vsource dc=h66
+parameters g67=atan(-0.5) h67=(atan(-0.5))/2
+vg67 (g67 0) vsource dc=g67
+vh67 (h67 0) vsource dc=h67
+parameters g68=atan(-0.0) h68=(atan(-0.0))/2
+vg68 (g68 0) vsource dc=g68
+vh68 (h68 0) vsource dc=h68
+parameters g69=atan(0.0) h69=(atan(0.0))/2
+vg69 (g69 0) vsource dc=g69
+vh69 (h69 0) vsource dc=h69
+parameters g70=atan(0.5) h70=(atan(0.5))/2
+vg70 (g70 0) vsource dc=g70
+vh70 (h70 0) vsource dc=h70
+parameters g71=atan(1.0) h71=(atan(1.0))/2
+vg71 (g71 0) vsource dc=g71
+vh71 (h71 0) vsource dc=h71
+parameters g72=atan(2.5) h72=(atan(2.5))/2
+vg72 (g72 0) vsource dc=g72
+vh72 (h72 0) vsource dc=h72
+parameters g73=atan(1e-3) h73=(atan(1e-3))/2
+vg73 (g73 0) vsource dc=g73
+vh73 (h73 0) vsource dc=h73
+parameters g74=atan(1e3) h74=(atan(1e3))/2
+vg74 (g74 0) vsource dc=g74
+vh74 (h74 0) vsource dc=h74
+parameters g75=atan(-3) h75=(atan(-3))/2
+vg75 (g75 0) vsource dc=g75
+vh75 (h75 0) vsource dc=h75
+parameters g76=atan(0) h76=(atan(0))/2
+vg76 (g76 0) vsource dc=g76
+vh76 (h76 0) vsource dc=h76
+parameters g77=atan(3) h77=(atan(3))/2
+vg77 (g77 0) vsource dc=g77
+vh77 (h77 0) vsource dc=h77
+parameters g78=sinh(-2.5) h78=(sinh(-2.5))/2
+vg78 (g78 0) vsource dc=g78
+vh78 (h78 0) vsource dc=h78
+parameters g79=sinh(-1.0) h79=(sinh(-1.0))/2
+vg79 (g79 0) vsource dc=g79
+vh79 (h79 0) vsource dc=h79
+parameters g80=sinh(-0.5) h80=(sinh(-0.5))/2
+vg80 (g80 0) vsource dc=g80
+vh80 (h80 0) vsource dc=h80
+parameters g81=sinh(-0.0) h81=(sinh(-0.0))/2
+vg81 (g81 0) vsource dc=g81
+vh81 (h81 0) vsource dc=h81
+parameters g82=sinh(0.0) h82=(sinh(0.0))/2
+vg82 (g82 0) vsource dc=g82
+vh82 (h82 0) vsource dc=h82
+parameters g83=sinh(0.5) h83=(sinh(0.5))/2
+vg83 (g83 0) vsource dc=g83
+vh83 (h83 0) vsource dc=h83
+parameters g84=sinh(1.0) h84=(sinh(1.0))/2
+vg84 (g84 0) vsource dc=g84
+vh84 (h84 0) vsource dc=h84
+parameters g85=sinh(2.5) h85=(sinh(2.5))/2
+vg85 (g85 0) vsource dc=g85
+vh85 (h85 0) vsource dc=h85
+parameters g86=sinh(1e-3) h86=(sinh(1e-3))/2
+vg86 (g86 0) vsource dc=g86
+vh86 (h86 0) vsource dc=h86
+parameters g88=sinh(-3) h88=(sinh(-3))/2
+vg88 (g88 0) vsource dc=g88
+vh88 (h88 0) vsource dc=h88
+parameters g89=sinh(0) h89=(sinh(0))/2
+vg89 (g89 0) vsource dc=g89
+vh89 (h89 0) vsource dc=h89
+parameters g90=sinh(3) h90=(sinh(3))/2
+vg90 (g90 0) vsource dc=g90
+vh90 (h90 0) vsource dc=h90
+parameters g91=cosh(-2.5) h91=(cosh(-2.5))/2
+vg91 (g91 0) vsource dc=g91
+vh91 (h91 0) vsource dc=h91
+parameters g92=cosh(-1.0) h92=(cosh(-1.0))/2
+vg92 (g92 0) vsource dc=g92
+vh92 (h92 0) vsource dc=h92
+parameters g93=cosh(-0.5) h93=(cosh(-0.5))/2
+vg93 (g93 0) vsource dc=g93
+vh93 (h93 0) vsource dc=h93
+parameters g94=cosh(-0.0) h94=(cosh(-0.0))/2
+vg94 (g94 0) vsource dc=g94
+vh94 (h94 0) vsource dc=h94
+parameters g95=cosh(0.0) h95=(cosh(0.0))/2
+vg95 (g95 0) vsource dc=g95
+vh95 (h95 0) vsource dc=h95
+parameters g96=cosh(0.5) h96=(cosh(0.5))/2
+vg96 (g96 0) vsource dc=g96
+vh96 (h96 0) vsource dc=h96
+parameters g97=cosh(1.0) h97=(cosh(1.0))/2
+vg97 (g97 0) vsource dc=g97
+vh97 (h97 0) vsource dc=h97
+parameters g98=cosh(2.5) h98=(cosh(2.5))/2
+vg98 (g98 0) vsource dc=g98
+vh98 (h98 0) vsource dc=h98
+parameters g99=cosh(1e-3) h99=(cosh(1e-3))/2
+vg99 (g99 0) vsource dc=g99
+vh99 (h99 0) vsource dc=h99
+parameters g101=cosh(-3) h101=(cosh(-3))/2
+vg101 (g101 0) vsource dc=g101
+vh101 (h101 0) vsource dc=h101
+parameters g102=cosh(0) h102=(cosh(0))/2
+vg102 (g102 0) vsource dc=g102
+vh102 (h102 0) vsource dc=h102
+parameters g103=cosh(3) h103=(cosh(3))/2
+vg103 (g103 0) vsource dc=g103
+vh103 (h103 0) vsource dc=h103
+parameters g104=tanh(-2.5) h104=(tanh(-2.5))/2
+vg104 (g104 0) vsource dc=g104
+vh104 (h104 0) vsource dc=h104
+parameters g105=tanh(-1.0) h105=(tanh(-1.0))/2
+vg105 (g105 0) vsource dc=g105
+vh105 (h105 0) vsource dc=h105
+parameters g106=tanh(-0.5) h106=(tanh(-0.5))/2
+vg106 (g106 0) vsource dc=g106
+vh106 (h106 0) vsource dc=h106
+parameters g107=tanh(-0.0) h107=(tanh(-0.0))/2
+vg107 (g107 0) vsource dc=g107
+vh107 (h107 0) vsource dc=h107
+parameters g108=tanh(0.0) h108=(tanh(0.0))/2
+vg108 (g108 0) vsource dc=g108
+vh108 (h108 0) vsource dc=h108
+parameters g109=tanh(0.5) h109=(tanh(0.5))/2
+vg109 (g109 0) vsource dc=g109
+vh109 (h109 0) vsource dc=h109
+parameters g110=tanh(1.0) h110=(tanh(1.0))/2
+vg110 (g110 0) vsource dc=g110
+vh110 (h110 0) vsource dc=h110
+parameters g111=tanh(2.5) h111=(tanh(2.5))/2
+vg111 (g111 0) vsource dc=g111
+vh111 (h111 0) vsource dc=h111
+parameters g112=tanh(1e-3) h112=(tanh(1e-3))/2
+vg112 (g112 0) vsource dc=g112
+vh112 (h112 0) vsource dc=h112
+parameters g113=tanh(1e3) h113=(tanh(1e3))/2
+vg113 (g113 0) vsource dc=g113
+vh113 (h113 0) vsource dc=h113
+parameters g114=tanh(-3) h114=(tanh(-3))/2
+vg114 (g114 0) vsource dc=g114
+vh114 (h114 0) vsource dc=h114
+parameters g115=tanh(0) h115=(tanh(0))/2
+vg115 (g115 0) vsource dc=g115
+vh115 (h115 0) vsource dc=h115
+parameters g116=tanh(3) h116=(tanh(3))/2
+vg116 (g116 0) vsource dc=g116
+vh116 (h116 0) vsource dc=h116
+parameters g117=asinh(-2.5) h117=(asinh(-2.5))/2
+vg117 (g117 0) vsource dc=g117
+vh117 (h117 0) vsource dc=h117
+parameters g118=asinh(-1.0) h118=(asinh(-1.0))/2
+vg118 (g118 0) vsource dc=g118
+vh118 (h118 0) vsource dc=h118
+parameters g119=asinh(-0.5) h119=(asinh(-0.5))/2
+vg119 (g119 0) vsource dc=g119
+vh119 (h119 0) vsource dc=h119
+parameters g120=asinh(-0.0) h120=(asinh(-0.0))/2
+vg120 (g120 0) vsource dc=g120
+vh120 (h120 0) vsource dc=h120
+parameters g121=asinh(0.0) h121=(asinh(0.0))/2
+vg121 (g121 0) vsource dc=g121
+vh121 (h121 0) vsource dc=h121
+parameters g122=asinh(0.5) h122=(asinh(0.5))/2
+vg122 (g122 0) vsource dc=g122
+vh122 (h122 0) vsource dc=h122
+parameters g123=asinh(1.0) h123=(asinh(1.0))/2
+vg123 (g123 0) vsource dc=g123
+vh123 (h123 0) vsource dc=h123
+parameters g124=asinh(2.5) h124=(asinh(2.5))/2
+vg124 (g124 0) vsource dc=g124
+vh124 (h124 0) vsource dc=h124
+parameters g125=asinh(1e-3) h125=(asinh(1e-3))/2
+vg125 (g125 0) vsource dc=g125
+vh125 (h125 0) vsource dc=h125
+parameters g126=asinh(1e3) h126=(asinh(1e3))/2
+vg126 (g126 0) vsource dc=g126
+vh126 (h126 0) vsource dc=h126
+parameters g127=asinh(-3) h127=(asinh(-3))/2
+vg127 (g127 0) vsource dc=g127
+vh127 (h127 0) vsource dc=h127
+parameters g128=asinh(0) h128=(asinh(0))/2
+vg128 (g128 0) vsource dc=g128
+vh128 (h128 0) vsource dc=h128
+parameters g129=asinh(3) h129=(asinh(3))/2
+vg129 (g129 0) vsource dc=g129
+vh129 (h129 0) vsource dc=h129
+parameters g136=acosh(1.0) h136=(acosh(1.0))/2
+vg136 (g136 0) vsource dc=g136
+vh136 (h136 0) vsource dc=h136
+parameters g137=acosh(2.5) h137=(acosh(2.5))/2
+vg137 (g137 0) vsource dc=g137
+vh137 (h137 0) vsource dc=h137
+parameters g139=acosh(1e3) h139=(acosh(1e3))/2
+vg139 (g139 0) vsource dc=g139
+vh139 (h139 0) vsource dc=h139
+parameters g142=acosh(3) h142=(acosh(3))/2
+vg142 (g142 0) vsource dc=g142
+vh142 (h142 0) vsource dc=h142
+parameters g145=atanh(-0.5) h145=(atanh(-0.5))/2
+vg145 (g145 0) vsource dc=g145
+vh145 (h145 0) vsource dc=h145
+parameters g146=atanh(-0.0) h146=(atanh(-0.0))/2
+vg146 (g146 0) vsource dc=g146
+vh146 (h146 0) vsource dc=h146
+parameters g147=atanh(0.0) h147=(atanh(0.0))/2
+vg147 (g147 0) vsource dc=g147
+vh147 (h147 0) vsource dc=h147
+parameters g148=atanh(0.5) h148=(atanh(0.5))/2
+vg148 (g148 0) vsource dc=g148
+vh148 (h148 0) vsource dc=h148
+parameters g151=atanh(1e-3) h151=(atanh(1e-3))/2
+vg151 (g151 0) vsource dc=g151
+vh151 (h151 0) vsource dc=h151
+parameters g154=atanh(0) h154=(atanh(0))/2
+vg154 (g154 0) vsource dc=g154
+vh154 (h154 0) vsource dc=h154
+parameters g156=exp(-2.5) h156=(exp(-2.5))/2
+vg156 (g156 0) vsource dc=g156
+vh156 (h156 0) vsource dc=h156
+parameters g157=exp(-1.0) h157=(exp(-1.0))/2
+vg157 (g157 0) vsource dc=g157
+vh157 (h157 0) vsource dc=h157
+parameters g158=exp(-0.5) h158=(exp(-0.5))/2
+vg158 (g158 0) vsource dc=g158
+vh158 (h158 0) vsource dc=h158
+parameters g159=exp(-0.0) h159=(exp(-0.0))/2
+vg159 (g159 0) vsource dc=g159
+vh159 (h159 0) vsource dc=h159
+parameters g160=exp(0.0) h160=(exp(0.0))/2
+vg160 (g160 0) vsource dc=g160
+vh160 (h160 0) vsource dc=h160
+parameters g161=exp(0.5) h161=(exp(0.5))/2
+vg161 (g161 0) vsource dc=g161
+vh161 (h161 0) vsource dc=h161
+parameters g162=exp(1.0) h162=(exp(1.0))/2
+vg162 (g162 0) vsource dc=g162
+vh162 (h162 0) vsource dc=h162
+parameters g163=exp(2.5) h163=(exp(2.5))/2
+vg163 (g163 0) vsource dc=g163
+vh163 (h163 0) vsource dc=h163
+parameters g164=exp(1e-3) h164=(exp(1e-3))/2
+vg164 (g164 0) vsource dc=g164
+vh164 (h164 0) vsource dc=h164
+parameters g166=exp(-3) h166=(exp(-3))/2
+vg166 (g166 0) vsource dc=g166
+vh166 (h166 0) vsource dc=h166
+parameters g167=exp(0) h167=(exp(0))/2
+vg167 (g167 0) vsource dc=g167
+vh167 (h167 0) vsource dc=h167
+parameters g168=exp(3) h168=(exp(3))/2
+vg168 (g168 0) vsource dc=g168
+vh168 (h168 0) vsource dc=h168
+parameters g174=log(0.5) h174=(log(0.5))/2
+vg174 (g174 0) vsource dc=g174
+vh174 (h174 0) vsource dc=h174
+parameters g175=log(1.0) h175=(log(1.0))/2
+vg175 (g175 0) vsource dc=g175
+vh175 (h175 0) vsource dc=h175
+parameters g176=log(2.5) h176=(log(2.5))/2
+vg176 (g176 0) vsource dc=g176
+vh176 (h176 0) vsource dc=h176
+parameters g177=log(1e-3) h177=(log(1e-3))/2
+vg177 (g177 0) vsource dc=g177
+vh177 (h177 0) vsource dc=h177
+parameters g178=log(1e3) h178=(log(1e3))/2
+vg178 (g178 0) vsource dc=g178
+vh178 (h178 0) vsource dc=h178
+parameters g181=log(3) h181=(log(3))/2
+vg181 (g181 0) vsource dc=g181
+vh181 (h181 0) vsource dc=h181
+parameters g187=ln(0.5) h187=(ln(0.5))/2
+vg187 (g187 0) vsource dc=g187
+vh187 (h187 0) vsource dc=h187
+parameters g188=ln(1.0) h188=(ln(1.0))/2
+vg188 (g188 0) vsource dc=g188
+vh188 (h188 0) vsource dc=h188
+parameters g189=ln(2.5) h189=(ln(2.5))/2
+vg189 (g189 0) vsource dc=g189
+vh189 (h189 0) vsource dc=h189
+parameters g190=ln(1e-3) h190=(ln(1e-3))/2
+vg190 (g190 0) vsource dc=g190
+vh190 (h190 0) vsource dc=h190
+parameters g191=ln(1e3) h191=(ln(1e3))/2
+vg191 (g191 0) vsource dc=g191
+vh191 (h191 0) vsource dc=h191
+parameters g194=ln(3) h194=(ln(3))/2
+vg194 (g194 0) vsource dc=g194
+vh194 (h194 0) vsource dc=h194
+parameters g200=log10(0.5) h200=(log10(0.5))/2
+vg200 (g200 0) vsource dc=g200
+vh200 (h200 0) vsource dc=h200
+parameters g201=log10(1.0) h201=(log10(1.0))/2
+vg201 (g201 0) vsource dc=g201
+vh201 (h201 0) vsource dc=h201
+parameters g202=log10(2.5) h202=(log10(2.5))/2
+vg202 (g202 0) vsource dc=g202
+vh202 (h202 0) vsource dc=h202
+parameters g203=log10(1e-3) h203=(log10(1e-3))/2
+vg203 (g203 0) vsource dc=g203
+vh203 (h203 0) vsource dc=h203
+parameters g204=log10(1e3) h204=(log10(1e3))/2
+vg204 (g204 0) vsource dc=g204
+vh204 (h204 0) vsource dc=h204
+parameters g207=log10(3) h207=(log10(3))/2
+vg207 (g207 0) vsource dc=g207
+vh207 (h207 0) vsource dc=h207
+parameters g211=sqrt(-0.0) h211=(sqrt(-0.0))/2
+vg211 (g211 0) vsource dc=g211
+vh211 (h211 0) vsource dc=h211
+parameters g212=sqrt(0.0) h212=(sqrt(0.0))/2
+vg212 (g212 0) vsource dc=g212
+vh212 (h212 0) vsource dc=h212
+parameters g213=sqrt(0.5) h213=(sqrt(0.5))/2
+vg213 (g213 0) vsource dc=g213
+vh213 (h213 0) vsource dc=h213
+parameters g214=sqrt(1.0) h214=(sqrt(1.0))/2
+vg214 (g214 0) vsource dc=g214
+vh214 (h214 0) vsource dc=h214
+parameters g215=sqrt(2.5) h215=(sqrt(2.5))/2
+vg215 (g215 0) vsource dc=g215
+vh215 (h215 0) vsource dc=h215
+parameters g216=sqrt(1e-3) h216=(sqrt(1e-3))/2
+vg216 (g216 0) vsource dc=g216
+vh216 (h216 0) vsource dc=h216
+parameters g217=sqrt(1e3) h217=(sqrt(1e3))/2
+vg217 (g217 0) vsource dc=g217
+vh217 (h217 0) vsource dc=h217
+parameters g219=sqrt(0) h219=(sqrt(0))/2
+vg219 (g219 0) vsource dc=g219
+vh219 (h219 0) vsource dc=h219
+parameters g220=sqrt(3) h220=(sqrt(3))/2
+vg220 (g220 0) vsource dc=g220
+vh220 (h220 0) vsource dc=h220
+parameters g221=abs(-2.5) h221=(abs(-2.5))/2
+vg221 (g221 0) vsource dc=g221
+vh221 (h221 0) vsource dc=h221
+parameters g222=abs(-1.0) h222=(abs(-1.0))/2
+vg222 (g222 0) vsource dc=g222
+vh222 (h222 0) vsource dc=h222
+parameters g223=abs(-0.5) h223=(abs(-0.5))/2
+vg223 (g223 0) vsource dc=g223
+vh223 (h223 0) vsource dc=h223
+parameters g224=abs(-0.0) h224=(abs(-0.0))/2
+vg224 (g224 0) vsource dc=g224
+vh224 (h224 0) vsource dc=h224
+parameters g225=abs(0.0) h225=(abs(0.0))/2
+vg225 (g225 0) vsource dc=g225
+vh225 (h225 0) vsource dc=h225
+parameters g226=abs(0.5) h226=(abs(0.5))/2
+vg226 (g226 0) vsource dc=g226
+vh226 (h226 0) vsource dc=h226
+parameters g227=abs(1.0) h227=(abs(1.0))/2
+vg227 (g227 0) vsource dc=g227
+vh227 (h227 0) vsource dc=h227
+parameters g228=abs(2.5) h228=(abs(2.5))/2
+vg228 (g228 0) vsource dc=g228
+vh228 (h228 0) vsource dc=h228
+parameters g229=abs(1e-3) h229=(abs(1e-3))/2
+vg229 (g229 0) vsource dc=g229
+vh229 (h229 0) vsource dc=h229
+parameters g230=abs(1e3) h230=(abs(1e3))/2
+vg230 (g230 0) vsource dc=g230
+vh230 (h230 0) vsource dc=h230
+parameters g231=abs(-3) h231=(abs(-3))/2
+vg231 (g231 0) vsource dc=g231
+vh231 (h231 0) vsource dc=h231
+parameters g232=abs(0) h232=(abs(0))/2
+vg232 (g232 0) vsource dc=g232
+vh232 (h232 0) vsource dc=h232
+parameters g233=abs(3) h233=(abs(3))/2
+vg233 (g233 0) vsource dc=g233
+vh233 (h233 0) vsource dc=h233
+parameters g234=floor(-2.5) h234=(floor(-2.5))/2
+vg234 (g234 0) vsource dc=g234
+vh234 (h234 0) vsource dc=h234
+parameters g235=floor(-1.0) h235=(floor(-1.0))/2
+vg235 (g235 0) vsource dc=g235
+vh235 (h235 0) vsource dc=h235
+parameters g236=floor(-0.5) h236=(floor(-0.5))/2
+vg236 (g236 0) vsource dc=g236
+vh236 (h236 0) vsource dc=h236
+parameters g237=floor(-0.0) h237=(floor(-0.0))/2
+vg237 (g237 0) vsource dc=g237
+vh237 (h237 0) vsource dc=h237
+parameters g238=floor(0.0) h238=(floor(0.0))/2
+vg238 (g238 0) vsource dc=g238
+vh238 (h238 0) vsource dc=h238
+parameters g239=floor(0.5) h239=(floor(0.5))/2
+vg239 (g239 0) vsource dc=g239
+vh239 (h239 0) vsource dc=h239
+parameters g240=floor(1.0) h240=(floor(1.0))/2
+vg240 (g240 0) vsource dc=g240
+vh240 (h240 0) vsource dc=h240
+parameters g241=floor(2.5) h241=(floor(2.5))/2
+vg241 (g241 0) vsource dc=g241
+vh241 (h241 0) vsource dc=h241
+parameters g242=floor(1e-3) h242=(floor(1e-3))/2
+vg242 (g242 0) vsource dc=g242
+vh242 (h242 0) vsource dc=h242
+parameters g243=floor(1e3) h243=(floor(1e3))/2
+vg243 (g243 0) vsource dc=g243
+vh243 (h243 0) vsource dc=h243
+parameters g244=floor(-3) h244=(floor(-3))/2
+vg244 (g244 0) vsource dc=g244
+vh244 (h244 0) vsource dc=h244
+parameters g245=floor(0) h245=(floor(0))/2
+vg245 (g245 0) vsource dc=g245
+vh245 (h245 0) vsource dc=h245
+parameters g246=floor(3) h246=(floor(3))/2
+vg246 (g246 0) vsource dc=g246
+vh246 (h246 0) vsource dc=h246
+parameters g247=ceil(-2.5) h247=(ceil(-2.5))/2
+vg247 (g247 0) vsource dc=g247
+vh247 (h247 0) vsource dc=h247
+parameters g248=ceil(-1.0) h248=(ceil(-1.0))/2
+vg248 (g248 0) vsource dc=g248
+vh248 (h248 0) vsource dc=h248
+parameters g249=ceil(-0.5) h249=(ceil(-0.5))/2
+vg249 (g249 0) vsource dc=g249
+vh249 (h249 0) vsource dc=h249
+parameters g250=ceil(-0.0) h250=(ceil(-0.0))/2
+vg250 (g250 0) vsource dc=g250
+vh250 (h250 0) vsource dc=h250
+parameters g251=ceil(0.0) h251=(ceil(0.0))/2
+vg251 (g251 0) vsource dc=g251
+vh251 (h251 0) vsource dc=h251
+parameters g252=ceil(0.5) h252=(ceil(0.5))/2
+vg252 (g252 0) vsource dc=g252
+vh252 (h252 0) vsource dc=h252
+parameters g253=ceil(1.0) h253=(ceil(1.0))/2
+vg253 (g253 0) vsource dc=g253
+vh253 (h253 0) vsource dc=h253
+parameters g254=ceil(2.5) h254=(ceil(2.5))/2
+vg254 (g254 0) vsource dc=g254
+vh254 (h254 0) vsource dc=h254
+parameters g255=ceil(1e-3) h255=(ceil(1e-3))/2
+vg255 (g255 0) vsource dc=g255
+vh255 (h255 0) vsource dc=h255
+parameters g256=ceil(1e3) h256=(ceil(1e3))/2
+vg256 (g256 0) vsource dc=g256
+vh256 (h256 0) vsource dc=h256
+parameters g257=ceil(-3) h257=(ceil(-3))/2
+vg257 (g257 0) vsource dc=g257
+vh257 (h257 0) vsource dc=h257
+parameters g258=ceil(0) h258=(ceil(0))/2
+vg258 (g258 0) vsource dc=g258
+vh258 (h258 0) vsource dc=h258
+parameters g259=ceil(3) h259=(ceil(3))/2
+vg259 (g259 0) vsource dc=g259
+vh259 (h259 0) vsource dc=h259
+parameters g260=round(-2.5) h260=(round(-2.5))/2
+vg260 (g260 0) vsource dc=g260
+vh260 (h260 0) vsource dc=h260
+parameters g261=round(-1.0) h261=(round(-1.0))/2
+vg261 (g261 0) vsource dc=g261
+vh261 (h261 0) vsource dc=h261
+parameters g262=round(-0.5) h262=(round(-0.5))/2
+vg262 (g262 0) vsource dc=g262
+vh262 (h262 0) vsource dc=h262
+parameters g263=round(-0.0) h263=(round(-0.0))/2
+vg263 (g263 0) vsource dc=g263
+vh263 (h263 0) vsource dc=h263
+parameters g264=round(0.0) h264=(round(0.0))/2
+vg264 (g264 0) vsource dc=g264
+vh264 (h264 0) vsource dc=h264
+parameters g265=round(0.5) h265=(round(0.5))/2
+vg265 (g265 0) vsource dc=g265
+vh265 (h265 0) vsource dc=h265
+parameters g266=round(1.0) h266=(round(1.0))/2
+vg266 (g266 0) vsource dc=g266
+vh266 (h266 0) vsource dc=h266
+parameters g267=round(2.5) h267=(round(2.5))/2
+vg267 (g267 0) vsource dc=g267
+vh267 (h267 0) vsource dc=h267
+parameters g268=round(1e-3) h268=(round(1e-3))/2
+vg268 (g268 0) vsource dc=g268
+vh268 (h268 0) vsource dc=h268
+parameters g269=round(1e3) h269=(round(1e3))/2
+vg269 (g269 0) vsource dc=g269
+vh269 (h269 0) vsource dc=h269
+parameters g270=round(-3) h270=(round(-3))/2
+vg270 (g270 0) vsource dc=g270
+vh270 (h270 0) vsource dc=h270
+parameters g271=round(0) h271=(round(0))/2
+vg271 (g271 0) vsource dc=g271
+vh271 (h271 0) vsource dc=h271
+parameters g272=round(3) h272=(round(3))/2
+vg272 (g272 0) vsource dc=g272
+vh272 (h272 0) vsource dc=h272
+parameters g273=integer(-2.5) h273=(integer(-2.5))/2
+vg273 (g273 0) vsource dc=g273
+vh273 (h273 0) vsource dc=h273
+parameters g274=integer(-1.0) h274=(integer(-1.0))/2
+vg274 (g274 0) vsource dc=g274
+vh274 (h274 0) vsource dc=h274
+parameters g275=integer(-0.5) h275=(integer(-0.5))/2
+vg275 (g275 0) vsource dc=g275
+vh275 (h275 0) vsource dc=h275
+parameters g276=integer(-0.0) h276=(integer(-0.0))/2
+vg276 (g276 0) vsource dc=g276
+vh276 (h276 0) vsource dc=h276
+parameters g277=integer(0.0) h277=(integer(0.0))/2
+vg277 (g277 0) vsource dc=g277
+vh277 (h277 0) vsource dc=h277
+parameters g278=integer(0.5) h278=(integer(0.5))/2
+vg278 (g278 0) vsource dc=g278
+vh278 (h278 0) vsource dc=h278
+parameters g279=integer(1.0) h279=(integer(1.0))/2
+vg279 (g279 0) vsource dc=g279
+vh279 (h279 0) vsource dc=h279
+parameters g280=integer(2.5) h280=(integer(2.5))/2
+vg280 (g280 0) vsource dc=g280
+vh280 (h280 0) vsource dc=h280
+parameters g281=integer(1e-3) h281=(integer(1e-3))/2
+vg281 (g281 0) vsource dc=g281
+vh281 (h281 0) vsource dc=h281
+parameters g282=integer(1e3) h282=(integer(1e3))/2
+vg282 (g282 0) vsource dc=g282
+vh282 (h282 0) vsource dc=h282
+parameters g283=integer(-3) h283=(integer(-3))/2
+vg283 (g283 0) vsource dc=g283
+vh283 (h283 0) vsource dc=h283
+parameters g284=integer(0) h284=(integer(0))/2
+vg284 (g284 0) vsource dc=g284
+vh284 (h284 0) vsource dc=h284
+parameters g285=integer(3) h285=(integer(3))/2
+vg285 (g285 0) vsource dc=g285
+vh285 (h285 0) vsource dc=h285
+parameters g286=int(-2.5) h286=(int(-2.5))/2
+vg286 (g286 0) vsource dc=g286
+vh286 (h286 0) vsource dc=h286
+parameters g287=int(-1.0) h287=(int(-1.0))/2
+vg287 (g287 0) vsource dc=g287
+vh287 (h287 0) vsource dc=h287
+parameters g288=int(-0.5) h288=(int(-0.5))/2
+vg288 (g288 0) vsource dc=g288
+vh288 (h288 0) vsource dc=h288
+parameters g289=int(-0.0) h289=(int(-0.0))/2
+vg289 (g289 0) vsource dc=g289
+vh289 (h289 0) vsource dc=h289
+parameters g290=int(0.0) h290=(int(0.0))/2
+vg290 (g290 0) vsource dc=g290
+vh290 (h290 0) vsource dc=h290
+parameters g291=int(0.5) h291=(int(0.5))/2
+vg291 (g291 0) vsource dc=g291
+vh291 (h291 0) vsource dc=h291
+parameters g292=int(1.0) h292=(int(1.0))/2
+vg292 (g292 0) vsource dc=g292
+vh292 (h292 0) vsource dc=h292
+parameters g293=int(2.5) h293=(int(2.5))/2
+vg293 (g293 0) vsource dc=g293
+vh293 (h293 0) vsource dc=h293
+parameters g294=int(1e-3) h294=(int(1e-3))/2
+vg294 (g294 0) vsource dc=g294
+vh294 (h294 0) vsource dc=h294
+parameters g295=int(1e3) h295=(int(1e3))/2
+vg295 (g295 0) vsource dc=g295
+vh295 (h295 0) vsource dc=h295
+parameters g296=int(-3) h296=(int(-3))/2
+vg296 (g296 0) vsource dc=g296
+vh296 (h296 0) vsource dc=h296
+parameters g297=int(0) h297=(int(0))/2
+vg297 (g297 0) vsource dc=g297
+vh297 (h297 0) vsource dc=h297
+parameters g298=int(3) h298=(int(3))/2
+vg298 (g298 0) vsource dc=g298
+vh298 (h298 0) vsource dc=h298
+parameters g299=sgn(-2.5) h299=(sgn(-2.5))/2
+vg299 (g299 0) vsource dc=g299
+vh299 (h299 0) vsource dc=h299
+parameters g300=sgn(-1.0) h300=(sgn(-1.0))/2
+vg300 (g300 0) vsource dc=g300
+vh300 (h300 0) vsource dc=h300
+parameters g301=sgn(-0.5) h301=(sgn(-0.5))/2
+vg301 (g301 0) vsource dc=g301
+vh301 (h301 0) vsource dc=h301
+parameters g302=sgn(-0.0) h302=(sgn(-0.0))/2
+vg302 (g302 0) vsource dc=g302
+vh302 (h302 0) vsource dc=h302
+parameters g303=sgn(0.0) h303=(sgn(0.0))/2
+vg303 (g303 0) vsource dc=g303
+vh303 (h303 0) vsource dc=h303
+parameters g304=sgn(0.5) h304=(sgn(0.5))/2
+vg304 (g304 0) vsource dc=g304
+vh304 (h304 0) vsource dc=h304
+parameters g305=sgn(1.0) h305=(sgn(1.0))/2
+vg305 (g305 0) vsource dc=g305
+vh305 (h305 0) vsource dc=h305
+parameters g306=sgn(2.5) h306=(sgn(2.5))/2
+vg306 (g306 0) vsource dc=g306
+vh306 (h306 0) vsource dc=h306
+parameters g307=sgn(1e-3) h307=(sgn(1e-3))/2
+vg307 (g307 0) vsource dc=g307
+vh307 (h307 0) vsource dc=h307
+parameters g308=sgn(1e3) h308=(sgn(1e3))/2
+vg308 (g308 0) vsource dc=g308
+vh308 (h308 0) vsource dc=h308
+parameters g309=sgn(-3) h309=(sgn(-3))/2
+vg309 (g309 0) vsource dc=g309
+vh309 (h309 0) vsource dc=h309
+parameters g310=sgn(0) h310=(sgn(0))/2
+vg310 (g310 0) vsource dc=g310
+vh310 (h310 0) vsource dc=h310
+parameters g311=sgn(3) h311=(sgn(3))/2
+vg311 (g311 0) vsource dc=g311
+vh311 (h311 0) vsource dc=h311
+parameters g312=pow(-2.0, -2.0) h312=(pow(-2.0, -2.0))/2
+vg312 (g312 0) vsource dc=g312
+vh312 (h312 0) vsource dc=h312
+parameters g314=pow(-2.0, -0.0) h314=(pow(-2.0, -0.0))/2
+vg314 (g314 0) vsource dc=g314
+vh314 (h314 0) vsource dc=h314
+parameters g315=pow(-2.0, 0.0) h315=(pow(-2.0, 0.0))/2
+vg315 (g315 0) vsource dc=g315
+vh315 (h315 0) vsource dc=h315
+parameters g317=pow(-2.0, 2.0) h317=(pow(-2.0, 2.0))/2
+vg317 (g317 0) vsource dc=g317
+vh317 (h317 0) vsource dc=h317
+parameters g318=pow(-2.0, -3) h318=(pow(-2.0, -3))/2
+vg318 (g318 0) vsource dc=g318
+vh318 (h318 0) vsource dc=h318
+parameters g319=pow(-2.0, 3) h319=(pow(-2.0, 3))/2
+vg319 (g319 0) vsource dc=g319
+vh319 (h319 0) vsource dc=h319
+parameters g320=pow(-2.0, 0) h320=(pow(-2.0, 0))/2
+vg320 (g320 0) vsource dc=g320
+vh320 (h320 0) vsource dc=h320
+parameters g321=pow(-0.5, -2.0) h321=(pow(-0.5, -2.0))/2
+vg321 (g321 0) vsource dc=g321
+vh321 (h321 0) vsource dc=h321
+parameters g323=pow(-0.5, -0.0) h323=(pow(-0.5, -0.0))/2
+vg323 (g323 0) vsource dc=g323
+vh323 (h323 0) vsource dc=h323
+parameters g324=pow(-0.5, 0.0) h324=(pow(-0.5, 0.0))/2
+vg324 (g324 0) vsource dc=g324
+vh324 (h324 0) vsource dc=h324
+parameters g326=pow(-0.5, 2.0) h326=(pow(-0.5, 2.0))/2
+vg326 (g326 0) vsource dc=g326
+vh326 (h326 0) vsource dc=h326
+parameters g327=pow(-0.5, -3) h327=(pow(-0.5, -3))/2
+vg327 (g327 0) vsource dc=g327
+vh327 (h327 0) vsource dc=h327
+parameters g328=pow(-0.5, 3) h328=(pow(-0.5, 3))/2
+vg328 (g328 0) vsource dc=g328
+vh328 (h328 0) vsource dc=h328
+parameters g329=pow(-0.5, 0) h329=(pow(-0.5, 0))/2
+vg329 (g329 0) vsource dc=g329
+vh329 (h329 0) vsource dc=h329
+parameters g334=pow(0.0, 0.5) h334=(pow(0.0, 0.5))/2
+vg334 (g334 0) vsource dc=g334
+vh334 (h334 0) vsource dc=h334
+parameters g335=pow(0.0, 2.0) h335=(pow(0.0, 2.0))/2
+vg335 (g335 0) vsource dc=g335
+vh335 (h335 0) vsource dc=h335
+parameters g337=pow(0.0, 3) h337=(pow(0.0, 3))/2
+vg337 (g337 0) vsource dc=g337
+vh337 (h337 0) vsource dc=h337
+parameters g339=pow(0.5, -2.0) h339=(pow(0.5, -2.0))/2
+vg339 (g339 0) vsource dc=g339
+vh339 (h339 0) vsource dc=h339
+parameters g340=pow(0.5, -0.5) h340=(pow(0.5, -0.5))/2
+vg340 (g340 0) vsource dc=g340
+vh340 (h340 0) vsource dc=h340
+parameters g341=pow(0.5, -0.0) h341=(pow(0.5, -0.0))/2
+vg341 (g341 0) vsource dc=g341
+vh341 (h341 0) vsource dc=h341
+parameters g342=pow(0.5, 0.0) h342=(pow(0.5, 0.0))/2
+vg342 (g342 0) vsource dc=g342
+vh342 (h342 0) vsource dc=h342
+parameters g343=pow(0.5, 0.5) h343=(pow(0.5, 0.5))/2
+vg343 (g343 0) vsource dc=g343
+vh343 (h343 0) vsource dc=h343
+parameters g344=pow(0.5, 2.0) h344=(pow(0.5, 2.0))/2
+vg344 (g344 0) vsource dc=g344
+vh344 (h344 0) vsource dc=h344
+parameters g345=pow(0.5, -3) h345=(pow(0.5, -3))/2
+vg345 (g345 0) vsource dc=g345
+vh345 (h345 0) vsource dc=h345
+parameters g346=pow(0.5, 3) h346=(pow(0.5, 3))/2
+vg346 (g346 0) vsource dc=g346
+vh346 (h346 0) vsource dc=h346
+parameters g347=pow(0.5, 0) h347=(pow(0.5, 0))/2
+vg347 (g347 0) vsource dc=g347
+vh347 (h347 0) vsource dc=h347
+parameters g348=pow(2.0, -2.0) h348=(pow(2.0, -2.0))/2
+vg348 (g348 0) vsource dc=g348
+vh348 (h348 0) vsource dc=h348
+parameters g349=pow(2.0, -0.5) h349=(pow(2.0, -0.5))/2
+vg349 (g349 0) vsource dc=g349
+vh349 (h349 0) vsource dc=h349
+parameters g350=pow(2.0, -0.0) h350=(pow(2.0, -0.0))/2
+vg350 (g350 0) vsource dc=g350
+vh350 (h350 0) vsource dc=h350
+parameters g351=pow(2.0, 0.0) h351=(pow(2.0, 0.0))/2
+vg351 (g351 0) vsource dc=g351
+vh351 (h351 0) vsource dc=h351
+parameters g352=pow(2.0, 0.5) h352=(pow(2.0, 0.5))/2
+vg352 (g352 0) vsource dc=g352
+vh352 (h352 0) vsource dc=h352
+parameters g353=pow(2.0, 2.0) h353=(pow(2.0, 2.0))/2
+vg353 (g353 0) vsource dc=g353
+vh353 (h353 0) vsource dc=h353
+parameters g354=pow(2.0, -3) h354=(pow(2.0, -3))/2
+vg354 (g354 0) vsource dc=g354
+vh354 (h354 0) vsource dc=h354
+parameters g355=pow(2.0, 3) h355=(pow(2.0, 3))/2
+vg355 (g355 0) vsource dc=g355
+vh355 (h355 0) vsource dc=h355
+parameters g356=pow(2.0, 0) h356=(pow(2.0, 0))/2
+vg356 (g356 0) vsource dc=g356
+vh356 (h356 0) vsource dc=h356
+parameters g357=pow(-3, -2.0) h357=(pow(-3, -2.0))/2
+vg357 (g357 0) vsource dc=g357
+vh357 (h357 0) vsource dc=h357
+parameters g359=pow(-3, -0.0) h359=(pow(-3, -0.0))/2
+vg359 (g359 0) vsource dc=g359
+vh359 (h359 0) vsource dc=h359
+parameters g360=pow(-3, 0.0) h360=(pow(-3, 0.0))/2
+vg360 (g360 0) vsource dc=g360
+vh360 (h360 0) vsource dc=h360
+parameters g362=pow(-3, 2.0) h362=(pow(-3, 2.0))/2
+vg362 (g362 0) vsource dc=g362
+vh362 (h362 0) vsource dc=h362
+parameters g363=pow(-3, -3) h363=(pow(-3, -3))/2
+vg363 (g363 0) vsource dc=g363
+vh363 (h363 0) vsource dc=h363
+parameters g364=pow(-3, 3) h364=(pow(-3, 3))/2
+vg364 (g364 0) vsource dc=g364
+vh364 (h364 0) vsource dc=h364
+parameters g365=pow(-3, 0) h365=(pow(-3, 0))/2
+vg365 (g365 0) vsource dc=g365
+vh365 (h365 0) vsource dc=h365
+parameters g366=pow(3, -2.0) h366=(pow(3, -2.0))/2
+vg366 (g366 0) vsource dc=g366
+vh366 (h366 0) vsource dc=h366
+parameters g367=pow(3, -0.5) h367=(pow(3, -0.5))/2
+vg367 (g367 0) vsource dc=g367
+vh367 (h367 0) vsource dc=h367
+parameters g368=pow(3, -0.0) h368=(pow(3, -0.0))/2
+vg368 (g368 0) vsource dc=g368
+vh368 (h368 0) vsource dc=h368
+parameters g369=pow(3, 0.0) h369=(pow(3, 0.0))/2
+vg369 (g369 0) vsource dc=g369
+vh369 (h369 0) vsource dc=h369
+parameters g370=pow(3, 0.5) h370=(pow(3, 0.5))/2
+vg370 (g370 0) vsource dc=g370
+vh370 (h370 0) vsource dc=h370
+parameters g371=pow(3, 2.0) h371=(pow(3, 2.0))/2
+vg371 (g371 0) vsource dc=g371
+vh371 (h371 0) vsource dc=h371
+parameters g372=pow(3, -3) h372=(pow(3, -3))/2
+vg372 (g372 0) vsource dc=g372
+vh372 (h372 0) vsource dc=h372
+parameters g373=pow(3, 3) h373=(pow(3, 3))/2
+vg373 (g373 0) vsource dc=g373
+vh373 (h373 0) vsource dc=h373
+parameters g374=pow(3, 0) h374=(pow(3, 0))/2
+vg374 (g374 0) vsource dc=g374
+vh374 (h374 0) vsource dc=h374
+parameters g379=pow(0, 0.5) h379=(pow(0, 0.5))/2
+vg379 (g379 0) vsource dc=g379
+vh379 (h379 0) vsource dc=h379
+parameters g380=pow(0, 2.0) h380=(pow(0, 2.0))/2
+vg380 (g380 0) vsource dc=g380
+vh380 (h380 0) vsource dc=h380
+parameters g382=pow(0, 3) h382=(pow(0, 3))/2
+vg382 (g382 0) vsource dc=g382
+vh382 (h382 0) vsource dc=h382
+parameters g384=hypot(-2.0, -2.0) h384=(hypot(-2.0, -2.0))/2
+vg384 (g384 0) vsource dc=g384
+vh384 (h384 0) vsource dc=h384
+parameters g385=hypot(-2.0, -0.5) h385=(hypot(-2.0, -0.5))/2
+vg385 (g385 0) vsource dc=g385
+vh385 (h385 0) vsource dc=h385
+parameters g386=hypot(-2.0, -0.0) h386=(hypot(-2.0, -0.0))/2
+vg386 (g386 0) vsource dc=g386
+vh386 (h386 0) vsource dc=h386
+parameters g387=hypot(-2.0, 0.0) h387=(hypot(-2.0, 0.0))/2
+vg387 (g387 0) vsource dc=g387
+vh387 (h387 0) vsource dc=h387
+parameters g388=hypot(-2.0, 0.5) h388=(hypot(-2.0, 0.5))/2
+vg388 (g388 0) vsource dc=g388
+vh388 (h388 0) vsource dc=h388
+parameters g389=hypot(-2.0, 2.0) h389=(hypot(-2.0, 2.0))/2
+vg389 (g389 0) vsource dc=g389
+vh389 (h389 0) vsource dc=h389
+parameters g390=hypot(-2.0, -3) h390=(hypot(-2.0, -3))/2
+vg390 (g390 0) vsource dc=g390
+vh390 (h390 0) vsource dc=h390
+parameters g391=hypot(-2.0, 3) h391=(hypot(-2.0, 3))/2
+vg391 (g391 0) vsource dc=g391
+vh391 (h391 0) vsource dc=h391
+parameters g392=hypot(-2.0, 0) h392=(hypot(-2.0, 0))/2
+vg392 (g392 0) vsource dc=g392
+vh392 (h392 0) vsource dc=h392
+parameters g393=hypot(-0.5, -2.0) h393=(hypot(-0.5, -2.0))/2
+vg393 (g393 0) vsource dc=g393
+vh393 (h393 0) vsource dc=h393
+parameters g394=hypot(-0.5, -0.5) h394=(hypot(-0.5, -0.5))/2
+vg394 (g394 0) vsource dc=g394
+vh394 (h394 0) vsource dc=h394
+parameters g395=hypot(-0.5, -0.0) h395=(hypot(-0.5, -0.0))/2
+vg395 (g395 0) vsource dc=g395
+vh395 (h395 0) vsource dc=h395
+parameters g396=hypot(-0.5, 0.0) h396=(hypot(-0.5, 0.0))/2
+vg396 (g396 0) vsource dc=g396
+vh396 (h396 0) vsource dc=h396
+parameters g397=hypot(-0.5, 0.5) h397=(hypot(-0.5, 0.5))/2
+vg397 (g397 0) vsource dc=g397
+vh397 (h397 0) vsource dc=h397
+parameters g398=hypot(-0.5, 2.0) h398=(hypot(-0.5, 2.0))/2
+vg398 (g398 0) vsource dc=g398
+vh398 (h398 0) vsource dc=h398
+parameters g399=hypot(-0.5, -3) h399=(hypot(-0.5, -3))/2
+vg399 (g399 0) vsource dc=g399
+vh399 (h399 0) vsource dc=h399
+parameters g400=hypot(-0.5, 3) h400=(hypot(-0.5, 3))/2
+vg400 (g400 0) vsource dc=g400
+vh400 (h400 0) vsource dc=h400
+parameters g401=hypot(-0.5, 0) h401=(hypot(-0.5, 0))/2
+vg401 (g401 0) vsource dc=g401
+vh401 (h401 0) vsource dc=h401
+parameters g402=hypot(0.0, -2.0) h402=(hypot(0.0, -2.0))/2
+vg402 (g402 0) vsource dc=g402
+vh402 (h402 0) vsource dc=h402
+parameters g403=hypot(0.0, -0.5) h403=(hypot(0.0, -0.5))/2
+vg403 (g403 0) vsource dc=g403
+vh403 (h403 0) vsource dc=h403
+parameters g404=hypot(0.0, -0.0) h404=(hypot(0.0, -0.0))/2
+vg404 (g404 0) vsource dc=g404
+vh404 (h404 0) vsource dc=h404
+parameters g405=hypot(0.0, 0.0) h405=(hypot(0.0, 0.0))/2
+vg405 (g405 0) vsource dc=g405
+vh405 (h405 0) vsource dc=h405
+parameters g406=hypot(0.0, 0.5) h406=(hypot(0.0, 0.5))/2
+vg406 (g406 0) vsource dc=g406
+vh406 (h406 0) vsource dc=h406
+parameters g407=hypot(0.0, 2.0) h407=(hypot(0.0, 2.0))/2
+vg407 (g407 0) vsource dc=g407
+vh407 (h407 0) vsource dc=h407
+parameters g408=hypot(0.0, -3) h408=(hypot(0.0, -3))/2
+vg408 (g408 0) vsource dc=g408
+vh408 (h408 0) vsource dc=h408
+parameters g409=hypot(0.0, 3) h409=(hypot(0.0, 3))/2
+vg409 (g409 0) vsource dc=g409
+vh409 (h409 0) vsource dc=h409
+parameters g410=hypot(0.0, 0) h410=(hypot(0.0, 0))/2
+vg410 (g410 0) vsource dc=g410
+vh410 (h410 0) vsource dc=h410
+parameters g411=hypot(0.5, -2.0) h411=(hypot(0.5, -2.0))/2
+vg411 (g411 0) vsource dc=g411
+vh411 (h411 0) vsource dc=h411
+parameters g412=hypot(0.5, -0.5) h412=(hypot(0.5, -0.5))/2
+vg412 (g412 0) vsource dc=g412
+vh412 (h412 0) vsource dc=h412
+parameters g413=hypot(0.5, -0.0) h413=(hypot(0.5, -0.0))/2
+vg413 (g413 0) vsource dc=g413
+vh413 (h413 0) vsource dc=h413
+parameters g414=hypot(0.5, 0.0) h414=(hypot(0.5, 0.0))/2
+vg414 (g414 0) vsource dc=g414
+vh414 (h414 0) vsource dc=h414
+parameters g415=hypot(0.5, 0.5) h415=(hypot(0.5, 0.5))/2
+vg415 (g415 0) vsource dc=g415
+vh415 (h415 0) vsource dc=h415
+parameters g416=hypot(0.5, 2.0) h416=(hypot(0.5, 2.0))/2
+vg416 (g416 0) vsource dc=g416
+vh416 (h416 0) vsource dc=h416
+parameters g417=hypot(0.5, -3) h417=(hypot(0.5, -3))/2
+vg417 (g417 0) vsource dc=g417
+vh417 (h417 0) vsource dc=h417
+parameters g418=hypot(0.5, 3) h418=(hypot(0.5, 3))/2
+vg418 (g418 0) vsource dc=g418
+vh418 (h418 0) vsource dc=h418
+parameters g419=hypot(0.5, 0) h419=(hypot(0.5, 0))/2
+vg419 (g419 0) vsource dc=g419
+vh419 (h419 0) vsource dc=h419
+parameters g420=hypot(2.0, -2.0) h420=(hypot(2.0, -2.0))/2
+vg420 (g420 0) vsource dc=g420
+vh420 (h420 0) vsource dc=h420
+parameters g421=hypot(2.0, -0.5) h421=(hypot(2.0, -0.5))/2
+vg421 (g421 0) vsource dc=g421
+vh421 (h421 0) vsource dc=h421
+parameters g422=hypot(2.0, -0.0) h422=(hypot(2.0, -0.0))/2
+vg422 (g422 0) vsource dc=g422
+vh422 (h422 0) vsource dc=h422
+parameters g423=hypot(2.0, 0.0) h423=(hypot(2.0, 0.0))/2
+vg423 (g423 0) vsource dc=g423
+vh423 (h423 0) vsource dc=h423
+parameters g424=hypot(2.0, 0.5) h424=(hypot(2.0, 0.5))/2
+vg424 (g424 0) vsource dc=g424
+vh424 (h424 0) vsource dc=h424
+parameters g425=hypot(2.0, 2.0) h425=(hypot(2.0, 2.0))/2
+vg425 (g425 0) vsource dc=g425
+vh425 (h425 0) vsource dc=h425
+parameters g426=hypot(2.0, -3) h426=(hypot(2.0, -3))/2
+vg426 (g426 0) vsource dc=g426
+vh426 (h426 0) vsource dc=h426
+parameters g427=hypot(2.0, 3) h427=(hypot(2.0, 3))/2
+vg427 (g427 0) vsource dc=g427
+vh427 (h427 0) vsource dc=h427
+parameters g428=hypot(2.0, 0) h428=(hypot(2.0, 0))/2
+vg428 (g428 0) vsource dc=g428
+vh428 (h428 0) vsource dc=h428
+parameters g429=hypot(-3, -2.0) h429=(hypot(-3, -2.0))/2
+vg429 (g429 0) vsource dc=g429
+vh429 (h429 0) vsource dc=h429
+parameters g430=hypot(-3, -0.5) h430=(hypot(-3, -0.5))/2
+vg430 (g430 0) vsource dc=g430
+vh430 (h430 0) vsource dc=h430
+parameters g431=hypot(-3, -0.0) h431=(hypot(-3, -0.0))/2
+vg431 (g431 0) vsource dc=g431
+vh431 (h431 0) vsource dc=h431
+parameters g432=hypot(-3, 0.0) h432=(hypot(-3, 0.0))/2
+vg432 (g432 0) vsource dc=g432
+vh432 (h432 0) vsource dc=h432
+parameters g433=hypot(-3, 0.5) h433=(hypot(-3, 0.5))/2
+vg433 (g433 0) vsource dc=g433
+vh433 (h433 0) vsource dc=h433
+parameters g434=hypot(-3, 2.0) h434=(hypot(-3, 2.0))/2
+vg434 (g434 0) vsource dc=g434
+vh434 (h434 0) vsource dc=h434
+parameters g435=hypot(-3, -3) h435=(hypot(-3, -3))/2
+vg435 (g435 0) vsource dc=g435
+vh435 (h435 0) vsource dc=h435
+parameters g436=hypot(-3, 3) h436=(hypot(-3, 3))/2
+vg436 (g436 0) vsource dc=g436
+vh436 (h436 0) vsource dc=h436
+parameters g437=hypot(-3, 0) h437=(hypot(-3, 0))/2
+vg437 (g437 0) vsource dc=g437
+vh437 (h437 0) vsource dc=h437
+parameters g438=hypot(3, -2.0) h438=(hypot(3, -2.0))/2
+vg438 (g438 0) vsource dc=g438
+vh438 (h438 0) vsource dc=h438
+parameters g439=hypot(3, -0.5) h439=(hypot(3, -0.5))/2
+vg439 (g439 0) vsource dc=g439
+vh439 (h439 0) vsource dc=h439
+parameters g440=hypot(3, -0.0) h440=(hypot(3, -0.0))/2
+vg440 (g440 0) vsource dc=g440
+vh440 (h440 0) vsource dc=h440
+parameters g441=hypot(3, 0.0) h441=(hypot(3, 0.0))/2
+vg441 (g441 0) vsource dc=g441
+vh441 (h441 0) vsource dc=h441
+parameters g442=hypot(3, 0.5) h442=(hypot(3, 0.5))/2
+vg442 (g442 0) vsource dc=g442
+vh442 (h442 0) vsource dc=h442
+parameters g443=hypot(3, 2.0) h443=(hypot(3, 2.0))/2
+vg443 (g443 0) vsource dc=g443
+vh443 (h443 0) vsource dc=h443
+parameters g444=hypot(3, -3) h444=(hypot(3, -3))/2
+vg444 (g444 0) vsource dc=g444
+vh444 (h444 0) vsource dc=h444
+parameters g445=hypot(3, 3) h445=(hypot(3, 3))/2
+vg445 (g445 0) vsource dc=g445
+vh445 (h445 0) vsource dc=h445
+parameters g446=hypot(3, 0) h446=(hypot(3, 0))/2
+vg446 (g446 0) vsource dc=g446
+vh446 (h446 0) vsource dc=h446
+parameters g447=hypot(0, -2.0) h447=(hypot(0, -2.0))/2
+vg447 (g447 0) vsource dc=g447
+vh447 (h447 0) vsource dc=h447
+parameters g448=hypot(0, -0.5) h448=(hypot(0, -0.5))/2
+vg448 (g448 0) vsource dc=g448
+vh448 (h448 0) vsource dc=h448
+parameters g449=hypot(0, -0.0) h449=(hypot(0, -0.0))/2
+vg449 (g449 0) vsource dc=g449
+vh449 (h449 0) vsource dc=h449
+parameters g450=hypot(0, 0.0) h450=(hypot(0, 0.0))/2
+vg450 (g450 0) vsource dc=g450
+vh450 (h450 0) vsource dc=h450
+parameters g451=hypot(0, 0.5) h451=(hypot(0, 0.5))/2
+vg451 (g451 0) vsource dc=g451
+vh451 (h451 0) vsource dc=h451
+parameters g452=hypot(0, 2.0) h452=(hypot(0, 2.0))/2
+vg452 (g452 0) vsource dc=g452
+vh452 (h452 0) vsource dc=h452
+parameters g453=hypot(0, -3) h453=(hypot(0, -3))/2
+vg453 (g453 0) vsource dc=g453
+vh453 (h453 0) vsource dc=h453
+parameters g454=hypot(0, 3) h454=(hypot(0, 3))/2
+vg454 (g454 0) vsource dc=g454
+vh454 (h454 0) vsource dc=h454
+parameters g455=hypot(0, 0) h455=(hypot(0, 0))/2
+vg455 (g455 0) vsource dc=g455
+vh455 (h455 0) vsource dc=h455
+parameters g456=fmod(-2.0, -2.0) h456=(fmod(-2.0, -2.0))/2
+vg456 (g456 0) vsource dc=g456
+vh456 (h456 0) vsource dc=h456
+parameters g457=fmod(-2.0, -0.5) h457=(fmod(-2.0, -0.5))/2
+vg457 (g457 0) vsource dc=g457
+vh457 (h457 0) vsource dc=h457
+parameters g460=fmod(-2.0, 0.5) h460=(fmod(-2.0, 0.5))/2
+vg460 (g460 0) vsource dc=g460
+vh460 (h460 0) vsource dc=h460
+parameters g461=fmod(-2.0, 2.0) h461=(fmod(-2.0, 2.0))/2
+vg461 (g461 0) vsource dc=g461
+vh461 (h461 0) vsource dc=h461
+parameters g462=fmod(-2.0, -3) h462=(fmod(-2.0, -3))/2
+vg462 (g462 0) vsource dc=g462
+vh462 (h462 0) vsource dc=h462
+parameters g463=fmod(-2.0, 3) h463=(fmod(-2.0, 3))/2
+vg463 (g463 0) vsource dc=g463
+vh463 (h463 0) vsource dc=h463
+parameters g465=fmod(-0.5, -2.0) h465=(fmod(-0.5, -2.0))/2
+vg465 (g465 0) vsource dc=g465
+vh465 (h465 0) vsource dc=h465
+parameters g466=fmod(-0.5, -0.5) h466=(fmod(-0.5, -0.5))/2
+vg466 (g466 0) vsource dc=g466
+vh466 (h466 0) vsource dc=h466
+parameters g469=fmod(-0.5, 0.5) h469=(fmod(-0.5, 0.5))/2
+vg469 (g469 0) vsource dc=g469
+vh469 (h469 0) vsource dc=h469
+parameters g470=fmod(-0.5, 2.0) h470=(fmod(-0.5, 2.0))/2
+vg470 (g470 0) vsource dc=g470
+vh470 (h470 0) vsource dc=h470
+parameters g471=fmod(-0.5, -3) h471=(fmod(-0.5, -3))/2
+vg471 (g471 0) vsource dc=g471
+vh471 (h471 0) vsource dc=h471
+parameters g472=fmod(-0.5, 3) h472=(fmod(-0.5, 3))/2
+vg472 (g472 0) vsource dc=g472
+vh472 (h472 0) vsource dc=h472
+parameters g474=fmod(0.0, -2.0) h474=(fmod(0.0, -2.0))/2
+vg474 (g474 0) vsource dc=g474
+vh474 (h474 0) vsource dc=h474
+parameters g475=fmod(0.0, -0.5) h475=(fmod(0.0, -0.5))/2
+vg475 (g475 0) vsource dc=g475
+vh475 (h475 0) vsource dc=h475
+parameters g478=fmod(0.0, 0.5) h478=(fmod(0.0, 0.5))/2
+vg478 (g478 0) vsource dc=g478
+vh478 (h478 0) vsource dc=h478
+parameters g479=fmod(0.0, 2.0) h479=(fmod(0.0, 2.0))/2
+vg479 (g479 0) vsource dc=g479
+vh479 (h479 0) vsource dc=h479
+parameters g480=fmod(0.0, -3) h480=(fmod(0.0, -3))/2
+vg480 (g480 0) vsource dc=g480
+vh480 (h480 0) vsource dc=h480
+parameters g481=fmod(0.0, 3) h481=(fmod(0.0, 3))/2
+vg481 (g481 0) vsource dc=g481
+vh481 (h481 0) vsource dc=h481
+parameters g483=fmod(0.5, -2.0) h483=(fmod(0.5, -2.0))/2
+vg483 (g483 0) vsource dc=g483
+vh483 (h483 0) vsource dc=h483
+parameters g484=fmod(0.5, -0.5) h484=(fmod(0.5, -0.5))/2
+vg484 (g484 0) vsource dc=g484
+vh484 (h484 0) vsource dc=h484
+parameters g487=fmod(0.5, 0.5) h487=(fmod(0.5, 0.5))/2
+vg487 (g487 0) vsource dc=g487
+vh487 (h487 0) vsource dc=h487
+parameters g488=fmod(0.5, 2.0) h488=(fmod(0.5, 2.0))/2
+vg488 (g488 0) vsource dc=g488
+vh488 (h488 0) vsource dc=h488
+parameters g489=fmod(0.5, -3) h489=(fmod(0.5, -3))/2
+vg489 (g489 0) vsource dc=g489
+vh489 (h489 0) vsource dc=h489
+parameters g490=fmod(0.5, 3) h490=(fmod(0.5, 3))/2
+vg490 (g490 0) vsource dc=g490
+vh490 (h490 0) vsource dc=h490
+parameters g492=fmod(2.0, -2.0) h492=(fmod(2.0, -2.0))/2
+vg492 (g492 0) vsource dc=g492
+vh492 (h492 0) vsource dc=h492
+parameters g493=fmod(2.0, -0.5) h493=(fmod(2.0, -0.5))/2
+vg493 (g493 0) vsource dc=g493
+vh493 (h493 0) vsource dc=h493
+parameters g496=fmod(2.0, 0.5) h496=(fmod(2.0, 0.5))/2
+vg496 (g496 0) vsource dc=g496
+vh496 (h496 0) vsource dc=h496
+parameters g497=fmod(2.0, 2.0) h497=(fmod(2.0, 2.0))/2
+vg497 (g497 0) vsource dc=g497
+vh497 (h497 0) vsource dc=h497
+parameters g498=fmod(2.0, -3) h498=(fmod(2.0, -3))/2
+vg498 (g498 0) vsource dc=g498
+vh498 (h498 0) vsource dc=h498
+parameters g499=fmod(2.0, 3) h499=(fmod(2.0, 3))/2
+vg499 (g499 0) vsource dc=g499
+vh499 (h499 0) vsource dc=h499
+parameters g501=fmod(-3, -2.0) h501=(fmod(-3, -2.0))/2
+vg501 (g501 0) vsource dc=g501
+vh501 (h501 0) vsource dc=h501
+parameters g502=fmod(-3, -0.5) h502=(fmod(-3, -0.5))/2
+vg502 (g502 0) vsource dc=g502
+vh502 (h502 0) vsource dc=h502
+parameters g505=fmod(-3, 0.5) h505=(fmod(-3, 0.5))/2
+vg505 (g505 0) vsource dc=g505
+vh505 (h505 0) vsource dc=h505
+parameters g506=fmod(-3, 2.0) h506=(fmod(-3, 2.0))/2
+vg506 (g506 0) vsource dc=g506
+vh506 (h506 0) vsource dc=h506
+parameters g507=fmod(-3, -3) h507=(fmod(-3, -3))/2
+vg507 (g507 0) vsource dc=g507
+vh507 (h507 0) vsource dc=h507
+parameters g508=fmod(-3, 3) h508=(fmod(-3, 3))/2
+vg508 (g508 0) vsource dc=g508
+vh508 (h508 0) vsource dc=h508
+parameters g510=fmod(3, -2.0) h510=(fmod(3, -2.0))/2
+vg510 (g510 0) vsource dc=g510
+vh510 (h510 0) vsource dc=h510
+parameters g511=fmod(3, -0.5) h511=(fmod(3, -0.5))/2
+vg511 (g511 0) vsource dc=g511
+vh511 (h511 0) vsource dc=h511
+parameters g514=fmod(3, 0.5) h514=(fmod(3, 0.5))/2
+vg514 (g514 0) vsource dc=g514
+vh514 (h514 0) vsource dc=h514
+parameters g515=fmod(3, 2.0) h515=(fmod(3, 2.0))/2
+vg515 (g515 0) vsource dc=g515
+vh515 (h515 0) vsource dc=h515
+parameters g516=fmod(3, -3) h516=(fmod(3, -3))/2
+vg516 (g516 0) vsource dc=g516
+vh516 (h516 0) vsource dc=h516
+parameters g517=fmod(3, 3) h517=(fmod(3, 3))/2
+vg517 (g517 0) vsource dc=g517
+vh517 (h517 0) vsource dc=h517
+parameters g519=fmod(0, -2.0) h519=(fmod(0, -2.0))/2
+vg519 (g519 0) vsource dc=g519
+vh519 (h519 0) vsource dc=h519
+parameters g520=fmod(0, -0.5) h520=(fmod(0, -0.5))/2
+vg520 (g520 0) vsource dc=g520
+vh520 (h520 0) vsource dc=h520
+parameters g523=fmod(0, 0.5) h523=(fmod(0, 0.5))/2
+vg523 (g523 0) vsource dc=g523
+vh523 (h523 0) vsource dc=h523
+parameters g524=fmod(0, 2.0) h524=(fmod(0, 2.0))/2
+vg524 (g524 0) vsource dc=g524
+vh524 (h524 0) vsource dc=h524
+parameters g525=fmod(0, -3) h525=(fmod(0, -3))/2
+vg525 (g525 0) vsource dc=g525
+vh525 (h525 0) vsource dc=h525
+parameters g526=fmod(0, 3) h526=(fmod(0, 3))/2
+vg526 (g526 0) vsource dc=g526
+vh526 (h526 0) vsource dc=h526
+parameters g528=min(-2.0, -2.0) h528=(min(-2.0, -2.0))/2
+vg528 (g528 0) vsource dc=g528
+vh528 (h528 0) vsource dc=h528
+parameters g529=min(-2.0, -0.5) h529=(min(-2.0, -0.5))/2
+vg529 (g529 0) vsource dc=g529
+vh529 (h529 0) vsource dc=h529
+parameters g530=min(-2.0, -0.0) h530=(min(-2.0, -0.0))/2
+vg530 (g530 0) vsource dc=g530
+vh530 (h530 0) vsource dc=h530
+parameters g531=min(-2.0, 0.0) h531=(min(-2.0, 0.0))/2
+vg531 (g531 0) vsource dc=g531
+vh531 (h531 0) vsource dc=h531
+parameters g532=min(-2.0, 0.5) h532=(min(-2.0, 0.5))/2
+vg532 (g532 0) vsource dc=g532
+vh532 (h532 0) vsource dc=h532
+parameters g533=min(-2.0, 2.0) h533=(min(-2.0, 2.0))/2
+vg533 (g533 0) vsource dc=g533
+vh533 (h533 0) vsource dc=h533
+parameters g534=min(-2.0, -3) h534=(min(-2.0, -3))/2
+vg534 (g534 0) vsource dc=g534
+vh534 (h534 0) vsource dc=h534
+parameters g535=min(-2.0, 3) h535=(min(-2.0, 3))/2
+vg535 (g535 0) vsource dc=g535
+vh535 (h535 0) vsource dc=h535
+parameters g536=min(-2.0, 0) h536=(min(-2.0, 0))/2
+vg536 (g536 0) vsource dc=g536
+vh536 (h536 0) vsource dc=h536
+parameters g537=min(-0.5, -2.0) h537=(min(-0.5, -2.0))/2
+vg537 (g537 0) vsource dc=g537
+vh537 (h537 0) vsource dc=h537
+parameters g538=min(-0.5, -0.5) h538=(min(-0.5, -0.5))/2
+vg538 (g538 0) vsource dc=g538
+vh538 (h538 0) vsource dc=h538
+parameters g539=min(-0.5, -0.0) h539=(min(-0.5, -0.0))/2
+vg539 (g539 0) vsource dc=g539
+vh539 (h539 0) vsource dc=h539
+parameters g540=min(-0.5, 0.0) h540=(min(-0.5, 0.0))/2
+vg540 (g540 0) vsource dc=g540
+vh540 (h540 0) vsource dc=h540
+parameters g541=min(-0.5, 0.5) h541=(min(-0.5, 0.5))/2
+vg541 (g541 0) vsource dc=g541
+vh541 (h541 0) vsource dc=h541
+parameters g542=min(-0.5, 2.0) h542=(min(-0.5, 2.0))/2
+vg542 (g542 0) vsource dc=g542
+vh542 (h542 0) vsource dc=h542
+parameters g543=min(-0.5, -3) h543=(min(-0.5, -3))/2
+vg543 (g543 0) vsource dc=g543
+vh543 (h543 0) vsource dc=h543
+parameters g544=min(-0.5, 3) h544=(min(-0.5, 3))/2
+vg544 (g544 0) vsource dc=g544
+vh544 (h544 0) vsource dc=h544
+parameters g545=min(-0.5, 0) h545=(min(-0.5, 0))/2
+vg545 (g545 0) vsource dc=g545
+vh545 (h545 0) vsource dc=h545
+parameters g546=min(0.0, -2.0) h546=(min(0.0, -2.0))/2
+vg546 (g546 0) vsource dc=g546
+vh546 (h546 0) vsource dc=h546
+parameters g547=min(0.0, -0.5) h547=(min(0.0, -0.5))/2
+vg547 (g547 0) vsource dc=g547
+vh547 (h547 0) vsource dc=h547
+parameters g548=min(0.0, -0.0) h548=(min(0.0, -0.0))/2
+vg548 (g548 0) vsource dc=g548
+vh548 (h548 0) vsource dc=h548
+parameters g549=min(0.0, 0.0) h549=(min(0.0, 0.0))/2
+vg549 (g549 0) vsource dc=g549
+vh549 (h549 0) vsource dc=h549
+parameters g550=min(0.0, 0.5) h550=(min(0.0, 0.5))/2
+vg550 (g550 0) vsource dc=g550
+vh550 (h550 0) vsource dc=h550
+parameters g551=min(0.0, 2.0) h551=(min(0.0, 2.0))/2
+vg551 (g551 0) vsource dc=g551
+vh551 (h551 0) vsource dc=h551
+parameters g552=min(0.0, -3) h552=(min(0.0, -3))/2
+vg552 (g552 0) vsource dc=g552
+vh552 (h552 0) vsource dc=h552
+parameters g553=min(0.0, 3) h553=(min(0.0, 3))/2
+vg553 (g553 0) vsource dc=g553
+vh553 (h553 0) vsource dc=h553
+parameters g554=min(0.0, 0) h554=(min(0.0, 0))/2
+vg554 (g554 0) vsource dc=g554
+vh554 (h554 0) vsource dc=h554
+parameters g555=min(0.5, -2.0) h555=(min(0.5, -2.0))/2
+vg555 (g555 0) vsource dc=g555
+vh555 (h555 0) vsource dc=h555
+parameters g556=min(0.5, -0.5) h556=(min(0.5, -0.5))/2
+vg556 (g556 0) vsource dc=g556
+vh556 (h556 0) vsource dc=h556
+parameters g557=min(0.5, -0.0) h557=(min(0.5, -0.0))/2
+vg557 (g557 0) vsource dc=g557
+vh557 (h557 0) vsource dc=h557
+parameters g558=min(0.5, 0.0) h558=(min(0.5, 0.0))/2
+vg558 (g558 0) vsource dc=g558
+vh558 (h558 0) vsource dc=h558
+parameters g559=min(0.5, 0.5) h559=(min(0.5, 0.5))/2
+vg559 (g559 0) vsource dc=g559
+vh559 (h559 0) vsource dc=h559
+parameters g560=min(0.5, 2.0) h560=(min(0.5, 2.0))/2
+vg560 (g560 0) vsource dc=g560
+vh560 (h560 0) vsource dc=h560
+parameters g561=min(0.5, -3) h561=(min(0.5, -3))/2
+vg561 (g561 0) vsource dc=g561
+vh561 (h561 0) vsource dc=h561
+parameters g562=min(0.5, 3) h562=(min(0.5, 3))/2
+vg562 (g562 0) vsource dc=g562
+vh562 (h562 0) vsource dc=h562
+parameters g563=min(0.5, 0) h563=(min(0.5, 0))/2
+vg563 (g563 0) vsource dc=g563
+vh563 (h563 0) vsource dc=h563
+parameters g564=min(2.0, -2.0) h564=(min(2.0, -2.0))/2
+vg564 (g564 0) vsource dc=g564
+vh564 (h564 0) vsource dc=h564
+parameters g565=min(2.0, -0.5) h565=(min(2.0, -0.5))/2
+vg565 (g565 0) vsource dc=g565
+vh565 (h565 0) vsource dc=h565
+parameters g566=min(2.0, -0.0) h566=(min(2.0, -0.0))/2
+vg566 (g566 0) vsource dc=g566
+vh566 (h566 0) vsource dc=h566
+parameters g567=min(2.0, 0.0) h567=(min(2.0, 0.0))/2
+vg567 (g567 0) vsource dc=g567
+vh567 (h567 0) vsource dc=h567
+parameters g568=min(2.0, 0.5) h568=(min(2.0, 0.5))/2
+vg568 (g568 0) vsource dc=g568
+vh568 (h568 0) vsource dc=h568
+parameters g569=min(2.0, 2.0) h569=(min(2.0, 2.0))/2
+vg569 (g569 0) vsource dc=g569
+vh569 (h569 0) vsource dc=h569
+parameters g570=min(2.0, -3) h570=(min(2.0, -3))/2
+vg570 (g570 0) vsource dc=g570
+vh570 (h570 0) vsource dc=h570
+parameters g571=min(2.0, 3) h571=(min(2.0, 3))/2
+vg571 (g571 0) vsource dc=g571
+vh571 (h571 0) vsource dc=h571
+parameters g572=min(2.0, 0) h572=(min(2.0, 0))/2
+vg572 (g572 0) vsource dc=g572
+vh572 (h572 0) vsource dc=h572
+parameters g573=min(-3, -2.0) h573=(min(-3, -2.0))/2
+vg573 (g573 0) vsource dc=g573
+vh573 (h573 0) vsource dc=h573
+parameters g574=min(-3, -0.5) h574=(min(-3, -0.5))/2
+vg574 (g574 0) vsource dc=g574
+vh574 (h574 0) vsource dc=h574
+parameters g575=min(-3, -0.0) h575=(min(-3, -0.0))/2
+vg575 (g575 0) vsource dc=g575
+vh575 (h575 0) vsource dc=h575
+parameters g576=min(-3, 0.0) h576=(min(-3, 0.0))/2
+vg576 (g576 0) vsource dc=g576
+vh576 (h576 0) vsource dc=h576
+parameters g577=min(-3, 0.5) h577=(min(-3, 0.5))/2
+vg577 (g577 0) vsource dc=g577
+vh577 (h577 0) vsource dc=h577
+parameters g578=min(-3, 2.0) h578=(min(-3, 2.0))/2
+vg578 (g578 0) vsource dc=g578
+vh578 (h578 0) vsource dc=h578
+parameters g579=min(-3, -3) h579=(min(-3, -3))/2
+vg579 (g579 0) vsource dc=g579
+vh579 (h579 0) vsource dc=h579
+parameters g580=min(-3, 3) h580=(min(-3, 3))/2
+vg580 (g580 0) vsource dc=g580
+vh580 (h580 0) vsource dc=h580
+parameters g581=min(-3, 0) h581=(min(-3, 0))/2
+vg581 (g581 0) vsource dc=g581
+vh581 (h581 0) vsource dc=h581
+parameters g582=min(3, -2.0) h582=(min(3, -2.0))/2
+vg582 (g582 0) vsource dc=g582
+vh582 (h582 0) vsource dc=h582
+parameters g583=min(3, -0.5) h583=(min(3, -0.5))/2
+vg583 (g583 0) vsource dc=g583
+vh583 (h583 0) vsource dc=h583
+parameters g584=min(3, -0.0) h584=(min(3, -0.0))/2
+vg584 (g584 0) vsource dc=g584
+vh584 (h584 0) vsource dc=h584
+parameters g585=min(3, 0.0) h585=(min(3, 0.0))/2
+vg585 (g585 0) vsource dc=g585
+vh585 (h585 0) vsource dc=h585
+parameters g586=min(3, 0.5) h586=(min(3, 0.5))/2
+vg586 (g586 0) vsource dc=g586
+vh586 (h586 0) vsource dc=h586
+parameters g587=min(3, 2.0) h587=(min(3, 2.0))/2
+vg587 (g587 0) vsource dc=g587
+vh587 (h587 0) vsource dc=h587
+parameters g588=min(3, -3) h588=(min(3, -3))/2
+vg588 (g588 0) vsource dc=g588
+vh588 (h588 0) vsource dc=h588
+parameters g589=min(3, 3) h589=(min(3, 3))/2
+vg589 (g589 0) vsource dc=g589
+vh589 (h589 0) vsource dc=h589
+parameters g590=min(3, 0) h590=(min(3, 0))/2
+vg590 (g590 0) vsource dc=g590
+vh590 (h590 0) vsource dc=h590
+parameters g591=min(0, -2.0) h591=(min(0, -2.0))/2
+vg591 (g591 0) vsource dc=g591
+vh591 (h591 0) vsource dc=h591
+parameters g592=min(0, -0.5) h592=(min(0, -0.5))/2
+vg592 (g592 0) vsource dc=g592
+vh592 (h592 0) vsource dc=h592
+parameters g593=min(0, -0.0) h593=(min(0, -0.0))/2
+vg593 (g593 0) vsource dc=g593
+vh593 (h593 0) vsource dc=h593
+parameters g594=min(0, 0.0) h594=(min(0, 0.0))/2
+vg594 (g594 0) vsource dc=g594
+vh594 (h594 0) vsource dc=h594
+parameters g595=min(0, 0.5) h595=(min(0, 0.5))/2
+vg595 (g595 0) vsource dc=g595
+vh595 (h595 0) vsource dc=h595
+parameters g596=min(0, 2.0) h596=(min(0, 2.0))/2
+vg596 (g596 0) vsource dc=g596
+vh596 (h596 0) vsource dc=h596
+parameters g597=min(0, -3) h597=(min(0, -3))/2
+vg597 (g597 0) vsource dc=g597
+vh597 (h597 0) vsource dc=h597
+parameters g598=min(0, 3) h598=(min(0, 3))/2
+vg598 (g598 0) vsource dc=g598
+vh598 (h598 0) vsource dc=h598
+parameters g599=min(0, 0) h599=(min(0, 0))/2
+vg599 (g599 0) vsource dc=g599
+vh599 (h599 0) vsource dc=h599
+parameters g600=max(-2.0, -2.0) h600=(max(-2.0, -2.0))/2
+vg600 (g600 0) vsource dc=g600
+vh600 (h600 0) vsource dc=h600
+parameters g601=max(-2.0, -0.5) h601=(max(-2.0, -0.5))/2
+vg601 (g601 0) vsource dc=g601
+vh601 (h601 0) vsource dc=h601
+parameters g602=max(-2.0, -0.0) h602=(max(-2.0, -0.0))/2
+vg602 (g602 0) vsource dc=g602
+vh602 (h602 0) vsource dc=h602
+parameters g603=max(-2.0, 0.0) h603=(max(-2.0, 0.0))/2
+vg603 (g603 0) vsource dc=g603
+vh603 (h603 0) vsource dc=h603
+parameters g604=max(-2.0, 0.5) h604=(max(-2.0, 0.5))/2
+vg604 (g604 0) vsource dc=g604
+vh604 (h604 0) vsource dc=h604
+parameters g605=max(-2.0, 2.0) h605=(max(-2.0, 2.0))/2
+vg605 (g605 0) vsource dc=g605
+vh605 (h605 0) vsource dc=h605
+parameters g606=max(-2.0, -3) h606=(max(-2.0, -3))/2
+vg606 (g606 0) vsource dc=g606
+vh606 (h606 0) vsource dc=h606
+parameters g607=max(-2.0, 3) h607=(max(-2.0, 3))/2
+vg607 (g607 0) vsource dc=g607
+vh607 (h607 0) vsource dc=h607
+parameters g608=max(-2.0, 0) h608=(max(-2.0, 0))/2
+vg608 (g608 0) vsource dc=g608
+vh608 (h608 0) vsource dc=h608
+parameters g609=max(-0.5, -2.0) h609=(max(-0.5, -2.0))/2
+vg609 (g609 0) vsource dc=g609
+vh609 (h609 0) vsource dc=h609
+parameters g610=max(-0.5, -0.5) h610=(max(-0.5, -0.5))/2
+vg610 (g610 0) vsource dc=g610
+vh610 (h610 0) vsource dc=h610
+parameters g611=max(-0.5, -0.0) h611=(max(-0.5, -0.0))/2
+vg611 (g611 0) vsource dc=g611
+vh611 (h611 0) vsource dc=h611
+parameters g612=max(-0.5, 0.0) h612=(max(-0.5, 0.0))/2
+vg612 (g612 0) vsource dc=g612
+vh612 (h612 0) vsource dc=h612
+parameters g613=max(-0.5, 0.5) h613=(max(-0.5, 0.5))/2
+vg613 (g613 0) vsource dc=g613
+vh613 (h613 0) vsource dc=h613
+parameters g614=max(-0.5, 2.0) h614=(max(-0.5, 2.0))/2
+vg614 (g614 0) vsource dc=g614
+vh614 (h614 0) vsource dc=h614
+parameters g615=max(-0.5, -3) h615=(max(-0.5, -3))/2
+vg615 (g615 0) vsource dc=g615
+vh615 (h615 0) vsource dc=h615
+parameters g616=max(-0.5, 3) h616=(max(-0.5, 3))/2
+vg616 (g616 0) vsource dc=g616
+vh616 (h616 0) vsource dc=h616
+parameters g617=max(-0.5, 0) h617=(max(-0.5, 0))/2
+vg617 (g617 0) vsource dc=g617
+vh617 (h617 0) vsource dc=h617
+parameters g618=max(0.0, -2.0) h618=(max(0.0, -2.0))/2
+vg618 (g618 0) vsource dc=g618
+vh618 (h618 0) vsource dc=h618
+parameters g619=max(0.0, -0.5) h619=(max(0.0, -0.5))/2
+vg619 (g619 0) vsource dc=g619
+vh619 (h619 0) vsource dc=h619
+parameters g620=max(0.0, -0.0) h620=(max(0.0, -0.0))/2
+vg620 (g620 0) vsource dc=g620
+vh620 (h620 0) vsource dc=h620
+parameters g621=max(0.0, 0.0) h621=(max(0.0, 0.0))/2
+vg621 (g621 0) vsource dc=g621
+vh621 (h621 0) vsource dc=h621
+parameters g622=max(0.0, 0.5) h622=(max(0.0, 0.5))/2
+vg622 (g622 0) vsource dc=g622
+vh622 (h622 0) vsource dc=h622
+parameters g623=max(0.0, 2.0) h623=(max(0.0, 2.0))/2
+vg623 (g623 0) vsource dc=g623
+vh623 (h623 0) vsource dc=h623
+parameters g624=max(0.0, -3) h624=(max(0.0, -3))/2
+vg624 (g624 0) vsource dc=g624
+vh624 (h624 0) vsource dc=h624
+parameters g625=max(0.0, 3) h625=(max(0.0, 3))/2
+vg625 (g625 0) vsource dc=g625
+vh625 (h625 0) vsource dc=h625
+parameters g626=max(0.0, 0) h626=(max(0.0, 0))/2
+vg626 (g626 0) vsource dc=g626
+vh626 (h626 0) vsource dc=h626
+parameters g627=max(0.5, -2.0) h627=(max(0.5, -2.0))/2
+vg627 (g627 0) vsource dc=g627
+vh627 (h627 0) vsource dc=h627
+parameters g628=max(0.5, -0.5) h628=(max(0.5, -0.5))/2
+vg628 (g628 0) vsource dc=g628
+vh628 (h628 0) vsource dc=h628
+parameters g629=max(0.5, -0.0) h629=(max(0.5, -0.0))/2
+vg629 (g629 0) vsource dc=g629
+vh629 (h629 0) vsource dc=h629
+parameters g630=max(0.5, 0.0) h630=(max(0.5, 0.0))/2
+vg630 (g630 0) vsource dc=g630
+vh630 (h630 0) vsource dc=h630
+parameters g631=max(0.5, 0.5) h631=(max(0.5, 0.5))/2
+vg631 (g631 0) vsource dc=g631
+vh631 (h631 0) vsource dc=h631
+parameters g632=max(0.5, 2.0) h632=(max(0.5, 2.0))/2
+vg632 (g632 0) vsource dc=g632
+vh632 (h632 0) vsource dc=h632
+parameters g633=max(0.5, -3) h633=(max(0.5, -3))/2
+vg633 (g633 0) vsource dc=g633
+vh633 (h633 0) vsource dc=h633
+parameters g634=max(0.5, 3) h634=(max(0.5, 3))/2
+vg634 (g634 0) vsource dc=g634
+vh634 (h634 0) vsource dc=h634
+parameters g635=max(0.5, 0) h635=(max(0.5, 0))/2
+vg635 (g635 0) vsource dc=g635
+vh635 (h635 0) vsource dc=h635
+parameters g636=max(2.0, -2.0) h636=(max(2.0, -2.0))/2
+vg636 (g636 0) vsource dc=g636
+vh636 (h636 0) vsource dc=h636
+parameters g637=max(2.0, -0.5) h637=(max(2.0, -0.5))/2
+vg637 (g637 0) vsource dc=g637
+vh637 (h637 0) vsource dc=h637
+parameters g638=max(2.0, -0.0) h638=(max(2.0, -0.0))/2
+vg638 (g638 0) vsource dc=g638
+vh638 (h638 0) vsource dc=h638
+parameters g639=max(2.0, 0.0) h639=(max(2.0, 0.0))/2
+vg639 (g639 0) vsource dc=g639
+vh639 (h639 0) vsource dc=h639
+parameters g640=max(2.0, 0.5) h640=(max(2.0, 0.5))/2
+vg640 (g640 0) vsource dc=g640
+vh640 (h640 0) vsource dc=h640
+parameters g641=max(2.0, 2.0) h641=(max(2.0, 2.0))/2
+vg641 (g641 0) vsource dc=g641
+vh641 (h641 0) vsource dc=h641
+parameters g642=max(2.0, -3) h642=(max(2.0, -3))/2
+vg642 (g642 0) vsource dc=g642
+vh642 (h642 0) vsource dc=h642
+parameters g643=max(2.0, 3) h643=(max(2.0, 3))/2
+vg643 (g643 0) vsource dc=g643
+vh643 (h643 0) vsource dc=h643
+parameters g644=max(2.0, 0) h644=(max(2.0, 0))/2
+vg644 (g644 0) vsource dc=g644
+vh644 (h644 0) vsource dc=h644
+parameters g645=max(-3, -2.0) h645=(max(-3, -2.0))/2
+vg645 (g645 0) vsource dc=g645
+vh645 (h645 0) vsource dc=h645
+parameters g646=max(-3, -0.5) h646=(max(-3, -0.5))/2
+vg646 (g646 0) vsource dc=g646
+vh646 (h646 0) vsource dc=h646
+parameters g647=max(-3, -0.0) h647=(max(-3, -0.0))/2
+vg647 (g647 0) vsource dc=g647
+vh647 (h647 0) vsource dc=h647
+parameters g648=max(-3, 0.0) h648=(max(-3, 0.0))/2
+vg648 (g648 0) vsource dc=g648
+vh648 (h648 0) vsource dc=h648
+parameters g649=max(-3, 0.5) h649=(max(-3, 0.5))/2
+vg649 (g649 0) vsource dc=g649
+vh649 (h649 0) vsource dc=h649
+parameters g650=max(-3, 2.0) h650=(max(-3, 2.0))/2
+vg650 (g650 0) vsource dc=g650
+vh650 (h650 0) vsource dc=h650
+parameters g651=max(-3, -3) h651=(max(-3, -3))/2
+vg651 (g651 0) vsource dc=g651
+vh651 (h651 0) vsource dc=h651
+parameters g652=max(-3, 3) h652=(max(-3, 3))/2
+vg652 (g652 0) vsource dc=g652
+vh652 (h652 0) vsource dc=h652
+parameters g653=max(-3, 0) h653=(max(-3, 0))/2
+vg653 (g653 0) vsource dc=g653
+vh653 (h653 0) vsource dc=h653
+parameters g654=max(3, -2.0) h654=(max(3, -2.0))/2
+vg654 (g654 0) vsource dc=g654
+vh654 (h654 0) vsource dc=h654
+parameters g655=max(3, -0.5) h655=(max(3, -0.5))/2
+vg655 (g655 0) vsource dc=g655
+vh655 (h655 0) vsource dc=h655
+parameters g656=max(3, -0.0) h656=(max(3, -0.0))/2
+vg656 (g656 0) vsource dc=g656
+vh656 (h656 0) vsource dc=h656
+parameters g657=max(3, 0.0) h657=(max(3, 0.0))/2
+vg657 (g657 0) vsource dc=g657
+vh657 (h657 0) vsource dc=h657
+parameters g658=max(3, 0.5) h658=(max(3, 0.5))/2
+vg658 (g658 0) vsource dc=g658
+vh658 (h658 0) vsource dc=h658
+parameters g659=max(3, 2.0) h659=(max(3, 2.0))/2
+vg659 (g659 0) vsource dc=g659
+vh659 (h659 0) vsource dc=h659
+parameters g660=max(3, -3) h660=(max(3, -3))/2
+vg660 (g660 0) vsource dc=g660
+vh660 (h660 0) vsource dc=h660
+parameters g661=max(3, 3) h661=(max(3, 3))/2
+vg661 (g661 0) vsource dc=g661
+vh661 (h661 0) vsource dc=h661
+parameters g662=max(3, 0) h662=(max(3, 0))/2
+vg662 (g662 0) vsource dc=g662
+vh662 (h662 0) vsource dc=h662
+parameters g663=max(0, -2.0) h663=(max(0, -2.0))/2
+vg663 (g663 0) vsource dc=g663
+vh663 (h663 0) vsource dc=h663
+parameters g664=max(0, -0.5) h664=(max(0, -0.5))/2
+vg664 (g664 0) vsource dc=g664
+vh664 (h664 0) vsource dc=h664
+parameters g665=max(0, -0.0) h665=(max(0, -0.0))/2
+vg665 (g665 0) vsource dc=g665
+vh665 (h665 0) vsource dc=h665
+parameters g666=max(0, 0.0) h666=(max(0, 0.0))/2
+vg666 (g666 0) vsource dc=g666
+vh666 (h666 0) vsource dc=h666
+parameters g667=max(0, 0.5) h667=(max(0, 0.5))/2
+vg667 (g667 0) vsource dc=g667
+vh667 (h667 0) vsource dc=h667
+parameters g668=max(0, 2.0) h668=(max(0, 2.0))/2
+vg668 (g668 0) vsource dc=g668
+vh668 (h668 0) vsource dc=h668
+parameters g669=max(0, -3) h669=(max(0, -3))/2
+vg669 (g669 0) vsource dc=g669
+vh669 (h669 0) vsource dc=h669
+parameters g670=max(0, 3) h670=(max(0, 3))/2
+vg670 (g670 0) vsource dc=g670
+vh670 (h670 0) vsource dc=h670
+parameters g671=max(0, 0) h671=(max(0, 0))/2
+vg671 (g671 0) vsource dc=g671
+vh671 (h671 0) vsource dc=h671
+parameters g672=atan2(-2.0, -2.0) h672=(atan2(-2.0, -2.0))/2
+vg672 (g672 0) vsource dc=g672
+vh672 (h672 0) vsource dc=h672
+parameters g673=atan2(-2.0, -0.5) h673=(atan2(-2.0, -0.5))/2
+vg673 (g673 0) vsource dc=g673
+vh673 (h673 0) vsource dc=h673
+parameters g674=atan2(-2.0, -0.0) h674=(atan2(-2.0, -0.0))/2
+vg674 (g674 0) vsource dc=g674
+vh674 (h674 0) vsource dc=h674
+parameters g675=atan2(-2.0, 0.0) h675=(atan2(-2.0, 0.0))/2
+vg675 (g675 0) vsource dc=g675
+vh675 (h675 0) vsource dc=h675
+parameters g676=atan2(-2.0, 0.5) h676=(atan2(-2.0, 0.5))/2
+vg676 (g676 0) vsource dc=g676
+vh676 (h676 0) vsource dc=h676
+parameters g677=atan2(-2.0, 2.0) h677=(atan2(-2.0, 2.0))/2
+vg677 (g677 0) vsource dc=g677
+vh677 (h677 0) vsource dc=h677
+parameters g678=atan2(-2.0, -3) h678=(atan2(-2.0, -3))/2
+vg678 (g678 0) vsource dc=g678
+vh678 (h678 0) vsource dc=h678
+parameters g679=atan2(-2.0, 3) h679=(atan2(-2.0, 3))/2
+vg679 (g679 0) vsource dc=g679
+vh679 (h679 0) vsource dc=h679
+parameters g680=atan2(-2.0, 0) h680=(atan2(-2.0, 0))/2
+vg680 (g680 0) vsource dc=g680
+vh680 (h680 0) vsource dc=h680
+parameters g681=atan2(-0.5, -2.0) h681=(atan2(-0.5, -2.0))/2
+vg681 (g681 0) vsource dc=g681
+vh681 (h681 0) vsource dc=h681
+parameters g682=atan2(-0.5, -0.5) h682=(atan2(-0.5, -0.5))/2
+vg682 (g682 0) vsource dc=g682
+vh682 (h682 0) vsource dc=h682
+parameters g683=atan2(-0.5, -0.0) h683=(atan2(-0.5, -0.0))/2
+vg683 (g683 0) vsource dc=g683
+vh683 (h683 0) vsource dc=h683
+parameters g684=atan2(-0.5, 0.0) h684=(atan2(-0.5, 0.0))/2
+vg684 (g684 0) vsource dc=g684
+vh684 (h684 0) vsource dc=h684
+parameters g685=atan2(-0.5, 0.5) h685=(atan2(-0.5, 0.5))/2
+vg685 (g685 0) vsource dc=g685
+vh685 (h685 0) vsource dc=h685
+parameters g686=atan2(-0.5, 2.0) h686=(atan2(-0.5, 2.0))/2
+vg686 (g686 0) vsource dc=g686
+vh686 (h686 0) vsource dc=h686
+parameters g687=atan2(-0.5, -3) h687=(atan2(-0.5, -3))/2
+vg687 (g687 0) vsource dc=g687
+vh687 (h687 0) vsource dc=h687
+parameters g688=atan2(-0.5, 3) h688=(atan2(-0.5, 3))/2
+vg688 (g688 0) vsource dc=g688
+vh688 (h688 0) vsource dc=h688
+parameters g689=atan2(-0.5, 0) h689=(atan2(-0.5, 0))/2
+vg689 (g689 0) vsource dc=g689
+vh689 (h689 0) vsource dc=h689
+parameters g690=atan2(0.0, -2.0) h690=(atan2(0.0, -2.0))/2
+vg690 (g690 0) vsource dc=g690
+vh690 (h690 0) vsource dc=h690
+parameters g691=atan2(0.0, -0.5) h691=(atan2(0.0, -0.5))/2
+vg691 (g691 0) vsource dc=g691
+vh691 (h691 0) vsource dc=h691
+parameters g694=atan2(0.0, 0.5) h694=(atan2(0.0, 0.5))/2
+vg694 (g694 0) vsource dc=g694
+vh694 (h694 0) vsource dc=h694
+parameters g695=atan2(0.0, 2.0) h695=(atan2(0.0, 2.0))/2
+vg695 (g695 0) vsource dc=g695
+vh695 (h695 0) vsource dc=h695
+parameters g696=atan2(0.0, -3) h696=(atan2(0.0, -3))/2
+vg696 (g696 0) vsource dc=g696
+vh696 (h696 0) vsource dc=h696
+parameters g697=atan2(0.0, 3) h697=(atan2(0.0, 3))/2
+vg697 (g697 0) vsource dc=g697
+vh697 (h697 0) vsource dc=h697
+parameters g699=atan2(0.5, -2.0) h699=(atan2(0.5, -2.0))/2
+vg699 (g699 0) vsource dc=g699
+vh699 (h699 0) vsource dc=h699
+parameters g700=atan2(0.5, -0.5) h700=(atan2(0.5, -0.5))/2
+vg700 (g700 0) vsource dc=g700
+vh700 (h700 0) vsource dc=h700
+parameters g701=atan2(0.5, -0.0) h701=(atan2(0.5, -0.0))/2
+vg701 (g701 0) vsource dc=g701
+vh701 (h701 0) vsource dc=h701
+parameters g702=atan2(0.5, 0.0) h702=(atan2(0.5, 0.0))/2
+vg702 (g702 0) vsource dc=g702
+vh702 (h702 0) vsource dc=h702
+parameters g703=atan2(0.5, 0.5) h703=(atan2(0.5, 0.5))/2
+vg703 (g703 0) vsource dc=g703
+vh703 (h703 0) vsource dc=h703
+parameters g704=atan2(0.5, 2.0) h704=(atan2(0.5, 2.0))/2
+vg704 (g704 0) vsource dc=g704
+vh704 (h704 0) vsource dc=h704
+parameters g705=atan2(0.5, -3) h705=(atan2(0.5, -3))/2
+vg705 (g705 0) vsource dc=g705
+vh705 (h705 0) vsource dc=h705
+parameters g706=atan2(0.5, 3) h706=(atan2(0.5, 3))/2
+vg706 (g706 0) vsource dc=g706
+vh706 (h706 0) vsource dc=h706
+parameters g707=atan2(0.5, 0) h707=(atan2(0.5, 0))/2
+vg707 (g707 0) vsource dc=g707
+vh707 (h707 0) vsource dc=h707
+parameters g708=atan2(2.0, -2.0) h708=(atan2(2.0, -2.0))/2
+vg708 (g708 0) vsource dc=g708
+vh708 (h708 0) vsource dc=h708
+parameters g709=atan2(2.0, -0.5) h709=(atan2(2.0, -0.5))/2
+vg709 (g709 0) vsource dc=g709
+vh709 (h709 0) vsource dc=h709
+parameters g710=atan2(2.0, -0.0) h710=(atan2(2.0, -0.0))/2
+vg710 (g710 0) vsource dc=g710
+vh710 (h710 0) vsource dc=h710
+parameters g711=atan2(2.0, 0.0) h711=(atan2(2.0, 0.0))/2
+vg711 (g711 0) vsource dc=g711
+vh711 (h711 0) vsource dc=h711
+parameters g712=atan2(2.0, 0.5) h712=(atan2(2.0, 0.5))/2
+vg712 (g712 0) vsource dc=g712
+vh712 (h712 0) vsource dc=h712
+parameters g713=atan2(2.0, 2.0) h713=(atan2(2.0, 2.0))/2
+vg713 (g713 0) vsource dc=g713
+vh713 (h713 0) vsource dc=h713
+parameters g714=atan2(2.0, -3) h714=(atan2(2.0, -3))/2
+vg714 (g714 0) vsource dc=g714
+vh714 (h714 0) vsource dc=h714
+parameters g715=atan2(2.0, 3) h715=(atan2(2.0, 3))/2
+vg715 (g715 0) vsource dc=g715
+vh715 (h715 0) vsource dc=h715
+parameters g716=atan2(2.0, 0) h716=(atan2(2.0, 0))/2
+vg716 (g716 0) vsource dc=g716
+vh716 (h716 0) vsource dc=h716
+parameters g717=atan2(-3, -2.0) h717=(atan2(-3, -2.0))/2
+vg717 (g717 0) vsource dc=g717
+vh717 (h717 0) vsource dc=h717
+parameters g718=atan2(-3, -0.5) h718=(atan2(-3, -0.5))/2
+vg718 (g718 0) vsource dc=g718
+vh718 (h718 0) vsource dc=h718
+parameters g719=atan2(-3, -0.0) h719=(atan2(-3, -0.0))/2
+vg719 (g719 0) vsource dc=g719
+vh719 (h719 0) vsource dc=h719
+parameters g720=atan2(-3, 0.0) h720=(atan2(-3, 0.0))/2
+vg720 (g720 0) vsource dc=g720
+vh720 (h720 0) vsource dc=h720
+parameters g721=atan2(-3, 0.5) h721=(atan2(-3, 0.5))/2
+vg721 (g721 0) vsource dc=g721
+vh721 (h721 0) vsource dc=h721
+parameters g722=atan2(-3, 2.0) h722=(atan2(-3, 2.0))/2
+vg722 (g722 0) vsource dc=g722
+vh722 (h722 0) vsource dc=h722
+parameters g723=atan2(-3, -3) h723=(atan2(-3, -3))/2
+vg723 (g723 0) vsource dc=g723
+vh723 (h723 0) vsource dc=h723
+parameters g724=atan2(-3, 3) h724=(atan2(-3, 3))/2
+vg724 (g724 0) vsource dc=g724
+vh724 (h724 0) vsource dc=h724
+parameters g725=atan2(-3, 0) h725=(atan2(-3, 0))/2
+vg725 (g725 0) vsource dc=g725
+vh725 (h725 0) vsource dc=h725
+parameters g726=atan2(3, -2.0) h726=(atan2(3, -2.0))/2
+vg726 (g726 0) vsource dc=g726
+vh726 (h726 0) vsource dc=h726
+parameters g727=atan2(3, -0.5) h727=(atan2(3, -0.5))/2
+vg727 (g727 0) vsource dc=g727
+vh727 (h727 0) vsource dc=h727
+parameters g728=atan2(3, -0.0) h728=(atan2(3, -0.0))/2
+vg728 (g728 0) vsource dc=g728
+vh728 (h728 0) vsource dc=h728
+parameters g729=atan2(3, 0.0) h729=(atan2(3, 0.0))/2
+vg729 (g729 0) vsource dc=g729
+vh729 (h729 0) vsource dc=h729
+parameters g730=atan2(3, 0.5) h730=(atan2(3, 0.5))/2
+vg730 (g730 0) vsource dc=g730
+vh730 (h730 0) vsource dc=h730
+parameters g731=atan2(3, 2.0) h731=(atan2(3, 2.0))/2
+vg731 (g731 0) vsource dc=g731
+vh731 (h731 0) vsource dc=h731
+parameters g732=atan2(3, -3) h732=(atan2(3, -3))/2
+vg732 (g732 0) vsource dc=g732
+vh732 (h732 0) vsource dc=h732
+parameters g733=atan2(3, 3) h733=(atan2(3, 3))/2
+vg733 (g733 0) vsource dc=g733
+vh733 (h733 0) vsource dc=h733
+parameters g734=atan2(3, 0) h734=(atan2(3, 0))/2
+vg734 (g734 0) vsource dc=g734
+vh734 (h734 0) vsource dc=h734
+parameters g735=atan2(0, -2.0) h735=(atan2(0, -2.0))/2
+vg735 (g735 0) vsource dc=g735
+vh735 (h735 0) vsource dc=h735
+parameters g736=atan2(0, -0.5) h736=(atan2(0, -0.5))/2
+vg736 (g736 0) vsource dc=g736
+vh736 (h736 0) vsource dc=h736
+parameters g739=atan2(0, 0.5) h739=(atan2(0, 0.5))/2
+vg739 (g739 0) vsource dc=g739
+vh739 (h739 0) vsource dc=h739
+parameters g740=atan2(0, 2.0) h740=(atan2(0, 2.0))/2
+vg740 (g740 0) vsource dc=g740
+vh740 (h740 0) vsource dc=h740
+parameters g741=atan2(0, -3) h741=(atan2(0, -3))/2
+vg741 (g741 0) vsource dc=g741
+vh741 (h741 0) vsource dc=h741
+parameters g742=atan2(0, 3) h742=(atan2(0, 3))/2
+vg742 (g742 0) vsource dc=g742
+vh742 (h742 0) vsource dc=h742
+parameters g744=sign(-2.0, -2.0) h744=(sign(-2.0, -2.0))/2
+vg744 (g744 0) vsource dc=g744
+vh744 (h744 0) vsource dc=h744
+parameters g745=sign(-2.0, -0.5) h745=(sign(-2.0, -0.5))/2
+vg745 (g745 0) vsource dc=g745
+vh745 (h745 0) vsource dc=h745
+parameters g746=sign(-2.0, -0.0) h746=(sign(-2.0, -0.0))/2
+vg746 (g746 0) vsource dc=g746
+vh746 (h746 0) vsource dc=h746
+parameters g747=sign(-2.0, 0.0) h747=(sign(-2.0, 0.0))/2
+vg747 (g747 0) vsource dc=g747
+vh747 (h747 0) vsource dc=h747
+parameters g748=sign(-2.0, 0.5) h748=(sign(-2.0, 0.5))/2
+vg748 (g748 0) vsource dc=g748
+vh748 (h748 0) vsource dc=h748
+parameters g749=sign(-2.0, 2.0) h749=(sign(-2.0, 2.0))/2
+vg749 (g749 0) vsource dc=g749
+vh749 (h749 0) vsource dc=h749
+parameters g750=sign(-2.0, -3) h750=(sign(-2.0, -3))/2
+vg750 (g750 0) vsource dc=g750
+vh750 (h750 0) vsource dc=h750
+parameters g751=sign(-2.0, 3) h751=(sign(-2.0, 3))/2
+vg751 (g751 0) vsource dc=g751
+vh751 (h751 0) vsource dc=h751
+parameters g752=sign(-2.0, 0) h752=(sign(-2.0, 0))/2
+vg752 (g752 0) vsource dc=g752
+vh752 (h752 0) vsource dc=h752
+parameters g753=sign(-0.5, -2.0) h753=(sign(-0.5, -2.0))/2
+vg753 (g753 0) vsource dc=g753
+vh753 (h753 0) vsource dc=h753
+parameters g754=sign(-0.5, -0.5) h754=(sign(-0.5, -0.5))/2
+vg754 (g754 0) vsource dc=g754
+vh754 (h754 0) vsource dc=h754
+parameters g755=sign(-0.5, -0.0) h755=(sign(-0.5, -0.0))/2
+vg755 (g755 0) vsource dc=g755
+vh755 (h755 0) vsource dc=h755
+parameters g756=sign(-0.5, 0.0) h756=(sign(-0.5, 0.0))/2
+vg756 (g756 0) vsource dc=g756
+vh756 (h756 0) vsource dc=h756
+parameters g757=sign(-0.5, 0.5) h757=(sign(-0.5, 0.5))/2
+vg757 (g757 0) vsource dc=g757
+vh757 (h757 0) vsource dc=h757
+parameters g758=sign(-0.5, 2.0) h758=(sign(-0.5, 2.0))/2
+vg758 (g758 0) vsource dc=g758
+vh758 (h758 0) vsource dc=h758
+parameters g759=sign(-0.5, -3) h759=(sign(-0.5, -3))/2
+vg759 (g759 0) vsource dc=g759
+vh759 (h759 0) vsource dc=h759
+parameters g760=sign(-0.5, 3) h760=(sign(-0.5, 3))/2
+vg760 (g760 0) vsource dc=g760
+vh760 (h760 0) vsource dc=h760
+parameters g761=sign(-0.5, 0) h761=(sign(-0.5, 0))/2
+vg761 (g761 0) vsource dc=g761
+vh761 (h761 0) vsource dc=h761
+parameters g762=sign(0.0, -2.0) h762=(sign(0.0, -2.0))/2
+vg762 (g762 0) vsource dc=g762
+vh762 (h762 0) vsource dc=h762
+parameters g763=sign(0.0, -0.5) h763=(sign(0.0, -0.5))/2
+vg763 (g763 0) vsource dc=g763
+vh763 (h763 0) vsource dc=h763
+parameters g764=sign(0.0, -0.0) h764=(sign(0.0, -0.0))/2
+vg764 (g764 0) vsource dc=g764
+vh764 (h764 0) vsource dc=h764
+parameters g765=sign(0.0, 0.0) h765=(sign(0.0, 0.0))/2
+vg765 (g765 0) vsource dc=g765
+vh765 (h765 0) vsource dc=h765
+parameters g766=sign(0.0, 0.5) h766=(sign(0.0, 0.5))/2
+vg766 (g766 0) vsource dc=g766
+vh766 (h766 0) vsource dc=h766
+parameters g767=sign(0.0, 2.0) h767=(sign(0.0, 2.0))/2
+vg767 (g767 0) vsource dc=g767
+vh767 (h767 0) vsource dc=h767
+parameters g768=sign(0.0, -3) h768=(sign(0.0, -3))/2
+vg768 (g768 0) vsource dc=g768
+vh768 (h768 0) vsource dc=h768
+parameters g769=sign(0.0, 3) h769=(sign(0.0, 3))/2
+vg769 (g769 0) vsource dc=g769
+vh769 (h769 0) vsource dc=h769
+parameters g770=sign(0.0, 0) h770=(sign(0.0, 0))/2
+vg770 (g770 0) vsource dc=g770
+vh770 (h770 0) vsource dc=h770
+parameters g771=sign(0.5, -2.0) h771=(sign(0.5, -2.0))/2
+vg771 (g771 0) vsource dc=g771
+vh771 (h771 0) vsource dc=h771
+parameters g772=sign(0.5, -0.5) h772=(sign(0.5, -0.5))/2
+vg772 (g772 0) vsource dc=g772
+vh772 (h772 0) vsource dc=h772
+parameters g773=sign(0.5, -0.0) h773=(sign(0.5, -0.0))/2
+vg773 (g773 0) vsource dc=g773
+vh773 (h773 0) vsource dc=h773
+parameters g774=sign(0.5, 0.0) h774=(sign(0.5, 0.0))/2
+vg774 (g774 0) vsource dc=g774
+vh774 (h774 0) vsource dc=h774
+parameters g775=sign(0.5, 0.5) h775=(sign(0.5, 0.5))/2
+vg775 (g775 0) vsource dc=g775
+vh775 (h775 0) vsource dc=h775
+parameters g776=sign(0.5, 2.0) h776=(sign(0.5, 2.0))/2
+vg776 (g776 0) vsource dc=g776
+vh776 (h776 0) vsource dc=h776
+parameters g777=sign(0.5, -3) h777=(sign(0.5, -3))/2
+vg777 (g777 0) vsource dc=g777
+vh777 (h777 0) vsource dc=h777
+parameters g778=sign(0.5, 3) h778=(sign(0.5, 3))/2
+vg778 (g778 0) vsource dc=g778
+vh778 (h778 0) vsource dc=h778
+parameters g779=sign(0.5, 0) h779=(sign(0.5, 0))/2
+vg779 (g779 0) vsource dc=g779
+vh779 (h779 0) vsource dc=h779
+parameters g780=sign(2.0, -2.0) h780=(sign(2.0, -2.0))/2
+vg780 (g780 0) vsource dc=g780
+vh780 (h780 0) vsource dc=h780
+parameters g781=sign(2.0, -0.5) h781=(sign(2.0, -0.5))/2
+vg781 (g781 0) vsource dc=g781
+vh781 (h781 0) vsource dc=h781
+parameters g782=sign(2.0, -0.0) h782=(sign(2.0, -0.0))/2
+vg782 (g782 0) vsource dc=g782
+vh782 (h782 0) vsource dc=h782
+parameters g783=sign(2.0, 0.0) h783=(sign(2.0, 0.0))/2
+vg783 (g783 0) vsource dc=g783
+vh783 (h783 0) vsource dc=h783
+parameters g784=sign(2.0, 0.5) h784=(sign(2.0, 0.5))/2
+vg784 (g784 0) vsource dc=g784
+vh784 (h784 0) vsource dc=h784
+parameters g785=sign(2.0, 2.0) h785=(sign(2.0, 2.0))/2
+vg785 (g785 0) vsource dc=g785
+vh785 (h785 0) vsource dc=h785
+parameters g786=sign(2.0, -3) h786=(sign(2.0, -3))/2
+vg786 (g786 0) vsource dc=g786
+vh786 (h786 0) vsource dc=h786
+parameters g787=sign(2.0, 3) h787=(sign(2.0, 3))/2
+vg787 (g787 0) vsource dc=g787
+vh787 (h787 0) vsource dc=h787
+parameters g788=sign(2.0, 0) h788=(sign(2.0, 0))/2
+vg788 (g788 0) vsource dc=g788
+vh788 (h788 0) vsource dc=h788
+parameters g789=sign(-3, -2.0) h789=(sign(-3, -2.0))/2
+vg789 (g789 0) vsource dc=g789
+vh789 (h789 0) vsource dc=h789
+parameters g790=sign(-3, -0.5) h790=(sign(-3, -0.5))/2
+vg790 (g790 0) vsource dc=g790
+vh790 (h790 0) vsource dc=h790
+parameters g791=sign(-3, -0.0) h791=(sign(-3, -0.0))/2
+vg791 (g791 0) vsource dc=g791
+vh791 (h791 0) vsource dc=h791
+parameters g792=sign(-3, 0.0) h792=(sign(-3, 0.0))/2
+vg792 (g792 0) vsource dc=g792
+vh792 (h792 0) vsource dc=h792
+parameters g793=sign(-3, 0.5) h793=(sign(-3, 0.5))/2
+vg793 (g793 0) vsource dc=g793
+vh793 (h793 0) vsource dc=h793
+parameters g794=sign(-3, 2.0) h794=(sign(-3, 2.0))/2
+vg794 (g794 0) vsource dc=g794
+vh794 (h794 0) vsource dc=h794
+parameters g795=sign(-3, -3) h795=(sign(-3, -3))/2
+vg795 (g795 0) vsource dc=g795
+vh795 (h795 0) vsource dc=h795
+parameters g796=sign(-3, 3) h796=(sign(-3, 3))/2
+vg796 (g796 0) vsource dc=g796
+vh796 (h796 0) vsource dc=h796
+parameters g797=sign(-3, 0) h797=(sign(-3, 0))/2
+vg797 (g797 0) vsource dc=g797
+vh797 (h797 0) vsource dc=h797
+parameters g798=sign(3, -2.0) h798=(sign(3, -2.0))/2
+vg798 (g798 0) vsource dc=g798
+vh798 (h798 0) vsource dc=h798
+parameters g799=sign(3, -0.5) h799=(sign(3, -0.5))/2
+vg799 (g799 0) vsource dc=g799
+vh799 (h799 0) vsource dc=h799
+parameters g800=sign(3, -0.0) h800=(sign(3, -0.0))/2
+vg800 (g800 0) vsource dc=g800
+vh800 (h800 0) vsource dc=h800
+parameters g801=sign(3, 0.0) h801=(sign(3, 0.0))/2
+vg801 (g801 0) vsource dc=g801
+vh801 (h801 0) vsource dc=h801
+parameters g802=sign(3, 0.5) h802=(sign(3, 0.5))/2
+vg802 (g802 0) vsource dc=g802
+vh802 (h802 0) vsource dc=h802
+parameters g803=sign(3, 2.0) h803=(sign(3, 2.0))/2
+vg803 (g803 0) vsource dc=g803
+vh803 (h803 0) vsource dc=h803
+parameters g804=sign(3, -3) h804=(sign(3, -3))/2
+vg804 (g804 0) vsource dc=g804
+vh804 (h804 0) vsource dc=h804
+parameters g805=sign(3, 3) h805=(sign(3, 3))/2
+vg805 (g805 0) vsource dc=g805
+vh805 (h805 0) vsource dc=h805
+parameters g806=sign(3, 0) h806=(sign(3, 0))/2
+vg806 (g806 0) vsource dc=g806
+vh806 (h806 0) vsource dc=h806
+parameters g807=sign(0, -2.0) h807=(sign(0, -2.0))/2
+vg807 (g807 0) vsource dc=g807
+vh807 (h807 0) vsource dc=h807
+parameters g808=sign(0, -0.5) h808=(sign(0, -0.5))/2
+vg808 (g808 0) vsource dc=g808
+vh808 (h808 0) vsource dc=h808
+parameters g809=sign(0, -0.0) h809=(sign(0, -0.0))/2
+vg809 (g809 0) vsource dc=g809
+vh809 (h809 0) vsource dc=h809
+parameters g810=sign(0, 0.0) h810=(sign(0, 0.0))/2
+vg810 (g810 0) vsource dc=g810
+vh810 (h810 0) vsource dc=h810
+parameters g811=sign(0, 0.5) h811=(sign(0, 0.5))/2
+vg811 (g811 0) vsource dc=g811
+vh811 (h811 0) vsource dc=h811
+parameters g812=sign(0, 2.0) h812=(sign(0, 2.0))/2
+vg812 (g812 0) vsource dc=g812
+vh812 (h812 0) vsource dc=h812
+parameters g813=sign(0, -3) h813=(sign(0, -3))/2
+vg813 (g813 0) vsource dc=g813
+vh813 (h813 0) vsource dc=h813
+parameters g814=sign(0, 3) h814=(sign(0, 3))/2
+vg814 (g814 0) vsource dc=g814
+vh814 (h814 0) vsource dc=h814
+parameters g815=sign(0, 0) h815=(sign(0, 0))/2
+vg815 (g815 0) vsource dc=g815
+vh815 (h815 0) vsource dc=h815
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

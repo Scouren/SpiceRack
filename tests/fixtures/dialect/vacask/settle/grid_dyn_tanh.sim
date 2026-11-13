@@ -1,0 +1,35 @@
+tanh on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b104 (d104 0) v=tanh(-2.5*($temp/$temp))
+r104 (d104 0) r r=1k
+b105 (d105 0) v=tanh(-1.0*($temp/$temp))
+r105 (d105 0) r r=1k
+b106 (d106 0) v=tanh(-0.5*($temp/$temp))
+r106 (d106 0) r r=1k
+b107 (d107 0) v=tanh(-0.0*($temp/$temp))
+r107 (d107 0) r r=1k
+b108 (d108 0) v=tanh(0.0*($temp/$temp))
+r108 (d108 0) r r=1k
+b109 (d109 0) v=tanh(0.5*($temp/$temp))
+r109 (d109 0) r r=1k
+b110 (d110 0) v=tanh(1.0*($temp/$temp))
+r110 (d110 0) r r=1k
+b111 (d111 0) v=tanh(2.5*($temp/$temp))
+r111 (d111 0) r r=1k
+b112 (d112 0) v=tanh(1e-3*($temp/$temp))
+r112 (d112 0) r r=1k
+b113 (d113 0) v=tanh(1e3*($temp/$temp))
+r113 (d113 0) r r=1k
+b114 (d114 0) v=tanh(-3*($temp/$temp))
+r114 (d114 0) r r=1k
+b115 (d115 0) v=tanh(0*($temp/$temp))
+r115 (d115 0) r r=1k
+b116 (d116 0) v=tanh(3*($temp/$temp))
+r116 (d116 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

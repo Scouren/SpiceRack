@@ -1,0 +1,14 @@
+# Oracle: R41 (a) and the lead's F11 ruling: a shipped module not proven its family's
+# (families::PROVEN; sp_mos2's pair deck differs from ngspice-45's level 2 at step 4) is read as
+# a module model, so its file's load stays a plain load that defines nothing the IR drops
+# (structure's drop_device_libraries); a proven one (sp_mos1, settle devices_semi) is the family
+# on both rows.
+# codes:
+file "unproven_load.sim" deck
+  title "an unproven shipped module and its file"
+  load osdi "spice/mos2.osdi"
+  device_library mos1
+  model nm module params=(vto=1i) module=sp_mos2
+  model n1 mos1 polarity=n params=(vto=1i)
+  element module_model m1 (d g 0 0) model=nm params=(w=1u l=1u)
+  element mosfet m2 (d g 0 0) model=n1 params=(w=1u l=1u)

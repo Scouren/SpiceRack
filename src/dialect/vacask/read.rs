@@ -12,10 +12,11 @@
 //! Cites: `rewrite/DIALECT-VACASK.md` §3.1; `DIALECT-NGSPICE.md` §3 (the same four steps).
 //!
 //! Contents: `Cst`, `Lower` (`Lower::span`, `Lower::text`, `Lower::start`, `Lower::body`,
-//! `Lower::comments_until`, `Lower::bind_master_later`), `references`, `read`, `unread`, `opaque`,
+//! `Lower::comments_until`, `Lower::bind_master_later`, `Lower::element_here`), `references`,
+//! `read`, `unread`, `opaque`,
 //! `statement_text`, `field_name`, `unclosed` (crate-private)
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::bind;
 use super::codes;
@@ -74,12 +75,18 @@ pub(super) struct Lower<'a, 'b, 's> {
     /// Each source a `type` alter reaches and the alters that are framing (R42: `fold::folds`).
     #[allow(dead_code, reason = "read_sources (S4.2) and read_run (S4.3) read it")]
     pub(super) folds: &'a fold::Folds,
+    /// Each scope's element names and how many of its items they cover (`Lower::element_here`).
+    pub(super) elements: HashMap<ir::ScopeId, (usize, HashSet<ir::NameId>)>,
     /// `parameters` entries a subcircuit's head took (their `Assign` nodes).
     pub(super) taken: HashSet<u32>,
     /// The next token whose leading gap has not been searched for comments.
     pub(super) gap_token: u32,
     /// The end of the gaps already searched (a byte of the tokenized text).
     pub(super) gap_end: u32,
+    /// The behavioural expression being read is literals only, which VACASK folds with its
+    /// parameter evaluator (settle atan2_forms: `v=atan2(0.5, -0.5)` is -0.785, C's 2.356;
+    /// R76a): its `atan2` is read in the static form.
+    pub(super) folded: bool,
 }
 
 /// Which area reads an instance statement.
@@ -120,6 +127,25 @@ impl Lower<'_, '_, '_> {
             scope: self.scope,
             span: self.stmt,
         });
+    }
+
+    /// Whether an element named `name` already stands in the current scope (run dup). A scope's
+    /// item list only grows, so its names are indexed once, as it grows: a read stays linear in
+    /// its instances (a scan of the scope per instance was quadratic: the scaling step).
+    pub(super) fn element_here(&mut self, name: &str) -> bool {
+        let d = self.b.design();
+        let items = d.items(self.scope);
+        let (seen, names) = self.elements.entry(self.scope).or_default();
+        assert!(*seen <= items.len(), "a scope's item list only grows");
+        for at in items[*seen..]
+            .iter()
+            .filter(|at| at.kind == ir::ItemKind::Element)
+        {
+            names.insert(d.row::<ir::Element>(at.index).name);
+        }
+        *seen = items.len();
+        let id = d.find_name(name);
+        !id.is_none() && names.contains(&id)
     }
 
     /// The start byte (in the file's own text) of statement `n`.
@@ -286,16 +312,27 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             masters: &mut masters,
             declared: &declared,
             folds: &folds,
+            elements: Default::default(),
             taken: HashSet::new(),
             gap_token: 0,
             gap_end: 0,
+            folded: false,
         };
         let root = cst.ast.fields(cst.ast.root()).to_vec();
         l.body(*top, &root, None);
         l.comments_until(u32::MAX, true);
     }
-    bind::reads(out, &reads, diags);
-    bind::masters(out, &masters, diags);
+    let visible = super::visible::Visible::new(out.design());
+    for (second, first) in visible.redefinitions(out.design()) {
+        diags.push_at(
+            read_structure::INCLUDED_TWICE,
+            out.design(),
+            second,
+            first.0,
+        );
+    }
+    bind::reads(out, &visible, &reads, diags);
+    bind::masters(out, &visible, &masters, diags);
 }
 
 /// Statement `n` as an `Opaque` of `class`, its text as written: the class's `S` note and,
@@ -399,11 +436,14 @@ pub(super) fn unclosed(cst: &Cst<'_>, n: Node) -> bool {
 /// One statement's dispatch: by its CST tag, and for a `Card` by its head word.
 fn statement(l: &mut Lower<'_, '_, '_>, n: Node) {
     let ast = &l.cst.ast;
-    let leaf = !matches!(
+    // A leaf, or a subcircuit's head line (`unclosed` stops at the first statement end, so a
+    // body is never scanned): `subckt s (a b` with no `)` to the end of the file is VACASK's
+    // syntax error (the reader fixtures' bracket mutants, b_redef_sub).
+    let checked = !matches!(
         ast.tag(n),
-        Tag::Title | Tag::Section | Tag::Subckt | Tag::If | Tag::Else | Tag::Control
+        Tag::Title | Tag::Section | Tag::If | Tag::Else | Tag::Control
     );
-    if leaf && unclosed(l.cst, n) {
+    if checked && unclosed(l.cst, n) {
         return opaque(
             l,
             n,

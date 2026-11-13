@@ -1,0 +1,7 @@
+section s
+  parameters q=5
+  model rq sp_resistor
+  subckt w (a)
+    r1 (a 0) rq r=q*1k
+  ends
+endsection

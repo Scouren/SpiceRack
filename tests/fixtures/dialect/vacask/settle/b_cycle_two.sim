@@ -1,0 +1,14 @@
+b_cycle_two: two subcircuits that instantiate each other ("Hierarchical recursion detected.")
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt p (a b)
+  r1 (a b) res r=1k
+  xq (a b) q
+ends
+subckt q (a b)
+  xp (a b) p
+ends
+x0 (n 0) p
+control
+  analysis op1 op
+endc

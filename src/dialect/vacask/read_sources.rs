@@ -236,11 +236,7 @@ pub(super) fn source(l: &mut Lower<'_, '_, '_>, n: Node) {
     }
     let h = l.cst.ast.header(n);
     let name = read::field_name(l.cst, h.name);
-    let d = l.b.design();
-    let taken = d.items(l.scope).iter().any(|at| {
-        at.kind == ir::ItemKind::Element && d.str(d.row::<ir::Element>(at.index).name) == name
-    });
-    if taken {
+    if l.element_here(&name) {
         return read::opaque(
             l,
             n,

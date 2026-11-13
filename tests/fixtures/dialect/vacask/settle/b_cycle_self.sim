@@ -1,0 +1,11 @@
+b_cycle_self: a subcircuit that instantiates itself ("Hierarchical recursion detected.")
+load "spice/resistor.osdi"
+model res sp_resistor
+subckt sub (a b)
+  r1 (a b) res r=1k
+  x1 (a b) sub
+ends
+x0 (n 0) sub
+control
+  analysis op1 op
+endc

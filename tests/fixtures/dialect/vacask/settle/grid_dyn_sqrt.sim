@@ -1,0 +1,21 @@
+sqrt on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b213 (d213 0) v=sqrt(0.5*($temp/$temp))
+r213 (d213 0) r r=1k
+b214 (d214 0) v=sqrt(1.0*($temp/$temp))
+r214 (d214 0) r r=1k
+b215 (d215 0) v=sqrt(2.5*($temp/$temp))
+r215 (d215 0) r r=1k
+b216 (d216 0) v=sqrt(1e-3*($temp/$temp))
+r216 (d216 0) r r=1k
+b217 (d217 0) v=sqrt(1e3*($temp/$temp))
+r217 (d217 0) r r=1k
+b220 (d220 0) v=sqrt(3*($temp/$temp))
+r220 (d220 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

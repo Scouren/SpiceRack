@@ -47,7 +47,15 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Family(ir::ModelFamily::Capacitor))
     .with(ir::Feature::Family(ir::ModelFamily::Inductor))
     .with(ir::Feature::Family(ir::ModelFamily::Diode))
-    .with(ir::Feature::Family(ir::ModelFamily::Mos1));
+    .with(ir::Feature::Family(ir::ModelFamily::Mos1))
+    .with(ir::Feature::Family(ir::ModelFamily::Mos2))
+    .with(ir::Feature::Family(ir::ModelFamily::Mos3))
+    .with(ir::Feature::Family(ir::ModelFamily::Mos6))
+    .with(ir::Feature::Family(ir::ModelFamily::Mos9))
+    .with(ir::Feature::Family(ir::ModelFamily::Vdmos))
+    .with(ir::Feature::Family(ir::ModelFamily::JfetShichman))
+    .with(ir::Feature::Family(ir::ModelFamily::JfetParkerSkellern))
+    .with(ir::Feature::Family(ir::ModelFamily::Mesfet));
 
 /// A model of a shipped module whose file no read `load` names, or whose family the read files
 /// load from files of different modules.

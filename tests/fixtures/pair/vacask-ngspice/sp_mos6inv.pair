@@ -1,0 +1,3 @@
+# VACASK corpus demo/spice/mos6inv.sim (F11: the shipped SPICE module as its IR family).
+owner = vacask
+proves = families::PROVEN

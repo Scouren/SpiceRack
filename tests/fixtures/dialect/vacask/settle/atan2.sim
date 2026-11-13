@@ -1,0 +1,42 @@
+atan2 on the plane
+model vsource vsource
+vone (one 0) vsource dc=1
+vp0 (p0 0) vsource dc=atan2(1.0, 1.0)
+bd0 (d0 0) v=atan2(1.0*v(one), 1.0*v(one))
+vp1 (p1 0) vsource dc=atan2(1.0, -1.0)
+bd1 (d1 0) v=atan2(1.0*v(one), -1.0*v(one))
+vp2 (p2 0) vsource dc=atan2(-1.0, -1.0)
+bd2 (d2 0) v=atan2(-1.0*v(one), -1.0*v(one))
+vp3 (p3 0) vsource dc=atan2(-1.0, 1.0)
+bd3 (d3 0) v=atan2(-1.0*v(one), 1.0*v(one))
+vp4 (p4 0) vsource dc=atan2(0.0, 1.0)
+bd4 (d4 0) v=atan2(0.0*v(one), 1.0*v(one))
+vp5 (p5 0) vsource dc=atan2(0.0, -1.0)
+bd5 (d5 0) v=atan2(0.0*v(one), -1.0*v(one))
+vp6 (p6 0) vsource dc=atan2(1.0, 0.0)
+bd6 (d6 0) v=atan2(1.0*v(one), 0.0*v(one))
+vp7 (p7 0) vsource dc=atan2(-1.0, 0.0)
+bd7 (d7 0) v=atan2(-1.0*v(one), 0.0*v(one))
+vp9 (p9 0) vsource dc=atan2(-0.0, -1.0)
+bd9 (d9 0) v=atan2(-0.0*v(one), -1.0*v(one))
+vp10 (p10 0) vsource dc=atan2(1, -1)
+bd10 (d10 0) v=atan2(1*v(one), -1*v(one))
+vp11 (p11 0) vsource dc=atan2(0, -1)
+bd11 (d11 0) v=atan2(0*v(one), -1*v(one))
+control
+  options rawfile="ascii"
+  var q0=atan2(1.0, 1.0)
+  var q1=atan2(1.0, -1.0)
+  var q2=atan2(-1.0, -1.0)
+  var q3=atan2(-1.0, 1.0)
+  var q4=atan2(0.0, 1.0)
+  var q5=atan2(0.0, -1.0)
+  var q6=atan2(1.0, 0.0)
+  var q7=atan2(-1.0, 0.0)
+  var q8=atan2(0.0, 0.0)
+  var q9=atan2(-0.0, -1.0)
+  var q10=atan2(1, -1)
+  var q11=atan2(0, -1)
+  print ("c0", q0, "c1", q1, "c2", q2, "c3", q3, "c4", q4, "c5", q5, "c6", q6, "c7", q7, "c8", q8, "c9", q9, "c10", q10, "c11", q11)
+  analysis op1 op
+endc

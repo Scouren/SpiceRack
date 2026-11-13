@@ -29,7 +29,7 @@ ngspice Analysis(DcInc) owed from=vacask
 ngspice Analysis(TimedOp) unspoken
 ngspice Expr(List) unspoken
 ngspice Func(PowRe) unspoken
-ngspice Func(Atan2) owed from=vacask
+ngspice Func(Atan2) unspoken
 ngspice Func(Hypot) owed from=vacask
 ngspice Func(Clamp) unspoken
 ngspice Func(Ddt) unspoken
@@ -298,8 +298,6 @@ vacask Elem(Laplace) unspoken
 vacask Elem(FreqTable) unspoken
 vacask Elem(Delay) unspoken
 vacask Elem(Bjt) owed from=ngspice
-vacask Elem(Jfet) owed from=ngspice
-vacask Elem(Mesfet) owed from=ngspice
 vacask Elem(Igbt) unspoken
 vacask Elem(VSwitch) owed from=ngspice
 vacask Elem(ISwitch) owed from=ngspice
@@ -329,6 +327,7 @@ vacask Analysis(TimedOp) unspoken
 vacask Expr(Freq) owed from=ngspice
 vacask Expr(List) unspoken
 vacask Func(PowRe) unspoken
+vacask Func(Atan2) unspoken
 vacask Func(Clamp) unspoken
 vacask Func(Ddt) unspoken
 vacask Func(Idt) unspoken

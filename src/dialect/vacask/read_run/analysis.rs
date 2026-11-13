@@ -446,12 +446,11 @@ fn tran_row(l: &mut Lower<'_, '_, '_>, t: Tran) -> ir::tran::Tran {
     }
 }
 
-/// Whether an analysis of the design already has `name`.
+/// Whether an analysis of the design already has `name`: the analysis table, not a walk of the
+/// whole design per analysis (the reader pushes every analysis into a reachable scope).
 fn used(l: &Lower<'_, '_, '_>, name: &str) -> bool {
     let design = l.b.design();
     let id = design.find_name(name);
-    !id.is_none()
-        && design.reachable().iter().any(|(at, _)| {
-            at.kind == ir::ItemKind::Analysis && design.row::<ir::Analysis>(at.index).name == id
-        })
+    let rows = <ir::Analysis as ir::ItemRow>::table(design).rows();
+    !id.is_none() && rows.iter().any(|a| a.name == id)
 }
