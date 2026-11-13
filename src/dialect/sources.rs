@@ -186,6 +186,9 @@ impl Reference {
 /// directory (`settle/include_cwd/` on `step2-ngspice` 4f3de43f: `ngspice -b sub/deck.sp` reads
 /// a file of that name in the working directory when one stands there). So this spelling works
 /// from every working directory that holds no file of that name, and from none that does.
+/// VACASK resolves in the other order (R78b): the including file's directory first, then the
+/// working directory, a nested include from its own file's directory (`settle/b_include_cwd/` on
+/// `step2-vacask-b` 883dc82b), so there the spelling holds from every working directory.
 pub fn relative_path(from: &str, to: &str) -> Option<String> {
     let above = |k: &str| k.starts_with('/') || k == ".." || k.starts_with("../");
     if above(from) || above(to) {
