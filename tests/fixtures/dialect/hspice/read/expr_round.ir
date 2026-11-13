@@ -1,0 +1,12 @@
+# codes:
+file "expr_round.sp" deck
+  title "expr_round"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): nint(2.5) = 2, nint(-2.5) = -2, nint(-0.5) = 0 (half to even; recorded HSPICE: 3, -3, -1: F68), int(-2.5) = -2, floor(-2.5) = -3, ceil(-2.5) = -2"
+  element vsource vs (s 0) dc=1
+  element vsource ve0 (e0 0) dc=(round_half_away(2.5))
+  element vsource ve1 (e1 0) dc=(round_half_away(-2.5))
+  element vsource ve2 (e2 0) dc=(round_half_away(-0.5))
+  element vsource ve3 (e3 0) dc=(trunc(-2.5))
+  element vsource ve4 (e4 0) dc=(floor(-2.5))
+  element vsource ve5 (e5 0) dc=(ceil(-2.5))
+  analysis dc (source_dc vs) (lin start=1 stop=1 step=1)

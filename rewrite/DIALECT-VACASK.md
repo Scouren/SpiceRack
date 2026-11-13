@@ -235,7 +235,7 @@ Every expression rule is two rows (A26): `<rule>` for the `Func`/`Binary` form a
 | Feature | Pass | IR → IR (one sentence) | Requires | Proof | Old rule it replaces |
 |---|---|---|---|---|---|
 | `Binary(Div)` | `div_to_div_typed`, `_dyn` | `Div(a,b)` → `DivTyped(a,b)`, with `a` wrapped as `Mul(1., a)` unless an operand is surely Real by the tag table (pass-expr 6b5b936f) | `Binary(DivTyped)` | eval (typed) | none: `respell` copied `/`, so ngspice `{1/3}` was 0 on VACASK (RUN i1): ledger |
-| `Func(PowAbs)` | `powabs_to_pow` | `PowAbs(x,y)` → `Pow(Abs(x), y)` | `Func(Pow)`, `Func(Abs)` | eval | `abs_power_out` |
+| `Func(PowAbs)` | `powabs_to_powre` then `powre_to_pow`, `_dyn` | `PowAbs(x,y)` → `PowRe(Abs(x), y)` → `Pow(Abs(x), y)` (the base is never negative; passes 85b783b9) | `Func(Pow)`, `Func(Abs)` | eval | `abs_power_out` |
 | `Func(RoundHalfEven)` | `round_half_even_to_away`, `_dyn` | `x - floor(x) == 0.5 ? 2 * round_half_away(x * 0.5) : round_half_away(x)` (pass-expr 6b5b936f) | `Ternary`, `Eq`, `Sub`, `Mul`, `Floor`, `RoundHalfAway` (no `Fmod`) | eval | none (old copied `nint`, which VACASK lacks) |
 | `Func(Sgn)` | `sgn_to_ternary`, `_dyn` | `Sgn(x)` → `x > 0 ? 1 : x < 0 ? -1 : 0`; U0105 when the operand may hold a draw (pass-expr 6b5b936f) | `Ternary`, `Gt`, `Lt` | eval | none: `sgn(0)` 0 → 1 (RUN e1): ledger |
 | `Func(Step)` | `step_to_ternary`, `_dyn` | by its definition as a ternary of its argument (pass-expr 6b5b936f) | `Ternary` | eval | none |

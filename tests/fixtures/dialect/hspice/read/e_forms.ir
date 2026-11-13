@@ -1,0 +1,12 @@
+# codes:
+file "e_forms.sp" deck
+  title "e_forms"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): v(a) = 6 (vcvs 3), v(b) = 8 (value='v(x)*4'), v(c) = 10 (vol='v(x)*5')"
+  element vsource vx (x 0) dc=2
+  element vcvs e1 (a 0 x 0) gain=3
+  element resistor ra (a 0) value=1k
+  element behav e2 (b 0) expr=(v(x) * 4)
+  element resistor rb (b 0) value=1k
+  element behav e3 (c 0) expr=(v(x) * 5)
+  element resistor rc (c 0) value=1k
+  analysis dc (source_dc vx) (lin start=2 stop=2 step=1)

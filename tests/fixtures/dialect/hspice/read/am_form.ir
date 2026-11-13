@@ -1,0 +1,7 @@
+# codes:
+file "am_form.sp" deck
+  title "am_form"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): v(1) = 2.513e-4 at 20 ns, rising: AM(SA OC FM FC TD)"
+  element vsource v1 (1 0) wave=am(offset=0 amplitude=2 mod_offset=1 mod_index=1 mod_freq=100 carrier_freq=1k delay=0 pre=zero given_zero=spice_default) dc_rule=wave_at_zero
+  element resistor r1 (1 0) value=1k
+  analysis tran stop=0.2m print_step=0.05m cap=ngspice_rule

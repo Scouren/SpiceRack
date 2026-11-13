@@ -1,0 +1,9 @@
+# codes:
+file "param_string.sp" deck
+  title "param_string"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): t2 = 8: .param t2=\"a^3\" is an expression, not a string"
+  param a = 2
+  param t2 = pow(a, 3)
+  element vsource vs (s 0) dc=1
+  element vsource ve0 (e0 0) dc=t2
+  analysis dc (source_dc vs) (lin start=1 stop=1 step=1)

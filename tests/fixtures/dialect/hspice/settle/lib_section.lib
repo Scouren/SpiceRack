@@ -1,0 +1,7 @@
+* lib
+.lib tt
+.param p=2
+.endl tt
+.lib ff
+.param p=4
+.endl ff

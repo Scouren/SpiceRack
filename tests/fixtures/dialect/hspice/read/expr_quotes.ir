@@ -1,0 +1,9 @@
+# codes:
+file "expr_quotes.sp" deck
+  title "expr_quotes"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): '2*3' = \"2*3\" = 6: both quotes delimit an expression"
+  param a = 2
+  element vsource vs (s 0) dc=1
+  element vsource ve0 (e0 0) dc=(2 * 3)
+  element vsource ve1 (e1 0) dc=(2 * 3)
+  analysis dc (source_dc vs) (lin start=1 stop=1 step=1)

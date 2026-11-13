@@ -1,0 +1,19 @@
+# codes:
+file "num_scale.sp" deck
+  title "num_scale"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): 1M = 1e-3, 1MEG = 1X = 1e6, 1MIL = 2.54e-5, 1A = 1e-18, 1G, 1T, 1F, 10pf = 1e-11, 1d3 = 1000, 2.5D-3 = 2.5e-3, 1k5 = 1000, 1kHz = 1000"
+  element vsource vs (s 0) dc=1
+  element vsource ve0 (e0 0) dc=1m
+  element vsource ve1 (e1 0) dc=1meg
+  element vsource ve2 (e2 0) dc=1meg
+  element vsource ve3 (e3 0) dc=1mil
+  element vsource ve4 (e4 0) dc=1a
+  element vsource ve5 (e5 0) dc=1g
+  element vsource ve6 (e6 0) dc=1t
+  element vsource ve7 (e7 0) dc=1f
+  element vsource ve8 (e8 0) dc=10p
+  element vsource ve9 (e9 0) dc=1e3
+  element vsource ve10 (e10 0) dc=2.5e-3
+  element vsource ve11 (e11 0) dc=1k
+  element vsource ve12 (e12 0) dc=1k
+  analysis dc (source_dc vs) (lin start=1 stop=1 step=1)

@@ -1,0 +1,11 @@
+# codes:
+file "subckt_params.sp" deck
+  title "subckt_params"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): i(v1) = -1e-3 (default w=1), i(v2) = -5e-4 (w=2): bare k=v after the ports"
+  subckt cell (a b) w=1
+    element resistor r1 (a b) value=(w * 1k)
+  element vsource v1 (1 0) dc=1
+  element instance x1 (1 0) model=cell
+  element vsource v2 (2 0) dc=1
+  element instance x2 (2 0) model=cell params=(w=2)
+  analysis dc (source_dc v1) (lin start=1 stop=1 step=1)

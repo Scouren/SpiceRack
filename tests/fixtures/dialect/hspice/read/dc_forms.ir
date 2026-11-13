@@ -1,0 +1,7 @@
+# codes:
+file "dc_forms.sp" deck
+  title "dc_forms"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): 1, 2, 3: '.dc v1 start=1 stop=3 step=1'"
+  element vsource v1 (1 0) dc=1
+  element resistor r1 (1 0) value=1k
+  analysis dc (source_dc v1) (lin start=1 stop=3 step=1)

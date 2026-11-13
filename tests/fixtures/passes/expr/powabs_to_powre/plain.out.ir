@@ -1,0 +1,4 @@
+file "p.sp" deck
+  param a = 2
+  param p = pow_re(abs(a - 3), 0.5) + pow_re(abs(-2), pow_re(abs(a), 2))
+  func f(x) = pow_re(abs(x), 3)

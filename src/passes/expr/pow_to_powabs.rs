@@ -17,7 +17,7 @@
 //! `pub fn pow_to_powabs_dyn(&mut ir::Design, &mut ir::Diags)`
 
 use super::POW_BASE;
-use super::nodes::{form, func_form, literal, note_left};
+use super::nodes::{form, func_form, literal, never_negative, note_left};
 use crate::ir;
 
 /// Rewrites `Pow` in every root of the plain form.
@@ -50,16 +50,4 @@ fn run(design: &mut ir::Design, diags: &mut ir::Diags, dynamic: bool) {
         Some(b.call(f, &[x, y]))
     });
     note_left(design, diags, func_form(ir::Func::Pow, dynamic), POW_BASE);
-}
-
-/// Whether `x` is `>= +0` on every evaluation (never negative, never `-0`).
-fn never_negative(d: &ir::Design, x: ir::ExprId) -> bool {
-    match d.expr(x) {
-        ir::Expr::Num(n) => d.literal_value(d.num(n)).is_sign_positive(),
-        ir::Expr::Call(f, _) => matches!(
-            f,
-            ir::Func::Abs | ir::Func::SqrtAbs | ir::Func::Exp | ir::Func::Sqr | ir::Func::PowAbs
-        ),
-        _ => false,
-    }
 }

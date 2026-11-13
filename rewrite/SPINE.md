@@ -141,8 +141,9 @@ reports its note at an item once: R69 d; bounded by the pass count + 1,
 asserted). A feature is legal for the target (A32, `passes::legal`) when the target has it, or
 a registered pass removes it and that pass's `requires` are legal in turn: the least fixed
 point, computed once per call, so a chain (`round_half_even_to_away` then
-`round_half_away_to_floor`) runs for a target with neither rounding, an inverse pair
-(`powabs_to_pow`, `pow_to_powabs`) supports nothing for a target with neither, and a chain whose
+`round_half_away_to_floor`) runs for a target with neither rounding, a cycle
+(`powabs_to_powre`, `powre_to_pow`, `pow_to_powabs`) supports nothing for a target with none of
+the three, and a chain whose
 last link the target cannot take runs nothing (no half-converted design). The bound holds: each
 link of a chain is one pass, the fixed point admits no cycle, so the missing set settles within
 one round per link. P3 still asks a pass to state every feature its output adds, a function,

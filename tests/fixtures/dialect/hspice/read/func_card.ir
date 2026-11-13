@@ -1,0 +1,8 @@
+# codes:
+file "func_card.sp" deck
+  title "func_card"
+  comment " settle (ESPice 0.3.0, --tokenizer=hspice; ESPice is not HSPICE): g(2,3) = 23: .func g(x,y) 'x*10+y' is accepted too"
+  func g(x, y) = x * 10 + y
+  element vsource vs (s 0) dc=1
+  element vsource ve0 (e0 0) dc=(@g(2, 3))
+  analysis dc (source_dc vs) (lin start=1 stop=1 step=1)
