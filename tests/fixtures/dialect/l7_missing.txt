@@ -745,7 +745,6 @@ hspice Run(SweepFreqLog) unspoken
 hspice Run(SweepEndOnStop) unspoken
 hspice Run(SweepCenterSpan) unspoken
 hspice Run(NoiseAcSweep) unspoken
-hspice Run(NoiseRefSourceAc) unspoken
 hspice Run(NoiseCurrentOutput) unspoken
 hspice Run(PzSourceInput) unspoken
 hspice Run(SpPorts) owed from=vacask
