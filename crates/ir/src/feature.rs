@@ -538,6 +538,13 @@ pub(crate) fn item_features(
                     *set = set.with(f);
                 }
             }
+            // R93a: a function point's member at a node of dynamic form, under a stated law
+            if forms[1] {
+                let node = crate::laws::Carrier::Node(design.expr(e));
+                crate::laws::carried(design, node, &mut |x| {
+                    *set = set.with(Feature::Circuit(x));
+                });
+            }
         }
     }
 }

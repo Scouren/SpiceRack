@@ -335,11 +335,31 @@ pub enum CircuitExtra {
     DiodeTtFactorUnclamped,
     /// The same under `Law::DiodeTtFactorClamped` (the VACASK module the flake pins).
     DiodeTtFactorClamped,
+    /// An expression node of dynamic form carrying R93a F42's point under `Law::TrigReduceCast`.
+    TrigReduceCast,
+    /// An expression node of dynamic form carrying R93a F42's point under `Law::TrigExact`.
+    TrigExact,
+    /// An expression node of dynamic form carrying R93a F43's point under `Law::ExpClamp1e99`.
+    ExpClamp1e99,
+    /// An expression node of dynamic form carrying R93a F43's point under `Law::ExpExact`.
+    ExpExact,
+    /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroMinus1e99`.
+    LogZeroMinus1e99,
+    /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroError`.
+    LogZeroError,
+    /// An expression node of dynamic form carrying R93a F45's point under `Law::DivGminGuard`.
+    DivGminGuard,
+    /// An expression node of dynamic form carrying R93a F45's point under `Law::DivExact`.
+    DivExact,
+    /// An expression node of dynamic form carrying R93a F46's point under `Law::AsinEdgeZero`.
+    AsinEdgeZero,
+    /// An expression node of dynamic form carrying R93a F46's point under `Law::AsinEdgeFails`.
+    AsinEdgeFails,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 139] = [
+    pub const ALL: [CircuitExtra; 149] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -479,6 +499,16 @@ impl CircuitExtra {
         CircuitExtra::DiodeIsrSmallSignalExact,
         CircuitExtra::DiodeTtFactorUnclamped,
         CircuitExtra::DiodeTtFactorClamped,
+        CircuitExtra::TrigReduceCast,
+        CircuitExtra::TrigExact,
+        CircuitExtra::ExpClamp1e99,
+        CircuitExtra::ExpExact,
+        CircuitExtra::LogZeroMinus1e99,
+        CircuitExtra::LogZeroError,
+        CircuitExtra::DivGminGuard,
+        CircuitExtra::DivExact,
+        CircuitExtra::AsinEdgeZero,
+        CircuitExtra::AsinEdgeFails,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

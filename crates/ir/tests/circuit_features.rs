@@ -19,6 +19,7 @@ mod tests {
         Delay, DelayLaw, FreqLaw, FreqTable, FreqUnit, Laplace, LaplaceForm, OutKind, Quantity,
         TableLaw, TableSource,
     };
+    use spicerack_ir::expr::{BinOp, Func};
     use spicerack_ir::passive::{Coupling, IcMode, Parasitics, Passive, TcBase, TcLaw};
     use spicerack_ir::semi::{InitialState, Switch};
     use spicerack_ir::source::{DcRule, Distof, Source};
@@ -1593,8 +1594,62 @@ mod tests {
         }),
         (X::DiodeTtFactorClamped, |b, t, on| {
             ttt(b, t, on, Law::DiodeTtFactorClamped)
+        }), // R93a F42-F46: the function in a behavioural source's expression against `sqrt` (a
+        // division against a product)
+        (X::TrigReduceCast, |b, t, on| {
+            func_point(b, t, on, Law::TrigReduceCast, Some(Func::Sin))
+        }),
+        (X::TrigExact, |b, t, on| {
+            func_point(b, t, on, Law::TrigExact, Some(Func::Cos))
+        }),
+        (X::ExpClamp1e99, |b, t, on| {
+            func_point(b, t, on, Law::ExpClamp1e99, Some(Func::Exp))
+        }),
+        (X::ExpExact, |b, t, on| {
+            func_point(b, t, on, Law::ExpExact, Some(Func::Exp))
+        }),
+        (X::LogZeroMinus1e99, |b, t, on| {
+            func_point(b, t, on, Law::LogZeroMinus1e99, Some(Func::Ln))
+        }),
+        (X::LogZeroError, |b, t, on| {
+            func_point(b, t, on, Law::LogZeroError, Some(Func::Log10))
+        }),
+        (X::DivGminGuard, |b, t, on| {
+            func_point(b, t, on, Law::DivGminGuard, None)
+        }),
+        (X::DivExact, |b, t, on| {
+            func_point(b, t, on, Law::DivExact, None)
+        }),
+        (X::AsinEdgeZero, |b, t, on| {
+            func_point(b, t, on, Law::AsinEdgeZero, Some(Func::Asin))
+        }),
+        (X::AsinEdgeFails, |b, t, on| {
+            func_point(b, t, on, Law::AsinEdgeFails, Some(Func::Acos))
         }),
     ];
+
+    /// A behavioural source `b1` under `law` whose expression is `f(v(a))` (a division `1/v(a)`
+    /// when `f` is `None`); off, `sqrt(v(a))` (a product `1*v(a)`).
+    fn func_point(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law, f: Option<Func>) {
+        b.set_laws(Laws::of(&[law]));
+        let v = b.v("a", None);
+        let e = match (f, on) {
+            (Some(f), true) => b.call(f, &[v]),
+            (Some(_), false) => b.call(Func::Sqrt, &[v]),
+            (None, on) => {
+                let one = n(b, 1);
+                b.binary(if on { BinOp::Div } else { BinOp::Mul }, one, v)
+            }
+        };
+        let h = b.head("b1", &["a", "0"], None, &[], ExprId::NONE);
+        b.behav(
+            t,
+            ElemKind::Behav,
+            h,
+            behav(e, OutKind::Voltage),
+            Span::NONE,
+        );
+    }
 
     fn vdmos_mult(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
         let one = n(b, 1);
@@ -1880,6 +1935,19 @@ mod tests {
             true,
         );
         assert!(!op.contains(law(Law::VdmosMultChargesOff)));
+        // R93a: a function point is carried only in a root of dynamic form, not by a resistor's
+        // constant value
+        let constant = used(
+            |b, t, _| {
+                b.set_laws(Laws::of(&[Law::ExpClamp1e99]));
+                let one = n(b, 1);
+                let value = b.call(Func::Exp, &[one]);
+                let row = Passive { value, ..plain(b) };
+                passive(b, t, ElemKind::Resistor, ExprId::NONE, row);
+            },
+            true,
+        );
+        assert!(!constant.contains(law(Law::ExpClamp1e99)));
     }
 
     #[test]
