@@ -55,6 +55,8 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Elem(ir::ElemKind::Inductor))
     .with(ir::Feature::Elem(ir::ElemKind::Diode))
     .with(ir::Feature::Elem(ir::ElemKind::Mosfet))
+    .with(ir::Feature::Elem(ir::ElemKind::Jfet))
+    .with(ir::Feature::Elem(ir::ElemKind::Mesfet))
     .with(ir::Feature::Elem(ir::ElemKind::ModuleModel))
     .with(ir::Feature::Elem(ir::ElemKind::Instance))
     .with(ir::Feature::Elem(ir::ElemKind::Unresolved))
@@ -499,9 +501,12 @@ fn field(kind: ir::ElemKind, p: &str) -> Option<&'static str> {
         (K::Resistor, "tce") => "tce",
         (K::Resistor | K::Capacitor | K::Inductor, "scale") => "scale",
         (K::Resistor, "noisy") => "noisy",
-        (K::Resistor | K::Capacitor | K::Inductor | K::Diode | K::Mosfet, "temp") => "temp",
-        (K::Resistor | K::Capacitor | K::Inductor | K::Diode | K::Mosfet, "dtemp") => "dtemp",
-        (K::Diode, "area") => "area",
+        (K::Resistor | K::Capacitor | K::Inductor, "temp") => "temp",
+        (K::Resistor | K::Capacitor | K::Inductor, "dtemp") => "dtemp",
+        // A semiconductor's typed fields (`Semi`): never a parameter beside them (X-domain).
+        (K::Diode | K::Bjt | K::Mosfet | K::Jfet | K::Mesfet, "temp") => "temp",
+        (K::Diode | K::Bjt | K::Mosfet | K::Jfet | K::Mesfet, "dtemp") => "dtemp",
+        (K::Diode | K::Bjt | K::Jfet | K::Mesfet, "area") => "area",
         _ => return None,
     })
 }

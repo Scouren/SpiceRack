@@ -184,8 +184,15 @@ pub(super) const OWN_FILES: &[(&str, ir::ModelFamily)] = &[
 ];
 
 /// The family the library file `path` (as a `load` writes it) implements, or `None` for any
-/// other file.
+/// other file and for a file whose module is not proven its family's (`families::PROVEN`): its
+/// load stays a plain load, as its models stay module models (F11: the library and the model
+/// agree, so no pass drops the file a module model needs).
 pub(super) fn library(path: &str) -> Option<ir::ModelFamily> {
+    let proven =
+        super::families::file_word(path).is_some_and(|w| super::families::PROVEN.contains(&w));
+    if !proven {
+        return None;
+    }
     let spice = ["spice/", "spice/sn/", "spice/full/"]
         .iter()
         .filter_map(|d| path.strip_prefix(d)?.strip_suffix(".osdi"))

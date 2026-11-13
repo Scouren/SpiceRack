@@ -1,0 +1,7 @@
+an unproven shipped module and its file
+load "spice/mos2.osdi"
+load "spice/mos1.osdi"
+model nm sp_mos2 vto=1
+model n1 sp_mos1 vto=1
+m1 (d g 0 0) nm w=1u l=1u
+m2 (d g 0 0) n1 w=1u l=1u
