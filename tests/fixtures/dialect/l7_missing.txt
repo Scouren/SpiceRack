@@ -114,7 +114,6 @@ ngspice Run(SweepFreqLog) unspoken
 ngspice Run(SweepEndOnStop) unspoken
 ngspice Run(SweepCenterSpan) unspoken
 ngspice Run(NoiseAcSweep) unspoken
-ngspice Run(NoiseRefSourceAc) unspoken
 ngspice Run(NoiseCurrentOutput) unspoken
 ngspice Run(PzSourceInput) unspoken
 ngspice Run(SpPorts) owed from=vacask
@@ -407,7 +406,6 @@ vacask Run(SweepEndOnStop) unspoken
 vacask Run(SweepCenterSpan) unspoken
 vacask Run(NoiseSummary) owed from=ngspice,hspice
 vacask Run(NoiseAcSweep) unspoken
-vacask Run(NoiseRefSourceAc) unspoken
 vacask Run(NoiseCurrentOutput) unspoken
 vacask Run(PzSourceInput) unspoken
 vacask Run(SpNoise) owed from=ngspice,hspice
