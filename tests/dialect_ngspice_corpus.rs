@@ -152,7 +152,7 @@ fn decks(root: &Path) -> Vec<PathBuf> {
 fn run(row: &DialectRow, deck: &Path) -> Result<(), (&'static str, String)> {
     let path = deck.to_string_lossy().into_owned();
     let reader = row.read.expect("ngspice reads");
-    let src = Sources::load(&[&path], ir::Role::Deck, reader, &mut |p| {
+    let src = Sources::load(&[&path], ir::Role::Deck, reader, None, &mut |p| {
         std::fs::read(p)
             .ok()
             .map(|b| String::from_utf8_lossy(&b).into_owned())

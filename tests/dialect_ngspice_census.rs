@@ -121,7 +121,7 @@ fn no_deck_ngspice_runs_clean_holds_a_statement_read_as_invalid() {
             modes.push(name);
             continue;
         }
-        let src = Sources::load(&[&name], ir::Role::Deck, reader, &mut |f| {
+        let src = Sources::load(&[&name], ir::Role::Deck, reader, None, &mut |f| {
             std::fs::read(root.join(f))
                 .ok()
                 .map(|b| String::from_utf8_lossy(&b).into_owned())
