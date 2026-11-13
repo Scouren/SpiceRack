@@ -149,8 +149,9 @@ pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags)
             let default = tables::default_file(row.family);
             // VACASK names a library by its file: the family's default, or a file it
             // ships for that family (a variant), which reads back as this row.
+            // `tables::library` reads a file back as a library only for a proven module's.
             let spelled = match row.path.is_none() {
-                true => default.is_some(),
+                true => default.is_some_and(|d| tables::library(&d) == Some(row.family)),
                 false => {
                     let path = design.str(row.path);
                     tables::library(path) == Some(row.family) && default.as_deref() != Some(path)
@@ -255,3 +256,34 @@ pub(super) fn opaque(w: &mut Writer<'_, '_>, row: ir::item::Opaque) {
 }
 
 // ---- private ----
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Oracle: `tables::library` (da95fe25: a load of a module not proven its family's reads as a
+    /// plain load) and round9's L5 seed 0 on ir-next 3e565243: a library the reader would not read
+    /// back as a library is refused, one of a proven module is spelled.
+    #[test]
+    fn a_library_of_an_unproven_module_is_refused() {
+        let refused = |family: ir::ModelFamily| {
+            let mut design = ir::Design::new();
+            let at = {
+                let mut b = design.builder();
+                let (_, top) = b.file("t.sim", ir::Role::Deck);
+                let row = ir::DeviceLibrary {
+                    path: ir::NameId::NONE,
+                    family,
+                };
+                b.device_library(top, row, ir::Span::NONE)
+            };
+            let mut diags = ir::Diags::new();
+            admit(&design, at, &mut diags);
+            diags.rows().iter().any(|d| d.code == NO_LIBRARY)
+        };
+        assert!(refused(ir::ModelFamily::JfetParkerSkellern));
+        assert!(refused(ir::ModelFamily::Vbic));
+        assert!(!refused(ir::ModelFamily::Diode));
+        assert!(!refused(ir::ModelFamily::JfetShichman));
+    }
+}

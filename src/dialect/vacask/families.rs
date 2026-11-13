@@ -20,7 +20,7 @@
 //!
 //! Contents: `Module`, `FAMILIES`, `PROVEN`, `Params`, `Name`, `module`, `file_word`, `default_word`,
 //! `Words` (`Words::of`, `Words::get`), `params`, `kind`, `has_polarity`, `model_name_in`, `model_name_out`, `instance_name_in`,
-//! `canonical`, `instance_name_out` (crate-private)
+//! `canonical`, `instance_name_out`, `proven_families` (crate-private)
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -383,6 +383,25 @@ pub(super) fn instance_name_out(word: &str, ir: &str) -> String {
     }
 }
 
+/// `set` with the family of every `PROVEN` module: the families a read yields (an unproven
+/// module's model and library read as a user module and a plain load, R41 a), so a reader's
+/// `FEATURES` claims no other (law L5).
+pub(super) const fn proven_families(set: ir::FeatureSet) -> ir::FeatureSet {
+    let mut out = set;
+    let mut i = 0;
+    while i < FAMILIES.len() {
+        let mut k = 0;
+        while k < PROVEN.len() {
+            if same(FAMILIES[i].word, PROVEN[k]) {
+                out = out.with(ir::Feature::Family(FAMILIES[i].family));
+            }
+            k += 1;
+        }
+        i += 1;
+    }
+    out
+}
+
 // ---- private ----
 
 impl Params {
@@ -415,6 +434,22 @@ const fn m(
         file,
         terminals,
     }
+}
+
+/// `a == b`, in a `const fn`.
+const fn same(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 #[cfg(test)]
