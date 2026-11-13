@@ -5,7 +5,8 @@
 //!
 //! Oracle: the rulings' text (R92: F21 `xom`/`xoi` absent 1e4 Å in ngspice-45 and 1e14 Å in the
 //! pinned VACASK; F24 `kp` absent 25+10·type against 15+5·type; F25 `tcvth`/`vtotc` negated;
-//! R96: F40 and F41 noted; every other point none).
+//! R96: F40 and F41 noted; R93a: F43, F44, F45 guarded under ngspice-45's law and noted under
+//! the exact one, F42 and F46 noted both ways; every other point none).
 //!
 //! Contents: tests only.
 
@@ -23,6 +24,7 @@ mod tests {
         Stated(Vec<(Vec<&'static str>, f64, f64)>),
         Negated(Vec<&'static str>),
         Noted,
+        Guarded,
     }
 
     fn want(law: Law) -> Want {
@@ -37,7 +39,15 @@ mod tests {
             L::DiodeIsrSmallSignalHand
             | L::DiodeIsrSmallSignalExact
             | L::DiodeTtFactorUnclamped
-            | L::DiodeTtFactorClamped => Want::Noted,
+            | L::DiodeTtFactorClamped
+            | L::TrigReduceCast
+            | L::TrigExact
+            | L::ExpExact
+            | L::LogZeroError
+            | L::DivExact
+            | L::AsinEdgeZero
+            | L::AsinEdgeFails => Want::Noted,
+            L::ExpClamp1e99 | L::LogZeroMinus1e99 | L::DivGminGuard => Want::Guarded,
             L::BcSatAreaTimesAreab
             | L::BcSatAreabOnly
             | L::SubSatLastFactor
@@ -69,6 +79,7 @@ mod tests {
             let got = match law.rewrite() {
                 Rewrite::None => Want::None,
                 Rewrite::Noted => Want::Noted,
+                Rewrite::Guarded => Want::Guarded,
                 Rewrite::Negated(names) => Want::Negated(names.to_vec()),
                 Rewrite::Stated(rows) => Want::Stated(
                     rows.iter()

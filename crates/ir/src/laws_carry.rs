@@ -10,7 +10,7 @@
 //! literally v" is given with a value that is not the literal v (a parameter read is not
 //! literal). An unresolved model is a carrier: its law is unknown.
 //!
-//! Cites: `rewrite/RULINGS.md` R86, R88, R91, R92, R94, R94a, R95, R96 (on the `rulings` branch); the runs
+//! Cites: `rewrite/RULINGS.md` R86, R88, R91, R92, R93a, R94, R94a, R95, R95a, R96 (on the `rulings` branch); the runs
 //! each `Law` variant's doc names.
 //!
 //! Contents (crate-private): `pub(crate) fn carries(&Design, &Row, Carrier) -> bool`,
@@ -19,6 +19,7 @@
 use crate::circuit_text::get_row;
 use crate::design::Design;
 use crate::element::{ElemKind, Element};
+use crate::expr::{BinOp, Expr, Func};
 use crate::id::{ExprId, ParamList};
 use crate::item::ItemKind;
 use crate::laws::{Carrier, Point, Row};
@@ -86,6 +87,7 @@ pub(crate) fn carries(design: &Design, law: &Row, row: Carrier<'_>) -> bool {
                     Err(()) => false,
                 }
         }
+        (point, Carrier::Node(e)) => node(point, e),
         (Point::DiodeTtFactor, Carrier::Model(m)) => {
             let ttt = |k: &str| given_not(design, param(design, m.params, &[k]), 0.0);
             f.contains(&m.family) && (ttt("ttt1") || ttt("ttt2"))
@@ -109,7 +111,12 @@ pub(crate) fn carries(design: &Design, law: &Row, row: Carrier<'_>) -> bool {
             | Point::BjtIrbSmallSignal
             | Point::VdmosMultCharges
             | Point::DiodeIsrReverse
-            | Point::DiodeIsrSmallSignal,
+            | Point::DiodeIsrSmallSignal
+            | Point::TrigReduce
+            | Point::ExpClamp
+            | Point::LogZero
+            | Point::DivGuard
+            | Point::AsinEdge,
             Carrier::Model(_),
         )
         | (
@@ -118,13 +125,46 @@ pub(crate) fn carries(design: &Design, law: &Row, row: Carrier<'_>) -> bool {
             | Point::VdmosKp
             | Point::VdmosTcvth
             | Point::VdmosClamp
-            | Point::DiodeTtFactor,
+            | Point::DiodeTtFactor
+            | Point::TrigReduce
+            | Point::ExpClamp
+            | Point::LogZero
+            | Point::DivGuard
+            | Point::AsinEdge,
             Carrier::Element(_),
         ) => false,
     }
 }
 
 // ---- private ----
+
+/// R93a's function points: whether an expression node in a root of dynamic form carries
+/// `point` (the function or operator whose ngspice-45 B-source law differs).
+fn node(point: Point, e: Expr) -> bool {
+    let call = |fs: &[Func]| matches!(e, Expr::Call(f, _) if fs.contains(&f));
+    match point {
+        Point::TrigReduce => call(&[Func::Sin, Func::Cos, Func::Tan]),
+        Point::ExpClamp => call(&[Func::Exp]),
+        Point::LogZero => call(&[Func::Ln, Func::Log10]),
+        Point::DivGuard => matches!(e, Expr::Binary(BinOp::Div | BinOp::DivTyped, ..)),
+        Point::AsinEdge => call(&[Func::Asin, Func::Acos]),
+        Point::BcSatArea
+        | Point::SubSatTemp
+        | Point::DiodeWlMult
+        | Point::DiodeSidewallKnee
+        | Point::DiodeXom
+        | Point::VdmosKp
+        | Point::VdmosTcvth
+        | Point::VdmosClamp
+        | Point::MosSmallSignal
+        | Point::Mos6SmallSignal
+        | Point::BjtIrbSmallSignal
+        | Point::VdmosMultCharges
+        | Point::DiodeIsrReverse
+        | Point::DiodeIsrSmallSignal
+        | Point::DiodeTtFactor => false,
+    }
+}
 
 /// The model an element names: `Ok(None)` when unresolved (its law unknown: a carrier),
 /// `Ok(Some(m))` for a model row, `Err(())` when it names another kind of definition.

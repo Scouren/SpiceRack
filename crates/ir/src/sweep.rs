@@ -339,14 +339,14 @@ pub(crate) fn sweep_handles(s: &SweepSpec, out: &mut Vec<Handle>) {
 /// `Lin` by a count that is not a literal).
 pub(crate) fn sweep_valid(design: &Design, s: &SweepSpec, at: SweepUse) -> bool {
     let set = |e: ExprId| !e.is_none();
-    let end_ok = match s.end {
+    let end_ok = || match s.end {
         SweepEnd::Grid | SweepEnd::OnStop => true,
         SweepEnd::Stretch => {
             matches!(s.kind, SweepKind::Dec | SweepKind::Oct) && !on_grid(design, s)
         }
         SweepEnd::NgDecade => s.kind == SweepKind::Dec && !on_grid(design, s),
     };
-    let count_ok = match s.count {
+    let count_ok = || match s.count {
         SweepCount::Plain => true,
         SweepCount::NgLin => {
             at == SweepUse::Freq
@@ -355,7 +355,7 @@ pub(crate) fn sweep_valid(design: &Design, s: &SweepSpec, at: SweepUse) -> bool 
                 && !matches!(design.expr(s.points), crate::expr::Expr::Num(_))
         }
     };
-    end_ok && count_ok && fields_valid(s)
+    fields_valid(s) && end_ok() && count_ok()
 }
 
 /// Adds the sweep's `RunExtra` features.
@@ -549,8 +549,9 @@ fn fields_valid(s: &SweepSpec) -> bool {
 
 /// A positive literal's digits as `(mantissa, power of ten)`, its value `mantissa × 10^power`
 /// exactly (`Mil`: the mantissa times 254 and the power less 7, 25.4e-6 = 254e-7); `None` for a
-/// read, a `Long` literal or a value not above zero.
+/// read, a `Long` literal, a value not above zero, or a handle out of range (`NONE`).
 fn digits(design: &Design, e: ExprId) -> Option<(i128, i32)> {
+    e.index_checked(design.expr_count_all())?;
     let crate::expr::Expr::Num(k) = design.expr(e) else {
         return None;
     };

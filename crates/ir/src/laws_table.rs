@@ -1,4 +1,4 @@
-//! The law table's rows (R90, R92, R94, R94a, R95, R96): a `Law` in, its `Row` out (point,
+//! The law table's rows (R90, R92, R93a, R94, R94a, R95, R96): a `Law` in, its `Row` out (point,
 //! families, member, IR word, rewriting kind), exhaustive over the variants. Split from `laws.rs`
 //! at its size limit; each variant's doc there carries its build, run and carriers.
 //!
@@ -16,6 +16,8 @@ const DIODES: &[ModelFamily] = &[ModelFamily::Diode, ModelFamily::DiodeLevel3];
 const VDMOS: &[ModelFamily] = &[ModelFamily::Vdmos];
 const MOS239: &[ModelFamily] = &[ModelFamily::Mos2, ModelFamily::Mos3, ModelFamily::Mos9];
 const MOS6: &[ModelFamily] = &[ModelFamily::Mos6];
+/// R93a's function points: carried by an expression node, no model family.
+const NONE: &[ModelFamily] = &[];
 const XOM_1E4: &[Stated] = &[
     Stated {
         names: &["xom"],
@@ -260,6 +262,64 @@ impl Law {
                 DIODES,
                 X::DiodeTtFactorClamped,
                 "diode_tt_factor_clamped",
+                Rewrite::Noted,
+            ),
+            Law::TrigReduceCast => (
+                P::TrigReduce,
+                NONE,
+                X::TrigReduceCast,
+                "trig_reduce_cast",
+                Rewrite::Noted,
+            ),
+            Law::TrigExact => (
+                P::TrigReduce,
+                NONE,
+                X::TrigExact,
+                "trig_exact",
+                Rewrite::Noted,
+            ),
+            Law::ExpClamp1e99 => (
+                P::ExpClamp,
+                NONE,
+                X::ExpClamp1e99,
+                "exp_clamp_1e99",
+                Rewrite::Guarded,
+            ),
+            Law::ExpExact => (P::ExpClamp, NONE, X::ExpExact, "exp_exact", Rewrite::Noted),
+            Law::LogZeroMinus1e99 => (
+                P::LogZero,
+                NONE,
+                X::LogZeroMinus1e99,
+                "log_zero_minus_1e99",
+                Rewrite::Guarded,
+            ),
+            Law::LogZeroError => (
+                P::LogZero,
+                NONE,
+                X::LogZeroError,
+                "log_zero_error",
+                Rewrite::Noted,
+            ),
+            Law::DivGminGuard => (
+                P::DivGuard,
+                NONE,
+                X::DivGminGuard,
+                "div_gmin_guard",
+                Rewrite::Guarded,
+            ),
+            Law::DivExact => (P::DivGuard, NONE, X::DivExact, "div_exact", Rewrite::Noted),
+            Law::AsinEdgeZero => (
+                P::AsinEdge,
+                NONE,
+                X::AsinEdgeZero,
+                "asin_edge_zero",
+                Rewrite::Noted,
+            ),
+            Law::AsinEdgeFails => (
+                P::AsinEdge,
+                NONE,
+                X::AsinEdgeFails,
+                "asin_edge_fails",
                 Rewrite::Noted,
             ),
         };

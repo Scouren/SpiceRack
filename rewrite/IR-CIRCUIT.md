@@ -290,3 +290,9 @@ class that holds it (or `gap: <why>`). A row with no home is a finding, not a fa
   - `DiodeTtFactorUnclamped` / `…Clamped` (noted, R91's clamp): a `Diode`/`DiodeLevel3` model whose `ttt1` or `ttt2` is given and not literally 0.
   The small-signal points share one carrier shape (`laws_carry::small_signal`: element kind, a model condition, an instance condition, the design condition).
 - The predicates read parameters by the family's own names, ngspice-45's and the pinned VACASK module's alike for every name read (`cjsw`/`cjp` and `tcvth`/`vtotc` are aliases in both builds, so both spellings count; `laws_carry.rs` header).
+- R93a (rulings): five function points, carried by an expression node in a root of dynamic form (`root_form`: class `Temp` or above, or a behavioural source's own expression; a function body by its callers' forms), reported by `features_used` beside the node's dynamic feature (`Carrier::Node`). `Laws` is a `u64` (40 variants, 20 points). `Rewrite::Guarded`: the variant's law is an expression around the plain member, written toward a target with the other law.
+  - F42 `TrigReduceCast` / `TrigExact` (`sin`, `cos`, `tan`; noted both ways).
+  - F43 `ExpClamp1e99` / `ExpExact` (`exp`; guarded / noted).
+  - F44 `LogZeroMinus1e99` / `LogZeroError` (`ln`, `log10`; guarded / noted).
+  - F45 `DivGminGuard` / `DivExact` (`/`, typed division; guarded / noted).
+  - F46 `AsinEdgeZero` / `AsinEdgeFails` (`asin`, `acos`; noted both ways).

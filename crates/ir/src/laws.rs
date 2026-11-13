@@ -7,20 +7,20 @@
 //! Data (the six questions). *What*: a set of [`Law`] variants, each a variant of one law point
 //! (a question two builds answer differently); a point's variants exclude each other. Each row
 //! of the table (`Law::row`) gives the variant's point, the families whose models follow it, its
-//! member, its IR word and its point's exact rewriting (R92, R96: none, stated, negated, noted). *How
-//! many*: one set per design; `Law::COUNT` variants (30, two per point, 15 points), one bit each
-//! in a `u32` (16 bits would hold 16; the compile-time assertions below fail the build when the
-//! enum outgrows 32 or a point gains a third variant). *Who writes*: a
+//! member, its IR word and its point's exact rewriting (R92, R96, R93a: none, stated, negated,
+//! noted, guarded). *How many*: one set per design; `Law::COUNT` variants (40, two per point, 20
+//! points), one bit each in a `u64` (the compile-time assertions below fail the build when the
+//! enum outgrows 64 or a point gains a third variant). *Who writes*: a
 //! reader, once per read, the constant of its simulator build (`Builder::set_laws`); the text's
 //! `laws` line; the generator; never a pass. *Who reads*: `features`, once per element or model
-//! row (O(the stated variants) ≤ `Law::COUNT`, each predicate O(the row's parameters and its one
+//! row and once per expression node of dynamic form (R93a's function points) (O(the stated variants) ≤ `Law::COUNT`, each predicate O(the row's parameters and its one
 //! model)); `check` (`LawConflict`); `dump`. *Hot or cold*: cold, read beside each row's other
 //! features. *Lifetime*: the design's.
 //!
 //! A built design states nothing, carries nothing and goes to any target under the target's law.
 //! Ceiling (R90): a design whose models follow two builds of one module cannot say so.
 //!
-//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R94, R94a, R95, R95a, R96 (on the `rulings`
+//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R93a, R94, R94a, R95, R95a, R96 (on the `rulings`
 //! branch); the
 //! runs in `crates/ir/tests/fixtures/bjt_substrate/` and `crates/ir/tests/fixtures/families/`.
 //! The carrier predicates are `laws_carry.rs`, the table's rows `laws_table.rs`.
@@ -178,13 +178,44 @@ pub enum Law {
     DiodeTtFactorUnclamped,
     /// Point R96: clamped at 1e-3 (the VACASK module the flake pins, `diode.va`).
     DiodeTtFactorClamped,
+    /// Point R93a F42, a behavioural `sin`, `cos`, `tan` of a large argument: reduced as
+    /// x − (int)(x/L)·L, the cast saturating past 2^31 periods (ngspice-45's B source; 2.8e-7 to
+    /// 1.3e-6 relative off the exact function, no wrong branch). Carried by the function in a
+    /// root of dynamic form. Noted both ways (no exact form; the note names the region).
+    TrigReduceCast,
+    /// Point R93a F42: the exact function (the pinned VACASK build).
+    TrigExact,
+    /// Point R93a F43, a behavioural `exp`: 1e99 above 227.9559242 (ngspice-45's B source; the
+    /// true value at 228 is 1.045e99). Carried by `exp` in a root of dynamic form. Guarded toward
+    /// a target with the exact law (`x > 227.9559242 ? 1e99 : exp(x)`).
+    ExpClamp1e99,
+    /// Point R93a F43: the exact function (VACASK). Noted toward ngspice.
+    ExpExact,
+    /// Point R93a F44, a behavioural `ln`, `log10` of 0: -1e99 (ngspice-45's B source). Carried by
+    /// `ln` or `log10` in a root of dynamic form. Guarded (`x == 0 ? -1e99 : ln(x)`).
+    LogZeroMinus1e99,
+    /// Point R93a F44: an error (VACASK). Noted toward ngspice.
+    LogZeroError,
+    /// Point R93a F45, a behavioural division: ±gmin·1e-20 added to the denominator
+    /// (ngspice-45's B source; 1/1e-30 is 1 % off, 1/0 is 1e32). Carried by `/` (and a typed
+    /// division) in a root of dynamic form. Guarded (the guard a literal from the design's gmin
+    /// where that is constant; else the rule refuses).
+    DivGminGuard,
+    /// Point R93a F45: the exact quotient (VACASK). Noted toward ngspice.
+    DivExact,
+    /// Point R93a F46, a dynamic `asin(±1)`, `acos(-1)`: converges to 0 (ngspice-45, the
+    /// linearization's slope 1e32 cancels the value). Carried by `asin` or `acos` in a root of
+    /// dynamic form. Noted both ways.
+    AsinEdgeZero,
+    /// Point R93a F46: fails loudly (VACASK).
+    AsinEdgeFails,
 }
 
 /// A set of stated laws, one bit per [`Law`]. Two variants of one point may stand in the set;
 /// `check` refuses that design (`Violation::LawConflict`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Laws {
-    bits: u32,
+    bits: u64,
 }
 
 /// The exact rewriting a law point has (R92, a closed set): what a rule needs and nothing more.
@@ -201,8 +232,14 @@ pub enum Rewrite {
     Negated(&'static [&'static str]),
     /// A difference under the simulators' own relative tolerance (1e-3) everywhere it was
     /// measured (R96): the rule restates the design's variant and leaves one note per carrier
-    /// naming the point.
+    /// naming the point. R93a widens it to a difference confined to a region the note states,
+    /// where no exact form exists (F42, F46; F43–F45 toward ngspice).
     Noted,
+    /// The variant's law is an expression around the plain member (R93a: F43's clamp, F44's
+    /// zero, F45's guarded denominator): toward a target with the other law, the rule writes
+    /// that expression on each carrier and restates the variant, so nothing grows on a round
+    /// trip. The rule bodies are the expression group owner's.
+    Guarded,
 }
 
 /// One parameter a stated variant fills in: its spellings in the family's own names (ngspice's
@@ -221,6 +258,8 @@ pub struct Stated {
 pub(crate) enum Carrier<'a> {
     Element(&'a Element),
     Model(&'a Model),
+    /// An expression node in a root of dynamic form (R93a's function points).
+    Node(crate::expr::Expr),
 }
 
 /// A law point: the question its variants answer. `LawConflict`'s `arg` is its index.
@@ -241,6 +280,11 @@ pub(crate) enum Point {
     DiodeIsrReverse,
     DiodeIsrSmallSignal,
     DiodeTtFactor,
+    TrigReduce,
+    ExpClamp,
+    LogZero,
+    DivGuard,
+    AsinEdge,
 }
 
 /// One variant's row: its point, the families whose models follow it, its member, its word,
@@ -254,7 +298,7 @@ pub(crate) struct Row {
 }
 
 /// Every point, in declaration order.
-const POINTS: [Point; 15] = [
+const POINTS: [Point; 20] = [
     Point::BcSatArea,
     Point::SubSatTemp,
     Point::DiodeWlMult,
@@ -270,16 +314,21 @@ const POINTS: [Point; 15] = [
     Point::DiodeIsrReverse,
     Point::DiodeIsrSmallSignal,
     Point::DiodeTtFactor,
+    Point::TrigReduce,
+    Point::ExpClamp,
+    Point::LogZero,
+    Point::DivGuard,
+    Point::AsinEdge,
 ];
 
-// 30 variants: a `u32`, one bit each (the build fails here when the enum outgrows it)
-const _: () = assert!(Law::COUNT <= u32::BITS as usize);
-const _: () = assert!(size_of::<Laws>() == 4);
+// 40 variants: a `u64`, one bit each (the build fails here when the enum outgrows it)
+const _: () = assert!(Law::COUNT <= u64::BITS as usize);
+const _: () = assert!(size_of::<Laws>() == 8);
 const _: () = assert!(Law::COUNT == 2 * POINTS.len());
 
 impl Law {
     /// Every variant, in declaration order (its bit in [`Laws`]).
-    pub const ALL: [Law; 30] = [
+    pub const ALL: [Law; 40] = [
         Law::BcSatAreaTimesAreab,
         Law::BcSatAreabOnly,
         Law::SubSatLastFactor,
@@ -310,6 +359,16 @@ impl Law {
         Law::DiodeIsrSmallSignalExact,
         Law::DiodeTtFactorUnclamped,
         Law::DiodeTtFactorClamped,
+        Law::TrigReduceCast,
+        Law::TrigExact,
+        Law::ExpClamp1e99,
+        Law::ExpExact,
+        Law::LogZeroMinus1e99,
+        Law::LogZeroError,
+        Law::DivGminGuard,
+        Law::DivExact,
+        Law::AsinEdgeZero,
+        Law::AsinEdgeFails,
     ];
     /// Variant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -349,13 +408,13 @@ impl Laws {
     /// The set with `law` added.
     pub const fn with(self, law: Law) -> Laws {
         Laws {
-            bits: self.bits | 1 << law as u32,
+            bits: self.bits | 1 << law as u64,
         }
     }
 
     /// Whether `law` is stated.
     pub const fn contains(self, law: Law) -> bool {
-        self.bits & 1 << law as u32 != 0
+        self.bits & 1 << law as u64 != 0
     }
 
     /// Whether nothing is stated.

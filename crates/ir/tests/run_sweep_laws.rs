@@ -117,6 +117,10 @@ fn an_end_rule_stands_only_where_it_means_something() {
     assert!(refused(
         "  analysis ac (dec ng_decade start=1 stop=1e6 points=10)"
     ));
+    // a rule on a range missing its stop is a field fault, not a panic (the text mutation law,
+    // seed 33 mutant 23)
+    assert!(refused("  analysis ac (dec ng_decade start=1 points=2)"));
+    assert!(refused("  analysis ac (oct stretch stop=1 points=2)"));
 }
 
 #[test]
