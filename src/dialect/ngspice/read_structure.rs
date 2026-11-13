@@ -27,6 +27,7 @@ use super::read::{Def, Lower, Stmt};
 use super::read_outputs;
 use super::read_run;
 use super::tables::Eval;
+use super::value::{Wrap, unwrap};
 use crate::ir;
 use crate::syntax::ast::{Ast, NONE, Node, Tag};
 use crate::syntax::token::Tokens;
@@ -349,7 +350,10 @@ pub(super) fn func_parts(text: &str) -> Option<(String, Vec<String>, &str)> {
     }
     let body = body.trim();
     let body = body.strip_prefix('=').unwrap_or(body).trim();
-    let body = unwrap(body);
+    let body = match unwrap(body) {
+        Wrap::Whole(inner, _) => inner,
+        Wrap::Bare(_) | Wrap::Parts => body.trim(),
+    };
     (!body.trim().is_empty()).then(|| (name.to_string(), args, body))
 }
 
@@ -409,7 +413,16 @@ fn assignments(lw: &Lower<'_, '_>, n: Node) -> Option<Vec<(String, String)>> {
 /// read by the evaluator its class picks (R14: one that reads `temper`, directly or through a
 /// definition, is the B-source parser's); one that reads the circuit is ngspice's error.
 fn parameter(lw: &Lower<'_, '_>, block: Node, value: &str) -> Result<Tree, expr_read::Fail> {
-    let text = unwrap(value);
+    let text = match unwrap(value) {
+        Wrap::Whole(inner, false) | Wrap::Bare(inner) => inner,
+        // "; sign expected." (settle wrap_param_1/2.sp), "Syntax error: letter [{]" (3/4)
+        Wrap::Whole(_, true) | Wrap::Parts => {
+            return Err(expr_read::Fail {
+                code: codes::WRAP,
+                class: ir::OpaqueClass::InvalidInSource,
+            });
+        }
+    };
     let class = lw.class(block, text, &[]);
     if class == Class::Circuit {
         return Err(expr_read::Fail {
@@ -427,27 +440,6 @@ fn eval(class: Class) -> Eval {
     } else {
         Eval::Numparam
     }
-}
-
-/// `text` without one `{…}` or `'…'` that wraps all of it.
-fn unwrap(text: &str) -> &str {
-    let t = text.trim();
-    if let Some(inner) = t.strip_prefix('\'').and_then(|r| r.strip_suffix('\''))
-        && !inner.contains('\'')
-    {
-        return inner;
-    }
-    if let Some(inner) = t.strip_prefix('{').and_then(|r| r.strip_suffix('}')) {
-        let mut depth = 0i32;
-        let wraps = inner.bytes().all(|c| {
-            depth += i32::from(c == b'{') - i32::from(c == b'}');
-            depth >= 0
-        });
-        if wraps && depth == 0 {
-            return inner;
-        }
-    }
-    t
 }
 
 /// Whether the statement stands in an `.if` branch.

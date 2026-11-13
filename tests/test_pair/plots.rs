@@ -5,6 +5,7 @@
 //! Cites: AMEND-A12 A32 (the rename map is the `name_with_letter` notes); `rewrite/SPINE.md` §8a.
 //!
 //! Contents:
+//! - `pub fn hierarchical(plots: Vec<RawData>) -> Vec<RawData>`
 //! - `pub fn renamed(plots: Vec<RawData>, map: &HashMap<String, String>) -> Vec<RawData>`
 //! - `pub fn only(plots: Vec<RawData>, keep: Option<&BTreeSet<String>>) -> Vec<RawData>`
 //! - `pub fn names(a: &[RawData], b: &[RawData], devices: &BTreeSet<String>, axes: &BTreeSet<String>) -> Result<(), String>`
@@ -14,6 +15,26 @@ use std::collections::{BTreeSet, HashMap};
 use spicerack::result::RawData;
 
 use crate::cmp;
+
+/// `plots` with ngspice's hierarchical device spelling made the path every other simulator
+/// writes: a branch current of a device inside an instance is `i(l.xgood1.l1)` on ngspice (the
+/// device's letter, then the path), `Xgood1:L1:flow(br)` on VACASK; the leading one-letter
+/// segment that repeats the last segment's letter goes.
+pub fn hierarchical(mut plots: Vec<RawData>) -> Vec<RawData> {
+    for v in plots.iter_mut().flat_map(|p| p.variables.iter_mut()) {
+        let n = cmp::normal(&v.name);
+        let Some(path) = n.strip_suffix("#branch") else {
+            continue;
+        };
+        let segs: Vec<&str> = path.split('.').collect();
+        let letter = |s: &str| s.chars().next().unwrap_or(' ');
+        if segs.len() >= 3 && segs[0].len() == 1 && letter(segs[0]) == letter(segs[segs.len() - 1])
+        {
+            v.name = segs[1..].join(".") + "#branch";
+        }
+    }
+    plots
+}
 
 /// `plots` with each vector named under the rename map: every `.`-segment of its normal name
 /// (and a branch's device) that the map holds, given back its source name.

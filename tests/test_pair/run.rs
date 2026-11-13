@@ -90,6 +90,9 @@ struct Spine {
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
 
+/// The refinement oracle's step cap: a transient's span over this.
+const REFINE: f64 = 2000.0;
+
 /// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
 /// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
 /// each axis, which VACASK writes as the axis's swept vector.
@@ -119,6 +122,18 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     }
     let spine = match spine(from, to, &deck.src, deck.policy) {
         Ok(s) => s,
+        Err((1, f)) if deck.policy == Policy::Lenient => {
+            // A corpus deck the reader refuses: when the source simulator rejects it too, the
+            // refusal is right and no reader finding (`source-rejects`, both messages).
+            let text = &deck.src.files()[0].1;
+            return match sim::run_checked(c.from_sim, &deck.path, text, &[], SECS) {
+                Ran::Failed(why) => {
+                    let said = format!("reader: {} | {}: {why}", f.said, c.from_sim.name());
+                    stop(fails, 1, fail("source-rejects", said), None)
+                }
+                _ => stop(fails, 1, f, None),
+            };
+        }
         Err((step, f)) => return stop(fails, step, f, None),
     };
     let written = Some(spine.files.clone());
@@ -167,8 +182,11 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     });
     let (a, b) = match ran {
         Ok((Ran::Plots(a), Ran::Plots(b))) => (
-            plots::only(a, pair.vectors.as_ref()),
-            plots::only(plots::renamed(b, &spine.renames), pair.vectors.as_ref()),
+            plots::only(plots::hierarchical(a), pair.vectors.as_ref()),
+            plots::only(
+                plots::renamed(plots::hierarchical(b), &spine.renames),
+                pair.vectors.as_ref(),
+            ),
         ),
         Ok((a, b)) => return stop(fails, 4, ran_fail(a, b), written),
         Err((_, f)) => return stop(fails, 4, f, written),
@@ -179,7 +197,43 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     }
     match cmp::compare(&a, &b, tol) {
         Err(why) => {
-            fails.insert(4, fail("mismatch", why));
+            // The refinement oracle (cross-sim's `simulator-differs:refinement`): both decks
+            // with every transient's step capped at span/REFINE; agreeing there, the two
+            // simulators' step control made the difference, not the conversion.
+            let refined = sim::refined(c.from_sim, text, REFINE)
+                .zip(sim::refined(c.to_sim, &entry.1, REFINE))
+                .and_then(|(ra, rb)| {
+                    let a2 = sim::run_checked(c.from_sim, &deck.path, &ra, &[], SECS);
+                    let b2 = sim::run_checked(
+                        c.to_sim,
+                        &deck.path.with_extension(c.to_ext),
+                        &rb,
+                        rest,
+                        SECS,
+                    );
+                    match (a2, b2) {
+                        (Ran::Plots(x), Ran::Plots(y)) => Some(
+                            cmp::compare(
+                                &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
+                                &plots::only(
+                                    plots::renamed(plots::hierarchical(y), &spine.renames),
+                                    pair.vectors.as_ref(),
+                                ),
+                                tol,
+                            )
+                            .is_ok(),
+                        ),
+                        _ => None,
+                    }
+                });
+            let f = match refined {
+                Some(true) => fail(
+                    "simulator-differs:refinement",
+                    format!("{why}; both agree with every step capped at span/{REFINE}"),
+                ),
+                _ => fail("mismatch", why),
+            };
+            fails.insert(4, f);
         }
         Ok(()) if std::env::var_os("PAIR_MARGINS").is_some() => {
             eprintln!("margin {}: {}", deck.name, margin(&a, &b, text, &entry.1));
@@ -372,18 +426,30 @@ fn read_back(to: &DialectRow, spine: &Spine) -> Result<(), Fail> {
     let normal =
         |d: &ir::Design| laws::canonical(&laws::read_all(ir_row, &laws::write_all(d, ir_row)));
     let (want, got) = (normal(&spine.legal), normal(&back));
-    // Every differing line, the first four: a known difference must not hide another.
-    let pairs = want.lines().zip(got.lines()).filter(|(w, g)| w != g);
-    let lines: Vec<String> = pairs
-        .take(4)
-        .map(|(w, g)| format!("legalized `{}`, read back `{}`", w.trim(), g.trim()))
-        .collect();
-    let said = match lines.is_empty() {
-        false => lines.join(" | "),
-        true => format!(
-            "{} lines legalized, {} read back",
-            want.lines().count(),
-            got.lines().count()
+    // The items each side holds that the other does not (lines of the normal form, counted, so
+    // an inserted or moved item does not shift every line after it), the first four of each.
+    let count = |t: &str| {
+        let mut m: BTreeMap<String, i64> = BTreeMap::new();
+        for l in t.lines() {
+            *m.entry(l.trim().to_string()).or_default() += 1;
+        }
+        m
+    };
+    let (cw, cg) = (count(&want), count(&got));
+    let only = |a: &BTreeMap<String, i64>, b: &BTreeMap<String, i64>| -> Vec<String> {
+        a.iter()
+            .filter(|(l, n)| **n > b.get(*l).copied().unwrap_or(0))
+            .map(|(l, _)| format!("`{l}`"))
+            .take(4)
+            .collect()
+    };
+    let (lost, gained) = (only(&cw, &cg), only(&cg, &cw));
+    let said = match (lost.is_empty(), gained.is_empty()) {
+        (true, true) => "the same items in another order".to_string(),
+        _ => format!(
+            "legalized only: {} | read back only: {}",
+            lost.join(", "),
+            gained.join(", ")
         ),
     };
     Err(fail("differs", said))

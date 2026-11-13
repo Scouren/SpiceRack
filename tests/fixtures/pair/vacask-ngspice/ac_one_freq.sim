@@ -1,0 +1,10 @@
+ac_one_freq: a resistor divider's AC response at one listed frequency, 1/(2*pi) Hz written as its digits, as VACASK's demo/natures decks list it (they write `1/(2*M_PI)`, a typed division of integers, the expression group's); the frequency vector holds that one value (|v(out)| = 0.75)
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (in 0) vsource dc=0.0 mag=1.0
+r1 (in out) resistor r=1k
+r2 (out 0) resistor r=3k
+control
+  analysis ac1 ac values=[0.15915494309189535]
+endc

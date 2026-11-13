@@ -5,7 +5,7 @@
 
 use spicerack::ir;
 
-use super::{Tally, compare, deck, generated, pulse_slope, sources_only};
+use super::{Tally, compare, compare_until, deck, generated, pulse_slope, sources_only};
 
 // ---- private ----
 
@@ -111,4 +111,54 @@ fn pulse_vacask_to_spice_keeps_every_value() {
     );
     assert_eq!(tally.worst, 0, "bit for bit wherever no time is wrapped");
     assert!(tally.sources > 100);
+}
+
+/// VACASK's single pulse and step (no period; a step has no fall either) written as SPICE
+/// pulses that do not repeat before the design's last stop: equal at the operating point and
+/// at every boundary instant up to that stop (VACASK runs `once.sim`, `step.sim` beside the
+/// rule's fixtures pin the two shapes), bit for bit: no time is wrapped there.
+#[test]
+fn pulse_vacask_to_spice_writes_a_single_pulse_and_a_step_up_to_the_stop() {
+    let mut tally = Tally::default();
+    for (fields, stop) in [
+        ("delay=1n rise=1n fall=1n width=1n period=0", "100n"),
+        ("delay=1n rise=1n fall=1n width=0 period=0", "100n"),
+        ("delay=1m rise=1u fall=0 width=0 period=0", "5m"),
+        ("delay=-3n rise=2n fall=0 width=7n period=0", "1u"),
+        ("delay=0 rise=1n fall=2n width=3n period=-1", "20n"),
+    ] {
+        let text = format!(
+            "file \"p.sp\" deck\n  element vsource v1 (a 0) dc=0 wave=pulse(v1=1 v2=3 {fields} law=vacask)\n  analysis tran stop={stop} max_step=1n\n"
+        );
+        let mut design = deck(&text);
+        let until = {
+            let mut s = 0.0;
+            for (i, _) in design.reachable() {
+                if i.kind == ir::ItemKind::Analysis {
+                    let a = design.row::<ir::Analysis>(i.index);
+                    let t = design.detail::<ir::tran::Tran>(a.detail);
+                    s = ir::eval(&design, t.stop, &super::Run).expect("a stop");
+                }
+            }
+            s
+        };
+        let before = tally.sources;
+        compare_until(
+            "pulse_vacask_to_spice",
+            design.clone(),
+            &mut tally,
+            Some(pulse_slope),
+            until,
+            false,
+        );
+        assert_eq!(tally.sources, before + 1, "{fields}: written");
+        // the law changed: the design holds no VACASK pulse
+        let pass = spicerack::passes::all()
+            .find(|p| p.name == "pulse_vacask_to_spice")
+            .expect("registered");
+        (pass.run)(&mut design, &mut ir::Diags::new());
+        let vacask = ir::Feature::Circuit(ir::CircuitExtra::PulseVacask);
+        assert!(!ir::features_used(&design).contains(vacask), "{fields}");
+    }
+    assert_eq!(tally.worst, 0, "bit for bit up to the stop");
 }

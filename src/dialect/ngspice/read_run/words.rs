@@ -8,24 +8,16 @@
 //! (`INPevaluate` with gobble: the rest of a number's token is ignored); runs: a bare parameter
 //! name in a dot card is an error (`.tran 1m ts`: circuit not parsed), `{ts}` is read.
 //!
-//! Contents: `pub(in super::super) enum Val`, `pub(in super::super) fn split`, `pub(super) fn value`,
-//! `pub(super) fn emit`, `pub(super) fn node`, `pub(super) fn invalid`
+//! Contents: `pub(in super::super) fn split`, `pub(super) fn value` (a [`Val`]),
+//! `pub(super) fn node`, `pub(super) fn invalid`
 
 use super::super::declare::Class;
-use super::super::expr_read::{self, Fail, Tree};
-use super::super::number::{self, Grammar};
+use super::super::expr_read::{self, Fail};
+use super::super::number;
 use super::super::read::{Lower, Stmt};
 use super::super::tables::Eval;
+use super::super::value::{Val, Wrap, unwrap};
 use crate::ir;
-
-/// A card value read but not yet appended.
-#[derive(Clone, Debug)]
-pub(in super::super) enum Val {
-    /// A number as written and how its digits fit (`number::Fit`).
-    Lit(ir::Literal, number::Fit),
-    /// A numparam expression (`{…}`).
-    Expr(Tree),
-}
 
 /// The words of `text`: blanks and `,` separate them, `=` is a word of its own, and a word
 /// runs on through a `(…)`, `{…}` or `'…'` group it opens (`v(a, b)` is one word).
@@ -71,32 +63,19 @@ pub(in super::super) fn split(text: &str) -> Vec<String> {
 /// token ignored) or a `{…}`/`'…'` numparam expression that reads no temperature or circuit.
 /// Anything else (a bare name) is ngspice's error.
 pub(super) fn value(lw: &Lower<'_, '_>, st: Stmt, word: &str) -> Result<Val, Fail> {
-    if let Some(inner) = wrapped(word) {
-        if lw.class(st.container, inner, &[]) >= Class::Temp {
-            return Err(invalid());
+    match unwrap(word) {
+        // "Bad syntax!" (settle wrap_analysis_1/2.sp), "Syntax error: letter [{]" (3/4)
+        Wrap::Parts | Wrap::Whole(_, true) => return Err(invalid()),
+        Wrap::Whole(inner, false) if !inner.trim().is_empty() => {
+            if lw.class(st.container, inner, &[]) >= Class::Temp {
+                return Err(invalid());
+            }
+            return expr_read::parse_in(inner, Eval::Numparam).map(Val::Tree);
         }
-        return expr_read::parse_in(inner, Eval::Numparam).map(Val::Expr);
+        Wrap::Whole(..) | Wrap::Bare(_) => {}
     }
-    let (negative, digits) = match word.as_bytes().first() {
-        Some(b'-') => (true, &word[1..]),
-        Some(b'+') => (false, &word[1..]),
-        _ => (false, word),
-    };
-    let s = number::scan(digits, Grammar::Inp).ok_or_else(invalid)?;
-    let (mut lit, mut fit) = (s.literal, s.fit);
-    if negative && lit.mantissa != 0 {
-        lit.mantissa = -lit.mantissa;
-        fit.negate();
-    }
-    Ok(Val::Lit(lit, fit))
-}
-
-/// Appends `v` for an item of `st` and returns its root.
-pub(super) fn emit(lw: &mut Lower<'_, '_>, st: Stmt, v: &Val) -> ir::ExprId {
-    match v {
-        Val::Lit(lit, fit) => lw.number(*lit, fit),
-        Val::Expr(tree) => lw.expr(st, tree, st.scope),
-    }
+    let s = number::card(word).ok_or_else(invalid)?;
+    Ok(Val::Lit(s.literal, s.fit))
 }
 
 /// The node of `v(n)` (either case), as a path, or `None` (`.ic`, `.nodeset`: `inppas3.c`).
@@ -126,15 +105,6 @@ fn path(lw: &mut Lower<'_, '_>, node: &str) -> Vec<String> {
     let mut out: Vec<String> = parts.iter().map(|p| lw.names.fold(p)).collect();
     out.push(lw.names.node(net));
     out
-}
-
-/// The text inside one `{…}` or `'…'` that wraps all of `word`.
-fn wrapped(word: &str) -> Option<&str> {
-    let inner = word
-        .strip_prefix('{')
-        .and_then(|r| r.strip_suffix('}'))
-        .or_else(|| word.strip_prefix('\'').and_then(|r| r.strip_suffix('\'')))?;
-    (!inner.trim().is_empty()).then_some(inner)
 }
 
 /// Moves a finished word into `out`.

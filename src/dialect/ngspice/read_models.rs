@@ -38,14 +38,15 @@
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn model(lw: &mut Lower<'_, '_>, st: Stmt)`
 
-use super::codes::Row;
+use super::codes::{self, Row};
 use super::cst;
 use super::declare::Class;
-use super::expr_read::{self, Tree};
+use super::expr_read;
 use super::families::{self, Reading};
 use super::number;
 use super::read::{Lower, Stmt};
 use super::tables::{self, Eval};
+use super::value::{Val, Wrap, emit, unwrap};
 use crate::ir::{self, Code, Feature, Info, Kind, ModelFamily as F, OpaqueClass, Polarity};
 use crate::syntax::ast::{NONE, Node, Tag};
 
@@ -213,16 +214,6 @@ enum Head {
 /// A refusal: the opaque's class and code.
 type Refusal = (OpaqueClass, Code);
 
-/// A parameter value, parsed and not yet pushed.
-enum Value {
-    /// A card number: its literal and how its digits fit (`number::Fit`).
-    Number(ir::Literal, number::Fit),
-    /// A numparam expression.
-    Expr(Tree),
-    /// A quoted string, unquoted.
-    Str(String),
-}
-
 /// A `.model` card → one `Model` row, or one `Opaque` with its code.
 pub(super) fn model(lw: &mut Lower<'_, '_>, st: Stmt) {
     if let Err((class, code)) = read(lw, st) {
@@ -308,7 +299,7 @@ fn read(lw: &mut Lower<'_, '_>, st: Stmt) -> Result<(), Refusal> {
     let id = lw.b.name(&name);
     let mut pairs = Vec::new();
     for (key, v) in &vals {
-        pairs.push((*key, emit_value(lw, st, v)));
+        pairs.push((*key, emit(lw, st, v)));
     }
     // the IR text parser's order: values, keys, bin base, version (one name table, L5)
     let params = lw.b.params(&pairs);
@@ -566,19 +557,25 @@ fn unread() -> Refusal {
 }
 
 /// The value at `node` of a card in `st`, or why it has no rule here.
-fn read_value(lw: &Lower<'_, '_>, st: Stmt, node: Node) -> Result<Value, Refusal> {
+fn read_value(lw: &Lower<'_, '_>, st: Stmt, node: Node) -> Result<Val, Refusal> {
     let text = lw.text(node);
     let expr = match lw.ast.tag(node) {
-        Tag::Str => return Ok(Value::Str(cst::unquote(&text))),
+        Tag::Str => return Ok(Val::Str(cst::unquote(&text))),
         Tag::Word if numberish(&text) => {
             let s = number::card(&text).ok_or_else(unread)?;
-            return Ok(Value::Number(s.literal, s.fit));
+            return Ok(Val::Lit(s.literal, s.fit));
         }
         Tag::Word if ["true", "false"].contains(&text.to_ascii_lowercase().as_str()) => {
             return Err(unread());
         }
         Tag::Word => text.as_str(),
-        Tag::Delimited => unwrap(&text),
+        Tag::Delimited => match unwrap(&text) {
+            // "Syntax error: letter [{]", fatal (settle wrap_model_3/4.sp)
+            Wrap::Whole(_, true) => return Err((OpaqueClass::InvalidInSource, codes::WRAP)),
+            Wrap::Whole(inner, false) | Wrap::Bare(inner) => inner,
+            // the deck runs on the first wrapper alone, with a warning (wrap_model_1/2.sp)
+            Wrap::Parts => return Err(unread()),
+        },
         _ => return Err(unread()),
     };
     // a value that reads `temper` is re-evaluated at each temperature by the B-source parser
@@ -590,17 +587,8 @@ fn read_value(lw: &Lower<'_, '_>, st: Stmt, node: Node) -> Result<Value, Refusal
         Class::Circuit => return Err(unread()),
     };
     expr_read::parse_in(expr, eval)
-        .map(Value::Expr)
+        .map(Val::Tree)
         .map_err(|f| (f.class, f.code))
-}
-
-/// Pushes `v` and returns its root (a rounded number is noted).
-fn emit_value(lw: &mut Lower<'_, '_>, st: Stmt, v: &Value) -> ir::ExprId {
-    match v {
-        Value::Number(lit, fit) => lw.number(*lit, fit),
-        Value::Expr(tree) => lw.expr(st, tree, st.scope),
-        Value::Str(s) => lw.b.string(s),
-    }
 }
 
 /// The double a card number token reads to (for a level or a txl decision), or `None` when it
@@ -622,14 +610,4 @@ fn numberish(text: &str) -> bool {
         Some(b'+' | b'-') => digit(1) || b.get(1) == Some(&b'.') && digit(2),
         _ => false,
     }
-}
-
-/// `text` without the one `{…}` or `'…'` that wraps all of it.
-fn unwrap(text: &str) -> &str {
-    let t = text.trim();
-    let inner = t
-        .strip_prefix('{')
-        .and_then(|r| r.strip_suffix('}'))
-        .or_else(|| t.strip_prefix('\'').and_then(|r| r.strip_suffix('\'')));
-    inner.unwrap_or(t)
 }

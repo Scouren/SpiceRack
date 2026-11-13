@@ -285,7 +285,7 @@ fn repeat(
         .step_by(2)
         .map(|p| match p {
             Val::Lit(l, _) => Some(*l),
-            Val::Tree(_) => None,
+            Val::Tree(_) | Val::Str(_) => None,
         })
         .collect();
     if let Some(times) = times {

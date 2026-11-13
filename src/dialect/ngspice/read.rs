@@ -67,6 +67,9 @@ pub(super) struct Lower<'a, 'd> {
     rows: &'a mut Vec<RowRef>,
     measured: &'a mut Vec<(usize, usize)>,
     declared: &'a Declared,
+    /// Every file's declare step, in `src`'s order (a `.subckt` of any file is ngspice's: it
+    /// expands every include into one deck before it looks for subcircuits).
+    files: &'a [Declared],
     script: &'a Script,
     /// `(scope, element name)` of every element card so far (folded).
     elements: &'a mut HashSet<(ir::ScopeId, String)>,
@@ -144,9 +147,11 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
     let mut rows = Vec::new();
     let mut measured = Vec::new();
     let mut elements = HashSet::new();
+    // every file declared before any is lowered (settle include_subckt_bad.sp)
+    let files: Vec<Declared> = asts.iter().zip(&toks).map(|(a, t)| declare(a, t)).collect();
     for (k, (path, _)) in src.files().iter().enumerate() {
         let (file, top) = out.file(path, roles[k]);
-        let declared = declare(&asts[k], &toks[k]);
+        let declared = &files[k];
         // ponytail: one file's script; a deck's includes inlined when a fixture needs them
         let script = declare::script(&asts[k], &toks[k]);
         let mut lw = Lower {
@@ -162,7 +167,8 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             pending: &mut pending,
             rows: &mut rows,
             measured: &mut measured,
-            declared: &declared,
+            declared,
+            files: &files,
             script: &script,
             elements: &mut elements,
             shift: u32::from(roles[k] == ir::Role::Library),
@@ -392,21 +398,14 @@ impl<'a, 'd> Lower<'a, 'd> {
 
     /// The port count and the head parameter names (folded, `name::key`) of the `.subckt name`
     /// ngspice binds from `st`'s block: the nearest block outward in this file, else a top-level
-    /// `.subckt` of an earlier file of the read; `None` when none is visible.
+    /// `.subckt` of any file of the read, in its order (ngspice inlines every include first:
+    /// settle include_subckt_ok.sp); `None` when none is visible.
     pub(super) fn subckt_head(&self, st: Stmt, name: &str) -> Option<(usize, Vec<String>)> {
-        if let Some((ports, f)) = self.declared.head(st.container, name) {
-            return Some((ports, f.to_vec()));
-        }
-        let d = self.b.design();
-        let key = name::key(name);
-        let def = d.definitions().iter().find(|def| {
-            def.kind == ir::DefKind::Subckt
-                && d.scope(def.scope).kind == ir::ScopeKind::File
-                && name::key(d.str(def.name)) == key
-        })?;
-        let s: ir::item::Subckt = d.row(def.item.index);
-        let formals = d.params(s.params).iter().map(|&(n, _)| name::key(d.str(n)));
-        Some((d.names(s.ports).len(), formals.collect()))
+        let (ports, f) = self
+            .declared
+            .head(st.container, name)
+            .or_else(|| self.files.iter().find_map(|d| d.top_head(name)))?;
+        Some((ports, f.to_vec()))
     }
 
     /// How many parameter reads and calls wait for the bind step (a mark for [`Lower::rescope`]).

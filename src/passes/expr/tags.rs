@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use super::nodes::def_values;
+use super::nodes::{def_values, live};
 use crate::ir;
 
 /// The set holding Int.
@@ -75,6 +75,14 @@ impl Tags {
             }
         }
         let values = def_values(design);
+        // the live calls only: a rewritten call stays in the table (rows are appended)
+        let calls: Vec<(ir::Ref, ir::ExprList)> = live(design)
+            .into_iter()
+            .filter_map(|e| match design.expr(e) {
+                ir::Expr::UserCall(r, args) if r.is_resolved() => Some((r, args)),
+                _ => None,
+            })
+            .collect();
         let bound = 2 * (defs.len() + t.formals.iter().map(Vec::len).sum::<usize>()) + 2;
         for _ in 0..bound {
             for i in 0..t.exprs.len() {
@@ -87,13 +95,7 @@ impl Tags {
                 changed |= joined != t.defs[d];
                 t.defs[d] = joined;
             }
-            for i in 0..t.exprs.len() {
-                let ir::Expr::UserCall(r, args) = design.expr(ir::ExprId(i as u32)) else {
-                    continue;
-                };
-                if !r.is_resolved() {
-                    continue;
-                }
+            for &(r, args) in &calls {
                 let d = r.def.index();
                 for (k, &a) in design.exprs(args).iter().enumerate() {
                     if let Some(slot) = t.formals[d].get_mut(k) {
