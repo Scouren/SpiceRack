@@ -93,7 +93,7 @@ fn a_section_calling_another_section_of_its_own_file_is_no_cycle_and_reads_its_c
     let (d, diags) = read(&["inc_lib_self.sp", "inc_lib_self.lib"]);
     assert!(!codes(&diags).contains(&"P1015".to_string()), "{diags:?}");
     assert_eq!(master_file(&d, "x1"), Some("inc_lib_self.lib".into()));
-    let reads: Vec<ir::DefId> = (0..d.expr_count())
+    let reads: Vec<ir::DefId> = (0..d.expr_count_all())
         .filter_map(|k| match d.expr(ir::ExprId(k as u32)) {
             ir::Expr::Param(r) if d.str(r.name) == "scale" => Some(r.def),
             _ => None,

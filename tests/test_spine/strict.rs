@@ -125,7 +125,7 @@ fn strict_passes_a_run_item_whose_target_is_defined() {
     for run in [
         "alter (element_value r1) value=2k",
         "alter (param r) value=2k",
-        "loop sweep keep_last (device_param r1 r) (list values=[1k, 2k])",
+        "loop sweep keep_last (device_param r1 tc1) (list values=[1k, 2k])",
     ] {
         let (_, diags) = strict(&format!("{head}  {run}\n"));
         assert!(diags.is_empty(), "{run}: {:?}", diags.rows());

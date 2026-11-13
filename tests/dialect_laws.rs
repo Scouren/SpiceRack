@@ -51,6 +51,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
+    ("l5", "ngspice", "seed 9 Untyped (the generator's stream of ir-rewrite 9e98f07a; the same class as the seed 19 row the last round deleted when its seed stopped drawing it): a whole-run `option interp` in a subcircuit body is written as `.control` / `option interp` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area (the writer spells a whole-run option inside a body it cannot be read back from)"),
     ("l5", "vacask", "seed 0 Untyped (the round's generator; on step2-vacask-b the row's seeds 1 and 38 hid it): a device_library of a family whose module is not proven (jfet_parker_skellern, vbic) is written `load \"spice/jfet2.osdi\"` / `load \"vbic_1p3.osdi\"` and reads back as a plain load (tables::library, da95fe25): write_structure::admit lets through a library the reader cannot read back. Fixed on step2-vacask (admit agrees with tables::library), goes with its hash. The evidence text also shows 141.585peta read back as 141.585e15: equal by meaning (R28; Design::eq_meaning -> literal_eq_across -> Literal::eq_value compares the normal value), not a cause"),
 ];
 

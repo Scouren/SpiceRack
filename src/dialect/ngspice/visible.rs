@@ -35,7 +35,7 @@ impl Visible {
     /// The table of `d` (its definitions and include items as read).
     pub(super) fn new(d: &ir::Design) -> Visible {
         let mut defs_of: HashMap<ir::ItemRef, Vec<ir::DefId>> = HashMap::new();
-        for (k, def) in d.definitions().iter().enumerate() {
+        for (k, def) in d.definitions_all().iter().enumerate() {
             let id = ir::DefId(u32::try_from(k).expect("definitions fit a u32"));
             defs_of.entry(def.item).or_default().push(id);
         }

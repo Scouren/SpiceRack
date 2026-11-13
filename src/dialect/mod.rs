@@ -26,7 +26,7 @@
 //! }
 //! let (mut design, mut diags) = (ir::Design::new(), ir::Diags::new());
 //! dialect::read(&src, from, Policy::Lenient, &mut design, &mut diags);
-//! for def in design.definitions() { /* kind, name, scope */ }
+//! for def in design.definitions_all() { /* kind, name, scope */ }
 //! dialect::legalize(&mut design, to, &mut diags);   // once per design and target
 //! for file in design.files() { let text = dialect::write(&design, file, to, &mut diags); }
 //! ```

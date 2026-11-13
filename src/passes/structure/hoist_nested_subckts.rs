@@ -363,13 +363,13 @@ fn hoist_one(
     }
     // a name the landing scope already defines (in any case) is renamed, its references follow
     let taken = |d: &ir::Design, n: &str| {
-        d.definitions().iter().any(|x| {
+        d.definitions_all().iter().any(|x| {
             x.scope == l && x.kind == ir::DefKind::Subckt && d.str(x.name).eq_ignore_ascii_case(n)
         })
     };
     let base = editor.design().str(row.name).to_string();
     if taken(editor.design(), &base) {
-        let bound = editor.design().definitions().len() + 1;
+        let bound = editor.design().definitions_all().len() + 1;
         let fresh = (1..=bound)
             .map(|n| format!("{base}_{n}"))
             .find(|n| !taken(editor.design(), n))

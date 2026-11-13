@@ -320,7 +320,7 @@ fn dropped(design: &ir::Design, was: Result<ir::Value, ir::Domain>, new: ir::Exp
     };
     let mut stack = vec![new];
     let mut seen = std::collections::HashSet::new();
-    for _ in 0..=2 * design.expr_count() + 1 {
+    for _ in 0..=2 * design.expr_count_all() + 1 {
         let Some(e) = stack.pop() else { return true };
         if e == at {
             return false;
@@ -358,7 +358,7 @@ fn int_capable(e: ir::Expr) -> bool {
 fn holds(design: &ir::Design, root: ir::ExprId, hit: fn(ir::Expr) -> bool) -> bool {
     let mut stack = vec![root];
     let mut seen = std::collections::HashSet::new();
-    for _ in 0..=2 * design.expr_count() + 1 {
+    for _ in 0..=2 * design.expr_count_all() + 1 {
         let Some(e) = stack.pop() else { return false };
         if e.is_none() || !seen.insert(e) {
             continue;
