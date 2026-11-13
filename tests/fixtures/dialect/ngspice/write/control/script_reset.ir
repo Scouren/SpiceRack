@@ -5,6 +5,6 @@ file "script_reset.sp" deck
   param p = 1k
   alter (element_value r1) value=2k
   analysis op
-  alter (param p) value=3k
+  alter (param p) value=3k at_reset
   reset values options temp tnom saves
   analysis op

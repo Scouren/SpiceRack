@@ -19,8 +19,8 @@ use spicerack_ir::dc_ac::{
 use spicerack_ir::periodic::{FreqAxis, Hb, HbTruncate, Pac, Pnoise, Pss, PssMode, Pstb, Pxf, Stb};
 use spicerack_ir::tran::{Four, StepCap, StepCeiling, Tran};
 use spicerack_ir::{
-    AcPart, Builder, Design, Diags, ExprId, FileId, List, Literal, NameId, NumForm, Role, ScopeId,
-    Span, SweepEnd, SweepSpec, Target, TargetKind, dump, link, parse,
+    Builder, Design, Diags, ExprId, FileId, List, Literal, NameId, NumForm, Role, ScopeId, Span,
+    SweepEnd, SweepSpec, Target, TargetKind, dump, link, parse,
 };
 
 const NO: ExprId = ExprId::NONE;
@@ -104,7 +104,7 @@ fn sweep(
 fn dc_and_small_signal_analyses() {
     let text = "file \"t.sp\" deck
   analysis op name=op1
-  analysis dc (source_dc v1) (lin start=0 stop=5 step=1) (temp) (list values=[0, 27]) name=s2 restart
+  analysis dc (source_dc v1) (lin start=0 stop=5 step=1) afresh (temp) (list values=[0, 27]) name=s2
   analysis ac (dec on_stop start=1 stop=1g points=10)
   analysis noise (vdiff (out) (ref)) source=v1 (oct start=1k stop=1meg points=3) points_per_summary=5 source_ac
   analysis tf (i (v2)) source=v1
@@ -129,22 +129,16 @@ fn dc_and_small_signal_analyses() {
                 target: v1,
                 sweep: s1,
                 name: NameId::NONE,
+                afresh: true,
             },
             DcAxis {
                 target: Target::TEMP,
                 sweep: s2,
                 name,
+                afresh: false,
             },
         ]);
-        b.analysis(
-            top,
-            None,
-            Dc {
-                axes,
-                restart: true,
-            },
-            Span::NONE,
-        );
+        b.analysis(top, None, Dc { axes }, Span::NONE);
         let s = sweep(b, SweepSpec::dec, ["1", "1g", "10"]).ending(SweepEnd::OnStop);
         b.analysis(top, None, Ac { sweep: s }, Span::NONE);
         let output = b.probe_vdiff(&["out"], &["ref"]);
@@ -231,7 +225,7 @@ fn time_domain_and_periodic_analyses() {
     let text = "file \"t.sp\" deck
   analysis tran name=t1 stop=1u print_step=1n segments=[2n, 2u] cap=ngspice_rule uic
   analysis tran stop=2u record_start=1u print_step=1n max_step=2n
-  analysis four fundamental=1k harmonics=9 periods=1 (v (out)) (v db (in))
+  analysis four fundamental=1k harmonics=9 periods=1 (v (out)) (v (in))
   option n_freqs value=10
   analysis four fundamental=2k periods=1 (v (out))
   analysis timed_op times=[1u, 2u]
@@ -274,10 +268,7 @@ fn time_domain_and_periodic_analyses() {
         };
         b.analysis(top, None, given, Span::NONE);
         let (f, h, p) = (n(b, "1k"), n(b, "9"), n(b, "1"));
-        let probes = [
-            b.probe_v(&["out"]),
-            b.probe_v(&["in"]).with_part(AcPart::Db),
-        ];
+        let probes = [b.probe_v(&["out"]), b.probe_v(&["in"])];
         let outputs = b.probes(&probes);
         let row = Four {
             fundamental: f,

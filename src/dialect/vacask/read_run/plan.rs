@@ -252,7 +252,8 @@ fn alter(l: &mut Lower<'_, '_, '_>, n: Node) {
                 }
             };
             let value = expr_read::expr(l, *v, Context::Param).expect("checked");
-            l.b.alter(l.scope, target, value, span);
+            // VACASK applies an alter where it stands (R70/A43, the pair deck alter_toplevel.sim)
+            l.b.alter(l.scope, target, value, ir::plan::AlterEffect::AtOnce, span);
         }
     }
 }

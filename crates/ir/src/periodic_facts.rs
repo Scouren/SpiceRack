@@ -182,6 +182,13 @@ impl DetailFacts for Pss {
         flag(set, self.uic, RunExtra::PssUic);
         flag(set, !self.sc_iter.is_none(), RunExtra::PssScIter);
         flag(set, !self.steady_coeff.is_none(), RunExtra::PssSteadyCoeff);
+        // R68/A42: one member for any of the four left out (R58: split on evidence only)
+        let four = [self.harmonics, self.points, self.sc_iter, self.steady_coeff];
+        flag(
+            set,
+            four.iter().any(|e| e.is_none()),
+            RunExtra::PssArgumentOmitted,
+        );
         flag(
             set,
             self.mode == PssMode::Autonomous && self.osc_n != NameId::GROUND,
@@ -257,15 +264,22 @@ impl DetailFacts for Pss {
         if modes.is_empty() {
             return None;
         }
+        // R68/A42: without `PssArgumentOmitted` all four optional arguments are given, which
+        // needs both of their own members
+        let omit = has(features, RunExtra::PssArgumentOmitted);
+        let full = has(features, RunExtra::PssScIter) && has(features, RunExtra::PssSteadyCoeff);
+        if !omit && !full {
+            return None;
+        }
         let mode = modes[g.below(modes.len() as u32) as usize];
         let fundamental = g.expr(b, features, Reads::Constant);
         let tstab = g.expr(b, features, Reads::Constant);
-        let harmonics = if g.chance(2) {
+        let harmonics = if !omit || g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {
             ExprId::NONE
         };
-        let points = if g.chance(2) {
+        let points = if !omit || g.chance(2) {
             g.expr(b, features, Reads::Constant)
         } else {
             ExprId::NONE
@@ -284,7 +298,7 @@ impl DetailFacts for Pss {
         };
         let uic = has(features, RunExtra::PssUic) && g.chance(2);
         let opt = |g: &mut Gen, b: &mut Builder<'_>, x: RunExtra| {
-            if has(features, x) && g.chance(3) {
+            if has(features, x) && (!omit || g.chance(3)) {
                 g.expr(b, features, Reads::Constant)
             } else {
                 ExprId::NONE

@@ -128,9 +128,9 @@ impl Write for Vacask {
         design: &ir::Design,
         file: ir::FileId,
         out: &mut String,
-        _diags: &mut ir::Diags,
+        diags: &mut ir::Diags,
     ) {
-        write::write(design, file, out);
+        write::write(design, file, out, diags);
     }
 }
 

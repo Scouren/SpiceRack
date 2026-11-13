@@ -16,7 +16,8 @@
 //! `pub struct Sens`, `pub struct SensAc`, `pub struct Pz`, `pub enum PzInput`,
 //! `pub enum PzTransfer`, `pub enum PzFind`, `pub struct Sp`, `pub struct Net`,
 //! `pub struct Disto`, `pub struct TimedOp`; on each enum: `ALL`, `COUNT`;
-//! `Design::dc_axes(&self, DcAxisList) -> &[DcAxis]`
+//! `Design::dc_axes(&self, DcAxisList) -> &[DcAxis]`;
+//! `pub fn dc_seeds(counts: &[usize], afresh: &[bool]) -> Vec<Option<usize>>`
 
 use crate::design::Design;
 use crate::id::{ExprId, ExprList, List, NameId, NameList};
@@ -27,12 +28,9 @@ use crate::sweep::SweepSpec;
 /// A DC sweep: nested axes, the first innermost (the SPICE order), at least one.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Dc {
-    /// The axes, innermost first.
+    /// The axes, innermost first. Which earlier point seeds each point is each axis's
+    /// `DcAxis::afresh` (R75; `dc_seeds`): the innermost one's is the old `restart`.
     pub axes: DcAxisList,
-    /// Each point starts from the initial guess instead of the previous point's solution
-    /// (ngspice in HSPICE compatibility mode; a Schmitt trigger then switches elsewhere,
-    /// `INV-semantics.md` 8.09).
-    pub restart: bool,
 }
 
 /// One axis of a DC sweep: a target (a source's DC value, temperature, a parameter, an element
@@ -46,6 +44,17 @@ pub struct DcAxis {
     /// The axis's name, or `NONE` (VACASK's `sweep <name>` names the swept vector in the
     /// results; SPICE `.dc` has none; A22).
     pub name: NameId,
+    /// Whether the solve right after this axis advances starts from the initial guess instead
+    /// of the previous point's solution (R75, the pair test's F8; `dc_seeds`). On the innermost
+    /// axis: every point but an outer step's first (`RunExtra::DcRestart`; ngspice in HSPICE
+    /// compatibility mode, `INV-semantics.md` 8.09). On an axis above it: the first point of
+    /// each of its steps (`DcOuterAfresh`, else `DcOuterCarries`). R58's evidence, a latch swept
+    /// two levels deep (step3-runrules 8379e74f, `tests/passes_run/decks/`): ngspice-45's
+    /// nested `.dc` starts each outer step afresh (`latch_desc.sp`: 3.490099 at outer step 2,
+    /// vin 2) and carries inside an inner sweep; VACASK carries everywhere (`latch.sim`: 4.9734)
+    /// and `continuation=0` makes exactly that level's steps start afresh
+    /// (`latch_c0_{outer,inner,both}.sim`).
+    pub afresh: bool,
 }
 
 /// An ordered list of DC axes, a range into the run owner's axis pool.
@@ -227,8 +236,8 @@ pub struct TimedOp {
     pub times: ExprList,
 }
 
-const _: () = assert!(size_of::<Dc>() == 12);
-const _: () = assert!(size_of::<DcAxis>() == 56);
+const _: () = assert!(size_of::<Dc>() == 8);
+const _: () = assert!(size_of::<DcAxis>() == 60);
 const _: () = assert!(size_of::<Ac>() == 28);
 const _: () = assert!(size_of::<Noise>() == 64);
 const _: () = assert!(size_of::<Tf>() == 28);
@@ -275,4 +284,35 @@ impl Design {
     pub fn dc_axes(&self, list: DcAxisList) -> &[DcAxis] {
         crate::run_words::get(&self.run.dc_axes, list).expect("an axis list inside the axis pool")
     }
+}
+
+/// The seed of each point of a nested DC sweep, in run order (the innermost axis fastest):
+/// `None` for the initial guess, `Some(k)` for the solution of point `k`. `counts` and `afresh`
+/// are per axis, innermost first (`DcAxis::afresh`). The rule (R75): the first point is the
+/// initial guess; any other point is seeded by the point before it unless the outermost axis
+/// that advanced to reach it starts afresh. The reference evaluator two dialects' nested
+/// sweeps are compared against. Asserts one bit per count and a grid under `u32::MAX` points.
+/// O(points × axes).
+pub fn dc_seeds(counts: &[usize], afresh: &[bool]) -> Vec<Option<usize>> {
+    assert!(counts.len() == afresh.len(), "one bit per axis");
+    let total = counts.iter().product::<usize>();
+    assert!(total < u32::MAX as usize, "a grid of a bounded size");
+    let mut seeds = Vec::with_capacity(total);
+    for p in 0..total {
+        if p == 0 {
+            seeds.push(None);
+            continue;
+        }
+        // the outermost axis whose index changed from p - 1 to p
+        let (mut stride, mut outermost) = (1usize, 0usize);
+        for (k, &n) in counts.iter().enumerate() {
+            if p % stride == 0 {
+                outermost = k;
+            }
+            stride *= n.max(1);
+        }
+        seeds.push((!afresh[outermost]).then(|| p - 1));
+    }
+    assert!(seeds.len() == total, "one seed per point");
+    seeds
 }

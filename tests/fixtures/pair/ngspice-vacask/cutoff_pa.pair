@@ -1,0 +1,3 @@
+owner = pair
+proves = step 4 absolute current term (cmp.rs: ABSTOL + GMIN * Vmax)
+vectors = i(vd)

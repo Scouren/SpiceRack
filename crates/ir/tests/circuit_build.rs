@@ -768,6 +768,7 @@ mod tests {
 
     /// `n` resistors, each valued by a parameter of its own pushed just before it: every element
     /// push follows a definition, as a reader of a PDK library does.
+    #[cfg(feature = "gen")]
     fn resistor_deck(n: usize) -> Design {
         let mut d = Design::new();
         let top = deck(&mut d);
@@ -792,40 +793,29 @@ mod tests {
         d
     }
 
-    /// The fastest of three runs of `f`, in seconds (the minimum filters other builds' load).
-    fn fastest(mut f: impl FnMut()) -> f64 {
-        (0..3)
-            .map(|_| {
-                let t = std::time::Instant::now();
-                f();
-                t.elapsed().as_secs_f64()
-            })
-            .fold(f64::INFINITY, f64::min)
-    }
-
-    /// Building and checking the circuit rows is linear in the items (the round-4 regression: the
-    /// builder's element assert recomputed the definition classes after every push). Oracle: the
-    /// same deck at N and 4N items. A linear step takes 4 times as long at 4N, a quadratic one
-    /// 16; the bound 10 leaves 2.5 times linear's ratio for noise and cache effects, and fails a
-    /// quadratic step.
+    /// Building and checking the circuit rows computes the definition classes a fixed number of
+    /// times, whatever the deck's size (the round-4 regression: the builder's element assert
+    /// recomputed them after every push, quadratic, and only a debug build showed it). Oracle: a
+    /// count, not a clock (`Design::class_computes`), so load cannot move it: none while the
+    /// deck is built (the builder's assert assumes, `Classes::Assume`), one for `check`, at N and
+    /// at 4N alike.
+    #[cfg(feature = "gen")]
     #[test]
-    fn building_and_checking_scale_linearly() {
+    fn building_and_checking_compute_the_classes_once() {
         const N: usize = 2_000;
-        const BOUND: f64 = 10.0;
-        let build_n = fastest(|| drop(resistor_deck(N)));
-        let build_4n = fastest(|| drop(resistor_deck(4 * N)));
-        assert!(
-            build_4n < BOUND * build_n,
-            "build: {build_n:.4} s at {N}, {build_4n:.4} s at {}",
-            4 * N
-        );
-        let (small, large) = (resistor_deck(N), resistor_deck(4 * N));
-        let check_n = fastest(|| spicerack_ir::check(&small, &mut spicerack_ir::Diags::new()));
-        let check_4n = fastest(|| spicerack_ir::check(&large, &mut spicerack_ir::Diags::new()));
-        assert!(
-            check_4n < BOUND * check_n,
-            "check: {check_n:.4} s at {N}, {check_4n:.4} s at {}",
-            4 * N
-        );
+        for n in [N, 4 * N] {
+            let d = resistor_deck(n);
+            assert_eq!(
+                d.class_computes(),
+                0,
+                "built at {n}: the classes never computed"
+            );
+            spicerack_ir::check(&d, &mut spicerack_ir::Diags::new());
+            assert_eq!(
+                d.class_computes(),
+                1,
+                "checked at {n}: the classes computed once"
+            );
+        }
     }
 }

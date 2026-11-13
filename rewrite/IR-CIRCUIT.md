@@ -158,6 +158,14 @@ versioned family but `Module` and `Other`) states its `version` (`check`, round 
 would be each simulator's own default). The generator draws it from `circuit_tables::VERSIONS`,
 ngspice-45's accepted versions per family with their source lines (its vocabulary, not a rule).
 
+(2026-11-12, R48 d.) A generated element that names a model mostly names one the design
+defines and the element sees, of a family its kind takes (`circuit_gen_head::takes`, the
+generator's data: the IR admits any non-builtin family, C5). When none is visible, a model of
+such a family is drawn first, in the element's scope, seven times in eight; and a visible one
+is named seven times in eight, the rest staying an unresolved name (an absent kit is legal).
+Property: `circuit_gen::a_named_model_mostly_exists`, a floor of 0.6 bound per kind over 1000
+seeds (the generator before this bound none of the sources and about half of the rest).
+
 - `ModelFamily` is the **equation family**, a closed enum (`Resistor`, `Capacitor`, `Diode`,
   `GummelPoon`, `Vbic`, `Hicum`, `Mos1`, `Mos2`, `Mos3`, `Mos6`, `Mos9`, `Bsim3`, `Bsim4`,
   `BsimSoi`, `Hisim2`, `HisimHv`, `Psp103`, `Vdmos`, `JfetShichman`, `JfetParkerSkellern`,
@@ -188,7 +196,8 @@ ngspice-45's accepted versions per family with their source lines (its vocabular
 ## 3a. Invariants every simulator holds (AMEND-A12 A19, R38)
 
 `check` reports `FieldDomain` (the generator never makes one): a passive with no value and no
-model; `ac` on a capacitor or inductor; `noisy == false` on a capacitor or inductor whose value
+model; `ac` or `tce` on a capacitor or inductor (R74: Xyce 7.10 refuses `TCE` on C and L, VACASK's
+sp_capacitor and sp_inductor have none); `noisy == false` on a capacitor or inductor whose value
 does not read the circuit; an instance parameter whose key names one of the row's own typed
 fields (`circuit_check::typed_key`: the detail row's IR field names from the field table, `m`
 and `mult`, and `temp` where the row has `temp_abs`; a kind without a detail row, such as a
@@ -257,3 +266,5 @@ in `build_circuit.rs`, read accessors), bodies `todo!()`, your `Extra` features 
 `feature.rs`, and `rewrite/COVERAGE-circuit.md`: one line per row of `INV-constructs.md` §D, §E,
 §F and of `INV-semantics.md` categories 5, 6, 7, naming the field, variant, feature or `Opaque`
 class that holds it (or `gap: <why>`). A row with no home is a finding, not a failure: list it.
+
+- Recursive hierarchy (the lead's finding on `dialect_laws` l5 seed 19): an instance whose subcircuit reaches the subcircuit holding it (itself, or through a cycle) is `Violation::InstanceCycle` (X0024), reported at every instance on the cycle, used or not (`hierarchy.rs`, Tarjan over the instance graph); the generator never draws one. Runs: ngspice-45 "unknown subckt: x0.x1.x1…", VACASK "Hierarchical recursion detected." (`crates/ir/tests/fixtures/hierarchy/`).

@@ -412,7 +412,7 @@ fn the_facade_writes_todays_message_lines_from_spans() {
         strict(at(0, 0)),
         strict(at(7, 0)),
     ];
-    let shown = facade::diags(&rows, &src, "t", "spectre");
+    let shown = facade::diags(&rows, &src, "t", "spectre", &[]);
     let codes: Vec<Code> = shown.diags.iter().map(|d| d.code).collect();
     assert_eq!(codes, [Code::W0203; 4], "a refusal stays a refusal");
     let title = dialect::info(STRICT_UNREAD).expect("the spine's row").title;
@@ -425,6 +425,31 @@ fn the_facade_writes_todays_message_lines_from_spans() {
         spicerack::syntax::diag::Kind::Refusal
     );
     assert_eq!(info(Code::W0204).kind, spicerack::syntax::diag::Kind::Note);
+}
+
+#[test]
+fn a_refusal_of_a_cited_feature_ends_with_its_evidence() {
+    // A34: the facade's U0001 message carries the target's citation for the feature.
+    let feature = ir::Feature::Item(ir::ItemKind::Subckt);
+    let row = |f: ir::Feature| ir::Diag {
+        code: ir::diag::UNSUPPORTED,
+        item: ir::ItemRef::NONE,
+        span: ir::Span::NONE,
+        arg: u32::from(f.index()),
+    };
+    let cites = [dialect::Citation {
+        feature,
+        evidence: "manual §2.4: no subcircuit",
+    }];
+    let other = ir::Feature::Item(ir::ItemKind::Func);
+    let src = Sources::one("t", "x\n");
+    let shown = facade::diags(&[row(feature), row(other)], &src, "t", "x", &cites);
+    let lines: Vec<&str> = shown.messages.lines().collect();
+    assert!(
+        lines[0].ends_with(": manual §2.4: no subcircuit"),
+        "{lines:?}"
+    );
+    assert!(!lines[1].contains("manual"), "{lines:?}");
 }
 
 #[test]

@@ -10,10 +10,14 @@
 //! `pub(crate) const VERSIONS`, `pub(crate) fn versioned`,
 //! `pub(crate) fn typed_key`, `pub(crate) fn library_free`, `pub(crate) fn builtin_kind`,
 //! `pub(crate) fn builtin_fits`,
-//! `pub(crate) fn bound_family`
+//! `pub(crate) fn bound_family`, `pub(crate) fn mult_class`, `pub(crate) fn voltage_output`
 
+use crate::circuit_extra::CircuitExtra as X;
 use crate::circuit_fields::Fields;
+use crate::circuit_text::get_row;
+use crate::controlled::{Behav, FreqTable, Laplace, OutKind, Poly, Quantity, TableSource};
 use crate::design::Design;
+use crate::element::Element;
 use crate::element::{DetailKind, ElemKind};
 use crate::model::{Model, ModelFamily};
 
@@ -265,6 +269,77 @@ pub(crate) fn bound_family(design: &Design, r: crate::id::Ref) -> Option<ModelFa
         .then(|| get_item::<Model>(design, def.item.index))
         .flatten()
         .map(|m| m.family)
+}
+
+/// Whether `e` is a controlled source whose output is a voltage: `Vcvs`, `Ccvs`, `Delay`, a
+/// `Poly`, `Table`, `Laplace` or `FreqTable` of voltage output, a `Behav` of `OutKind::Voltage`.
+/// `false` for any other element or a detail row out of range.
+pub(crate) fn voltage_output(design: &Design, e: &Element) -> bool {
+    use ElemKind as E;
+    let v = Quantity::Voltage;
+    match e.kind {
+        E::Vcvs | E::Ccvs | E::Delay => true,
+        E::Poly => get_row::<Poly>(design, e.detail).is_some_and(|r| r.output == v),
+        E::Table => get_row::<TableSource>(design, e.detail).is_some_and(|r| r.output == v),
+        E::Laplace => get_row::<Laplace>(design, e.detail).is_some_and(|r| r.output == v),
+        E::FreqTable => get_row::<FreqTable>(design, e.detail).is_some_and(|r| r.output == v),
+        E::Behav => {
+            get_row::<Behav>(design, e.detail).is_some_and(|r| r.output == OutKind::Voltage)
+        }
+        _ => false,
+    }
+}
+
+/// The multiplicity member of a kind's class; a controlled source's by whether its output is a
+/// voltage (`voltage`, `voltage_output`; ignored for every other kind).
+pub(crate) fn mult_class(kind: ElemKind, voltage: bool) -> X {
+    use ElemKind as E;
+    match kind {
+        E::Resistor => X::MultResistor,
+        E::Capacitor => X::MultCapacitor,
+        E::Inductor => X::MultInductor,
+        E::VSource => X::MultVSource,
+        E::ISource => X::MultISource,
+        E::Vcvs
+        | E::Vccs
+        | E::Cccs
+        | E::Ccvs
+        | E::Poly
+        | E::Table
+        | E::Behav
+        | E::Laplace
+        | E::FreqTable
+        | E::Delay
+            if voltage =>
+        {
+            X::MultControlledVoltage
+        }
+        E::Vcvs
+        | E::Vccs
+        | E::Cccs
+        | E::Ccvs
+        | E::Poly
+        | E::Table
+        | E::Behav
+        | E::Laplace
+        | E::FreqTable
+        | E::Delay => X::MultControlledCurrent,
+        E::Diode | E::Bjt | E::Mosfet | E::Jfet | E::Mesfet | E::Igbt => X::MultSemi,
+        E::Instance => X::MultInstanceParallel, // the law's own member: `element_features`
+        E::CodeModel | E::ModuleModel | E::Module => X::MultModule,
+        E::ChargeCapacitor
+        | E::FluxInductor
+        | E::Coupling
+        | E::Port
+        | E::VSwitch
+        | E::ISwitch
+        | E::LosslessLine
+        | E::LossyLine
+        | E::RcLine
+        | E::SingleLossyLine
+        | E::CoupledLines
+        | E::Unresolved => X::MultOther,
+    }
 }
 
 // ---- private ----

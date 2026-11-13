@@ -1,0 +1,9 @@
+ngspice-45 -b (nix develop .#testing), each deck's error lines:
+self.cir:
+Error: unknown subckt: x0.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1 n s
+    in line no. 4 from file self.cir
+    Simulation interrupted due to error!
+cycle.cir:
+Error: unknown subckt: x0.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1.x1 n p
+    in line no. 8 from file cycle.cir
+    Simulation interrupted due to error!

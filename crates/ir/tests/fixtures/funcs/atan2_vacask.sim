@@ -1,0 +1,14 @@
+atan2 quadrants on VACASK: atan2(y, x) for y = 1, x = -1 (C gives 2.35619), and y = -1, x = -1 (C gives -2.35619)
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+v1 (a 0) vsource dc=1
+r1 (a 0) res r=1k
+control
+  var q2=atan2(1.0, -1.0) q3=atan2(-1.0, -1.0) q1=atan2(1.0, 1.0) yz=atan2(0.0, -1.0) yn=atan2(-0.0, -1.0)
+  print ("q2", q2)
+  print ("q3", q3)
+  print ("q1", q1)
+  print ("yz", yz)
+  print ("yn", yn)
+endc
