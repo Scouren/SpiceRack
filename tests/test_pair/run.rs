@@ -22,7 +22,7 @@ use spicerack::ir;
 use spicerack::ir::ItemRow as _;
 
 use crate::files::PairFile;
-use crate::sim::{self, Ran};
+use crate::sim::{self, Ran, Sim};
 use crate::{Cell, cmp, laws, plots};
 
 /// A deck to run: its name in the cell's list, the source file (the simulator runs it there,
@@ -211,6 +211,12 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         return stop(fails, 4, f, written);
     }
     let entry = &(entry.0.clone(), entry_text);
+    // The written deck is plain ngspice: the reader read the folder's `.spiceinit` mode into the
+    // design, so the init beside it would apply the mode twice (R87; the lead, 2026-11-13). An
+    // empty one stands in for the linked original.
+    if c.to_sim == Sim::Ngspice && deck.path.with_file_name(".spiceinit").exists() {
+        placed.push((".spiceinit".to_string(), String::new()));
+    }
     let rest = &placed[..];
     let text = &deck.src.files()[0].1;
     let folder = deck.path.parent().unwrap_or(std::path::Path::new(""));

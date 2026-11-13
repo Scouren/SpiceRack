@@ -317,12 +317,12 @@ vacask Elem(FreqTable) unspoken
 vacask Elem(Delay) unspoken
 vacask Elem(Bjt) owed from=ngspice,hspice
 vacask Elem(Igbt) unspoken
-vacask Elem(VSwitch) owed from=ngspice,hspice
-vacask Elem(ISwitch) owed from=ngspice,hspice
+vacask Elem(VSwitch) owed from=ngspice
+vacask Elem(ISwitch) owed from=ngspice
 vacask Elem(LossyLine) owed from=ngspice,hspice
 vacask Elem(RcLine) owed from=ngspice,hspice
 vacask Elem(SingleLossyLine) owed from=ngspice,hspice
-vacask Elem(CoupledLines) owed from=ngspice,hspice
+vacask Elem(CoupledLines) owed from=ngspice
 vacask Elem(CodeModel) owed from=ngspice,hspice
 vacask Elem(Module) unspoken
 vacask Wave(TrNoise) owed from=ngspice,hspice
@@ -408,7 +408,7 @@ vacask Circuit(DelaySampled) unspoken
 vacask Circuit(SemiInitialOff) owed from=ngspice,hspice
 vacask Circuit(SemiInitialOn) unspoken
 vacask Circuit(DiodeThermal) owed from=ngspice,hspice
-vacask Circuit(SwitchInitial) owed from=ngspice,hspice
+vacask Circuit(SwitchInitial) owed from=ngspice
 vacask Circuit(SwitchControlExpr) unspoken
 vacask Circuit(LineLengthVel) unspoken
 vacask Circuit(LineLumps) owed from=ngspice,hspice
@@ -682,6 +682,9 @@ hspice Elem(Laplace) unspoken
 hspice Elem(FreqTable) unspoken
 hspice Elem(Delay) unspoken
 hspice Elem(Igbt) unspoken
+hspice Elem(VSwitch) owed from=ngspice
+hspice Elem(ISwitch) owed from=ngspice
+hspice Elem(CoupledLines) owed from=ngspice
 hspice Elem(Module) unspoken
 hspice Elem(Unresolved) owed from=vacask
 hspice Wave(Pattern) unspoken
@@ -770,6 +773,7 @@ hspice Circuit(FreqComplexLinear) unspoken
 hspice Circuit(FreqDbLogFreq) unspoken
 hspice Circuit(DelaySampled) unspoken
 hspice Circuit(SemiInitialOn) unspoken
+hspice Circuit(SwitchInitial) owed from=ngspice
 hspice Circuit(SwitchControlExpr) unspoken
 hspice Circuit(LineLengthVel) unspoken
 hspice Circuit(ModelAko) unspoken

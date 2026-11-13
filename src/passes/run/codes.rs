@@ -51,6 +51,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        wr::IN_SUBCKT,
+        ir::Info {
+            title: "a whole-run state item inside a subcircuit body",
+            cite: "R98 (X0028); R27",
+            explain: "The target holds state from where it stands, and no positional state item may stand in a subcircuit body: a body is instantiated, not run. Moving the item to the deck's top would change what it holds for (a body holds per instance and names its own nodes, which the top cannot say for a subcircuit used twice or never), so it is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         tc::NO_PRINT_STEP,
         ir::Info {
             title: "a transient under ngspice's step ceiling with no print step",
@@ -299,15 +308,6 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a uic-only device initial condition an operating point of the design would read",
             cite: "crates/ir/src/passive.rs (IcMode); xyce-2's run device_ic_op.cir",
             explain: "The source applies this initial condition only to a transient that skips the operating point; the target holds it in every operating point too. The two agree only when the design solves no operating point, i.e. every analysis is a uic transient. Here some analysis solves one, so the item is refused.",
-            kind: ir::Kind::Note,
-        },
-    ),
-    (
-        wr::IN_BODY,
-        ir::Info {
-            title: "a whole-run state item inside a subcircuit body",
-            cite: "rewrite/RULINGS.md R98, R27",
-            explain: "Inside a subcircuit body a state item is a placement that holds for the whole run; holding from where it stands has no meaning there (a subcircuit is instantiated, not executed), so the target's positional form cannot state it and the item is refused.",
             kind: ir::Kind::Note,
         },
     ),

@@ -1,8 +1,0 @@
-file "a.sp" deck
-  env temp=50 whole_run
-  subckt s (a b)
-    env tnom=30 whole_run
-    element resistor r1 (a b) value=1k
-  element instance x1 (n 0) model=s
-  element vsource v1 (n 0) dc=1
-  analysis op

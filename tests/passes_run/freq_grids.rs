@@ -8,12 +8,25 @@
 //! the exact grid; VACASK ceiling-stretches both), from `decks/f33_*`; VACASK's `values=[…]`
 //! returns its values exactly; ngspice's `.ac` has no list form.
 //!
+//! And a non-integer literal count (R99a), from `decks/f33_frac_*`: ngspice-45 rounds it half
+//! up (`dec 2.5` is `dec 3`, `lin 2.5` is `lin 3`), VACASK truncates `points` (`2.5` is `2`),
+//! neither says a word. A count given by an expression (an ngspice `.param`, `{5/2}`; a
+//! VACASK control `var`, `5.0/2`) behaves as its value written literally (R99b).
+//!
 //! Contents: `pub fn linear_frequency_sweeps_run_what_each_simulator_counts()`,
-//! `pub fn log_frequency_sweeps_run_each_simulators_law()`
+//! `pub fn log_frequency_sweeps_run_each_simulators_law()`,
+//! `pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask()`
 
 use std::path::Path;
 
 use crate::sim::{self, Ran, Sim};
+
+/// A frequency sweep's spacing, for the reference grid.
+#[derive(Clone, Copy)]
+enum Law {
+    Dec,
+    Lin,
+}
 
 /// Each deck's frequency count on its simulator, as its title records.
 pub fn linear_frequency_sweeps_run_what_each_simulator_counts() {
@@ -136,6 +149,58 @@ pub fn log_frequency_sweeps_run_each_simulators_law() {
         ),
         "ngspice took `.ac list`"
     );
+}
+
+/// Each `f33_frac_*` deck runs the exact grid of the integer count its title records: the
+/// decade grid `1k * 10^(k/n)` to 100k, the linear grid `1k + 1k*k/(n-1)` to 2k.
+pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask() {
+    // (simulator, deck, the law, the integer count it runs as)
+    let cases = [
+        (Sim::Ngspice, "f33_frac_ac_dec2p4.sp", Law::Dec, 2),
+        (Sim::Ngspice, "f33_frac_ac_dec2p5.sp", Law::Dec, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec2p6.sp", Law::Dec, 3),
+        (Sim::Ngspice, "f33_frac_ac_lin2p5.sp", Law::Lin, 3),
+        (Sim::Ngspice, "f33_frac_ac_lin3p5.sp", Law::Lin, 4),
+        (Sim::Ngspice, "f33_frac_ac_lin3p6.sp", Law::Lin, 4),
+        (Sim::Vacask, "f33_frac_vacask_dec2p4.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec2p5.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec2p6.sim", Law::Dec, 2),
+        // VACASK's linear `points` counts intervals: points=1 runs two frequencies
+        (Sim::Vacask, "f33_frac_vacask_lin1p5.sim", Law::Lin, 2),
+        (Sim::Vacask, "f33_frac_vacask_lin1p6.sim", Law::Lin, 2),
+        (Sim::Vacask, "f33_frac_vacask_lin2p5.sim", Law::Lin, 3),
+        // a count given by an expression behaves as its value written literally (R99b)
+        (Sim::Ngspice, "f33_frac_ac_dec_param2p5.sp", Law::Dec, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec_param2p4.sp", Law::Dec, 2),
+        (Sim::Ngspice, "f33_frac_ac_lin_param2p5.sp", Law::Lin, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec_5by2.sp", Law::Dec, 3),
+        (Sim::Vacask, "f33_frac_vacask_dec_var2p5.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec_var2p6.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_lin_var1p5.sim", Law::Lin, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec_5p0by2.sim", Law::Dec, 2),
+    ];
+    for (simulator, deck, law, n) in cases {
+        let want: Vec<f64> = match law {
+            Law::Dec => (0..=2 * n)
+                .map(|k| 1e3 * 10f64.powf(k as f64 / n as f64))
+                .collect(),
+            Law::Lin => (0..n)
+                .map(|k| 1e3 + 1e3 * k as f64 / (n - 1) as f64)
+                .collect(),
+        };
+        let axis = sweep(simulator, deck);
+        assert_eq!(
+            axis.len(),
+            want.len(),
+            "{deck}: {axis:?}, recorded {want:?}"
+        );
+        for (got, rec) in axis.iter().zip(&want) {
+            assert!(
+                (got - rec).abs() <= 1e-9 * rec,
+                "{deck}: {axis:?}, recorded {want:?}"
+            );
+        }
+    }
 }
 
 // ---- private ----

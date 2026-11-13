@@ -99,17 +99,18 @@ pub(super) fn spellable(d: &ir::Design, e: &ir::Element) -> Result<(), Why> {
         K::Mosfet => b'm',
         K::Jfet => b'j',
         K::Mesfet => b'z',
-        K::VSwitch => b's',
-        K::ISwitch => b'w',
         K::LosslessLine => b't',
         K::LossyLine => b'o',
         K::RcLine => b'u',
         K::SingleLossyLine => b'y',
-        K::CoupledLines => b'p',
         K::CodeModel => b'a',
         K::ModuleModel => b'n',
         K::Instance => b'x',
-        K::FluxInductor
+        // HSPICE's S, W and P cards are other elements (read_elements: unread)
+        K::VSwitch
+        | K::ISwitch
+        | K::CoupledLines
+        | K::FluxInductor
         | K::VSource
         | K::ISource
         | K::Port
