@@ -219,7 +219,10 @@ fn run_in(
     c.arg((10 * secs).to_string())
         .arg("prlimit")
         .arg(format!("--cpu={secs}"))
-        .arg(format!("--fsize={}", if checked { CHECKED_FSIZE } else { FSIZE }))
+        .arg(format!(
+            "--fsize={}",
+            if checked { CHECKED_FSIZE } else { FSIZE }
+        ))
         .env("OMP_NUM_THREADS", "1")
         .current_dir(dir);
     match sim {
