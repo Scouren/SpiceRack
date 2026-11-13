@@ -14,7 +14,7 @@
 #[rustfmt::skip] // a table: one row per line
 pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Elem(Port)", FIXPOINT, SOURCES),
-    ("ngspice", "Elem(Table)", FIXPOINT, ELEMENTS),
+    ("ngspice", "Elem(Table)", "tables_with_number_points_round_trip_by_meaning", TABLE_POINTS),
     ("ngspice", "Wave(Pulse)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Sin)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(Exp)", FIXPOINT, SOURCES),
@@ -57,8 +57,7 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
 const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
 // Why, per area: every admitted generated design drops the kind by that area's refusal.
-const ELEMENTS: &str =
-    "interim: dialect_ngspice_elements' fixtures (resistor, capacitor_inductor, controlled)";
+const TABLE_POINTS: &str = "the generator draws a table point as an expression, which the table card cannot spell (W1100 Table; ngspice substitutes a braced point once, settle table_brace_point.sp: R74 (4)); tables with number points are built by the elements' covering property (tests/dialect_ngspice_covering.rs)";
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
 const SCRIPT_FIELD: &str = "the generator draws an analysis field as an expression, which a script command cannot spell (W1305, settle script_tran_brace.sp); the control area's property builds script plans with number fields";
 const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, sens, four, pss)";
