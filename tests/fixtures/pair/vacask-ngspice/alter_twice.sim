@@ -1,0 +1,14 @@
+alter_twice: two top-level parameter alters in a row between operating points (r1 = 1k*a*b); ngspice gets alterparam then reset after each, and the second reset keeps the first alter: i(v1) = -0.01, -0.005, -0.00166667 on VACASK and on ngspice-45
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+parameters a=1.0 b=1.0
+v1 (in 0) vsource dc=10.0
+r1 (in 0) resistor r=1k*a*b
+control
+  analysis op1 op
+  alter instance("__topinst__") a=2.0
+  analysis op2 op
+  alter instance("__topinst__") b=3.0
+  analysis op3 op
+endc
