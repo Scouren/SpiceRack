@@ -1104,6 +1104,35 @@ mod tests {
         assert_eq!(params, only(Violation::FieldDomain));
     }
 
+    /// R86: a base-collector law of its own (`AreabOnly`) only on a Gummel-Poon model; on a
+    /// diode model it is `FieldDomain`, and either law is legal on Gummel-Poon.
+    #[test]
+    fn only_a_gummel_poon_model_states_a_base_collector_area_law() {
+        let with = |family: ModelFamily, polarity: Polarity, law: spicerack_ir::BcSatArea| {
+            checked(move |b, top| {
+                let name = b.name("m");
+                let row = spicerack_ir::Model {
+                    bc_sat_area: law,
+                    ..model(name, family, polarity)
+                };
+                b.push(top, row, Span::NONE);
+            })
+        };
+        use spicerack_ir::BcSatArea::{AreaTimesAreab, AreabOnly};
+        assert_eq!(
+            with(ModelFamily::GummelPoon, Polarity::N, AreabOnly),
+            Vec::<Code>::new()
+        );
+        assert_eq!(
+            with(ModelFamily::GummelPoon, Polarity::N, AreaTimesAreab),
+            Vec::<Code>::new()
+        );
+        assert_eq!(
+            with(ModelFamily::Diode, Polarity::None, AreabOnly),
+            only(Violation::FieldDomain)
+        );
+    }
+
     /// A model of a versioned family states its version (ng-models' L5 finding: "no version"
     /// means each simulator's own default); its neighbour, a family of one version with none
     /// stated, stays legal.

@@ -273,11 +273,18 @@ pub enum CircuitExtra {
     /// A pulse, sine, exponential or SFFM under ngspice's zero rule
     /// (`GivenZero::SpiceDefault`).
     GivenZeroSpiceDefault,
+    /// A BJT on which the two base-collector saturation laws differ (its area is not literally
+    /// 1, and its Gummel-Poon model gives neither `ibe` nor `ibc`) under `BcSatArea::AreaTimesAreab`
+    /// (ngspice-45; R86, `BcSatArea`'s doc). An instance whose model is unresolved sets both
+    /// members: its law is unknown, so only a target holding both may take it.
+    BjtBcSatAreaTimesAreab,
+    /// The same under `BcSatArea::AreabOnly` (the VACASK module the flake pins; R86).
+    BjtBcSatAreabOnly,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 109] = [
+    pub const ALL: [CircuitExtra; 111] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -387,6 +394,8 @@ impl CircuitExtra {
         CircuitExtra::TcLawReciprocal,
         CircuitExtra::GivenZeroAsGiven,
         CircuitExtra::GivenZeroSpiceDefault,
+        CircuitExtra::BjtBcSatAreaTimesAreab,
+        CircuitExtra::BjtBcSatAreabOnly,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

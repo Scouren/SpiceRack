@@ -16,7 +16,7 @@ use crate::feature::Feature;
 use crate::r#gen::Params;
 use crate::id::{ExprId, ItemRef, List, NameId};
 use crate::item::DefKind;
-use crate::model::{Model, ModelFamily, Polarity};
+use crate::model::{BcSatArea, Model, ModelFamily, Polarity};
 use crate::span::Span;
 
 impl R<'_, '_> {
@@ -126,6 +126,15 @@ impl R<'_, '_> {
         } else {
             NameId::NONE
         };
+        // R86: a Gummel-Poon model's base-collector law by which member the set holds
+        let areab_only = family == ModelFamily::GummelPoon
+            && r.has(X::BjtBcSatAreabOnly)
+            && (!r.has(X::BjtBcSatAreaTimesAreab) || r.g.chance(2));
+        let bc_sat_area = if areab_only {
+            BcSatArea::AreabOnly
+        } else {
+            BcSatArea::AreaTimesAreab
+        };
         let row = Model {
             name,
             params,
@@ -136,6 +145,7 @@ impl R<'_, '_> {
             word,
             family,
             polarity,
+            bc_sat_area,
         };
         let item = r.b.model(r.scope, row, Span::NONE);
         // R48 (d): the elements that take its family may name it

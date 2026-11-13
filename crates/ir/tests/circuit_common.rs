@@ -167,6 +167,7 @@ pub fn model(name: NameId, family: ModelFamily, polarity: Polarity) -> Model {
         word: NameId::NONE,
         family,
         polarity,
+        bc_sat_area: spicerack_ir::BcSatArea::AreaTimesAreab,
     }
 }
 

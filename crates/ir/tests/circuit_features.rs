@@ -1486,7 +1486,30 @@ mod tests {
                 },
             )
         }),
+        // R86: a BJT of area 2 against its neighbour of area 1, on a Gummel-Poon model of
+        // each law (an area of literally 1 is where the two laws agree)
+        (X::BjtBcSatAreaTimesAreab, |b, t, on| {
+            bjt_law(b, t, on, spicerack_ir::BcSatArea::AreaTimesAreab)
+        }),
+        (X::BjtBcSatAreabOnly, |b, t, on| {
+            bjt_law(b, t, on, spicerack_ir::BcSatArea::AreabOnly)
+        }),
     ];
+
+    fn bjt_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: spicerack_ir::BcSatArea) {
+        let name = b.name("m");
+        let row = spicerack_ir::Model {
+            bc_sat_area: law,
+            ..model(name, ModelFamily::GummelPoon, Polarity::N)
+        };
+        b.model(t, row, Span::NONE);
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let area = n(b, if on { 2 } else { 1 });
+        let mut h = b.head("q1", &["c", "b", "e"], Some("m"), &[], ExprId::NONE);
+        h.model = Ref { name, def };
+        let row = spicerack_ir::semi::Semi { area, ..semi() };
+        b.semi(t, ElemKind::Bjt, h, row, Span::NONE);
+    }
 
     #[test]
     fn every_circuit_extra_is_set_by_its_field_and_not_by_its_neighbour() {
