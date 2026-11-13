@@ -651,24 +651,20 @@ hspice Analysis(Pstb) unspoken
 hspice Analysis(Stb) owed from=vacask
 hspice Analysis(DcInc) owed from=vacask
 hspice Expr(List) unspoken
-hspice Func(PowRe) unspoken
 hspice Func(Atan2) unspoken
 hspice Func(Asinh) owed from=ngspice,vacask
 hspice Func(Acosh) owed from=ngspice,vacask
 hspice Func(Atanh) owed from=ngspice,vacask
 hspice Func(Hypot) owed from=vacask
 hspice Func(Fmod) owed from=ngspice,vacask
-hspice Func(Clamp) unspoken
 hspice Func(Ddt) unspoken
 hspice Func(Idt) unspoken
-hspice FuncDyn(PowRe) unspoken
 hspice FuncDyn(Atan2) owed from=vacask
 hspice FuncDyn(Asinh) owed from=ngspice,vacask
 hspice FuncDyn(Acosh) owed from=ngspice,vacask
 hspice FuncDyn(Atanh) owed from=ngspice,vacask
 hspice FuncDyn(Hypot) owed from=vacask
 hspice FuncDyn(Fmod) unspoken
-hspice FuncDyn(Clamp) unspoken
 hspice FuncDyn(Ddt) owed from=ngspice,vacask
 hspice FuncDyn(Idt) owed from=vacask
 hspice Binary(IntDiv) unspoken
