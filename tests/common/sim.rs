@@ -618,7 +618,7 @@ mod tests {
     fn a_simulators_own_error_report_is_found() {
         // Oracle: the simulators' own output, recorded in .#testing (R70's F7 deck on
         // ngspice-45; VACASK on an analysis reading `$temp`, which exits 0 and writes op1.raw).
-        // A clean log of each has no report. Checks: 4.
+        // A clean log of each has no report. Checks: 5.
         let ng = "Circuit: alter_toplevel\nError: no such device or model name __topinst__\n\
                   No. of Data Rows : 1\n";
         let said = reported(Sim::Ngspice, ng);
@@ -632,6 +632,14 @@ mod tests {
         assert_eq!(
             said.as_deref(),
             Some("Variable or constant '$temp' not defined.")
+        );
+        // ngspice-45 -b on spice-bench's buggy-meas-tran.sp (light lane): a failed measure
+        // prints a line that does not start `Error`.
+        let meas = "Circuit: file: buggy-meas-tran.sp\n \
+                    .measure tran yint inter v(2) from=2m to=3m failed!\n";
+        assert_eq!(
+            reported(Sim::Ngspice, meas).as_deref(),
+            Some(".measure tran yint inter v(2) from=2m to=3m failed!")
         );
         assert_eq!(
             reported(Sim::Ngspice, "Circuit: rc\nNo. of Data Rows : 432\n"),

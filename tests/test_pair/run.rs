@@ -570,14 +570,7 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
 /// `compare` still passes, found by bisection to 1 %, and the difference `compare` names just
 /// below it (the worst vector, its value and the tolerance there).
 fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
-    let at = |f: f64| {
-        let mut t = cmp::Tol::of(&[src, written]);
-        for (k, d) in [("reltol", 1e-3), ("vntol", 1e-6), ("abstol", 1e-12)] {
-            t.tighten(k, d * f)
-                .expect("a fraction of the default tightens");
-        }
-        cmp::compare(a, b, t)
-    };
+    let at = |f: f64| cmp::compare(a, b, cmp::Tol::of(&[src, written]).scaled(f));
     let (mut lo, mut hi) = (0.0f64, 1.0f64);
     // Bounded: seven halvings take the bracket under 1 %.
     for _ in 0..7 {
