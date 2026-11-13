@@ -180,7 +180,16 @@ fn run_in(
             kept.display()
         );
     }
-    let dir = kept.as_path();
+    // A file named `../x` (an include above the deck's folder) needs a folder above the run's:
+    // the run goes that many folders down, so every file stays inside the temporary one.
+    let ups = files
+        .iter()
+        .map(|(n, _)| n.split('/').take_while(|s| *s == "..").count())
+        .max()
+        .unwrap_or(0);
+    let nested = (0..ups).fold(kept.clone(), |d, _| d.join("w"));
+    std::fs::create_dir_all(&nested).unwrap_or_else(|e| harness(&e));
+    let dir = nested.as_path();
     if let Some(parent) = deck.parent()
         && let Ok(rd) = std::fs::read_dir(parent)
     {

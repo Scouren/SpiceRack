@@ -63,8 +63,13 @@ pub fn identical(a: &[RawData], b: &[RawData]) -> Result<(), String> {
                     yb.len()
                 ));
             }
+            // A complex plot's scale (frequency) is real: ngspice-45's SP analysis leaves its
+            // imaginary part unset, a different subnormal in each run of one deck
+            // (Tschebyschef-LP.sp: 4.63557106232844e-310 against …765e-310).
+            let scale = i == 0;
             for (p, (x, y)) in ya.iter().zip(&yb).enumerate() {
-                if x.0.to_bits() == y.0.to_bits() && x.1.to_bits() == y.1.to_bits() {
+                let im_same = scale || x.1.to_bits() == y.1.to_bits();
+                if x.0.to_bits() == y.0.to_bits() && im_same {
                     continue;
                 }
                 differ += 1;

@@ -93,7 +93,8 @@ struct Spine {
 
 /// A source simulator's words for a file it cannot open, lower case (ngspice-45: "Error opening
 /// osdi lib … No such file or directory!", "Library … couldn't be loaded!", "Could not find
-/// include file"; VACASK: "No such file or directory").
+/// include file"; VACASK: "No such file or directory", and "File '<name>' not found" for a
+/// Verilog-A source the corpus does not ship).
 const ABSENT: [&str; 4] = [
     "no such file or directory",
     "couldn't be loaded",
@@ -154,31 +155,67 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
         return stop(fails, 4, f, written);
     }
     // The written includes, relative to the entry's folder: the run directory holds the
-    // entry and links that folder's files.
-    // ponytail: an include outside that folder's top level is not run (the linked folder is
-    // read-only in the store); place it when a corpus deck needs it.
+    // entry and links that folder's files. An include the deck names by an absolute path (the
+    // spice-bench decks name their kits in the store, read-only) is placed under `abs/` at that
+    // path, and every written file's text names it there: only the path's spelling changes, so
+    // the run reads the written include and not the original.
+    // An include above the deck's folder is placed there (`../x`, `sim` nests the run); one in
+    // a subfolder is not run.
+    // ponytail: the linked subfolder is the read-only original; place it when a deck needs it.
     let base = std::path::Path::new(&entry.0)
         .parent()
         .unwrap_or(std::path::Path::new(""));
     let mut placed = Vec::new();
+    let mut moved = Vec::new();
     for (p, t) in rest {
-        match std::path::Path::new(p).strip_prefix(base) {
-            Ok(r) if !r.to_string_lossy().contains('/') => {
-                placed.push((r.to_string_lossy().into_owned(), t.clone()));
+        match (p.starts_with('/'), crate::files::relative(base, p)) {
+            (false, Some(r)) => placed.push((r, t.clone())),
+            (true, _) => {
+                moved.push((p.clone(), format!("abs{p}")));
+                placed.push((format!("abs{p}"), t.clone()));
             }
-            _ => {
+            (false, None) => {
                 let f = fail(
                     "harness-path",
-                    format!("written include {p} not beside the deck"),
+                    format!("written include {p} in a subfolder of the deck's"),
                 );
                 return stop(fails, 4, f, written);
             }
         }
     }
+    // The source's includes above its folder, placed for its run as the written ones are.
+    let above: Vec<(String, String)> = deck.src.files()[1..]
+        .iter()
+        .filter(|(p, _)| !p.starts_with('/'))
+        .filter_map(|(p, t)| crate::files::relative(base, p).map(|r| (r, t.clone())))
+        .filter(|(r, _)| r.starts_with("../"))
+        .collect();
+    let relocate = |t: &str| {
+        moved
+            .iter()
+            .fold(t.to_string(), |t, (from, to)| t.replace(from.as_str(), to))
+    };
+    for f in &mut placed {
+        f.1 = relocate(&f.1);
+    }
+    let entry_text = relocate(&entry.1);
+    // A moved include that no written text names by the path it was written for would be read
+    // from the original: the run would not test the written file.
+    let named = |to: &String| {
+        entry_text.contains(to.as_str()) || placed.iter().any(|f| f.1.contains(to.as_str()))
+    };
+    if let Some((from, _)) = moved.iter().find(|(_, to)| !named(to)) {
+        let f = fail(
+            "harness-path",
+            format!("no written text names the include {from}"),
+        );
+        return stop(fails, 4, f, written);
+    }
+    let entry = &(entry.0.clone(), entry_text);
     let rest = &placed[..];
     let text = &deck.src.files()[0].1;
     let ran = guard(4, || {
-        let a = sim::run_checked(c.from_sim, &deck.path, text, &[], SECS);
+        let a = sim::run_checked(c.from_sim, &deck.path, text, &above, SECS);
         let b = sim::run_checked(
             c.to_sim,
             &deck.path.with_extension(c.to_ext),
@@ -207,7 +244,28 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     };
     if c.from == c.to {
         if let Err(why) = crate::same::identical(&a, &b) {
-            fails.insert(4, fail("differs", why));
+            // The oracle needs a source that reproduces itself: the source run again, and
+            // differing from its own first run, the deck is the simulator's, not ours (ngspice-45
+            // draws `trnoise` afresh each run whatever `.option seed` says).
+            let again = sim::run_checked(c.from_sim, &deck.path, text, &above, SECS);
+            let own = match again {
+                Ran::Plots(mut x) => {
+                    if spine.uic {
+                        cmp::without_start(&mut x);
+                    }
+                    let x = plots::only(plots::hierarchical(x), pair.vectors.as_ref());
+                    crate::same::identical(&a, &x).err()
+                }
+                _ => Some("the second run failed".to_string()),
+            };
+            let f = match own {
+                Some(self_diff) => fail(
+                    "source-nondeterministic",
+                    format!("{why}; the source against itself: {self_diff}"),
+                ),
+                None => fail("differs", why),
+            };
+            fails.insert(4, f);
         }
     } else {
         let texts = (text.as_str(), entry.1.as_str(), rest);
@@ -544,7 +602,8 @@ fn ran_fail(a: Ran, b: Ran) -> Fail {
             // A file the deck names that is not where it runs (an include, an `.osdi` the
             // corpus does not ship): the deck cannot run as it stands, a fact of the corpus.
             let low = why.to_ascii_lowercase();
-            let absent = ABSENT.iter().any(|w| low.contains(w));
+            let absent = ABSENT.iter().any(|w| low.contains(w))
+                || (low.contains("file '") && low.contains("' not found"));
             let class = if absent {
                 "source-environment"
             } else {

@@ -9,6 +9,7 @@
 //! - `pub fn pair_file(deck: &Path) -> Result<PairFile, String>`,
 //!   `pub fn pair_text(text: &str) -> Result<PairFile, String>`
 //! - `pub fn listed(cell: &str) -> BTreeMap<(String, u8), String>`
+//! - `pub fn relative(base: &Path, p: &str) -> Option<String>`
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -90,4 +91,21 @@ pub fn listed(cell: &str) -> BTreeMap<(String, u8), String> {
         );
     }
     out
+}
+
+/// `p` (a written or source file, the same root as `base`) named from the folder `base`: the
+/// file name when beside it, `../…` when above it; `None` for a file in a subfolder.
+pub fn relative(base: &std::path::Path, p: &str) -> Option<String> {
+    let b: Vec<_> = base.components().collect();
+    let q: Vec<_> = std::path::Path::new(p).components().collect();
+    let common = b.iter().zip(&q).take_while(|(x, y)| x == y).count();
+    let ups = b.len() - common;
+    let rest: Vec<String> = q[common..]
+        .iter()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    if rest.is_empty() || (ups == 0 && rest.len() > 1) {
+        return None;
+    }
+    Some("../".repeat(ups) + &rest.join("/"))
 }

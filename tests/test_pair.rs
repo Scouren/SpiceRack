@@ -307,6 +307,25 @@ fn a_pair_file_tightens_and_never_loosens() {
 }
 
 #[test]
+fn an_include_is_named_from_the_decks_folder() {
+    // Oracle: the paths written out by hand (VACASK's demo/bsim3-ptm/amp.sim includes
+    // demo/cmos180n.lib). Checks: 4.
+    let base = Path::new("demo/bsim3-ptm");
+    let named = |p: &str| files::relative(base, p);
+    assert_eq!(named("demo/bsim3-ptm/x.inc").as_deref(), Some("x.inc"));
+    assert_eq!(
+        named("demo/cmos180n.lib").as_deref(),
+        Some("../cmos180n.lib")
+    );
+    assert_eq!(named("lib/a/b.lib").as_deref(), Some("../../lib/a/b.lib"));
+    assert_eq!(
+        named("demo/bsim3-ptm/sub/y.inc"),
+        None,
+        "a subfolder is not placed"
+    );
+}
+
+#[test]
 fn a_cell_names_rows_with_the_sides_it_needs() {
     // Oracle: `dialect::BUILTIN` as `src/dialect/mod.rs` lists it. Checks: one per cell.
     for c in CELLS {
