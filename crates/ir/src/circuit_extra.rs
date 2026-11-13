@@ -357,7 +357,7 @@ pub enum CircuitExtra {
     DefaultTnom27,
     /// The same under `Law::DefaultTnom25` (HSPICE).
     DefaultTnom25,
-    /// A MOSFET carrying the BSIM4 4.5 small-signal point under `Law::Bsim4v45SmallSignalHand`.
+    /// A MOSFET carrying F86's point (BSIM4 4.5 small-signal) under `Law::Bsim4v45SmallSignalHand`.
     Bsim4v45SmallSignalHand,
     /// The same under `Law::Bsim4v45SmallSignalExact`.
     Bsim4v45SmallSignalExact,

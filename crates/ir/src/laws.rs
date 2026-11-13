@@ -228,7 +228,8 @@ pub enum Law {
     DefaultTnom27,
     /// Point R102: 25 °C (HSPICE).
     DefaultTnom25,
-    /// Point (R96), the small-signal of BSIM4 at version 4.5: ngspice-45's 4.5 code, its AC
+    /// Point F86 (R96), the small-signal of BSIM4 at version 4.5 (the version gap itself is F85,
+    /// a writer's refusal): ngspice-45's 4.5 code, its AC
     /// output conductance 2e-4 off the slope of its own DC current in saturation (gf180mcuD's
     /// nfet_03v3, `families/gf180_n1/runs.out`; its 4.8 code 1.5e-7). Carried as F27, by a
     /// MOSFET on a `Bsim4` model of version 4.5 (or an unresolved one). Noted both ways.
