@@ -44,6 +44,7 @@ const READ: &[&str] = &[
     "foreach_unrolled",
     "hash_line",
     "in_branch",
+    "in_subckt",
     "inert_commands",
     "meas_card_run",
     "meas_command",

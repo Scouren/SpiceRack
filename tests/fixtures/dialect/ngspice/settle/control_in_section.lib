@@ -1,0 +1,7 @@
+* lib
+.lib sec
+.control
+echo lib-block-ran
+option noinit
+.endc
+.endl sec

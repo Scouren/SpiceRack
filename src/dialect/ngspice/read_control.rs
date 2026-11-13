@@ -23,7 +23,7 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! the codes `pub(super) const FLOW`, `READS`, `EFFECT`, `STATE_WITH_CARDS`, `UNROLL`, `DISPLAY`,
-//! `NO_RESET`, `FORM`, `OWN`, `IN_BRANCH`, `NO_COMMAND`, `REJECTED`,
+//! `NO_RESET`, `FORM`, `OWN`, `IN_BRANCH`, `NO_COMMAND`, `REJECTED`, `IN_SUBCKT`,
 //! `pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt)`,
 //! `pub(super) fn script_line(lw: &mut Lower<'_, '_>, scope: ir::ScopeId, index: usize, span: ir::Span)`
 
@@ -114,6 +114,10 @@ pub(super) const NO_COMMAND: ir::Code = ir::Code::new(b'P', 1411);
 /// A command ngspice rejects (`alter` with no value, an `alterparam` with no `=`):
 /// `InvalidInSource`.
 pub(super) const REJECTED: ir::Code = ir::Code::new(b'P', 1412);
+/// A block or `*#` line in a `.subckt` body: ngspice runs it once, before the deck's, iff the
+/// subcircuit has an instance (settle `control_in_subckt.sp`, `control_in_subckt_unused.sp`),
+/// which no IR item states (R98, X0028): its own text, `Script`.
+pub(super) const IN_SUBCKT: ir::Code = ir::Code::new(b'P', 1413);
 
 /// This area's codes, `P1400–P1499`.
 pub(super) const CODES: &[Row] = &[
@@ -178,6 +182,12 @@ pub(super) const CODES: &[Row] = &[
         "ngspice runs it whatever the condition; kept as text (Private).",
     ),
     note(
+        IN_SUBCKT,
+        "a control block in a .subckt body",
+        "ngspice-45 runs (settle control_in_subckt.sp, control_in_subckt_unused.sp); rewrite/RULINGS.md R98",
+        "ngspice runs it once, before the deck's, iff the subcircuit has an instance, which no IR item states; kept as its own text (Script).",
+    ),
+    note(
         NO_COMMAND,
         "a script word ngspice has no command for",
         "ngspice-45 commands.c; S3-CONTROL §2, L1",
@@ -193,8 +203,11 @@ pub(super) const CODES: &[Row] = &[
 
 /// A control block: the deck's script read once, this statement's part pushed.
 pub(super) fn control(lw: &mut Lower<'_, '_>, st: Stmt) {
-    if in_branch(lw, st.scope) {
+    if within(lw, st.scope, ir::ScopeKind::Branch) {
         return whole(lw, st, ir::OpaqueClass::Private, IN_BRANCH);
+    }
+    if within(lw, st.scope, ir::ScopeKind::Subckt) {
+        return whole(lw, st, ir::OpaqueClass::Script, IN_SUBCKT);
     }
     let me = lw.script_index(st);
     let ops = match planned(lw, me) {
@@ -220,8 +233,11 @@ pub(super) fn script_line(
     span: ir::Span,
 ) {
     let text = lw.deck_script()[index].clone();
-    if in_branch(lw, scope) {
+    if within(lw, scope, ir::ScopeKind::Branch) {
         return lw.opaque_text(scope, &text, span, ir::OpaqueClass::Private, IN_BRANCH);
+    }
+    if within(lw, scope, ir::ScopeKind::Subckt) {
+        return lw.opaque_text(scope, &text, span, ir::OpaqueClass::Script, IN_SUBCKT);
     }
     let ops = match planned(lw, index) {
         Err(code) => return lw.opaque_text(scope, &text, span, ir::OpaqueClass::Script, code),
@@ -281,14 +297,14 @@ const fn note(
     )
 }
 
-/// Whether `scope` is an `.if` branch or inside one.
-fn in_branch(lw: &Lower<'_, '_>, scope: ir::ScopeId) -> bool {
+/// Whether `scope` is a scope of `kind` or inside one.
+fn within(lw: &Lower<'_, '_>, scope: ir::ScopeId, kind: ir::ScopeKind) -> bool {
     let d = lw.b.design();
     let mut s = scope;
     // Bounded: each step goes one scope outward; a file's top scope has no parent.
     while !s.is_none() {
         let sc = d.scope(s);
-        if sc.kind == ir::ScopeKind::Branch {
+        if sc.kind == kind {
             return true;
         }
         s = sc.parent;

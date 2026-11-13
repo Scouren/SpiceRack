@@ -16,6 +16,11 @@
 //! element `x` (its whole name, R23); `@x[q]` is device quantity `q` as spelled. A dotted name
 //! is a path when ngspice's flattening made it: `x1.n` (instances lead with `x`) and
 //! `v.x1.v9` (an element's letter, the instances, its name).
+//! A `.save @x[q]` whose device has no vector `q`
+//! (`outputs::readable`) drops that probe with `P1354` and a card left with none is `Inert`:
+//! ngspice's `write` stops on an empty vector (settle `device_output_missing.sp`). A second
+//! `save` adds to the set until `delete all` (settle `save_scope_status.sp`), so each card is one
+//! `Save` item and the IR's saves are their union.
 //!
 //! Every function validates the whole card into local values before the first push.
 //!
@@ -24,7 +29,7 @@
 //! `tests/fixtures/dialect/ngspice/read/outputs/`; `rewrite/INV-semantics.md` 9.01–9.08.
 //!
 //! Contents: `pub(super) const FEATURES`, `pub(super) const CODES`, `pub(super) const UNTYPED`,
-//! `INVALID`, `INERT`, `DC_WINDOW`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
+//! `INVALID`, `INERT`, `DC_WINDOW`, `NO_VECTOR`, `pub(super) enum No`, `pub(super) fn card(lw: &mut Lower<'_, '_>, st: Stmt)`,
 //! `pub(super) fn probe(lw, st, text: &str, analysis: ir::AnalysisKind) -> Result<ir::Probe, Fail>`,
 //! `pub(super) fn script_save(lw, st, &[String], ir::Applies) -> Result<(), No>`,
 //! `pub(super) fn meas_command(lw, st, &[String]) -> Result<(), No>`,
@@ -43,7 +48,7 @@ use super::codes::Row;
 use super::expr_read::Fail;
 use super::read::{Lower, Stmt};
 use super::tables;
-use crate::ir::{self, AnalysisKind, Code, Feature, ItemKind, RunExtra};
+use crate::ir::{self, AnalysisKind, Code, Feature, ItemKind, ProbeKind, RunExtra};
 use crate::syntax::ast::Tag;
 
 /// The IR rows this area reads (and its writer spells).
@@ -87,9 +92,19 @@ pub(super) const INERT: Code = Code::new(b'P', 1352);
 /// A dc measure window with an expression bound: ngspice orders the two after substitution,
 /// and the IR has no window "between the two, in either order": `Unread`, counted on its own.
 pub(super) const DC_WINDOW: Code = Code::new(b'P', 1353);
+/// A saved `@dev[name]` the device has no output vector for (`outputs.rs`): ngspice keeps an
+/// empty vector (settle `device_outputs.sp`), so the save holds nothing for it; the probe is
+/// left out with this note (the 38 decks' various/bjt_ac_par.sp: `save @q1[pi] @q1[go]`).
+pub(super) const NO_VECTOR: Code = Code::new(b'P', 1354);
 
 /// This area's codes.
 pub(super) const CODES: &[Row] = &[
+    note(
+        NO_VECTOR,
+        "a saved device output ngspice has no vector for",
+        "ngspice-45 device instance tables (outputs.txt); settle device_outputs.sp",
+        "ngspice keeps an empty vector for it; the probe is left out of the save.",
+    ),
     note(
         UNTYPED,
         "an output form the IR cannot state yet",
@@ -125,6 +140,9 @@ pub(super) enum No {
     Invalid,
     /// A dc window whose order is known only at run time (`P1353`).
     DcWindow,
+    /// A save of device outputs ngspice has no vector for, all of them (`P1354`): it saves
+    /// nothing.
+    Inert,
 }
 
 /// An output card into `st.scope`, or one opaque with its code.
@@ -259,6 +277,7 @@ pub(super) fn fail(no: No) -> Fail {
         No::Untyped => (UNTYPED, ir::OpaqueClass::Unread),
         No::Invalid => (INVALID, ir::OpaqueClass::InvalidInSource),
         No::DcWindow => (DC_WINDOW, ir::OpaqueClass::Unread),
+        No::Inert => (NO_VECTOR, ir::OpaqueClass::Inert),
     };
     Fail { code, class }
 }
@@ -268,7 +287,22 @@ pub(super) fn fail(no: No) -> Fail {
 /// `.save word …` (`WholeRun`: a dot card holds for the whole run wherever it stands, A27) or a
 /// script's `save word …` (`FromHere`): one `Save` for every analysis.
 fn save(lw: &mut Lower<'_, '_>, st: Stmt, words: &[String], holds: ir::Applies) -> Result<(), No> {
-    let wants = probes(words, Ctx::Save)?;
+    let mut wants = probes(words, Ctx::Save)?;
+    let held = |w: &Want| {
+        let dev = w.a.last().and_then(|e| e.bytes().next());
+        w.kind != ProbeKind::Param
+            || dev
+                .zip(w.b.first())
+                .is_none_or(|(l, q)| super::outputs::readable(l.to_ascii_lowercase(), q))
+    };
+    let before = wants.len();
+    wants.retain(held);
+    if wants.is_empty() {
+        return Err(No::Inert);
+    }
+    if wants.len() < before {
+        lw.note(st, NO_VECTOR);
+    }
     let probes: Vec<ir::Probe> = wants.iter().map(|w| build(lw, w)).collect();
     let span = lw.span(st.node);
     lw.b.save(st.scope, ir::AnalysisKinds::ALL, holds, &probes, span);

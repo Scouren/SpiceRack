@@ -51,6 +51,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
+    ("l5", "ngspice", "seed 9 Untyped: a script-only option (`option interp`) in a `.subckt` body, written as a `.control` block there, reads back as its own text (Script P1413, R98: ngspice runs such a block once, before the deck's, iff the subckt has an instance; settle control_in_subckt.sp). The design is an IR violation by R98 (X0028, ir-rewrite 7c373aa0): the row goes when that check and the generator change reach the trunk"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the

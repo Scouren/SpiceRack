@@ -364,7 +364,9 @@ fn table(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card, rest: &[Item], current: 
         let nums: Option<Vec<_>> = pair.iter().map(|s| number_word(s)).collect();
         match nums {
             Some(n) if p.kind == Kind::Group && n.len() == 2 => xy.extend(n),
-            // an expression in a table point: XSPICE pwl reads numbers only (inpcom.c FIXME)
+            // a braced point is numparam's: a number once substituted (settle
+            // table_brace_point.sp), which the reader cannot evaluate; the IR's expression
+            // point is one the writer refuses (R74 (4)), so the card stays ngspice's text
             _ => return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM),
         }
     }
