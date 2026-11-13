@@ -1,0 +1,8 @@
+# Oracle: run131 (scratchpad vacask/run131) and the corpus's demo/cmos180n.lib: a section named by
+# a keyword is spelled bare (`section model`, `include "…" section=model` run); VACASK reads no
+# quoted section name ("Syntax error, unexpected string in include directive.", "Syntax error,
+# unmatched string in section directive."). Found by pair-2's vacask-vacask census (bsim3-ptm).
+file "section_keyword.sim" deck
+  title "section keyword"
+  include "section_keyword.sim" section=model
+  section model
