@@ -19,11 +19,12 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod dc_axes_to_loops`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod alter_at_reset`, `pub mod dc_axes_to_loops`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
 //! `codes.rs`)
 
+pub mod alter_at_reset;
 mod codes;
 pub mod dc_axes_to_loops;
 pub mod drop_print;
@@ -269,6 +270,20 @@ pub(super) const PASSES: &[Pass] = &[
         requires: DC_LOOPS,
         notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
         run: dc_axes_to_loops::dc_axis_model_param_to_loop,
+    },
+    Pass {
+        name: "alter_param_at_once_to_at_reset",
+        removes: ir::Feature::Run(RunExtra::AlterParamAtOnce),
+        requires: ir::FeatureSet::EMPTY
+            .with(ir::Feature::Run(RunExtra::AlterParamAtReset))
+            .with(ir::Feature::Item(ir::ItemKind::Reset))
+            .with(ir::Feature::Run(RunExtra::ResetValues))
+            .with(ir::Feature::Run(RunExtra::ResetOptions))
+            .with(ir::Feature::Run(RunExtra::ResetTemp))
+            .with(ir::Feature::Run(RunExtra::ResetTnom))
+            .with(ir::Feature::Run(RunExtra::ResetSaves)),
+        notes: &[alter_at_reset::ALTER_KEPT],
+        run: alter_at_reset::alter_param_at_once_to_at_reset,
     },
     // one row per option proven inert (`inert_options.rs`)
     inert(inert_options::INERT[0]),

@@ -6,8 +6,9 @@
 //! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`
 
 use super::{
-    dc_axes_to_loops, drop_print, fs, ic_next_only, inert_options, loop_end, names_dropped,
-    names_given, run_items_together, save_set_to_all, sweep_forms, tc, tran_print_step, wr,
+    alter_at_reset, dc_axes_to_loops, drop_print, fs, ic_next_only, inert_options, loop_end,
+    names_dropped, names_given, run_items_together, save_set_to_all, sweep_forms, tc,
+    tran_print_step, wr,
 };
 use crate::ir;
 
@@ -244,6 +245,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a print card in a loop's body or a branch",
             cite: "R83",
             explain: "The print changes no result, but dropping it from a loop's body or a branch changes the body's shape, a feature of its own, so it is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        alter_at_reset::ALTER_KEPT,
+        ir::Info {
+            title: "a parameter alter whose reset would undo other script state",
+            cite: "R70; rewrite/AMEND-A12.md A43",
+            explain: "The target's parameter alter takes effect at the next reset, so a reset would follow it; a reset also undoes value alters, options, temperatures and saves in force from earlier in the run (or every earlier pass in a loop's body), and one of those is in force here, so the alter is refused.",
             kind: ir::Kind::Note,
         },
     ),
