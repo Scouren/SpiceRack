@@ -114,6 +114,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        fs::STOP_AS_PRINT_STEP,
+        ir::Info {
+            title: "a transient's stop given as its print step",
+            cite: "rewrite/AMEND-A12.md A41; ngspice-45 dctran.c, traninit.c",
+            explain: "The source gives no output interval, and the target's transient needs one. With its step ceiling given, ngspice reads the interval only for its first step and, under uic, a breakpoint; at the stop or past it neither changes a point, so the stop is written and the results are the target's own accepted steps.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         ic_next_only::IC_KEPT,
         ir::Info {
             title: "an initial condition or node set whose reach the target cannot state",

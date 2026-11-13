@@ -156,7 +156,7 @@ pub(super) const PASSES: &[Pass] = &[
         removes: ir::Feature::Run(ir::RunExtra::TranSimulatorStep),
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(ir::RunExtra::TranPrintStep)),
         notes: &[fs::FIRST_STEP_KEPT, fs::NO_STEP_VALUE],
-        run: fs::tran_first_step_to_print,
+        run: fs::tran_simulator_step_to_print,
     },
     Pass {
         name: "tran_first_step_to_print",
