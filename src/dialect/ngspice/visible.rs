@@ -9,7 +9,9 @@
 //! Cites: ngspice-45 runs, settle `include_subckt_ok.sp`, `inc_after.sp` (an X card before or
 //! after the include), `inc_local_{in,out,param}.sp` (an include in a `.subckt` body is local
 //! to it), `inc_section_{named,other}.sp` (only the named section), `inc_twice_{before,after}.sp`
-//! (first subcircuit, last parameter), `inc_model_param.sp`, `inc_nested.sp`; INV 3.01.
+//! (first subcircuit, last parameter), `inc_model_param.sp`, `inc_nested.sp`,
+//! `formal_scope.sp`, `formal_scope_lib.sp` (a subcircuit's formal is seen from its own body
+//! only, F34); INV 3.01.
 //!
 //! Contents: `pub(super) struct Visible`, `Visible::new(&ir::Design) -> Visible`,
 //! `Visible::lookup(&self, &ir::Design, ir::ScopeId, ir::DefKind, ir::NameId) -> ir::DefId`
@@ -39,8 +41,18 @@ impl Visible {
             let id = ir::DefId(u32::try_from(k).expect("definitions fit a u32"));
             defs_of.entry(def.item).or_default().push(id);
         }
-        let scopes: HashSet<ir::ScopeId> = d.reachable().into_iter().map(|(_, s)| s).collect();
+        let reachable = d.reachable();
+        let scopes: HashSet<ir::ScopeId> = reachable.iter().map(|&(_, s)| s).collect();
+        let holder: HashMap<ir::ItemRef, ir::ScopeId> = reachable.into_iter().collect();
         let mut seen = HashMap::new();
+        // a definition its item does not stand beside (a subcircuit's formal: its scope is the
+        // body, its item the `.subckt` in the parent) is seen from its own scope first (F34)
+        for (k, def) in d.definitions().iter().enumerate() {
+            if holder.get(&def.item).is_some_and(|&h| h != def.scope) {
+                let id = ir::DefId(u32::try_from(k).expect("definitions fit a u32"));
+                seen.entry((def.scope, def.kind, def.name)).or_insert(id);
+            }
+        }
         for &scope in &scopes {
             for def in expanded(d, scope, &defs_of) {
                 let row = d.def(def);
@@ -122,7 +134,15 @@ fn expanded(
             continue;
         };
         stack.push((at, k + 1));
-        out.extend(defs_of.get(&item).into_iter().flatten());
+        // only the definitions this item makes in the scope it stands in (F34: a subckt's
+        // formals are its body's, not the parent's)
+        out.extend(
+            defs_of
+                .get(&item)
+                .into_iter()
+                .flatten()
+                .filter(|&&def| d.def(def).scope == at),
+        );
         if item.kind == ir::ItemKind::Include
             && let Some(target) = target(d, item)
             && done.insert(target)

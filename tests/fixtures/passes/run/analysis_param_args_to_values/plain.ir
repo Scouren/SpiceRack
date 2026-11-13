@@ -1,0 +1,3 @@
+file "a.sp" deck
+  param tstop = 1u
+  analysis tran stop=tstop print_step=1n cap=none

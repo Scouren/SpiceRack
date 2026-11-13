@@ -1,0 +1,3 @@
+# Two at-once parameter alters, each written alterparam + reset: the second reset keeps the first (R70; a parameter alter is never restored).
+owner = runrules
+proves = alter_param_at_once_to_at_reset
