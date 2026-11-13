@@ -1,0 +1,66 @@
+Load decks of sp_diode against ngspice-45, written by ../load.py diode_load.
+Builds on PATH: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n (source hfvpfb0bgw9819wkb7kzpdaasbd0hd5r, devices/dio),
+VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (devices/spice/diode.va, ngspice-47-159 vadng-pre-48).
+Run: `nix develop .#testing -c tests/fixtures/families/load_run.sh diode_load`. i(vd) in A, |i(vd)| at 1 GHz for acg/acd.
+nom is 27 C, m=1, the control of m3 (27 C, m=3) and of off (80 C, m=3); all give area=2 (level 1, no sidewall: R91 F22's
+knee never stands). Regions (vd): rev -2, fwd 0.6, high 0.85 (ikf, rs), bkdn -5.2 (bv=5). acd only (two terminals).
+Oracles (fd.py, last lines): each nominal region's operating point moved 1e-5 V on the gate (base) and the drain
+(collector, anode), whose central differences are gm and gds of the DC law, against |i(vd)| at 1 kHz; it holds where
+the conductance is well above the 1 kHz capacitive current and the differences' resolution (ngspice prints 12 digits:
+about 5e-11 S), so not in cutoff or reverse. And the multiplier's metamorphic relation: every m3 reading is 3 times its
+nom reading within 1e-9 relative and 1e-10 absolute (the solver's gmin is not multiplied); a failing row is printed.
+The model gives isr=1e-12 nr=2 (the recombination current), ikf, rs, bv/ibv, cjo/vj/m/fc, tt, xti, eg.
+Result: two differences, both in the recombination current; the control ../diode_noisr (the same cards without isr
+and nr) agrees everywhere (DC to 6e-5 at a reverse pA, AC to 1e-10, both AC the derivatives).
+(1) Reverse DC: ngspice-45 carries no recombination current under reverse bias, VACASK does: nom_rev_dc 2.020e-12 A
+against 3.679e-12 (the gmin and is*area parts agree; without isr both read 2.020e-12), off_rev_dc 4.60e-11 against
+2.08e-10. Class: a law (R90 shape), carried by a diode whose model gives isr, at a reverse bias.
+(2) Forward AC: ngspice-45's conductance at nom_fwd (0.6 V, recombination-dominated) is 7.66e-5 off the central
+difference of its own DC current, 1.2e-6 at nom_high; VACASK 2e-8. At 1 GHz fwd 3.3e-5. Class: ngspice-45's AC is
+not its DC law's linearisation (as mos2/3/9 and bjt).
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+m3_bkdn_acd            ngspice=7.124343164283e-01     vacask=0.7124343163789604       rel=6.93e-11 
+m3_bkdn_dc             ngspice=4.167234447172e-03     vacask=0.004167234451583216     rel=1.06e-09 
+m3_fwd_acd             ngspice=1.125528660401e-01     vacask=0.11254914027533376      rel=3.31e-05 
+m3_fwd_dc              ngspice=-2.20913023112e-04     vacask=-0.000220913023111867    rel=6.02e-13 
+m3_high_acd            ngspice=1.176206907002e+00     vacask=1.1762069962038937       rel=7.58e-08 
+m3_high_dc             ngspice=-7.65085689994e-02     vacask=-0.07650856899895435     rel=5.82e-12 
+m3_rev_acd             ngspice=2.196605448362e-02     vacask=0.021966054496194112     rel=5.72e-10 
+m3_rev_dc              ngspice=2.060129844494e-12     vacask=7.036168188013494e-12    rel=7.07e-01 
+nom_bkdn_acd_1k        ngspice=4.534897901938e-02     vacask=0.04534897901393818      rel=1.20e-10 
+nom_bkdn_acd           ngspice=2.374781054395e-01     vacask=0.2374781054211417       rel=7.73e-11 
+nom_bkdn_dc            ngspice=1.389078152128e-03     vacask=0.001389078153599329     rel=1.06e-09 
+nom_bkdn_dc_fd_dm      ngspice=1.389531707556e-03     vacask=0.001389531709026749     rel=1.06e-09 
+nom_bkdn_dc_fd_dp      ngspice=1.388624727967e-03     vacask=0.0013886247294371       rel=1.06e-09 
+nom_fwd_acd_1k         ngspice=2.612687518251e-03     vacask=0.0026124872798497806    rel=7.66e-05 
+nom_fwd_acd            ngspice=3.751762201688e-02     vacask=0.0375163800911809       rel=3.31e-05 
+nom_fwd_dc             ngspice=-7.36376747679e-05     vacask=-7.363767476788787e-05   rel=1.65e-13 
+nom_fwd_dc_fd_dm       ngspice=-7.36115544328e-05     vacask=-7.361155443277062e-05   rel=3.99e-13 
+nom_fwd_dc_fd_dp       ngspice=-7.36638041794e-05     vacask=-7.366380417937599e-05   rel=3.26e-13 
+nom_high_acd_1k        ngspice=2.445878735576e-01     vacask=0.2445881722911438       rel=1.22e-06 
+nom_high_acd           ngspice=3.920689690006e-01     vacask=0.39206899873452133      rel=7.58e-08 
+nom_high_dc            ngspice=-2.55028563333e-02     vacask=-0.02550285633318843     rel=4.37e-12 
+nom_high_dc_fd_dm      ngspice=-2.55004104915e-02     vacask=-0.02550041049134193     rel=6.20e-12 
+nom_high_dc_fd_dp      ngspice=-2.55053022549e-02     vacask=-0.02550530225478595     rel=4.47e-12 
+nom_rev_acd_1k         ngspice=7.323245253495e-09     vacask=7.3232452534997475e-09   rel=6.48e-13 
+nom_rev_acd            ngspice=7.322018165385e-03     vacask=0.007322018165389451     rel=6.08e-13 
+nom_rev_dc             ngspice=2.019939771003e-12     vacask=3.67872272933058e-12     rel=4.51e-01 
+nom_rev_dc_fd_dm       ngspice=2.020050793305e-12     vacask=3.678732729346729e-12    rel=4.51e-01 
+nom_rev_dc_fd_dp       ngspice=2.020050793305e-12     vacask=3.678712729314406e-12    rel=4.51e-01 
+off_bkdn_acd           ngspice=2.945778442826e-01     vacask=0.2945778432738232       rel=3.42e-09 
+off_bkdn_dc            ngspice=1.504480206033e-03     vacask=0.001504480360773351     rel=1.03e-07 
+off_fwd_acd            ngspice=6.410962605033e-01     vacask=0.6410960579670958       rel=3.16e-07 
+off_fwd_dc             ngspice=-4.30542037266e-03     vacask=-0.004305420372663743    rel=8.69e-13 
+off_high_acd           ngspice=1.183469455107e+00     vacask=1.1834694974848985       rel=3.58e-08 
+off_high_dc            ngspice=-1.31077186041e-01     vacask=-0.131077186040902       rel=7.48e-13 
+off_rev_acd            ngspice=2.234393365709e-02     vacask=0.02234393367011517      rel=5.83e-10 
+off_rev_dc             ngspice=4.604094883121e-11     vacask=2.075191710400178e-10    rel=7.78e-01 
+nom_bkdn ngspice: gds(fd) 4.5348979e-02 acd_1k 0.04534897901938 (9.50e-09)
+nom_bkdn vacask: gds(fd) 4.5348979e-02 acd_1k 0.04534897901393818 (1.03e-08)
+nom_fwd ngspice: gds(fd) 2.6124873e-03 acd_1k 0.002612687518251 (7.66e-05)
+nom_fwd vacask: gds(fd) 2.6124873e-03 acd_1k 0.0026124872798497806 (1.93e-08)
+nom_high ngspice: gds(fd) 2.4458817e-01 acd_1k 0.2445878735576 (1.21e-06)
+nom_high vacask: gds(fd) 2.4458817e-01 acd_1k 0.2445881722911438 (3.69e-10)
+nom_rev ngspice: gds(fd) 0.0000000e+00 acd_1k 7.323245253495e-09 (7.32e+291)
+nom_rev vacask: gds(fd) 1.0000016e-12 acd_1k 7.3232452534997475e-09 (7.32e+03)

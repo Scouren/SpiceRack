@@ -1,13 +1,17 @@
 """load.py FAMILY: writes a family's load decks beside it, one ngspice deck (.cir) and one VACASK
 deck (.sim) per (condition, region, reading). Families: mos1, mos2, mos3, mos6, mos9 (a bulk at
--0.5 V), jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, passive. Conditions: `nom` (27 C, m=1) is the control of
-`off` (80 C, m=3); geometry is given in both. Readings: `dc` the operating-point current of `vd`,
+-0.5 V), jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, diode_load and diode_noisr (two terminals),
+vdmos_load, passive. Conditions: `nom` (27 C, m=1) is the control of `off` (80 C, m=3) and of
+`m3` (27 C, m=3); geometry is given in all. Readings: `dc` the operating-point current of `vd`,
 `acg` |i(vd)| at 1 GHz with the gate driven, `acd` |i(vd)| at 1 GHz with the drain driven.
 `load.py passive` writes the resistor, capacitor and inductor decks (PASSIVES).
 The rows of a family are its model cards, its instance lines and its region biases, below.
 Both decks set reltol=1e-9 and abstol=1e-15: at VACASK's default abstol a cutoff current of
 2.5 pA settles 0.19 pA off (mos1 nom_cut_dc: -2.693e-12 against ngspice-45's -2.502e-12, both
--2.502e-12 at abstol 1e-15), the solver's tolerance and not the device's law."""
+-2.502e-12 at abstol 1e-15), the solver's tolerance and not the device's law. vdmos_load sets
+abstol=1e-12: VACASK's Newton does not converge in its cutoff decks below (nom at 1e-14, m3 at 1e-13).
+`m3` (27 C, m=3) is the metamorphic control of the multiplier: m copies in parallel at the same
+terminal voltages carry exactly m times every current and admittance of one (fd.py checks it)."""
 import sys
 
 # every MOS level: junctions (cj, cjsw over ad/as/pd/ps) and Meyer capacitances (tox, cgso/cgdo/cgbo)
@@ -70,7 +74,24 @@ FAMILIES['bjt'] = dict(
 # the control of bjt's small-signal: a constant base resistance (no rbm, irb)
 FAMILIES['bjt_rbconst'] = dict(FAMILIES['bjt'],
                                params=FAMILIES['bjt']['params'].replace(' rbm=10 irb=1m', ''))
-CONDITIONS = {'nom': (27, 1), 'off': (80, 3)}
+# the diode (level 1; no sidewall, so R91 F22's knee never stands) and the VDMOS (tcvth absent
+# and fc*vj under 2.5, where the second reading's laws agree); two-terminal regions (None, vd)
+FAMILIES['diode_load'] = dict(
+    load='spice/diode.osdi', letter='d', nodes='d 0', geometry='area=2',
+    ng_model='.model nm d {p}', va_model='model nm sp_diode {p}',
+    params='is=1e-14 n=1.05 rs=5 bv=5 ibv=1e-6 ikf=10m cjo=1p vj=0.7 m=0.4 fc=0.5 tt=1n xti=3 '
+           'eg=1.11 isr=1e-12 nr=2',
+    regions={'rev': (None, -2.0), 'fwd': (None, 0.6), 'high': (None, 0.85), 'bkdn': (None, -5.2)})
+# the control of diode_load's recombination current: the same cards without isr and nr
+FAMILIES['diode_noisr'] = dict(FAMILIES['diode_load'],
+                               params=FAMILIES['diode_load']['params'].replace(' isr=1e-12 nr=2', ''))
+FAMILIES['vdmos_load'] = dict(
+    load='spice/vdmos.osdi', nodes='d g 0', va_nodes='d g 0 t tc', geometry='', abstol='1e-12',
+    ng_model='.model nm vdmos {p}', va_model='model nm sp_vdmos type=1 {p}',
+    params='vto=2 kp=20 lambda=0.01 rd=10m rs=10m rg=1 cgdmin=50p cgdmax=500p a=0.5 cgs=1n cjo=1n '
+           'vj=0.8 m=0.4 fc=0.5 is=1e-12 n=1.2 tt=50n',
+    regions={'cut': (1.0, 10.0), 'lin': (6.0, 0.5), 'sat': (3.0, 10.0)})
+CONDITIONS = {'nom': (27, 1), 'm3': (27, 3), 'off': (80, 3)}
 
 # the passives: one region each, so per (condition, form) one reading of `vd` driving node a; an
 # inductor stands behind a 1-ohm resistor (a source across it alone has no operating point).
@@ -101,18 +122,22 @@ PASSIVES = {
 def decks(name, f):
     for cond, (temp, m) in CONDITIONS.items():
         for region, (vg, vd) in f['regions'].items():
-            for reading in ('dc', 'acg', 'acd'):
+            gate = vg is not None
+            for reading in ('dc', 'acg', 'acd') if gate else ('dc', 'acd'):
                 stem = f'{cond}_{region}_{reading}'
                 bulk = f['nodes'].endswith(' b')
                 vbs = ', vbs=-0.5' if bulk else ''
-                title = f'{name} {cond} ({temp} C, m={m}), {region} (vgs={vg}, vds={vd}{vbs}), {reading}'
+                vgs = f'vgs={vg}, ' if gate else ''
+                title = f'{name} {cond} ({temp} C, m={m}), {region} ({vgs}vds={vd}{vbs}), {reading}'
                 x = f.get('letter', 'm') + '1'
                 gac = ' ac 1' if reading == 'acg' else ''
                 dac = ' ac 1' if reading == 'acd' else ''
                 inst = f['geometry'] + (f' m={m}' if m != 1 else '')
                 ng = [title, f['ng_model'].format(p=f['params']),
-                      f'vd d 0 dc {vd}{dac}', f'vg g 0 dc {vg}{gac}'] + ['vb b 0 dc -0.5'] * bulk + [
-                      f'{x} {f["nodes"]} nm {inst}', f'.temp {temp}', '.options reltol=1e-9 abstol=1e-15',
+                      f'vd d 0 dc {vd}{dac}'] + [f'vg g 0 dc {vg}{gac}'] * gate + [
+                      'vb b 0 dc -0.5'] * bulk + [
+                      f'{x} {f["nodes"]} nm {inst}', f'.temp {temp}',
+                      f'.options reltol=1e-9 abstol={f.get("abstol", "1e-15")}',
                       '.control', 'set numdgt=12']
                 ng += ['op', 'print i(vd)'] if reading == 'dc' else \
                       ['ac lin 1 1g 1g', 'print mag(i(vd))']
@@ -121,10 +146,11 @@ def decks(name, f):
                 va = [title, f'load "{f["load"]}"', 'model vs vsource',
                       f['va_model'].format(p=f['params']),
                       f'vd (d 0) vs dc={vd}' + (' mag=1' if dac else ''),
-                      f'vg (g 0) vs dc={vg}' + (' mag=1' if gac else ''),
+                      ] + [f'vg (g 0) vs dc={vg}' + (' mag=1' if gac else '')] * gate + [
                       ] + ['vb (b 0) vs dc=-0.5'] * bulk + [
-                      f'{x} ({f["nodes"]}) nm {va_inst}',
-                      'control', f'  options temp={temp} tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"',
+                      f'{x} ({f.get("va_nodes", f["nodes"])}) nm {va_inst}',
+                      'control', f'  options temp={temp} tnom=27 reltol=1e-9 '
+                      f'abstol={f.get("abstol", "1e-15")} rawfile="ascii"',
                       '  analysis op1 op' if reading == 'dc' else
                       '  analysis ac1 ac from=1e9 to=1e9 mode="lin" points=1', 'endc']
                 yield stem, '\n'.join(ng) + '\n', '\n'.join(va) + '\n'
@@ -138,14 +164,16 @@ def probes(stem, vg, vd, ng, va):
     gds of the DC law both simulators share; and the AC readings at 1 kHz (`_acg_1k`, `_acd_1k`),
     where the capacitances add under 1e-8 relative."""
     h = 1e-5
-    for tag, (g, d) in {'gp': (vg + h, vd), 'gm': (vg - h, vd), 'dp': (vg, vd + h),
-                        'dm': (vg, vd - h)}.items():
+    moves = {'dp': (vg, vd + h), 'dm': (vg, vd - h)}
+    if vg is not None:
+        moves = {'gp': (vg + h, vd), 'gm': (vg - h, vd)} | moves
+    for tag, (g, d) in moves.items():
         yield (f'{stem}_fd_{tag}',
                ng.replace(f'vd d 0 dc {vd}', f'vd d 0 dc {d!r}').replace(f'vg g 0 dc {vg}',
                                                                         f'vg g 0 dc {g!r}'),
                va.replace(f'vd (d 0) vs dc={vd}', f'vd (d 0) vs dc={d!r}')
                  .replace(f'vg (g 0) vs dc={vg}', f'vg (g 0) vs dc={g!r}'))
-    for drive, src in (('acg', 'vg'), ('acd', 'vd')):
+    for drive, src in (('acg', 'vg'), ('acd', 'vd'))[vg is None:]:
         v = vg if src == 'vg' else vd
         n = ng.replace(f'{src} {src[1]} 0 dc {v}', f'{src} {src[1]} 0 dc {v} ac 1')
         a = va.replace(f'{src} ({src[1]} 0) vs dc={v}', f'{src} ({src[1]} 0) vs dc={v} mag=1')
