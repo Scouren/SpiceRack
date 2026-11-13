@@ -201,6 +201,16 @@ pub(super) fn source(lw: &mut Lower<'_, '_>, st: Stmt) {
     let current = head.as_bytes()[0].eq_ignore_ascii_case(&b'i');
     let c = match card::card(&rest, current) {
         Ok(c) => c,
+        // an HSPICE source function this reader has no rule for (`pat`: the suite's
+        // pattern_source.sp runs on ESPice)
+        Err(Bad::Invalid)
+            if rest
+                .to_ascii_lowercase()
+                .split_whitespace()
+                .any(|w| w.starts_with("pat")) =>
+        {
+            return lw.unread(st);
+        }
         Err(Bad::Invalid) => {
             return lw.opaque(st, ir::OpaqueClass::InvalidInSource, SOURCE_INVALID);
         }

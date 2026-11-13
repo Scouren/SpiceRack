@@ -244,7 +244,12 @@ pub(super) fn coupling(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[It
 fn is_value(i: &Item) -> bool {
     match i.kind {
         Kind::Brace => true,
-        Kind::Word => number_word(&i.text).is_some(),
+        // a word led by a digit is a value, a number or none (`1e3k`: the suite's
+        // invalid/hspice_exponent_scale.sp, refused by `val`), never a model name
+        Kind::Word => i
+            .text
+            .trim_start_matches(['-', '+'])
+            .starts_with(|c: char| c.is_ascii_digit() || c == '.'),
         Kind::Assign | Kind::Group => false,
     }
 }

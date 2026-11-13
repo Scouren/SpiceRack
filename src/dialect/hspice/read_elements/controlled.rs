@@ -30,6 +30,16 @@ pub(super) fn efgh(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
     let letter = card.name.as_bytes()[0].to_ascii_lowercase();
     let voltage_ctl = matches!(letter, b'e' | b'g');
     let current_out = matches!(letter, b'g' | b'f');
+    // HSPICE's frequency-domain and delay forms (the conformance suite's laplace_source.sp,
+    // pole_source.sp run on ESPice): no rule yet
+    let low = text.to_ascii_lowercase();
+    let form = |k: &str| {
+        low.split(|c: char| !c.is_ascii_alphanumeric())
+            .any(|w| w == k)
+    };
+    if ["laplace", "pole", "freq", "delay"].iter().any(|k| form(k)) {
+        return lw.opaque(st, ir::OpaqueClass::Unread, UNREAD_FORM);
+    }
     if items.len() < 3
         || items[..2]
             .iter()
@@ -97,9 +107,6 @@ pub(super) fn efgh(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[It
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     }
     card.mult = m;
-    if word.starts_with("laplace") {
-        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
-    }
     if word == "table" && voltage_ctl {
         return table(lw, st, &card, &rest[1..], current_out);
     }

@@ -40,7 +40,8 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("vacask", "Wave(Exp)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Pwl)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Am)", "property_am_and_mutual_round_trip", VC_SOURCES),
-    ("hspice", "Elem(Capacitor)", FIXPOINT, HS_CAPACITOR),
+    ("hspice", "Elem(Resistor)", FIXPOINT, HS_DRAW),
+    ("hspice", "Elem(Inductor)", FIXPOINT, HS_DRAW),
     ("hspice", "Elem(Port)", FIXPOINT, HS_CARRIED),
     ("hspice", "Elem(Table)", FIXPOINT, HS_CARRIED),
     ("hspice", "Elem(Behav)", FIXPOINT, HS_BEHAV),
@@ -71,7 +72,7 @@ const VC_DRAWS: &str = "VACASK takes an instance's kind from its master: admits 
 const VC_SOURCES_INTERIM: &str = "interim: dialect_vacask_sources' fixtures (sources, controlled, pulse, sine, exp, pwl); the generator names a source's model with a fresh name: waits for the generator binding it";
 const CODE_MODELS: &str = "the generator's code-model words name none of the build's (W1206); a seeded property of the build's code models covers it (tests/dialect_ngspice_models.rs)";
 // hspice (tests/dialect_hspice.rs's read fixtures; its gate is goal 2's)
-const HS_CAPACITOR: &str = "interim: dialect_hspice's fixtures timed_op, pulse_zero_rise hold a capacitor; no admitted generated design of 512 seeds holds one since the loop features (.temp list, .alter, .data) moved the draw (cause not yet traced)";
+const HS_DRAW: &str = "interim: no admitted generated design of 512 seeds holds one since the draw moved with the HSPICE element set (S, W, P no switches or coupled lines); resistors stand in most read fixtures, an inductor in none (cause not traced; likely ir-2's optional model names, ir-rewrite a74298cd)";
 const HS_BEHAV: &str = "interim: dialect_hspice's fixtures e_forms, e_max; the generator names a behavioural source with a B, which HSPICE has not (W4100 Letter: an E or G name is no writer's to invent)";
 const HS_SOURCES: &str = "interim: dialect_hspice's fixtures pulse_zero_rise, timed_op, sffm_order, am_form; the positional source card refuses the generator's sources (W4150)";
 const HS_CARRIED: &str = "interim: carried from the ngspice dialect's shape, no settle deck on ESPice yet (its HSPICE form is a lead)";

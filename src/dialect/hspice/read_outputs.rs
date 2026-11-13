@@ -81,7 +81,7 @@ pub(super) const FEATURES: ir::FeatureSet = tables::feature_set(&[
 
 /// An output form the IR has no row for yet: `Unread`.
 pub(super) const UNTYPED: Code = Code::new(b'P', 4350);
-/// An output card ngspice rejects or fails on: `InvalidInSource`.
+/// An output form the ngspice dialect refuses, a lead for HSPICE: `Unread`.
 pub(super) const INVALID: Code = Code::new(b'P', 4351);
 /// `.plot`, `.width`: an ASCII picture or a column width, no number: `Inert`.
 pub(super) const INERT: Code = Code::new(b'P', 4352);
@@ -110,9 +110,9 @@ pub(super) const CODES: &[Row] = &[
     ),
     note(
         INVALID,
-        "an output card ngspice rejects or fails on",
+        "an output card form the HSPICE reader has no rule for",
         "ngspice-45 com_measure2.c get_measure2, measure.c do_measure, dotcards.c gettoks",
-        "deriv and err are not supported, an unknown function or analysis, v(a,b) in a measure, vi(, td= naming a measure (fatal), a print with no output; kept as ngspice text (InvalidInSource).",
+        "the ngspice dialect's refusals (deriv, err, an unknown function or analysis, v(a,b) in a measure, td= naming a measure, a print with no output), leads for HSPICE; kept as text (Unread).",
     ),
     note(
         DC_WINDOW,
@@ -223,7 +223,9 @@ pub(super) fn probe(
 pub(super) fn fail(no: No) -> Fail {
     let (code, class) = match no {
         No::Untyped => (UNTYPED, ir::OpaqueClass::Unread),
-        No::Invalid => (INVALID, ir::OpaqueClass::InvalidInSource),
+        // ponytail: ngspice's measure refusals are leads for HSPICE (ESPice runs the suite's
+        // meas_forms.sp, meas_events.sp): no form is refused until a run says so
+        No::Invalid => (INVALID, ir::OpaqueClass::Unread),
         No::DcWindow => (DC_WINDOW, ir::OpaqueClass::Unread),
         No::Inert => (NO_VECTOR, ir::OpaqueClass::Inert),
     };

@@ -52,9 +52,9 @@ pub(super) const GLOBAL_GROUND: Code = Code::new(b'P', 4010);
 /// A call of a `.func` in scope with another argument count than its formals: ngspice stops
 /// ("parameter mismatch for function call"): `InvalidInSource`.
 pub(super) const CALL_ARITY: Code = Code::new(b'P', 4013);
-/// A value whose `{…}` or `'…'` ngspice rejects where numparam reads it whole (a `.param`, a
-/// model parameter): wrappers that wrap parts of it (`{a}+{b}`), or one inside another
-/// (`'a+{b}'`; settle `wrap_*.sp`): `InvalidInSource`.
+/// A statement holding a brace (HSPICE has no `{…}` expression: settle `expr_braces.sp`, the
+/// suite's `invalid/hspice_brace_*.sp`; ESPice only), or a value with quotes around parts of it
+/// or inside its own: `InvalidInSource`.
 pub(super) const WRAP: Code = Code::new(b'P', 4014);
 /// An `.include` or `.lib` call whose file includes, itself or through others, the file that
 /// holds it: ngspice-45 crashes (settle `inc_cycle.sp`, exit 139): `InvalidInSource`.
@@ -151,9 +151,9 @@ pub(super) const CODES: &[Row] = &[
     ),
     row(
         WRAP,
-        "a value whose braces or quotes ngspice rejects",
-        "ngspice-45 runs (settle wrap_*.sp: '; sign expected.', 'Syntax error: letter [{]')",
-        "numparam replaces each {...} on its own and reads no wrapper inside another in a .param or a model parameter; kept as InvalidInSource text.",
+        "a brace, or quotes around parts of a value",
+        "settle expr_braces.sp (ESPice 0.3.0 in HSPICE mode); the VAMS conformance suite's invalid/hspice_brace_*.sp",
+        "HSPICE quotes expressions ('...' or \"...\"); a brace anywhere, or quotes inside quotes, is no HSPICE text; kept as InvalidInSource text.",
     ),
     row(
         INCLUDE_CYCLE,

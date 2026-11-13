@@ -156,6 +156,14 @@ pub(super) fn card(token: &str) -> Option<Scan> {
         _ => (false, token),
     };
     let mut s = scan(rest)?;
+    // the rest of the token is a unit tail or digits, never an operator (`2*rv`: the suite's
+    // invalid/hspice_unquoted_expression.sp, which ESPice refuses)
+    if !rest[s.len..]
+        .bytes()
+        .all(|c| c.is_ascii_alphanumeric() || c == b'_')
+    {
+        return None;
+    }
     if negative && s.literal.mantissa != 0 {
         s.literal.mantissa = -s.literal.mantissa;
         s.fit.negate();
