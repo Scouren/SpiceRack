@@ -1,0 +1,12 @@
+level 3 metal capacitor wm=lm=100u, xom given, AC current at 1 MHz
+load "spice/diode.osdi"
+load "spice/capacitor.osdi"
+model vs vsource
+model c sp_capacitor
+model dm sp_diode level=3 is=1e-20 cjo=0 wm=100u lm=100u xom=1e4
+v1 (a 0) vs dc=-1 mag=1
+d1 (a 0) dm
+control
+  options rawfile="ascii" reltol=1e-9
+  analysis ac1 ac from=1meg to=1meg mode="lin" points=1
+endc
