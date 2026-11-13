@@ -4,8 +4,9 @@
 //! feature honesty, L8 isolation (writer); L5 round trip (both); L6 corpus fixpoint (both,
 //! `--features corpus` only). L9 belongs to each dialect's own simulator tests.
 //!
-//! Each law runs per row and its failing rows are compared with [`KNOWN`], strictly both ways:
-//! an unexpected failure and an unexpected pass both fail. Every file a writer writes is its own
+//! Each law runs per row and seed and its failures, by (row, seed), are compared with [`KNOWN`],
+//! strictly both ways (`common/known.rs`): an unexpected failure and an unexpected pass both
+//! fail, a known failure at one seed hiding none at another. Every file a writer writes is its own
 //! text at its own path, read back as one `Sources` (entry first). A row that is not lossless
 //! generates no `Opaque` (an opaque's class is its reader's judgement of the text, which a
 //! generated text cannot carry).
@@ -27,6 +28,8 @@ mod memcap;
 
 #[path = "common/feature_states.rs"]
 mod feature_states;
+#[path = "common/known.rs"]
+mod known;
 #[path = "common/known_reach.rs"]
 mod known_reach;
 #[path = "common/laws.rs"]
@@ -34,6 +37,7 @@ mod law_harness;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
+use known::{Fails, Known};
 use known_reach::KNOWN_REACH;
 use law_harness::{
     PARAMS, SIZE, Tally, admitted, canonical, generated, one_file, read_all, read_text, readers,
@@ -46,13 +50,13 @@ use spicerack::ir::r#gen::{Params, generate};
 /// The seeds every generated law runs (printed on failure).
 const SEEDS: std::ops::Range<u64> = 0..64;
 
-/// The laws a row fails today: (law, row, why). Strict both ways (`check_known`): a row
-/// that fails a law it is not listed for fails, and so does a listed row that passes. Each
-/// dialect branch lists its own rows here; the `ir` row fails none.
+/// The laws a row fails today: (law, row, the seeds it fails at, why). Strict both ways by
+/// (row, seed) (`known::compare`): a seed that fails and is not listed fails, and so does a
+/// listed seed that passes. Each dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
-const KNOWN: &[(&str, &str, &str)] = &[
-    ("l5", "ngspice", "seed 9 Untyped (the generator's stream of ir-rewrite 9e98f07a; the same class as the seed 19 row the last round deleted when its seed stopped drawing it): a whole-run `option interp` in a subcircuit body is written as `.control` / `option interp` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area (the writer spells a whole-run option inside a body it cannot be read back from)"),
-    ("l5", "vacask", "seed 0 Untyped (the round's generator; on step2-vacask-b the row's seeds 1 and 38 hid it): a device_library of a family whose module is not proven (jfet_parker_skellern, vbic) is written `load \"spice/jfet2.osdi\"` / `load \"vbic_1p3.osdi\"` and reads back as a plain load (tables::library, da95fe25): write_structure::admit lets through a library the reader cannot read back. Fixed on step2-vacask (admit agrees with tables::library), goes with its hash. The evidence text also shows 141.585peta read back as 141.585e15: equal by meaning (R28; Design::eq_meaning -> literal_eq_across -> Literal::eq_value compares the normal value), not a cause"),
+const KNOWN: &[Known] = &[
+    ("l5", "ngspice", &["seed 2", "seed 9"], "a whole-run option in a subcircuit body (seed 2 `option no_acct`, seed 9 `option interp`) is written as `.control` / `option …` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area (the writer spells a whole-run option inside a body it cannot be read back from). The class of the seed 19 row the last round deleted: a whole-row entry hid seed 2 until rows named their seeds"),
+    ("l5", "vacask", &["seed 0", "seed 3", "seed 4", "seed 5", "seed 6", "seed 7", "seed 10", "seed 11", "seed 17", "seed 20", "seed 30", "seed 31", "seed 32", "seed 35", "seed 36", "seed 37", "seed 42", "seed 50", "seed 53", "seed 56", "seed 59", "seed 61", "seed 62"], "a device_library of a family whose module is not proven (bsim3, bsim4, bsim_bulk, psp103, vdmos, mos2, mesfet, gummel_poon, vbic, jfet_parker_skellern) is written `load \"<its file>.osdi\"` and reads back as a plain load (tables::library, da95fe25): write_structure::admit lets through a library the reader cannot read back. Fixed on step2-vacask (admit agrees with tables::library), goes with its hash. The evidence also shows `peta` read back as `e15` and `c` as `e-2`: equal by meaning (R28; eq_meaning's literal_eq_across: Literal::eq_value), not a cause. A whole-row entry hid every seed but the first until rows named their seeds"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the
@@ -130,24 +134,47 @@ fn l1_an_empty_text_is_one_file_with_no_item() {
     reader_laws("l1-empty", |row, _| {
         let (design, diags) = read_text(row, "");
         let files: Vec<ir::FileId> = design.files().collect();
+        let mut fails = Fails::default();
         if files.len() != 1 || !design.reachable().is_empty() || !diags.is_empty() {
-            return Err(format!(
+            let m = format!(
                 "{} files, {} items, rows {:?}",
                 files.len(),
                 design.reachable().len(),
                 diags.rows()
-            ));
+            );
+            fails.check("empty", m);
+        } else if design.str(design.file(files[0]).path) != "law" {
+            fails.check("path", "the file is not at its source path".to_string());
         }
-        match design.str(design.file(files[0]).path) == "law" {
-            true => Ok(()),
-            false => Err("the file is not at its source path".to_string()),
-        }
+        fails
     });
+}
+
+/// The KNOWN comparison's own oracle (`common/known.rs`): under a row listed at seed 9, a
+/// failure at seed 5 as well is reported, and so is the listed seed 9 when it passes.
+#[test]
+fn a_known_row_hides_no_other_seed_and_a_listed_seed_that_passes_fails() {
+    const ROWS: &[Known] = &[("lx", "ngspice", &["seed 9"], "planted")];
+    let mut both = Fails::default();
+    both.seed(9, "the known one".to_string());
+    both.seed(5, "a new one".to_string());
+    assert_eq!(
+        known::mismatches("lx", &[("ngspice", both)], ROWS),
+        ["ngspice seed 5: fails, not listed: a new one"]
+    );
+    assert_eq!(
+        known::mismatches("lx", &[("ngspice", Fails::default())], ROWS),
+        ["ngspice seed 9: listed, and passes: remove it"]
+    );
+    let mut exact = Fails::default();
+    exact.seed(9, "the known one".to_string());
+    assert!(known::mismatches("lx", &[("ngspice", exact)], ROWS).is_empty());
 }
 
 #[test]
 fn l3_one_read_and_four_threads_give_the_same_bytes() {
     laws("l3", |row, writer| {
+        let mut fails = Fails::default();
         let mut tally = Tally::new();
         for (seed, params) in cases(SEEDS.take(8)) {
             let design = match admitted(seed, params, row, writer) {
@@ -169,10 +196,11 @@ fn l3_one_read_and_four_threads_give_the_same_bytes() {
                     .collect()
             });
             if !threads.iter().all(|t| *t == once) {
-                return Err(format!("seed {seed} {params:?}: the threads differ"));
+                fails.seed(seed, format!("{params:?}: the threads differ"));
             }
         }
-        tally.some()
+        fails.ran(tally.some());
+        fails
     });
 }
 
@@ -184,8 +212,9 @@ fn l4_write_is_total_over_a_design_legalize_accepted() {
 #[test]
 fn l5_read_of_write_is_the_design() {
     laws("l5", |row, writer| {
+        let mut fails = Fails::default();
         if row.read.is_none() {
-            return Ok(());
+            return fails;
         }
         let mut tally = Tally::new();
         for (seed, params) in cases(SEEDS) {
@@ -201,14 +230,16 @@ fn l5_read_of_write_is_the_design() {
             // By meaning (R28), in normal form (each side through the IR text): real literals
             // equal by value, ids in canonical order; the IR text is the failure's evidence.
             if !same_meaning(&back, &design) {
-                return Err(format!(
-                    "seed {seed} {params:?}:\n{}\nread back as\n{}",
+                let m = format!(
+                    "{params:?}:\n{}\nread back as\n{}",
                     canonical(&design),
                     canonical(&back)
-                ));
+                );
+                fails.seed(seed, m);
             }
         }
-        tally.some()
+        fails.ran(tally.some());
+        fails
     });
 }
 
@@ -257,9 +288,10 @@ fn l7_legalized_designs_use_only_the_writers_features() {
     let all = dialect::irtext::IrText.features();
     laws("l7", |row, writer| {
         // a citation is of a lacked feature no pass makes legal, with its evidence (A34)
+        let mut fails = Fails::default();
         let stale = feature_states::stale(row, writer);
         if !stale.is_empty() {
-            return Err(format!("stale citations: {}", stale.join("; ")));
+            fails.check("stale citations", stale.join("; "));
         }
         for seed in SEEDS {
             let mut design = generate(seed, all, SIZE);
@@ -280,12 +312,11 @@ fn l7_legalized_designs_use_only_the_writers_features() {
                 .map(|f| u32::from(f.index()))
                 .collect();
             if left != refused {
-                return Err(format!(
-                    "seed {seed}: what is left {left:?} is not what is refused {refused:?}"
-                ));
+                let m = format!("what is left {left:?} is not what is refused {refused:?}");
+                fails.seed(seed, m);
             }
         }
-        Ok(())
+        fails
     });
 }
 
@@ -293,6 +324,7 @@ fn l7_legalized_designs_use_only_the_writers_features() {
 fn l8_a_file_is_written_the_same_whatever_the_other_files() {
     let ir_row = dialect::by_name("ir").expect("the ir row");
     laws("l8", |row, writer| {
+        let mut fails = Fails::default();
         let mut tally = Tally::new();
         for (seed, params) in cases(SEEDS) {
             let design = match admitted(seed, params, row, writer) {
@@ -314,12 +346,11 @@ fn l8_a_file_is_written_the_same_whatever_the_other_files() {
             let mut diags = ir::Diags::new();
             let again = dialect::write(&permuted, permuted.find_file(&path), row, &mut diags);
             if again != first {
-                return Err(format!(
-                    "seed {seed} {params:?}: the file is written otherwise"
-                ));
+                fails.seed(seed, format!("{params:?}: the file is written otherwise"));
             }
         }
-        tally.some()
+        fails.ran(tally.some());
+        fails
     });
 }
 
@@ -453,13 +484,17 @@ fn shrink_lets_l4_see_a_writer_bug_in_a_row_that_admits_nothing() {
     let seed = (0..SEARCH_MAX)
         .find(|&s| refused_as_generated(s) && keeps_a_capacitor(s))
         .expect("within SEARCH_MAX seeds, a refused design whose shrink keeps a capacitor");
-    let found = l4_on(row, &Panicky, seed..seed + 1).expect_err("L4 sees the writer's panic");
-    assert!(found.contains("panicked"), "{found}");
+    let found = l4_on(row, &Panicky, seed..seed + 1).evidence();
+    assert!(
+        found.contains("panicked"),
+        "L4 sees the writer's panic: {found}"
+    );
 }
 
 /// L4 on one row: each seed shrunk to admitted, every file written; a refusal or a writer's
 /// panic is the failure (with its seed).
-fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> Result<(), String> {
+fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> Fails {
+    let mut fails = Fails::default();
     let mut tally = Tally::new();
     for (seed, params) in cases(seeds) {
         let design = match admitted(seed, params, row, writer) {
@@ -477,7 +512,8 @@ fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> R
             }
         }));
         if wrote.is_err() {
-            return Err(format!("seed {seed} {params:?}: the writer panicked"));
+            fails.seed(seed, format!("{params:?}: the writer panicked"));
+            continue;
         }
         let refusals: Vec<_> = diags
             .rows()
@@ -485,10 +521,11 @@ fn l4_on(row: &DialectRow, writer: &dyn Write, seeds: std::ops::Range<u64>) -> R
             .filter(|d| dialect::refuses(d.code))
             .collect();
         if !refusals.is_empty() {
-            return Err(format!("seed {seed} {params:?}: {refusals:?}"));
+            fails.seed(seed, format!("{params:?}: {refusals:?}"));
         }
     }
-    tally.some()
+    fails.ran(tally.some());
+    fails
 }
 
 /// Every (seed, setting) of `seeds` under both generator settings (A28: untyped parameters
@@ -511,60 +548,35 @@ fn kind(f: ir::Feature) -> bool {
     )
 }
 
-/// Runs `law` on every row with a writer and compares the rows it fails on with the known
-/// failures of that law ([`KNOWN`]), strictly: an unexpected failure and an unexpected pass both
-/// fail, each with its message.
-fn laws(name: &str, law: impl Fn(&DialectRow, &dyn Write) -> Result<(), String>) {
-    let mut failing = Vec::new();
-    let mut messages = Vec::new();
-    for (row, writer) in writers() {
-        if let Err(m) = caught(|| law(row, writer)) {
-            failing.push(row.name);
-            messages.push(format!("{}: {m}", row.name));
-        }
-    }
-    check_known(name, &failing, &messages);
+/// Runs `law` on every row with a writer and compares its failures, by (row, seed), with the
+/// known failures of that law ([`KNOWN`]), strictly: an unexpected failure and an unexpected
+/// pass both fail, each with its evidence.
+fn laws(name: &str, law: impl Fn(&DialectRow, &dyn Write) -> Fails) {
+    let failing: Vec<(&str, Fails)> = writers()
+        .map(|(row, writer)| (row.name, caught(|| law(row, writer))))
+        .collect();
+    known::compare(name, &failing, KNOWN);
 }
 
 /// [`laws`] over the rows with a reader.
-fn reader_laws(name: &str, law: impl Fn(&DialectRow, &dyn Read) -> Result<(), String>) {
-    let mut failing = Vec::new();
-    let mut messages = Vec::new();
-    for (row, reader) in readers() {
-        if let Err(m) = caught(|| law(row, reader)) {
-            failing.push(row.name);
-            messages.push(format!("{}: {m}", row.name));
-        }
-    }
-    check_known(name, &failing, &messages);
+fn reader_laws(name: &str, law: impl Fn(&DialectRow, &dyn Read) -> Fails) {
+    let failing: Vec<(&str, Fails)> = readers()
+        .map(|(row, reader)| (row.name, caught(|| law(row, reader))))
+        .collect();
+    known::compare(name, &failing, KNOWN);
 }
 
-/// `law()`, a panic in it (a reader's or a writer's) turned into the row's failure, so one row
-/// that panics fails as a row instead of aborting the law for every row.
-fn caught(law: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+/// `law()`, a panic in it (a reader's or a writer's) turned into the row's `panicked` failure,
+/// so one row that panics fails as a row instead of aborting the law for every row.
+fn caught(law: impl FnOnce() -> Fails) -> Fails {
     match catch_unwind(AssertUnwindSafe(law)) {
-        Ok(result) => result,
+        Ok(fails) => fails,
         Err(p) => {
             let msg = p.downcast_ref::<String>().cloned();
             let msg = msg.or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()));
-            Err(format!("panicked: {}", msg.unwrap_or_default()))
+            Fails::one("panicked", msg.unwrap_or_default())
         }
     }
-}
-
-/// The rows that failed law `name` against its [`KNOWN`] rows, in `BUILTIN` order.
-fn check_known(name: &str, failing: &[&str], messages: &[String]) {
-    let known: Vec<&str> = KNOWN
-        .iter()
-        .filter(|(law, _, _)| *law == name)
-        .map(|(_, row, _)| *row)
-        .collect();
-    assert_eq!(
-        failing,
-        known,
-        "{name}: failing rows against KNOWN\n{}",
-        messages.join("\n")
-    );
 }
 
 /// `len` pseudo-random bytes of seed `seed` (splitmix64), as text: mostly IR-text bytes, some

@@ -17,8 +17,9 @@
 //! no `.notes` fails, and so does a `.notes` that lists what the pass did not append; a fixture
 //! folder naming no registered pass fails.
 //!
-//! Failing passes are compared with [`KNOWN`] by name, strictly both ways; a law that ran on no
-//! generated design for a pass fails for it (a registered pass with no law run is a failure).
+//! Failures are compared with [`KNOWN`] by (pass, seed), strictly both ways
+//! (`common/known.rs`); a law that ran on no generated design for a pass fails for it (a
+//! registered pass with no law run is a failure).
 //! Meaning (the reference evaluator, or a simulator on both forms) is each pass's own test.
 //!
 //! Oracles: generated designs (`ir::gen::generate`, valid by construction), `ir::check`,
@@ -27,6 +28,8 @@
 //!
 //! Contents: tests only.
 
+#[path = "common/known.rs"]
+mod known;
 #[path = "common/memcap.rs"]
 mod memcap;
 #[path = "common/p2.rs"]
@@ -34,6 +37,7 @@ mod p2;
 
 use std::path::Path;
 
+use known::{Fails, Known};
 use p2::p2_on;
 use spicerack::dialect;
 use spicerack::ir;
@@ -54,9 +58,10 @@ const SIZE: Size = Size {
     files: 3,
 };
 
-/// The laws a pass fails today: (law, pass, why). Strict both ways: a pass failing a law it
-/// is not listed for fails, and so does a listed pass that passes.
-const KNOWN: &[(&str, &str, &str)] = &[];
+/// The laws a pass fails today: (law, pass, the seeds it fails at, why). Strict both ways by
+/// (pass, seed) (`known::compare`): a seed that fails and is not listed fails, and so does a
+/// listed seed that passes.
+const KNOWN: &[Known] = &[];
 
 /// A pass's own generation set, for a feature the generator does not reach over every feature
 /// (a competing feature always wins): the laws then also run on `generate(seed, set)`. The set
@@ -252,8 +257,11 @@ fn p2_by_item_catches_a_pass_that_notes_one_item_and_leaves_two() {
         notes: &[LEAKY],
         run: note_first_comment,
     };
-    let found = p2_on(&leaky).expect_err("P2 sees the comments left with no note");
-    assert!(found.contains("keeps it with no note"), "{found}");
+    let found = p2_on(&leaky).evidence();
+    assert!(
+        found.contains("keeps it with no note"),
+        "P2 sees the comments left with no note: {found}"
+    );
     let design = generate(0, &ir::FeatureSet::ALL, SIZE);
     let spans: Vec<ir::Span> = carrying(&design, leaky.removes)
         .iter()
@@ -306,6 +314,7 @@ fn p4_twice_is_once() {
 fn p5_a_design_without_the_feature_is_untouched() {
     laws("p5", |pass| {
         let without = ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(pass.removes));
+        let mut fails = Fails::default();
         let mut ran = 0;
         for seed in SEEDS {
             let mut design = generate(seed, &without, SIZE);
@@ -317,13 +326,12 @@ fn p5_a_design_without_the_feature_is_untouched() {
             let mut diags = ir::Diags::new();
             (pass.run)(&mut design, &mut diags);
             if canonical(&design) != before {
-                return Err(format!(
-                    "seed {seed}: it changed a design without {:?}",
-                    pass.removes
-                ));
+                let m = format!("it changed a design without {:?}", pass.removes);
+                fails.seed(seed, m);
             }
         }
-        ran_on(ran)
+        fails.ran(ran_on(ran));
+        fails
     });
 }
 
@@ -353,46 +361,37 @@ fn every_fixture_reads_passes_and_writes_its_expected_text() {
 
 /// Runs `law` on every registered pass and compares the passes it fails on with [`KNOWN`],
 /// strictly: an unexpected failure and an unexpected pass both fail, each with its message.
-fn laws(name: &str, law: impl Fn(&Pass) -> Result<(), String>) {
-    let mut failing = Vec::new();
-    let mut messages = Vec::new();
-    for pass in passes::all() {
-        if let Err(m) = law(pass) {
-            failing.push(pass.name);
-            messages.push(format!("{}: {m}", pass.name));
-        }
-    }
-    let known: Vec<&str> = KNOWN.iter().filter(|k| k.0 == name).map(|k| k.1).collect();
-    assert_eq!(
-        failing,
-        known,
-        "{name}: failing passes against KNOWN\n{}",
-        messages.join("\n")
-    );
+fn laws(name: &str, law: impl Fn(&Pass) -> Fails) {
+    let failing: Vec<(&str, Fails)> = passes::all().map(|p| (p.name, law(p))).collect();
+    known::compare(name, &failing, KNOWN);
 }
 
-/// `law` on every generated design that uses `pass.removes`, over every feature and then over
-/// the pass's own [`GEN_SETS`] set if it has one; an error when none does.
-fn each_with(
-    pass: &Pass,
-    law: impl Fn(u64, ir::Design) -> Result<(), String>,
-) -> Result<(), String> {
+/// `law` on every generated design that uses `pass.removes`, over every feature (labels `seed
+/// <n>`) and then over the pass's own [`GEN_SETS`] set if it has one (`own set seed <n>`); a
+/// `ran on nothing` failure when none does.
+fn each_with(pass: &Pass, law: impl Fn(u64, ir::Design) -> Result<(), String>) -> Fails {
+    let mut fails = Fails::default();
     let mut ran = 0;
     let own = GEN_SETS
         .iter()
         .find(|(name, _)| *name == pass.name)
         .map(|(_, set)| *set);
-    for set in std::iter::once(ir::FeatureSet::ALL).chain(own) {
+    for (k, set) in std::iter::once(ir::FeatureSet::ALL).chain(own).enumerate() {
         for seed in SEEDS {
             let design = generate(seed, &set, SIZE);
             if !ir::features_used(&design).contains(pass.removes) {
                 continue;
             }
             ran += 1;
-            law(seed, design)?;
+            match (law(seed, design), k) {
+                (Ok(()), _) => {}
+                (Err(m), 0) => fails.seed(seed, m),
+                (Err(m), _) => fails.check(&format!("own set seed {seed}"), m),
+            }
         }
     }
-    ran_on(ran)
+    fails.ran(ran_on(ran));
+    fails
 }
 
 /// `Ok` when the law ran on at least one design.
