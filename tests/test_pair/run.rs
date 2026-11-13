@@ -599,7 +599,10 @@ fn margin(a: &[RawData], b: &[RawData], src: &str, written: &str) -> String {
 /// Step 4's verdict when a run gave no plots: whose run, and why.
 fn ran_fail(a: Ran, b: Ran) -> Fail {
     match (a, b) {
-        (Ran::Timeout, _) | (_, Ran::Timeout) => fail("slow", "past the CPU budget".into()),
+        (Ran::Timeout, _) | (_, Ran::Timeout) => fail(
+            "slow",
+            "past the CPU budget or the output cap (512 MiB a file)".into(),
+        ),
         (Ran::Failed(why), _) => fail("source-fails", why),
         (_, Ran::Failed(why)) => fail("target-fails", why),
         (Ran::Plots(_), Ran::Plots(_)) => unreachable!("a run without plots"),

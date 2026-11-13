@@ -53,6 +53,12 @@ const STRIDE_SIX: usize = 10;
 /// never a pass or a skip; the class must be empty before a release).
 const BUDGET: u64 = 120;
 
+/// Bytes free under the temp dir (where every simulator run's directory goes) below which no
+/// deck starts: it is `environment` at step 1, named. The peak a census adds is its workers
+/// times the files one run writes times `sim`'s 512 MiB cap per file, each run's directory
+/// removed when the run returns.
+const DISK_MIN: u64 = 20 << 30;
+
 /// A deck still running after this many seconds is named on stderr while it runs.
 const SLOW: u64 = 120;
 
@@ -142,7 +148,21 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
                     let Some(p) = paths.get(k) else { break };
                     running.lock().expect("no worker panicked")[w] =
                         Some((k, std::time::Instant::now()));
+                    let free = free_bytes(&std::env::temp_dir());
                     let mut v = match only.is_none() && slow.contains(&rel(p)) {
+                        // The disk guard: no deck starts under DISK_MIN free.
+                        _ if free < DISK_MIN => Done {
+                            fails: [(
+                                1,
+                                run::fail(
+                                    "environment",
+                                    format!("{} GB free under the temp dir, 20 needed", free >> 30),
+                                ),
+                            )]
+                            .into(),
+                            last: 1,
+                            written: None,
+                        },
                         // Quarantined: its conversion alone can run for hours (the
                         // powergrid decks), so it is named, not run.
                         true => Done {
@@ -257,6 +277,20 @@ fn budgeted(
         Ok(_) => rx.recv().ok().flatten().unwrap_or_else(slow),
         Err(_) => slow(),
     }
+}
+
+/// Bytes free on the file system that holds `dir` (`df`'s avail column).
+fn free_bytes(dir: &Path) -> u64 {
+    let out = std::process::Command::new("df")
+        .args(["--output=avail", "-B1"])
+        .arg(dir)
+        .output()
+        .expect("df on PATH");
+    let text = String::from_utf8_lossy(&out.stdout);
+    text.lines()
+        .nth(1)
+        .and_then(|l| l.trim().parse().ok())
+        .expect("df's avail column")
 }
 
 /// A hash of a deck's written files, paths and bytes.
