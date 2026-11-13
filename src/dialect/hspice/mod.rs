@@ -27,8 +27,8 @@
 //!
 //! Cites: `rewrite/DIALECT-HSPICE.md`; `REWRITE-PLAN.md` §2–§4; `rewrite/SPINE.md`.
 //!
-//! Contents: `pub struct Hspice`, `pub static HSPICE: Hspice`, `pub const FEATURES:
-//! ir::FeatureSet`, `pub use codes::info`; `impl Read for Hspice`, `impl Write for Hspice`
+//! Contents: `pub struct Hspice`, `pub static HSPICE: Hspice`, `pub const LAWS: ir::Laws`,
+//! `pub const FEATURES: ir::FeatureSet`, `pub use codes::info`; `impl Read for Hspice`, `impl Write for Hspice`
 
 mod bind;
 mod codes;
@@ -72,6 +72,11 @@ pub struct Hspice;
 /// The `hspice` row of `dialect::BUILTIN`.
 pub static HSPICE: Hspice = Hspice;
 
+/// The laws HSPICE computes by (R90): none stated yet. HSPICE's device laws are not settled
+/// (ESPice is the only oracle here); hspice-2 settles them. A design read here states no law
+/// and goes to any target under the target's law.
+pub const LAWS: ir::Laws = ir::Laws::EMPTY;
+
 /// What HSPICE spells natively: the union of the areas' sets, each the image of its reader
 /// (law L5) and nothing more.
 pub const FEATURES: ir::FeatureSet = write_structure::FEATURES
@@ -85,7 +90,8 @@ pub const FEATURES: ir::FeatureSet = write_structure::FEATURES
     .union(read_sources::FEATURES)
     .union(read_models::FEATURES)
     .union(read_run::FEATURES)
-    .union(read_outputs::FEATURES);
+    .union(read_outputs::FEATURES)
+    .union(LAWS.features());
 
 impl Read for Hspice {
     /// Each `.include` path and `.lib` call's file, in text order, as written.
@@ -95,6 +101,7 @@ impl Read for Hspice {
 
     /// Every file of `src`, in its order (entries in `src.form()`, the rest libraries).
     fn read(&self, src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
+        out.set_laws(LAWS); // once per read: the build's laws (R90)
         read::read(src, out, diags);
     }
 }

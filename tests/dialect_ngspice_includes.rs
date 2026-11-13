@@ -228,7 +228,7 @@ fn read_owner(d: &ir::Design, name: &str) -> Option<String> {
 
 /// The file of the `.func` the design's one user call binds to, or `None` (unresolved).
 fn call_file(d: &ir::Design) -> Option<String> {
-    let calls: Vec<ir::Ref> = (0..d.expr_count())
+    let calls: Vec<ir::Ref> = (0..d.expr_count_all())
         .filter_map(
             |k| match d.expr(ir::ExprId(u32::try_from(k).expect("fits"))) {
                 ir::Expr::UserCall(r, _) => Some(r),
