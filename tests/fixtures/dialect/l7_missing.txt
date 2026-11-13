@@ -102,7 +102,6 @@ ngspice Circuit(TcBaseTnom) unspoken
 ngspice Run(TranStartup) unspoken
 ngspice Run(TranNoise) owed from=vacask
 ngspice Run(TranSegments) unspoken
-ngspice Run(DcRestart) owed from=vacask # R75a: VACASK reads continuation=0 on the inner sweep; ngspice has no every-point-afresh .dc (dc_axes_to_loops peels only the axes a loop can sweep)
 ngspice Run(DcAxisParam) owed from=vacask
 ngspice Run(DcAxisSubcktParam) unspoken
 ngspice Run(DcAxisOption) owed from=vacask
@@ -133,7 +132,6 @@ ngspice Run(PssDriven) unspoken
 ngspice Run(PeriodicRelative) unspoken
 ngspice Run(LoopTable) unspoken
 ngspice Run(LoopMonteCarlo) owed from=vacask
-ngspice Run(LoopRestore) owed from=vacask
 ngspice Run(LoopTemp) owed from=vacask
 ngspice Run(LoopSubcktParam) unspoken
 ngspice Run(LoopOption) owed from=vacask
@@ -171,7 +169,6 @@ ngspice Run(NodeSetMidRun) owed from=vacask
 ngspice Run(NodeSetFromHere) owed from=vacask
 ngspice Run(PssOscDiff) unspoken
 ngspice Run(PssArgumentOmitted) unspoken
-ngspice Run(AlterParamAtOnce) owed from=vacask
 ngspice Run(DcOuterCarries) owed from=vacask
 ngspice Option(MethodEuler) owed from=vacask
 ngspice Option(MaxStep) unspoken
@@ -196,8 +193,8 @@ ngspice Family(Mos0) unspoken
 ngspice Family(BsimSoi) unspoken
 ngspice Family(Ekv) unspoken
 ngspice Family(Hisim1) unspoken
-ngspice Family(Psp103) owed from=vacask
-ngspice Family(BsimBulk) owed from=vacask
+ngspice Family(Psp103) unspoken
+ngspice Family(BsimBulk) unspoken
 ngspice Family(VdmosRpi) unspoken
 ngspice Family(JfetShockley) unspoken
 ngspice Family(JfetHspice2) unspoken
@@ -486,7 +483,6 @@ vacask Run(ResetValues) owed from=ngspice
 vacask Run(ResetOptions) owed from=ngspice
 vacask Run(ResetTemp) owed from=ngspice
 vacask Run(ResetTnom) owed from=ngspice
-vacask Run(AnalysisParamArgument) owed from=ngspice
 vacask Run(PssArgumentOmitted) unspoken
 vacask Run(AlterParamAtReset) owed from=ngspice
 vacask Option(PivTol) owed from=ngspice
@@ -519,13 +515,18 @@ vacask Family(DiodeIdeal) unspoken
 vacask Family(DiodeSpectre) unspoken
 vacask Family(Juncap200) unspoken
 vacask Family(DiodeCmc) unspoken
+vacask Family(GummelPoon) owed from=ngspice
+vacask Family(Vbic) owed from=ngspice
 vacask Family(Hicum0) unspoken
 vacask Family(Hicum2) owed from=ngspice
 vacask Family(Mextram) unspoken
 vacask Family(HbtUcsd) unspoken
 vacask Family(Mos0) unspoken
+vacask Family(Mos2) owed from=ngspice
 vacask Family(Bsim1) owed from=ngspice
 vacask Family(Bsim2) owed from=ngspice
+vacask Family(Bsim3) owed from=ngspice
+vacask Family(Bsim4) owed from=ngspice
 vacask Family(BsimSoi) unspoken
 vacask Family(B3SoiFd) owed from=ngspice
 vacask Family(B3SoiDd) owed from=ngspice
@@ -536,6 +537,9 @@ vacask Family(Ekv) unspoken
 vacask Family(Hisim1) unspoken
 vacask Family(Hisim2) owed from=ngspice
 vacask Family(HisimHv) owed from=ngspice
+vacask Family(Psp103) unspoken
+vacask Family(BsimBulk) unspoken
+vacask Family(Vdmos) owed from=ngspice
 vacask Family(VdmosRpi) unspoken
 vacask Family(JfetShockley) unspoken
 vacask Family(JfetHspice2) unspoken

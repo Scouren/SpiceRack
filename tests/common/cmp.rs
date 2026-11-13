@@ -13,7 +13,10 @@
 //! 2 * (RELTOL * swing + floor), the swing being the vector's largest
 //! magnitude in the reference run, the floor VNTOL for a voltage and
 //! ABSTOL + GMIN * Vmax for a current (Vmax the plot's largest node
-//! voltage: each simulator puts GMIN = 1e-12 S on other junctions). A transient also carries the local
+//! voltage: each simulator puts GMIN = 1e-12 S on other junctions). A matched pair of vectors is
+//! one quantity with one type: the one either raw file states, the name's when both say `notype`
+//! (VACASK types every vector so; `typed`), so a VACASK reference's branch currents are held to
+//! the current floor, not to VNTOL, a million times looser. A transient also carries the local
 //! truncation error each integrator allows, TRTOL = 7 times RELTOL in
 //! ngspice and Xyce, so a point passes within 1e-2 of the swing (rounded up
 //! from 2 * 7e-3 / sqrt(2), the two errors independent) plus 2 * VNTOL,
@@ -42,9 +45,10 @@
 //! The pair test's refinement class (`simulator-differs:refinement`, rulings R84) is not a pass
 //! and not a conversion finding: a transient that leaves the tube is run again with both decks'
 //! step capped at span/2000 (`sim::refined`), and agreeing there, its difference is the two
-//! simulators' step control. span/2000 because span/200 is not fine enough: dio.sim (a diode's
-//! reverse recovery) and resonator.sim (a lossless LC) still differ at span/200 and agree at
-//! span/2000, as at span/20000. A factor on the truncation-error test (`trtol`,
+//! simulators' step control. span/2000 because span/200 is not fine enough: resonator.sim (a
+//! lossless LC) still differs at span/200 and agrees at span/2000, as at span/20000. dio.sim (a
+//! diode's reverse recovery) does not agree refined (rulings R84a, F52): VACASK converges at
+//! first order to a current 3.5 % from ngspice's, so it stays `mismatch`. A factor on the truncation-error test (`trtol`,
 //! `tran_lteratio`) is a hint and never mapped (R84): giving both the same factor does not give
 //! them the same steps (resonator with `trtol=3.5` still left the tube). It covers transients
 //! only: a DC or AC difference has no step to refine and stays `mismatch`.
@@ -64,7 +68,7 @@
 use std::collections::HashMap;
 
 use num_complex::Complex64;
-use spicerack::result::{RawData, VarType};
+use spicerack::result::{RawData, VarInfo, VarType};
 
 use super::tube::leaves_tube;
 
@@ -202,8 +206,8 @@ impl Tol {
         t
     }
 
-    /// `key` (`reltol`, `vntol`, `abstol`, `tube`) set to `value`, which
-    /// may only tighten: `Err` for an unknown key, a negative value, or one
+    /// `key` (`reltol`, `vntol`, `abstol`, `tube`) set to at most `value`
+    /// (a tighter value already set stays), which may only tighten: `Err` for an unknown key, a negative value, or one
     /// above the default (RELTOL 1e-3, VNTOL 1e-6 V, ABSTOL 1e-12 A, tube
     /// 0.01), which would loosen the simulators' own accuracy. VNTOL and
     /// ABSTOL may not go below the default either: they are each simulator's
@@ -228,7 +232,8 @@ impl Tol {
                 "{key} = {value:e} is below the simulators' own floor {floor:e}"
             ));
         }
-        *slot = value;
+        // A tighter value already set (a deck's own, a narrower triage tube) stays.
+        *slot = slot.min(value);
         Ok(())
     }
 
@@ -391,10 +396,16 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
     for (j, w) in b.variables.iter().enumerate().skip(first) {
         in_b.entry(normal(&w.name)).or_insert(j);
     }
+    // A matched pair is one quantity with one type (`typed`): `types[i]` for `a`'s vector `i`.
+    let types: Vec<VarType> = a
+        .variables
+        .iter()
+        .map(|v| typed(v, in_b.get(&normal(&v.name)).map(|&j| &b.variables[j])))
+        .collect();
     // A current's floor: ABSTOL plus what GMIN at the plot's largest node
     // voltage carries, since each simulator puts GMIN on other junctions.
     let vmax = (first..a.variables.len())
-        .filter(|&i| a.variables[i].var_type == VarType::Voltage)
+        .filter(|&i| types[i] == VarType::Voltage)
         .flat_map(|i| column(a, i))
         .map(|c| c.norm())
         .fold(0.0, f64::max);
@@ -411,7 +422,7 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
         shared += 1;
         let (ya, yb) = (column(a, i), column(b, j));
         let swing = ya.iter().map(|c| c.norm()).fold(0.0, f64::max);
-        let floor = match v.var_type {
+        let floor = match types[i] {
             VarType::Current => t.abstol + GMIN * vmax,
             _ => t.vntol,
         };
@@ -435,7 +446,7 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
                 .filter(|&p| xa[p] >= lo && xa[p] <= hi)
                 .collect();
             let (ta, va): (Vec<f64>, Vec<f64>) = keep.iter().map(|&p| (xa[p], ra[p])).unzip();
-            let current = v.var_type == VarType::Current;
+            let current = types[i] == VarType::Current;
             if t.autonomous && oscillates_alike(&ta, &va, &xb, &rb, tol, current) {
                 continue;
             }
@@ -483,6 +494,26 @@ fn plot(k: &str, a: &RawData, b: &RawData, t: Tol) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// The one type of a matched pair of vectors, `a`'s and `b`'s (`None`: `a`'s alone): the type
+/// either raw file states (ngspice types its vectors, `a`'s first), and only when both say
+/// `notype` (VACASK types every vector so) the name's: `<element>:flow(br)` (a branch) and
+/// `<element>.i` (`save p('r1', i)`) are currents, a node is a voltage, and a device quantity
+/// (`@m1[gm]`) stays `Other`.
+fn typed(a: &VarInfo, b: Option<&VarInfo>) -> VarType {
+    let mut stated = [Some(a), b].into_iter().flatten().map(|v| v.var_type);
+    if let Some(t) = stated.find(|&t| t != VarType::Other) {
+        return t;
+    }
+    let n = a.name.to_ascii_lowercase();
+    if n.ends_with(":flow(br)") || n.ends_with(".i") {
+        VarType::Current
+    } else if n.contains(['@', '[']) {
+        VarType::Other
+    } else {
+        VarType::Voltage
+    }
 }
 
 /// The AC magnitude an independent source `line` (lower case) gives,
@@ -581,7 +612,6 @@ fn oscillates_alike(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use spicerack::result::VarInfo;
 
     /// A real plot named `plot_name` of `rows`: each vector's name, type and
     /// points.
@@ -692,6 +722,46 @@ mod tests {
         assert!(compare(&a, &off, Tol::of(&[])).is_err());
         let twice = [ngspice(grid, low), ngspice(grid, low)];
         assert!(compare(&twice, &b, Tol::of(&[])).is_err());
+    }
+
+    #[test]
+    fn a_vacask_reference_compares_its_currents_at_the_current_floor() {
+        // VACASK types every vector `notype`, ngspice types its own: a matched pair is one
+        // quantity, typed by the file that states it, by the name when neither does. Oracle:
+        // the floors of the module doc written out by hand (a current's 2·(ABSTOL + GMIN·Vmax),
+        // Vmax 5 V from the node `vdd`), against which the voltage floor 2·VNTOL = 2e-6 A was a
+        // million times loose. Checks: 4.
+        let op = |rows: &[(&str, VarType, [f64; 4])]| {
+            let mut p = real("Operating Point", rows);
+            p.real_data.iter_mut().for_each(|c| c.truncate(1));
+            p
+        };
+        let vacask = |i: f64, j: f64| {
+            op(&[
+                ("vdd", VarType::Other, [5.0; 4]),
+                ("v1:flow(br)", VarType::Other, [i; 4]),
+                ("r1.i", VarType::Other, [j; 4]),
+            ])
+        };
+        let ngspice = |i: f64, j: f64| {
+            op(&[
+                ("v(vdd)", VarType::Voltage, [5.0; 4]),
+                ("i(v1)", VarType::Current, [i; 4]),
+                ("r1.i", VarType::Other, [j; 4]),
+            ])
+        };
+        let t = Tol::of(&[]);
+        // A branch current 1 nA off: a difference (its tolerance 2·(RELTOL·1e-9 + 1e-12 + 5e-12)).
+        assert!(compare(&[vacask(1e-9, 0.0)], &[ngspice(2e-9, 0.0)], t).is_err());
+        // An element's current named `<element>.i`, untyped on both sides: a current too.
+        assert!(compare(&[vacask(0.0, 1e-9)], &[ngspice(0.0, 2e-9)], t).is_err());
+        // 8 pA off passes: GMIN·Vmax counts the untyped node `vdd` as a voltage.
+        let near = 1e-9 + 8e-12;
+        assert_eq!(
+            compare(&[vacask(1e-9, 1e-9)], &[ngspice(near, near)], t),
+            Ok(())
+        );
+        assert!(compare(&[vacask(1e-9, 1e-9)], &[ngspice(1e-9 + 2e-11, 1e-9)], t).is_err());
     }
 
     #[test]

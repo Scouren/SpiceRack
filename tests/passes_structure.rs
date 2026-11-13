@@ -20,6 +20,8 @@ mod bindings;
 mod r53;
 #[path = "passes_structure/reads.rs"]
 mod reads;
+#[path = "passes_structure/unused.rs"]
+mod unused;
 
 use spicerack::ir;
 use spicerack::ir::r#gen::{Size, generate};

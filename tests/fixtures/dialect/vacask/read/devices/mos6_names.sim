@@ -1,0 +1,4 @@
+sp_mos6 names: ps_mod and the module-only kf af nlev
+load "spice/mos6.osdi"
+model m6 sp_mos6 vto=0.7 ps_mod=0.1 kf=1e-25 af=1 nlev=2
+m1 (d g 0 0) m6 w=1u l=1u ps=2u

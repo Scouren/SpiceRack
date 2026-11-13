@@ -1,0 +1,13 @@
+f33_vacask_ac_values: VACASK ac values=[...] runs the listed values exactly (binary raw: 1000, 3162.2776601683795, 12345.678; 1e3*pow(5e3/1e3, 1.0/2) = 2236.06797749979; 1/2 is integer division, so 1e3*pow(5e3/1e3, 1/2) = 1000)
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=1.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  options rawfile="binary"
+  analysis ac1 ac values=[1000, 3162.2776601683795, 12345.678, 1e3*pow(5e3/1e3, 1.0/2), 1e3*pow(5e3/1e3, 1/2)]
+endc

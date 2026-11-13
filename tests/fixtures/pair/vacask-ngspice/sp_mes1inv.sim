@@ -1,0 +1,28 @@
+SPICE MESFET level 1 inverter
+
+load "spice/mes1.osdi"
+load "resistor.osdi"
+load "capacitor.osdi"
+
+model v vsource
+model r resistor
+model c capacitor
+
+// The corpus deck elaborates each inverter in turn; here both stand at the top.
+model nf sp_mes1 type=1 rd=46 rs=46 vt0=-1.5 lambda=0.03 alpha=3 beta=1.4e-3 cgs=1p cgd=2p kf=1e-14 af=1
+vddn (supn 0) v dc=5
+rdn (supn dn) r r=2k
+j1n (dn gn 0) nf $mfactor=2 area=3
+vinn (inn 0) v type="pulse" val0=-2 val1=0 delay=1n rise=0.1n fall=0.1n width=0.5u period=1u
+rinn (inn gn) r r=100
+
+model pf sp_mes1 type=-1 rd=46 rs=46 vt0=-1.5 lambda=0.03 alpha=3 beta=1.4e-3 cgs=1p cgd=2p kf=1e-14 af=1
+vddp (supp 0) v dc=5
+rdp (0 dp) r r=2k
+j1p (dp gp supp) pf $mfactor=2 area=3
+vinp (inp 0) v type="pulse" val0=5 val1=7 delay=1n rise=0.1n fall=0.1n width=0.5u period=1u
+rinp (inp gp) r r=100
+
+control
+  analysis tran1 tran step=0.1n stop=5u maxstep=0.1n
+endc

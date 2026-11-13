@@ -136,6 +136,7 @@ pub fn dc_axes_to_loops_convert_generated_designs(seeds: std::ops::Range<u64>, s
             "dc_axis_model_param_to_loop",
             ir::RunExtra::DcAxisModelParam,
         ),
+        ("dc_restart_to_loops", ir::RunExtra::DcAxisElementValue),
     ] {
         let pass = passes::all().find(|p| p.name == name).expect("registered");
         let set = crate::gen_sets::dc_loops(axis);
@@ -187,8 +188,8 @@ pub fn the_vacask_reader_states_continuation_per_level() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
     use ir::RunExtra::{DcOuterCarries, DcRestart};
     // innermost first: (vin, rin); toward ngspice, the features refused (none: it converts).
-    // ngspice holds an afresh outer axis and a carrying inner one only; no rule peels the
-    // element-value axis into a loop, so an afresh inner axis stays refused
+    // ngspice holds an afresh outer axis and a carrying inner one; every axis afresh becomes
+    // loops of operating points (`dc_restart_to_loops`); a carried outer axis stays refused
     for (deck, want, refused) in [
         ("latch.sim", [false, false], &[DcOuterCarries][..]),
         ("latch_c0_outer.sim", [false, true], &[][..]),
@@ -197,7 +198,7 @@ pub fn the_vacask_reader_states_continuation_per_level() {
             [true, false],
             &[DcOuterCarries, DcRestart][..],
         ),
-        ("latch_c0_both.sim", [true, true], &[DcRestart][..]),
+        ("latch_c0_both.sim", [true, true], &[][..]),
     ] {
         let path = dir.join(deck);
         let text = std::fs::read_to_string(&path).expect("the deck");
