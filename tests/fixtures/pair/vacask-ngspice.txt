@@ -29,3 +29,4 @@ dio_ring 4 mismatch finding=F51 # R84a: ngspice-45 rings +-1.05 A each step afte
 sp_mos3inv 4 simulator-differs:refinement proof=harness # the gate current in the input ramp: at the deck's 1 ns cap ngspice-45 -3.8451 mA, VACASK -3.7979 mA at 1.075 us (1.2 %, over tol 3.85e-5); at 0.1 ns -3.8144 vs -3.8049 (0.25 %), both moving: seen once step 4 compared both ways
 sp_mos6inv 4 simulator-differs:refinement proof=harness # as sp_mos3inv (level 6, at 3.09 us)
 sp_mos9inv 4 simulator-differs:refinement proof=harness # as sp_mos3inv (level 9, the same numbers)
+sp_mos2inv 4 mismatch finding=F93 # upstream-gap:F93, default tolerances: vdd:flow(br) -2.94e-3 A off at 3.0516 us (tol 4.8e-5), refined vin:flow(br) -1.57e-3 A; at tight tolerances the two agree (sp_mos2inv_tight; diffs-2 F93, differences 00a78992)

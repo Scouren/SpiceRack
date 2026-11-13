@@ -1,0 +1,6 @@
+# sp_mos2inv at reltol 1e-6, abstol 1e-14, vntol 1e-10 and a 0.05 ns step cap (at reltol 1e-9 VACASK
+# aborts: "Timestep too small. Transient analysis aborted."): F93 (diffs 00a78992,
+# rewrite/upstream/decks/F93): VACASK's sp_mos2 and ngspice-45's level 2 agree; the
+# default-tolerance deck differs at the switching edge by the simulators' tolerances only.
+owner = vacask
+proves = families::PROVEN

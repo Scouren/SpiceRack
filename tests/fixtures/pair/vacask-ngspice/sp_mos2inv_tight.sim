@@ -1,0 +1,46 @@
+SPICE MOSFET level 2 CMOS inverter
+
+load "spice/mos2.osdi"
+load "resistor.osdi"
+load "capacitor.osdi"
+
+model v vsource
+model r resistor
+model c capacitor
+
+model nm sp_mos2 ( type=1 
+  phi=0.7 tox=4.08e-8 xj=0.2 tpg=1
+  vto=1 delta=4.586 ld=2.972e-7 kp=5.3532e-4
+  uo=632.5 uexp=0.1328 ucrit=3.897e4 rsh=6.202
+  gamma=0.5263 nsub=5.977e15 nfs=5.925e11 vmax=5.83e4
+  lambda=0.05 cgdo=3.7731e-10 cgso=3.7731e-10
+  cgbo=3.4581e-10 cj=1.3679e-4 mj=0.63238 cjsw=5.1553e-10
+  mjsw=0.26805 pb=0.4 
+  kf=0.032f af=1
+)
+
+model pm sp_mos2 ( type=-1 
+  phi=0.7 tox=4.08e-8 xj=0.2 tpg=1
+  vto=-1 delta=4.586 ld=2.972e-7 kp=5.3532e-4
+  uo=632.5 uexp=0.1328 ucrit=3.897e4 rsh=6.202
+  gamma=0.5263 nsub=5.977e15 nfs=5.925e11 vmax=5.83e4
+  lambda=0.05 cgdo=3.7731e-10 cgso=3.7731e-10
+  cgbo=3.4581e-10 cj=1.3679e-4 mj=0.63238 cjsw=5.1553e-10
+  mjsw=0.26805 pb=0.4 
+  kf=0.032f af=1
+)
+
+vdd (1 0) v dc=5
+m1 (out in 0 0) nm w=200u l=50u $mfactor=2 nrs=1 nrd=1
+m2 (out in 1 1) pm w=200u l=50u $mfactor=2 nrs=1 nrd=1
+r1 (out 0) r r=100k
+vin (in 0) v dc=0 type="pulse" val0=0 val1=5 delay=1u rise=100n fall=100n width=1u period=2u
+
+control
+  options reltol=1e-6 abstol=1e-14 vntol=1e-10
+  analysis tran1 tran step=1n stop=5u maxstep=0.05n
+ 
+endc
+
+
+
