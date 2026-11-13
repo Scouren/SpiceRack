@@ -20,7 +20,14 @@ pub(super) fn reported(sim: Sim, log: &str) -> Option<String> {
         Sim::Ngspice | Sim::NgspiceHsa => log
             .lines()
             .map(str::trim)
-            .filter(|l| l.starts_with("Error") || l.contains("Simulation interrupted"))
+            .filter(|l| {
+                l.starts_with("Error")
+                    || l.contains("Simulation interrupted")
+                    // A measure that failed: `.measure tran yint inter v(2) … failed!` (a
+                    // line not starting `Error`), and `measure 'tdiff'  failed`.
+                    || (l.starts_with(".meas") && l.ends_with("failed!"))
+                    || (l.starts_with("measure '") && l.ends_with("failed"))
+            })
             .collect(),
         Sim::Vacask => {
             let run = log.split_once("Simulating:").map_or(log, |(_, r)| r);
