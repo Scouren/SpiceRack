@@ -50,6 +50,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
     ("l5", "ngspice", "seed 19 Untyped: a whole-run `option no_init` in a `.lib` section is written as `.control` / `option noinit` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area. (Seed 11's causes are gone: a script number word keeps its long digits, settle loop_long.sp; an element-value loop over `g149` is refused by the writer, W1407)"),
+    ("l5", "vacask", "seed 1 Untyped: the generator on this branch draws a subcircuit that instantiates itself (`g24` in `g24`, reached from nothing); the reader keeps such an instance as Private P2131 (VACASK runs an unreached cycle, settle b_cycle_unused). Waits for the IR's InstanceCycle and the generator's closes_cycle (ir-rewrite 1512e4af): the row goes when that reaches this branch"),
     ("l7", "ngspice", "lacked features with neither a pass nor a citation (Load first; citations.toml not written yet)"),
     ("l7", "vacask", "no ngspice<->VACASK passes until S4.4"),
 ];

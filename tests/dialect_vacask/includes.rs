@@ -7,7 +7,7 @@
 //! Oracle: VACASK 36be560 on the settle decks `b_incsec*.sim` (what it printed, asserted here
 //! first), then the reader on the same files: what each read and master binds to.
 //!
-//! Contents: tests only.
+//! Contents: tests, and for `recursion` `vacask`.
 
 use spicerack::dialect::{self, Policy, Sources};
 use spicerack::ir;
@@ -17,6 +17,30 @@ use std::process::Command;
 
 /// The settle folder.
 const SETTLE: &str = "tests/fixtures/dialect/vacask/settle/";
+
+/// What VACASK printed for settle deck `<stem>.sim`, run in a fresh directory with each
+/// `<stem>--<name>` file beside it as `<name>`.
+pub(super) fn vacask(stem: &str) -> String {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    for e in std::fs::read_dir(SETTLE).expect("the settle directory") {
+        let p = e.expect("an entry").path();
+        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        let local = match name.strip_prefix(&format!("{stem}--")) {
+            Some(rest) => rest.to_string(),
+            None if name == format!("{stem}.sim") => name,
+            None => continue,
+        };
+        std::fs::copy(&p, dir.path().join(local)).expect("a settle file");
+    }
+    let done = Command::new("vacask")
+        .arg(Path::new(&format!("{stem}.sim")))
+        .current_dir(dir.path())
+        .output()
+        .expect("vacask not runnable: run in `nix develop .#testing`");
+    let mut out = String::from_utf8_lossy(&done.stdout).into_owned();
+    out.push_str(&String::from_utf8_lossy(&done.stderr));
+    out
+}
 
 // ---- private ----
 
@@ -185,30 +209,6 @@ fn value_def(d: &ir::Design, name: &str) -> Option<(String, String)> {
         ir::Expr::Param(r) => place(d, r.def),
         other => panic!("{name}: a parameter read, not {other:?}"),
     }
-}
-
-/// What VACASK printed for settle deck `<stem>.sim`, run in a fresh directory with each
-/// `<stem>--<name>` file beside it as `<name>`.
-fn vacask(stem: &str) -> String {
-    let dir = tempfile::tempdir().expect("a temporary directory");
-    for e in std::fs::read_dir(SETTLE).expect("the settle directory") {
-        let p = e.expect("an entry").path();
-        let name = p.file_name().unwrap().to_string_lossy().into_owned();
-        let local = match name.strip_prefix(&format!("{stem}--")) {
-            Some(rest) => rest.to_string(),
-            None if name == format!("{stem}.sim") => name,
-            None => continue,
-        };
-        std::fs::copy(&p, dir.path().join(local)).expect("a settle file");
-    }
-    let done = Command::new("vacask")
-        .arg(Path::new(&format!("{stem}.sim")))
-        .current_dir(dir.path())
-        .output()
-        .expect("vacask not runnable: run in `nix develop .#testing`");
-    let mut out = String::from_utf8_lossy(&done.stdout).into_owned();
-    out.push_str(&String::from_utf8_lossy(&done.stderr));
-    out
 }
 
 /// The `resistance` each `print instance(…)` dump shows, by instance name, in order.
