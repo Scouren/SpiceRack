@@ -1,0 +1,67 @@
+Load decks of gf180_nf against ngspice-45, written by ../load.py gf180_nf.
+gf180mcuD's BSIM4 nfet_03v3 as the kit has it (the kit on PATH: $PDK_ROOT/gf180mcuD of spicerack-pdks), typical
+corner, its binned models and corner expressions, the mismatch switch 0 (design.ngspice): ngspice-45 reads the kit's
+ngspice files; VACASK reads the same models converted by VACASK's own gf180tovc. Run: `nix develop .#testing -c
+tests/fixtures/families/gf180_run.sh` (makes ../kit/, then load_run.sh per family; checked). Conditions nom/m3/off,
+regions (vgs, vds) cut (0.3, 3.3), lin (3.3, 0.1), sat (1.5, 3.3), bulk -0.5 V; m is the wrapper's parameter on both.
+Result: a difference of 1e-4 to 1.3e-3 (w=10u l=0.5u nf=3: up to 2.4 %), the m relation holding on both. Its cause (../gf180_version/runs.out):
+the kit's cards say version=4.5; ngspice-45 runs its BSIM4 4.5 code for them; gf180tovc drops the version and VACASK's
+sp_bsim4v8 has no 4.5 (version="4.5" warns "unknown BSIM4 version. Working now with BSIM4.8.3."), so VACASK runs 4.8.
+The same card at version 4.8 on both agrees to 3e-12, and the flat bin card (../gf180_flat) gives the kit's numbers to
+the digit: bin selection, the corner expressions and the converter are exact. ngspice's own AC gds is 2e-4 off its DC
+slope in saturation (VACASK's 4e-10). Class: a model version one simulator lacks (VACASK: no BSIM4 4.5), silently
+replaced by its converter.
+
+warning: Git tree '/home/omare/Documents/Projects/EDA-Tools/Schematic/SpiceRack/.claude/worktrees/ir' is dirty
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+m3_cut_acd             ngspice=8.634558344197e-05     vacask=8.63455817290983e-05     rel=1.98e-08
+m3_cut_acg             ngspice=2.302724238999e-05     vacask=2.302842646303023e-05    rel=5.14e-05
+m3_cut_dc              ngspice=-1.94712420552e-11     vacask=-1.901024175886187e-11   rel=2.37e-02
+m3_lin_acd             ngspice=1.124993373770e-02     vacask=0.011164870717058966     rel=7.56e-03
+m3_lin_acg             ngspice=3.018753592413e-04     vacask=0.00030797378014168467   rel=1.98e-02
+m3_lin_dc              ngspice=-1.17181278194e-03     vacask=-0.001162696463867928    rel=7.78e-03
+m3_sat_acd             ngspice=1.066575252820e-04     vacask=0.0001074056224237573    rel=6.97e-03
+m3_sat_acg             ngspice=3.879225704371e-03     vacask=0.0038476606129626487    rel=8.14e-03
+m3_sat_dc              ngspice=-1.58385361230e-03     vacask=-0.001572338996255217    rel=7.27e-03
+nom_cut_acd_1k         ngspice=2.882229969916e-11     vacask=2.8821114219276437e-11   rel=4.11e-05
+nom_cut_acd            ngspice=2.878186114732e-05     vacask=2.8781860576366097e-05   rel=1.98e-08
+nom_cut_acg_1k         ngspice=7.902235748023e-11     vacask=7.482237297204325e-11    rel=5.31e-02
+nom_cut_acg            ngspice=7.675747463330e-06     vacask=7.676142154343409e-06    rel=5.14e-05
+nom_cut_dc             ngspice=-6.49041401839e-12     vacask=-6.336747252953958e-12   rel=2.37e-02
+nom_cut_dc_fd_dm       ngspice=-6.49039875582e-12     vacask=-6.336732215930645e-12   rel=2.37e-02
+nom_cut_dc_fd_dp       ngspice=-6.49042928101e-12     vacask=-6.336762290016201e-12   rel=2.37e-02
+nom_cut_dc_fd_gm       ngspice=-6.48962764682e-12     vacask=-6.336003086275148e-12   rel=2.37e-02
+nom_cut_dc_fd_gp       ngspice=-6.49120062057e-12     vacask=-6.337491637852866e-12   rel=2.37e-02
+nom_lin_acd_1k         ngspice=3.748585839036e-03     vacask=0.003720220605352075     rel=7.57e-03
+nom_lin_acd            ngspice=3.749977912567e-03     vacask=0.0037216235723529895    rel=7.56e-03
+nom_lin_acg_1k         ngspice=6.787724820215e-05     vacask=7.085801734338907e-05    rel=4.21e-02
+nom_lin_acg            ngspice=1.006251197471e-04     vacask=0.00010265792671389489   rel=1.98e-02
+nom_lin_dc             ngspice=-3.90604260646e-04     vacask=-0.000387565487955976    rel=7.78e-03
+nom_lin_dc_fd_dm       ngspice=-3.90566774631e-04     vacask=-0.0003875282855974654   rel=7.78e-03
+nom_lin_dc_fd_dp       ngspice=-3.90641746352e-04     vacask=-0.0003876026900095737   rel=7.78e-03
+nom_lin_dc_fd_gm       ngspice=-3.90603581871e-04     vacask=-0.000387564779373468    rel=7.78e-03
+nom_lin_dc_fd_gp       ngspice=-3.90604939416e-04     vacask=-0.0003875661965338146   rel=7.78e-03
+nom_sat_acd_1k         ngspice=2.038967907354e-05     vacask=2.082143900842504e-05    rel=2.07e-02
+nom_sat_acd            ngspice=3.555250842732e-05     vacask=3.5801874141252436e-05   rel=6.97e-03
+nom_sat_acg_1k         ngspice=1.292434008434e-03     vacask=0.0012819069135264326    rel=8.15e-03
+nom_sat_acg            ngspice=1.293075234790e-03     vacask=0.0012825535376542161    rel=8.14e-03
+nom_sat_dc             ngspice=-5.27951204099e-04     vacask=-0.0005241129987517388   rel=7.27e-03
+nom_sat_dc_fd_dm       ngspice=-5.27951000194e-04     vacask=-0.0005241127905388025   rel=7.27e-03
+nom_sat_dc_fd_dp       ngspice=-5.27951408006e-04     vacask=-0.0005241132069675826   rel=7.27e-03
+nom_sat_dc_fd_gm       ngspice=-5.27938279803e-04     vacask=-0.0005241001797278655   rel=7.27e-03
+nom_sat_dc_fd_gp       ngspice=-5.27964128484e-04     vacask=-0.0005241258178661356   rel=7.27e-03
+off_cut_acd            ngspice=8.742279007126e-05     vacask=8.742277547754075e-05    rel=1.67e-07
+off_cut_acg            ngspice=2.315537995094e-05     vacask=2.3165475798695835e-05   rel=4.36e-04
+off_cut_dc             ngspice=-2.66330476822e-10     vacask=-2.648556177432067e-10   rel=5.54e-03
+off_lin_acd            ngspice=9.709981328380e-03     vacask=0.00962908591555649      rel=8.33e-03
+off_lin_acg            ngspice=2.969997915458e-04     vacask=0.00030119225207924337   rel=1.39e-02
+off_lin_dc             ngspice=-1.00855952879e-03     vacask=-0.0009999108905700922   rel=8.58e-03
+off_sat_acd            ngspice=1.024080802574e-04     vacask=0.00010311436962724188   rel=6.85e-03
+off_sat_acg            ngspice=3.409181098149e-03     vacask=0.0033858014214883094    rel=6.86e-03
+off_sat_dc             ngspice=-1.48622493799e-03     vacask=-0.001482723995160964    rel=2.36e-03
+nom_cut ngspice: gm(fd) 7.8648688e-11 acg_1k 7.902235748023e-11 (4.75e-03);  gds(fd) 1.5262595e-12 acd_1k 2.882229969916e-11 (1.79e+01)
+nom_cut vacask: gm(fd) 7.4427579e-11 acg_1k 7.482237297204325e-11 (5.30e-03);  gds(fd) 1.5037043e-12 acd_1k 2.8821114219276437e-11 (1.82e+01)
+nom_lin ngspice: gm(fd) 6.7877250e-05 acg_1k 6.787724820215e-05 (2.65e-08);  gds(fd) 3.7485861e-03 acd_1k 0.003748585839036 (5.63e-08)
+nom_lin vacask: gm(fd) 7.0858017e-05 acg_1k 7.085801734338907e-05 (1.94e-10);  gds(fd) 3.7202206e-03 acd_1k 0.003720220605352075 (1.72e-11)
+nom_sat ngspice: gm(fd) 1.2924341e-03 acg_1k 0.001292434008434 (3.22e-08);  gds(fd) 2.0390600e-05 acd_1k 2.038967907354e-05 (4.52e-05)
+nom_sat vacask: gm(fd) 1.2819069e-03 acg_1k 0.0012819069135264326 (1.87e-11);  gds(fd) 2.0821439e-05 acd_1k 2.082143900842504e-05 (9.05e-11)

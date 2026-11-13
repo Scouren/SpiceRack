@@ -1,0 +1,13 @@
+gf180_n10 off (80 C, m=3), cut (vgs=0.3, vds=3.3, vbs=-0.5), dc
+model vs vsource
+include "../kit/gf180mcuD/libs.tech/vacask/models/gf180_vacask_common.lib"
+include "../kit/gf180mcuD/libs.tech/vacask/models/design.lib"
+include "../kit/gf180mcuD/libs.tech/vacask/models/mos_tt.lib"
+vd (d 0) vs dc=3.3
+vg (g 0) vs dc=0.3
+vb (b 0) vs dc=-0.5
+x1 (d g 0 b) nfet_03v3 w=10u l=2u m=3
+control
+  options temp=80 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis op1 op
+endc
