@@ -1,6 +1,6 @@
 """load.py FAMILY: writes a family's load decks beside it, one ngspice deck (.cir) and one VACASK
 deck (.sim) per (condition, region, reading). Families: mos1, mos2, mos3, mos6, mos9 (a bulk at
--0.5 V), mos6_nocap, jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, diode_load and diode_noisr (two terminals),
+-0.5 V), mos6_nocap, bsim3, bsim4, bsim4_nf (corpus cards), jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, diode_load and diode_noisr (two terminals),
 vdmos_load, passive. Conditions: `nom` (27 C, m=1) is the control of `off` (80 C, m=3) and of
 `m3` (27 C, m=3); geometry is given in all. Readings: `dc` the operating-point current of `vd`,
 `acg` |i(vd)| at 1 GHz with the gate driven, `acd` |i(vd)| at 1 GHz with the drain driven.
@@ -96,6 +96,27 @@ FAMILIES['vdmos_load'] = dict(
            'vj=0.8 m=0.4 fc=0.5 is=1e-12 n=1.2 tt=50n',
     regions={'cut': (1.0, 10.0), 'lin': (6.0, 0.5), 'sat': (3.0, 10.0)})
 CONDITIONS = {'nom': (27, 1), 'm3': (27, 3), 'off': (80, 3)}
+
+def card(name):
+    """A model card's parameters from cards/<name>.params (its first line the provenance)."""
+    here = __import__('os').path.dirname(__import__('os').path.abspath(__file__))
+    return open(f'{here}/cards/{name}.params').read().split('\n', 1)[1].strip()
+
+
+# BSIM3v3 and BSIM4v8 on corpus cards (cards/*.params name their sources): ngspice-45 level 8 and
+# 14 against VACASK's sp_bsim3v3 and sp_bsim4v8; bsim4_nf the same BSIM4 at nf=3 (fingers)
+FAMILIES['bsim3'] = dict(
+    load='spice/bsim3v3.osdi', nodes='d g 0 b',
+    ng_model='.model nm nmos level=8 version=3.3.0 {p}', va_model='model nm sp_bsim3v3 type=1 {p}',
+    params=card('bsim3'), geometry='w=10u l=0.35u ad=10p as=10p pd=22u ps=22u',
+    regions={'cut': (0.3, 2.0), 'lin': (3.0, 0.2), 'sat': (1.5, 3.0)})
+FAMILIES['bsim4'] = dict(
+    load='spice/bsim4v8.osdi', nodes='d g 0 b',
+    ng_model='.model nm nmos level=14 version=4.8.2 {p}',
+    va_model='model nm sp_bsim4v8 type=1 version="4.8.2" {p}',
+    params=card('bsim4'), geometry='w=1u l=0.1u ad=0.1p as=0.1p pd=2.2u ps=2.2u',
+    regions={'cut': (0.1, 1.0), 'lin': (1.0, 0.05), 'sat': (0.6, 1.0)})
+FAMILIES['bsim4_nf'] = dict(FAMILIES['bsim4'], geometry='w=1u l=0.1u nf=3 ad=0.1p as=0.1p pd=2.2u ps=2.2u')
 
 # the passives: one region each, so per (condition, form) one reading of `vd` driving node a; an
 # inductor stands behind a 1-ohm resistor (a source across it alone has no operating point).
