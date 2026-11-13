@@ -118,30 +118,30 @@ pub(super) const CODES: &[Row] = &[
     ),
 ];
 
-/// Whether `scope`'s run plan needs the script form: among its run items (loop bodies
-/// included) an `Alter`, a `Loop`, a `Reset`, a `FromHere` state item or save, or a script command kept as its
-/// own `.control` pair (a display command's place among the analyses is kept only by a
-/// script). A whole-script `Script` opaque does not: its deck keeps its cards (R49 (3)).
+/// Whether `scope`'s run plan needs the script form: among its run items, and those of the
+/// `.lib` sections it defines (every `.control` block of a file is one script, read_control:
+/// L5 seed 19, a section's `option` beside a top `.op` card read back as P1404), an `Alter`, a
+/// `Loop`, a `Reset`, a `FromHere` state item or save, or a script command kept as its own
+/// `.control` pair (a display command's place among the analyses is kept only by a script). A
+/// whole-script `Script` opaque does not: its deck keeps its cards (R49 (3)).
 #[allow(
     dead_code,
     reason = "the spine calls it once ng-scaffold's `Out::scripted` lands"
 )]
 pub(super) fn needs_script(design: &ir::Design, scope: ir::ScopeId) -> bool {
-    design.items(scope).iter().any(|&item| match item.kind {
-        ir::ItemKind::Alter | ir::ItemKind::Loop | ir::ItemKind::Reset => true,
-        ir::ItemKind::Option => {
-            design.row::<ir::OptionRow>(item.index).holds == ir::Applies::FromHere
+    let mut scopes = vec![scope];
+    // Bounded: each section body is pushed once by the section item that owns it.
+    while let Some(at) = scopes.pop() {
+        for &item in design.items(at) {
+            if item.kind == ir::ItemKind::Section {
+                scopes.push(design.row::<ir::item::Section>(item.index).body);
+            }
         }
-        ir::ItemKind::Env => design.row::<ir::Env>(item.index).holds == ir::Applies::FromHere,
-        ir::ItemKind::Save => design.row::<ir::Save>(item.index).holds == ir::Applies::FromHere,
-        ir::ItemKind::Opaque => {
-            let o: ir::item::Opaque = design.row(item.index);
-            o.class != ir::OpaqueClass::Script
-                && design.str(o.dialect) == "ngspice"
-                && design.text(o.text).starts_with(".control\n")
+        if scripted_items(design, at) {
+            return true;
         }
-        _ => false,
-    })
+    }
+    false
 }
 
 /// Appends a refusal for this area's items ngspice cannot spell for a reason no feature states
@@ -301,6 +301,25 @@ pub(super) fn alter(w: &mut Out<'_>, item: ir::ItemRef) {
 }
 
 // ---- private ----
+
+/// Whether one scope's own items need the script form (`needs_script`'s test per scope).
+fn scripted_items(design: &ir::Design, scope: ir::ScopeId) -> bool {
+    design.items(scope).iter().any(|&item| match item.kind {
+        ir::ItemKind::Alter | ir::ItemKind::Loop | ir::ItemKind::Reset => true,
+        ir::ItemKind::Option => {
+            design.row::<ir::OptionRow>(item.index).holds == ir::Applies::FromHere
+        }
+        ir::ItemKind::Env => design.row::<ir::Env>(item.index).holds == ir::Applies::FromHere,
+        ir::ItemKind::Save => design.row::<ir::Save>(item.index).holds == ir::Applies::FromHere,
+        ir::ItemKind::Opaque => {
+            let o: ir::item::Opaque = design.row(item.index);
+            o.class != ir::OpaqueClass::Script
+                && design.str(o.dialect) == "ngspice"
+                && design.text(o.text).starts_with(".control\n")
+        }
+        _ => false,
+    })
+}
 
 /// A refusal row.
 const fn refusal(
