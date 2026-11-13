@@ -86,3 +86,20 @@ without a delay), `Circuit(SinPreOffset)` (wave.rs:61 says xy hs, no inventory c
 The two inventories disagree on HSPICE's `FREQ` (IS:147 5.28 has it, IC:245 D61 says hs lacks
 it) and HSPICE's E `DELAY` (IS:149 5.30 sampled, IC:274 D90 pure): both kept on the IS rows,
 which cite the HSPICE manual.
+
+## Group 3: the combinations no simulator has, made refusals (the lead's rule, 2026-11-13)
+
+Each was a feature of a combination of members that stay; it is now a `FieldDomain` row (the IR
+text reader refuses it like every row `check` names), and the generator draws none. Xyce's spec
+(`rewrite/DIALECT-XYCE.md` on `differences`) was read first: it keeps `Run(DcAxisSubcktParam)`
+(`.dc X1:…`, its `.dc` row), so that one stays a feature.
+
+| member deleted | now refused | why |
+|---|---|---|
+| `Circuit(SinPreZero)` | a `Sin` with `PreDelay::Zero` (`circuit_check::wave_ok`) | `PreDelay::Zero` is ngspice's AM and SFFM only; IS:125 5.06 lt sp va hold the value, wave.rs xy hs the offset |
+| `Circuit(AmPreOffset)` | an `Am` with `PreDelay::Offset`; AM's IR-text default is now `zero` | IS:122 5.03: ng 0, va the t = delay value; xy lt have no AM |
+| `Extra(IfConditionDynamic)` | an `If` condition of class `Temp` or above (`check_scopes::dynamic_conditions`) | IS:289 11.08: `.if` decided once from parameters |
+| `Extra(FormalWithoutDefault)` | a `Subckt` formal with no default (the row's check) | no row names a formal without one; Xyce's `params: w=1` (DIALECT-XYCE.md, subcircuit parameters) |
+| `Run(LoopSubcktParam)` | a sweep or table loop over `TargetKind::SubcktParam` (the loop rows' `fault`) | no row; the DC axis keeps it (Xyce) and the alter keeps it (ng G72) |
+
+A goal-2 spec that shows one of these brings it back as a member.

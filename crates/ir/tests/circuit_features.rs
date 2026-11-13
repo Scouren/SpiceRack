@@ -349,7 +349,7 @@ mod tests {
                 b.wave(r)
             }
             WaveKind::Am => {
-                let r = am(b, AmModTime::Delay, PreDelay::Offset);
+                let r = am(b, AmModTime::Delay, PreDelay::Zero);
                 b.wave(r)
             }
             WaveKind::TrNoise => b.wave(TrNoise {
@@ -824,7 +824,11 @@ mod tests {
         }),
         (X::SinPreOffset, |b, t, on| {
             let one = n(b, 1);
-            let pre = if on { PreDelay::Offset } else { PreDelay::Zero };
+            let pre = if on {
+                PreDelay::Offset
+            } else {
+                PreDelay::HoldDelayValue
+            };
             let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
             with_wave(b, t, w)
         }),
@@ -835,12 +839,6 @@ mod tests {
             } else {
                 PreDelay::Offset
             };
-            let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
-            with_wave(b, t, w)
-        }),
-        (X::SinPreZero, |b, t, on| {
-            let one = n(b, 1);
-            let pre = if on { PreDelay::Zero } else { PreDelay::Offset };
             let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
             with_wave(b, t, w)
         }),
@@ -878,15 +876,6 @@ mod tests {
             let w = b.wave(r);
             with_wave(b, t, w)
         }),
-        (X::AmPreOffset, |b, t, on| {
-            let r = am(
-                b,
-                AmModTime::Delay,
-                if on { PreDelay::Offset } else { PreDelay::Zero },
-            );
-            let w = b.wave(r);
-            with_wave(b, t, w)
-        }),
         (X::AmPreHold, |b, t, on| {
             let r = am(
                 b,
@@ -904,7 +893,11 @@ mod tests {
             let r = am(
                 b,
                 AmModTime::Delay,
-                if on { PreDelay::Zero } else { PreDelay::Offset },
+                if on {
+                    PreDelay::Zero
+                } else {
+                    PreDelay::HoldDelayValue
+                },
             );
             let w = b.wave(r);
             with_wave(b, t, w)

@@ -34,7 +34,7 @@ use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{IcMode, TcBase, TcLaw};
 use crate::source::DcRule;
-use crate::wave::{GivenZero, PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
+use crate::wave::{GivenZero, PreDelay, PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
 
 /// What is wrong with an element beyond its terminal count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -417,6 +417,8 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
                 &[s.offset, s.amplitude],
                 &[s.freq, s.delay, s.damping, s.phase_deg],
             ) && paired(s.amplitude2, s.freq2)
+                // R100: no simulator holds a sine at 0 before its delay
+                && s.pre != PreDelay::Zero
         }),
         WaveKind::Exp => side::<Exp>(design, w.index, v)
             .is_none_or(|x| fits(x.given_zero, &[x.v1, x.v2], &[x.td1, x.tau1, x.td2, x.tau2])),
@@ -453,6 +455,8 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
                 a.phase_c_deg,
             ];
             fits(a.given_zero, &[a.offset, a.amplitude, a.mod_offset], &def)
+                // R100: no simulator holds an AM at its offset before its delay
+                && a.pre != PreDelay::Offset
         }),
         WaveKind::TrNoise => side::<TrNoise>(design, w.index, v).is_none_or(|t| all(&[t.na, t.nt])),
         WaveKind::TrRandom => side::<TrRandom>(design, w.index, v)

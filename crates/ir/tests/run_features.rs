@@ -85,7 +85,6 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::LoopScoped, "  loop sweep (temp) (list values=[1])\n    analysis op\n  analysis op", L),
     (RunExtra::LoopTemp, L, "  loop sweep (param p) (list values=[1])\n    analysis op"),
     (RunExtra::LoopParam, "  loop sweep (param p) (list values=[1])\n    analysis op", L),
-    (RunExtra::LoopSubcktParam, "  loop sweep (subckt_param div r) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopSourceDc, "  loop sweep (source_dc v1) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopElementValue, "  loop sweep (element_value r1) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopDeviceParam, "  loop sweep (device_param m1 w) (list values=[1])\n    analysis op", L),

@@ -8,7 +8,8 @@
 //! Contents: crate: `pub(crate) fn files_and_scopes(&mut Out<'_>)`,
 //! `pub(crate) fn live_scopes(&Design) -> Vec<bool>`, `pub(crate) fn stale_definitions(&mut Out<'_>)`,
 //! `pub(crate) fn reference_scopes(&mut Out<'_>)` (F34),
-//! `pub(crate) fn misplaced_strings(&Design, ExprId) -> Vec<ExprId>` (`StringOperand`)
+//! `pub(crate) fn misplaced_strings(&Design, ExprId) -> Vec<ExprId>` (`StringOperand`),
+//! `pub(crate) fn dynamic_conditions(&mut Out<'_>)` (R100)
 
 use std::collections::{HashMap, HashSet};
 
@@ -217,6 +218,27 @@ pub(crate) fn misplaced_strings(d: &Design, node: ExprId) -> Vec<ExprId> {
         .into_iter()
         .filter(|&k| matches!(d.expr(k), Expr::Str(_)))
         .collect()
+}
+
+/// R100: `FieldDomain` at every `If` a condition of which is of class `Temp` or above (no
+/// simulator decides a netlist by the temperature or the circuit; INV-semantics 11.08: `.if` is
+/// decided once from parameters). Run on a design whose handles hold, with the class table.
+pub(crate) fn dynamic_conditions(out: &mut Out<'_>) {
+    let d = out.design;
+    let table = crate::class::def_classes(d);
+    for (item, _) in d.reachable() {
+        if item.kind != ItemKind::If {
+            continue;
+        }
+        let row: crate::item::If = d.row(item.index);
+        let dynamic = d.branches(row.branches).iter().any(|br| {
+            !br.cond.is_none()
+                && crate::class::tree_class(d, br.cond, table) >= crate::class::ExprClass::Temp
+        });
+        if dynamic {
+            out.report(Violation::FieldDomain, item, item.index);
+        }
+    }
 }
 
 // ---- private ----

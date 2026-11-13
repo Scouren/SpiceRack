@@ -99,8 +99,8 @@ pub struct Gen {
     /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
     /// `Extra::CaseSensitiveNames`).
     pub(crate) case_ok: bool,
-    /// Whether the expression being built must be of class `Constant` (cleared around an `If`
-    /// condition when the set lacks `Extra::IfConditionDynamic`).
+    /// Whether the expression being built must be of class `Constant` (set around an `If`
+    /// condition, R100, and a constant head default).
     pub(crate) constant_only: bool,
     /// Whether the expression being built is a behavioural source's own expression
     /// (`ExprUse::Behavioural`): its operators take the dynamic form whatever its class (R66).

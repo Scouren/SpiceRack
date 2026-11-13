@@ -126,11 +126,6 @@ pub enum Extra {
     /// and VACASK read a deck's line 1 as its title whatever it holds, so an absent title and an
     /// empty one are the same text there).
     DeckWithoutTitle,
-    /// A `Subckt` head parameter with no default (A15 K2: an instance must pass it).
-    FormalWithoutDefault,
-    /// An `If` condition of class `Temp` or `Circuit` (A15 K2: a netlist chosen by a value no
-    /// constant fold decides).
-    IfConditionDynamic,
     /// A literal of form `Long` anywhere in the design (A18, R37): its digits outlive the
     /// mantissa. A writer that spells them verbatim lists it; another target gets the pass that
     /// writes the correctly rounded shortest double.
@@ -313,8 +308,6 @@ impl Extra {
         Extra::EnclosingRef,
         Extra::FormalNotConstant,
         Extra::DeckWithoutTitle,
-        Extra::FormalWithoutDefault,
-        Extra::IfConditionDynamic,
         Extra::LongLiteral,
         Extra::SubcktConstantParam,
         Extra::StringValue,

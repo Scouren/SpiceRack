@@ -51,7 +51,10 @@ impl DetailFacts for SweepLoop {
     }
 
     fn fault(&self, design: &Design) -> Option<Violation> {
-        (!target_valid(&self.target) || !sweep_valid(design, &self.sweep, SweepUse::Loop))
+        // R100: no simulator loops over a subcircuit's default (Xyce's `.dc X1:…` keeps the DC
+        // axis's)
+        let pruned = self.target.kind == crate::plan::TargetKind::SubcktParam;
+        (pruned || !target_valid(&self.target) || !sweep_valid(design, &self.sweep, SweepUse::Loop))
             .then_some(Violation::FieldDomain)
     }
 
@@ -81,7 +84,10 @@ impl DetailFacts for TableLoop {
         };
         let n = columns.len() as u32;
         let rows_ok = n > 0 && self.values.len >= n && self.values.len.is_multiple_of(n);
-        (!rows_ok || !columns.iter().all(target_valid)).then_some(Violation::FieldDomain)
+        let pruned = columns
+            .iter()
+            .any(|t| t.kind == crate::plan::TargetKind::SubcktParam);
+        (!rows_ok || pruned || !columns.iter().all(target_valid)).then_some(Violation::FieldDomain)
     }
 
     #[cfg(any(test, feature = "gen"))]

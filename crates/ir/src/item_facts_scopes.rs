@@ -9,8 +9,6 @@
 use std::borrow::Cow;
 
 use crate::build::Builder;
-#[cfg(any(test, feature = "gen"))]
-use crate::class::ExprClass;
 use crate::design::Design;
 use crate::diag::Diags;
 #[cfg(any(test, feature = "gen"))]
@@ -64,10 +62,6 @@ impl RowFacts for Subckt {
         if not_constant {
             *set = set.with(Feature::Extra(Extra::FormalNotConstant));
         }
-        // A15 K2: a formal an instance must pass
-        if design.params(self.params).iter().any(|p| p.1.is_none()) {
-            *set = set.with(Feature::Extra(Extra::FormalWithoutDefault));
-        }
         // A25 item 4: a default by type
         for p in design.params(self.params) {
             value_type(design, p.1, set);
@@ -101,7 +95,9 @@ impl RowFacts for Subckt {
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let ports = design.names(self.ports);
         let params: Vec<NameId> = design.params(self.params).iter().map(|p| p.0).collect();
-        if self.name.is_none() || !distinct(ports) || !distinct(&params) {
+        // R100: every formal has its default (no simulator's row names one without)
+        let bare = design.params(self.params).iter().any(|p| p.1.is_none());
+        if self.name.is_none() || !distinct(ports) || !distinct(&params) || bare {
             field_domain(design, at, out);
         }
     }
@@ -185,28 +181,18 @@ impl RowFacts for Subckt {
         g.bound_reads = f.contains(Feature::Extra(Extra::FormalOuterRead));
         g.unbound_reads = f.contains(Feature::Extra(Extra::FormalUnboundRead));
         g.constant_only = !free;
-        // no formal can be made when it may neither go without a default nor have one
-        let formals = if f.contains(Feature::Expr(ExprTag::Num))
-            || f.contains(Feature::Extra(Extra::FormalWithoutDefault))
-        {
+        // a formal has a default (R100), so none without numbers
+        let formals = if f.contains(Feature::Expr(ExprTag::Num)) {
             g.below(3)
         } else {
             0
         };
         let defaults: Vec<ExprId> = (0..formals)
             .map(|_| {
-                // a formal has its default unless the set has FormalWithoutDefault (A15 K2)
-                let value = f.contains(Feature::Expr(ExprTag::Num))
-                    && (!f.contains(Feature::Extra(Extra::FormalWithoutDefault)) || g.chance(2));
-                let e = if value {
-                    value_roots(g, f, true);
-                    let e = g.expr(b, f, Reads::Constant);
-                    value_roots(g, f, false);
-                    e
-                } else {
-                    ExprId::NONE
-                };
-                classes.push(if value { g.class } else { ExprClass::Constant });
+                value_roots(g, f, true);
+                let e = g.expr(b, f, Reads::Constant);
+                value_roots(g, f, false);
+                classes.push(g.class);
                 e
             })
             .collect();
@@ -320,16 +306,7 @@ impl RowFacts for If {
         }
     }
 
-    fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
-        // A15 K2: a condition no constant fold decides
-        let table = crate::class::def_classes(design);
-        let dynamic = design.branches(self.branches).iter().any(|br| {
-            crate::class::tree_class(design, br.cond, table) >= crate::class::ExprClass::Temp
-        });
-        if dynamic {
-            *set = set.with(Feature::Extra(Extra::IfConditionDynamic));
-        }
-    }
+    fn features(&self, _design: &Design, _at: ItemRef, _scope: ScopeId, _set: &mut FeatureSet) {}
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         let branches = design.branches(self.branches);
@@ -372,8 +349,9 @@ impl RowFacts for If {
         features: &FeatureSet,
     ) -> ItemRef {
         let f = features;
-        // a condition is of class Constant unless the set has IfConditionDynamic (A15 K2)
-        g.constant_only = !f.contains(Feature::Extra(Extra::IfConditionDynamic));
+        // a condition is of class Constant (R100: one reading the temperature or the circuit is
+        // `check_scopes::dynamic_conditions`'s FieldDomain)
+        g.constant_only = true;
         let mut conds: Vec<ExprId> = (0..1 + g.below(2))
             .map(|_| g.expr(b, f, Reads::Constant))
             .collect();

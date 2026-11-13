@@ -239,7 +239,7 @@ fields! {
     Am {
         offset: Expr = N, amplitude: Expr = N, mod_offset: Expr = N, mod_index: Expr = N,
         mod_freq: Expr = N, carrier_freq: Expr = N, delay: Expr = N, phase_m_deg: Expr = N,
-        phase_c_deg: Expr = N, mod_time: Choice = AmModTime::Delay, pre: Choice = PreDelay::Offset,
+        phase_c_deg: Expr = N, mod_time: Choice = AmModTime::Delay, pre: Choice = PreDelay::Zero,
         given_zero: Choice = GivenZero::AsGiven,
     }
     TrNoise {

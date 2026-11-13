@@ -109,16 +109,12 @@ pub enum CircuitExtra {
     SinPreOffset,
     /// A sine that holds its t = delay value before the delay (`PreDelay::HoldDelayValue`).
     SinPreHold,
-    /// A sine that is 0 before the delay (`PreDelay::Zero`).
-    SinPreZero,
     /// A sine's second tone (`Sin::amplitude2`, sp, 5.07).
     SinSecondTone,
     /// An SFFM under `SffmLaw::Spice3`.
     SffmSpice3,
     /// An SFFM under `SffmLaw::Ngspice`.
     SffmNgspice,
-    /// An AM that is its offset before the delay.
-    AmPreOffset,
     /// An AM that holds its t = delay value before the delay (va).
     AmPreHold,
     /// An AM that is 0 before the delay (ng).
@@ -359,7 +355,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 149] = [
+    pub const ALL: [CircuitExtra; 147] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -398,11 +394,9 @@ impl CircuitExtra {
         CircuitExtra::SinCycles,
         CircuitExtra::SinPreOffset,
         CircuitExtra::SinPreHold,
-        CircuitExtra::SinPreZero,
         CircuitExtra::SinSecondTone,
         CircuitExtra::SffmSpice3,
         CircuitExtra::SffmNgspice,
-        CircuitExtra::AmPreOffset,
         CircuitExtra::AmPreHold,
         CircuitExtra::AmPreZero,
         CircuitExtra::AmModCarrierPhase,

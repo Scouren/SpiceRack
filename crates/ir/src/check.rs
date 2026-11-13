@@ -222,6 +222,7 @@ pub fn check(design: &Design, diags: &mut Diags) {
             out.report(Violation::InstanceCycle, at, at.index);
         }
         crate::check_scopes::reference_scopes(&mut out);
+        crate::check_scopes::dynamic_conditions(&mut out);
         crate::state_order::order_in_subckt(design, out.diags);
         for (at, element) in crate::link::target_aliases(design) {
             out.report(Violation::TargetAlias, at, element.0);

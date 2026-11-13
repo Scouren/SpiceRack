@@ -26,11 +26,7 @@ impl R<'_, '_> {
             .filter(|&k| {
                 self.f.contains(Feature::Wave(k))
                     && match k {
-                        WaveKind::Sin => {
-                            self.has(X::SinPreOffset)
-                                || self.has(X::SinPreHold)
-                                || self.has(X::SinPreZero)
-                        }
+                        WaveKind::Sin => self.has(X::SinPreOffset) || self.has(X::SinPreHold),
                         WaveKind::Pulse => self.has(X::PulseSpice) || self.has(X::PulseVacask),
                         WaveKind::Exp => self.has(X::ExpTd2FromZero) || self.has(X::ExpTd2FromTd1),
                         WaveKind::Sffm => {
@@ -39,11 +35,7 @@ impl R<'_, '_> {
                                     || self.has(X::SffmPreHold)
                                     || self.has(X::SffmPreZero))
                         }
-                        WaveKind::Am => {
-                            self.has(X::AmPreOffset)
-                                || self.has(X::AmPreHold)
-                                || self.has(X::AmPreZero)
-                        }
+                        WaveKind::Am => self.has(X::AmPreHold) || self.has(X::AmPreZero),
                         _ => true,
                     }
                     && (!matches!(
@@ -105,7 +97,7 @@ impl R<'_, '_> {
                 })
             }
             WaveKind::Sin => {
-                let pre = self.pre(X::SinPreOffset, X::SinPreHold, X::SinPreZero);
+                let pre = self.pre(Some(X::SinPreOffset), X::SinPreHold, None);
                 let given_zero = self.zero_rule();
                 let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
                 let freq = self.defaulted(given_zero);
@@ -158,7 +150,7 @@ impl R<'_, '_> {
                     (SffmLaw::Spice3, Some(X::SffmSpice3)),
                     (SffmLaw::Ngspice, Some(X::SffmNgspice)),
                 ]);
-                let pre = self.pre(X::SffmPreOffset, X::SffmPreHold, X::SffmPreZero);
+                let pre = self.pre(Some(X::SffmPreOffset), X::SffmPreHold, Some(X::SffmPreZero));
                 let given_zero = self.zero_rule();
                 let [offset, amplitude]: [ExprId; 2] = std::array::from_fn(|_| self.ex());
                 let carrier_freq = self.defaulted(given_zero);
@@ -179,7 +171,7 @@ impl R<'_, '_> {
                 })
             }
             WaveKind::Am => {
-                let pre = self.pre(X::AmPreOffset, X::AmPreHold, X::AmPreZero);
+                let pre = self.pre(None, X::AmPreHold, Some(X::AmPreZero));
                 let mod_time = if self.maybe(X::AmModCarrierPhase) {
                     AmModTime::CarrierPhase
                 } else {
@@ -273,12 +265,13 @@ impl R<'_, '_> {
         }
     }
 
-    fn pre(&mut self, offset: X, hold: X, zero: X) -> PreDelay {
-        self.pick(&[
-            (PreDelay::Offset, Some(offset)),
-            (PreDelay::HoldDelayValue, Some(hold)),
-            (PreDelay::Zero, Some(zero)),
-        ])
+    /// A pre-delay rule the set allows, among those the wave has (`None`: a rule no simulator
+    /// gives this wave, never drawn, R100).
+    fn pre(&mut self, offset: Option<X>, hold: X, zero: Option<X>) -> PreDelay {
+        let mut rules = vec![(PreDelay::HoldDelayValue, Some(hold))];
+        rules.extend(offset.map(|x| (PreDelay::Offset, Some(x))));
+        rules.extend(zero.map(|x| (PreDelay::Zero, Some(x))));
+        self.pick(&rules)
     }
 
     fn pwl(&mut self) -> Pwl {

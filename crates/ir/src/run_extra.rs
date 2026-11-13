@@ -158,8 +158,6 @@ pub enum RunExtra {
     LoopTemp,
     /// A loop over a parameter.
     LoopParam,
-    /// A loop over a subcircuit's parameter default.
-    LoopSubcktParam,
     /// A loop over a source's DC value.
     LoopSourceDc,
     /// A loop over an element's value.
@@ -416,7 +414,7 @@ pub enum RunExtra {
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 176] = [
+    pub const ALL: [RunExtra; 175] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -486,7 +484,6 @@ impl RunExtra {
         RunExtra::LoopScoped,
         RunExtra::LoopTemp,
         RunExtra::LoopParam,
-        RunExtra::LoopSubcktParam,
         RunExtra::LoopSourceDc,
         RunExtra::LoopElementValue,
         RunExtra::LoopDeviceParam,
