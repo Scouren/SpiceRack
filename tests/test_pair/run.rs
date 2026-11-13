@@ -93,8 +93,14 @@ struct Spine {
 /// CPU seconds per simulator run (the wall clock gets ten times as much: `sim::run_checked`).
 const SECS: u64 = 60;
 
-/// The refinement oracle's step cap: a transient's span over this.
-const REFINE: f64 = 2000.0;
+/// The refinement oracle's step cap: a transient's span over this (a deck's own smaller cap
+/// kept). span/2000 was too coarse once the tube narrowed: the MOS level 3 inverter's gate
+/// current during its input ramp is 1.2 % apart at the deck's own 1 ns cap and 0.25 % at 0.1 ns
+/// (both simulators moving toward each other), so only a finer cap shows its convergence.
+const REFINE: f64 = 20000.0;
+
+/// The refined comparison's time tube, a fraction of the stop time: ten refined steps.
+const FINE_TUBE: f64 = 10.0 / REFINE;
 
 /// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
 /// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
@@ -204,11 +210,18 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
     for (k, v) in &pair.tightened {
         tol.tighten(k, *v).expect("pair_file checked it");
     }
-    match cmp::compare(&a, &b, tol) {
+    match agree(&a, &b, tol) {
         Err(why) => {
             // The refinement oracle (cross-sim's `simulator-differs:refinement`): both decks
-            // with every transient's step capped at span/REFINE; agreeing there, the two
-            // simulators' step control made the difference, not the conversion.
+            // with every transient's step capped at span/REFINE; agreeing there, with the time
+            // tube narrowed to FINE_TUBE (rulings R84a: the tube absorbs an edge's placement by
+            // the steps, never a difference the circuit keeps), the two simulators' step
+            // control made the difference, not the conversion. F52 showed the hole: a reverse
+            // recovery 4.8 ns later on VACASK with both steps at 0.5 ns, inside the 1 % tube
+            // (10 ns).
+            let mut fine = tol;
+            fine.tighten("tube", FINE_TUBE)
+                .expect("FINE_TUBE is under the default tube");
             let refined = sim::refined(c.from_sim, text, REFINE)
                 .zip(sim::refined(c.to_sim, &entry.1, REFINE))
                 .and_then(|(ra, rb)| {
@@ -226,25 +239,28 @@ pub fn steps(c: &Cell, from: &DialectRow, to: &DialectRow, deck: &Deck, pair: &P
                                 cmp::without_start(&mut x);
                                 cmp::without_start(&mut y);
                             }
-                            cmp::compare(
+                            agree(
                                 &plots::only(plots::hierarchical(x), pair.vectors.as_ref()),
                                 &plots::only(
                                     plots::renamed(plots::hierarchical(y), &spine.renames),
                                     pair.vectors.as_ref(),
                                 ),
-                                tol,
+                                fine,
                             )
-                            .is_ok()
                         }),
                         _ => None,
                     }
                 });
             let f = match refined {
-                Some(true) => fail(
+                Some(Ok(())) => fail(
                     "simulator-differs:refinement",
                     format!("{why}; both agree with every step capped at span/{REFINE}"),
                 ),
-                _ => fail("mismatch", why),
+                Some(Err(still)) => fail(
+                    "mismatch",
+                    format!("{why}; with every step capped at span/{REFINE}: {still}"),
+                ),
+                None => fail("mismatch", why),
             };
             fails.insert(4, f);
         }
@@ -561,6 +577,14 @@ fn opaques(design: &ir::Design, diags: &ir::Diags, read: usize) -> Vec<String> {
             format!("{}/{:?}/{note}/{word}", design.str(o.dialect), o.class)
         })
         .collect()
+}
+
+/// Whether the two runs agree each way: `cmp::compare` holds the first run in the second's
+/// time tube only, so a target that rings about the source's value passed it (F51: ngspice's
+/// ±1 A trapezoidal ringing about VACASK's -1e-7 A held VACASK's run inside its band).
+fn agree(a: &[RawData], b: &[RawData], tol: cmp::Tol) -> Result<(), String> {
+    cmp::compare(a, b, tol)?;
+    cmp::compare(b, a, tol).map_err(|why| format!("the target's run in the source's tube: {why}"))
 }
 
 /// How much of step 4's value tolerance a passing pair uses (`PAIR_MARGINS=1`, triage). It

@@ -45,9 +45,10 @@
 //! The pair test's refinement class (`simulator-differs:refinement`, rulings R84) is not a pass
 //! and not a conversion finding: a transient that leaves the tube is run again with both decks'
 //! step capped at span/2000 (`sim::refined`), and agreeing there, its difference is the two
-//! simulators' step control. span/2000 because span/200 is not fine enough: dio.sim (a diode's
-//! reverse recovery) and resonator.sim (a lossless LC) still differ at span/200 and agree at
-//! span/2000, as at span/20000. A factor on the truncation-error test (`trtol`,
+//! simulators' step control. span/2000 because span/200 is not fine enough: resonator.sim (a
+//! lossless LC) still differs at span/200 and agrees at span/2000, as at span/20000. dio.sim (a
+//! diode's reverse recovery) does not agree refined (rulings R84a, F52): VACASK converges at
+//! first order to a current 3.5 % from ngspice's, so it stays `mismatch`. A factor on the truncation-error test (`trtol`,
 //! `tran_lteratio`) is a hint and never mapped (R84): giving both the same factor does not give
 //! them the same steps (resonator with `trtol=3.5` still left the tube). It covers transients
 //! only: a DC or AC difference has no step to refine and stays `mismatch`.
@@ -205,8 +206,8 @@ impl Tol {
         t
     }
 
-    /// `key` (`reltol`, `vntol`, `abstol`, `tube`) set to `value`, which
-    /// may only tighten: `Err` for an unknown key, a negative value, or one
+    /// `key` (`reltol`, `vntol`, `abstol`, `tube`) set to at most `value`
+    /// (a tighter value already set stays), which may only tighten: `Err` for an unknown key, a negative value, or one
     /// above the default (RELTOL 1e-3, VNTOL 1e-6 V, ABSTOL 1e-12 A, tube
     /// 0.01), which would loosen the simulators' own accuracy. VNTOL and
     /// ABSTOL may not go below the default either: they are each simulator's
@@ -231,7 +232,8 @@ impl Tol {
                 "{key} = {value:e} is below the simulators' own floor {floor:e}"
             ));
         }
-        *slot = value;
+        // A tighter value already set (a deck's own, a narrower triage tube) stays.
+        *slot = slot.min(value);
         Ok(())
     }
 
