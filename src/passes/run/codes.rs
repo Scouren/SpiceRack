@@ -51,6 +51,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        wr::IN_SUBCKT,
+        ir::Info {
+            title: "a whole-run state item inside a subcircuit body",
+            cite: "R98 (X0028); R27",
+            explain: "The target holds state from where it stands, and no positional state item may stand in a subcircuit body: a body is instantiated, not run. Moving the item to the deck's top would change what it holds for (a body holds per instance and names its own nodes, which the top cannot say for a subcircuit used twice or never), so it is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
         tc::NO_PRINT_STEP,
         ir::Info {
             title: "a transient under ngspice's step ceiling with no print step",

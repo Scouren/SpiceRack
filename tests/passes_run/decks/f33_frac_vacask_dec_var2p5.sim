@@ -1,0 +1,14 @@
+f33_frac_vacask_dec_var2p5: VACASK control `var n=2.5` with `mode="dec" points=n` from 1k to 100k runs 2 per decade (5 points), as the literal does: truncates, no message (a circuit `parameters n` is not visible here: "Variable or constant n not defined", R68)
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=0.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  options rawfile="ascii"
+  var n=2.5
+  analysis ac1 ac from=1k to=100k mode="dec" points=n
+endc

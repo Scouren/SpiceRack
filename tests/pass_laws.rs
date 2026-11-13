@@ -160,6 +160,12 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
         "dc_restart_to_loops",
         gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
     ),
+    // a DC list sweep: the generator over every feature reaches none since the IR round
+    // (ir-next a2665caf's draws)
+    (
+        "sweep_dc_list_to_step",
+        gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
+    ),
     ("analysis_param_args_to_values", gen_sets::PARAM_ARGS),
     (
         "tran_cap_ngspice_to_given",

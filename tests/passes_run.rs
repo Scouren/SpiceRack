@@ -151,6 +151,11 @@ fn log_frequency_sweeps_run_each_simulators_law() {
 }
 
 #[test]
+fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask() {
+    freq_grids::non_integer_counts_round_on_ngspice_and_truncate_on_vacask();
+}
+
+#[test]
 fn a_loop_of_ops_is_no_continued_sweep() {
     dc_loops::a_loop_of_ops_is_no_continued_sweep();
 }

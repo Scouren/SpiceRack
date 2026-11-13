@@ -16,7 +16,8 @@
 //! usable row, so a target that can say "no default" gets the clean form.
 //!
 //! Left with a note: a subcircuit whose body reads an enclosing model, function or subcircuit,
-//! or an enclosing parameter one of its own formals is named as (`READS_ENCLOSING`), or one defined in a branch, loop or section inside a subcircuit
+//! names an enclosing parameter in a row (a statistics item varies it: a formal would vary a
+//! copy), or reads an enclosing parameter one of its own formals is named as (`READS_ENCLOSING`), or one defined in a branch, loop or section inside a subcircuit
 //! (`NOT_IN_BODY`).
 //!
 //! Cites: `rewrite/AMEND-A12.md` K2, A15 K1, A32; R27; `rewrite/DIALECT-VACASK.md` §6.
@@ -188,9 +189,18 @@ fn plan(design: &ir::Design, s2: ir::ItemRef, l2: ir::ScopeId) -> Option<Vec<ir:
     for (item, _) in subtree(design, s2) {
         let mut refs = Vec::new();
         design.item_refs(item, &mut refs);
-        let mut defs: Vec<ir::DefId> = refs.iter().map(|r| r.0.def).collect();
-        defs.extend(expr_reads(design, item));
-        for def in defs.into_iter().filter(|d| !d.is_none()) {
+        // a row naming an enclosing definition (a model, a statistics item's varied parameter)
+        // names that one: a formal would be a copy
+        if refs
+            .iter()
+            .any(|r| !r.0.def.is_none() && design.def(r.0.def).scope == l2)
+        {
+            return None;
+        }
+        for def in expr_reads(design, item)
+            .into_iter()
+            .filter(|d| !d.is_none())
+        {
             let d = design.def(def);
             if d.scope != l2 {
                 continue;
