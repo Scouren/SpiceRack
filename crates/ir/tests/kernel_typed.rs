@@ -182,6 +182,7 @@ fn every_row_of_the_tag_table() {
         BinOp::Eq,
         BinOp::And,
         BinOp::Or,
+        BinOp::Xor,
         BinOp::BitAnd,
         BinOp::Shl,
     ] {

@@ -167,6 +167,10 @@ pub enum BinOp {
     And,
     /// Either non-zero. `b` is evaluated only when `a` is zero (C).
     Or,
+    /// Exactly one non-zero, 0 or 1; both operands evaluated (Xyce `^`: `0.4^0.7` = 0, `0^1` =
+    /// 1, `1^1` = 0, `2^3` = 0, `rewrite/DIALECT-XYCE.md` on `differences`, `expr_xor`). Not
+    /// `BitXor`, VACASK's integer one.
+    Xor,
     /// Bitwise AND of integer-valued operands (VACASK `&`); a fractional operand is a domain
     /// error.
     BitAnd,
@@ -435,7 +439,7 @@ impl Expr {
 
 impl BinOp {
     /// Every operator, in declaration order.
-    pub const ALL: [BinOp; 18] = [
+    pub const ALL: [BinOp; 19] = [
         BinOp::Add,
         BinOp::Sub,
         BinOp::Mul,
@@ -448,6 +452,7 @@ impl BinOp {
         BinOp::Ge,
         BinOp::And,
         BinOp::Or,
+        BinOp::Xor,
         BinOp::BitAnd,
         BinOp::BitOr,
         BinOp::BitXor,

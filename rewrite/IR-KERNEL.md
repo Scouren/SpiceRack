@@ -151,8 +151,9 @@ fixes four things:
      `Trunc`, `Floor`, `Ceil`; `Fmod` takes the dividend's sign; `Clamp(x, lo, hi)`.
    There is no `limit`, `pwr`, `pwrs`, `if`, `nint`, `log` or named constant in the IR: readers
    map each to the member (or draw, or literal) its own simulator means.
-3. **Operators.** `And`, `Or`, `Not` read "nonzero is true" and yield 0 or 1. There is no logical
-   XOR (each reader expands it with its own truth rule). `BitAnd`, `BitOr`, `BitXor`, `BitNot`,
+3. **Operators.** `And`, `Or`, `Xor`, `Not` read "nonzero is true" and yield 0 or 1 (`Xor`, added
+   2026-11-13 for Xyce's `^`: `0.4^0.7` = 0, `DIALECT-XYCE.md`; LTspice's `^` thresholds at 0.5 and
+   its reader expands it). `BitAnd`, `BitOr`, `BitXor`, `BitNot`,
    `Shl`, `Shr` are VACASK's integer operators. (`IntDiv` removed 2026-11-13, R100: no speaker;
    ngspice's `\` is `Trunc(Abs(Div))`.)
 4. **Leaves for what a dialect leaves to the analysis.** `TStep` and `TStop` (the transient's

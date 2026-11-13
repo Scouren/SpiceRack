@@ -253,6 +253,13 @@ fn binary_operators() {
     exact(bin(BinOp::Ge, 2.0, 2.0), 1.0);
     exact(bin(BinOp::And, 2.0, 0.0), 0.0);
     exact(bin(BinOp::And, 2.0, 3.0), 1.0); // non-zero is true, the result is 0 or 1
+    // Xyce `^` (DIALECT-XYCE.md, run expr_xor): exactly one non-zero
+    exact(bin(BinOp::Xor, 0.4, 0.7), 0.0);
+    exact(bin(BinOp::Xor, 0.0, 1.0), 1.0);
+    exact(bin(BinOp::Xor, 1.0, 0.0), 1.0);
+    exact(bin(BinOp::Xor, 1.0, 1.0), 0.0);
+    exact(bin(BinOp::Xor, 2.0, 3.0), 0.0);
+    exact(bin(BinOp::Xor, 0.0, 0.0), 0.0);
     exact(bin(BinOp::Or, 0.0, 0.0), 0.0);
     exact(bin(BinOp::Or, 0.0, -2.0), 1.0);
     exact(bin(BinOp::BitAnd, 6.0, 3.0), 2.0); // 110 & 011

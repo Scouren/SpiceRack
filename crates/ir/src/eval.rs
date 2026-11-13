@@ -401,7 +401,7 @@ fn binary_int(op: BinOp, both_int: bool) -> bool {
         BinOp::Add | BinOp::Sub | BinOp::Mul => both_int,
         BinOp::Div => false,
         BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => true,
-        BinOp::And | BinOp::Or => true,
+        BinOp::And | BinOp::Or | BinOp::Xor => true,
         BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr => true,
         BinOp::DivTyped => both_int,
     }
@@ -440,6 +440,7 @@ fn binary(e: ExprId, op: BinOp, a: f64, b: f64) -> Result<f64, Domain> {
         BinOp::Gt => Ok(bool(a > b)),
         BinOp::Ge => Ok(bool(a >= b)),
         BinOp::And | BinOp::Or => unreachable!("And and Or short-circuit"),
+        BinOp::Xor => Ok(bool((a != 0.0) != (b != 0.0))),
         BinOp::BitAnd => bits(|a, b| a & b),
         BinOp::BitOr => bits(|a, b| a | b),
         BinOp::BitXor => bits(|a, b| a ^ b),

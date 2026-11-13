@@ -302,7 +302,7 @@ pub fn write_params(design: &Design, list: ParamList, ctx: &Ctx, out: &mut Strin
 /// The binding power of a binary operator (higher binds tighter; the ternary is 1, unary 12).
 pub(crate) fn binary_prec(op: BinOp) -> u8 {
     match op {
-        BinOp::Or => 2,
+        BinOp::Or | BinOp::Xor => 2,
         BinOp::And => 3,
         BinOp::BitOr => 4,
         BinOp::BitXor => 5,
@@ -421,6 +421,7 @@ fn binary_text(op: BinOp) -> &'static str {
         BinOp::Ge => " >= ",
         BinOp::And => " && ",
         BinOp::Or => " || ",
+        BinOp::Xor => " ^^ ",
         BinOp::BitAnd => " & ",
         BinOp::BitOr => " | ",
         BinOp::BitXor => " ^ ",
