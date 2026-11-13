@@ -10,7 +10,8 @@
 //!
 //! And a non-integer literal count (R99a), from `decks/f33_frac_*`: ngspice-45 rounds it half
 //! up (`dec 2.5` is `dec 3`, `lin 2.5` is `lin 3`), VACASK truncates `points` (`2.5` is `2`),
-//! neither says a word.
+//! neither says a word. A count given by an expression (an ngspice `.param`, `{5/2}`; a
+//! VACASK control `var`, `5.0/2`) behaves as its value written literally (R99b).
 //!
 //! Contents: `pub fn linear_frequency_sweeps_run_what_each_simulator_counts()`,
 //! `pub fn log_frequency_sweeps_run_each_simulators_law()`,
@@ -168,6 +169,15 @@ pub fn non_integer_counts_round_on_ngspice_and_truncate_on_vacask() {
         (Sim::Vacask, "f33_frac_vacask_lin1p5.sim", Law::Lin, 2),
         (Sim::Vacask, "f33_frac_vacask_lin1p6.sim", Law::Lin, 2),
         (Sim::Vacask, "f33_frac_vacask_lin2p5.sim", Law::Lin, 3),
+        // a count given by an expression behaves as its value written literally (R99b)
+        (Sim::Ngspice, "f33_frac_ac_dec_param2p5.sp", Law::Dec, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec_param2p4.sp", Law::Dec, 2),
+        (Sim::Ngspice, "f33_frac_ac_lin_param2p5.sp", Law::Lin, 3),
+        (Sim::Ngspice, "f33_frac_ac_dec_5by2.sp", Law::Dec, 3),
+        (Sim::Vacask, "f33_frac_vacask_dec_var2p5.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec_var2p6.sim", Law::Dec, 2),
+        (Sim::Vacask, "f33_frac_vacask_lin_var1p5.sim", Law::Lin, 2),
+        (Sim::Vacask, "f33_frac_vacask_dec_5p0by2.sim", Law::Dec, 2),
     ];
     for (simulator, deck, law, n) in cases {
         let want: Vec<f64> = match law {
