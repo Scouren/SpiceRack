@@ -20,6 +20,13 @@
 //! failure (3 does not stop 4: a wrong number behind a known step-3 failure stays visible);
 //! a refusal stops the deck (no text).
 //!
+//! What step 4 does not compare: measures. Under the stated meaning of an ngspice deck
+//! (`ngspice -b -r`, R49) no `.measure` card is evaluated at all: ngspice-45 prints "No
+//! .measure possible in batch mode (-b) with -r rawfile set!" and writes the vectors only. So
+//! no cell compares a measure today; VACASK has no measure statement (`Item(Measure)` is
+//! refused toward it and never read from it). A cell with a third dialect that has measures
+//! makes the measure comparison a step of its own, with its own source mode.
+//!
 //! A deck is `tests/fixtures/pair/<cell>/<deck>.<ext>` (`.sp` ngspice, `.sim` VACASK), with
 //! an optional `<deck>.pair` beside it: `key = value` a line, `#` comments; `owner`,
 //! `proves`, the tightenings `reltol`, `vntol`, `abstol`, `tube` (a looser value fails the
