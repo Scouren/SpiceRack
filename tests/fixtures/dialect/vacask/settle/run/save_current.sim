@@ -1,0 +1,49 @@
+element currents by kind: i(x) and p(x, i) (F13, run130)
+// VACASK (the .#testing build), at t=1.942e-9, one save line each: i(x) prints x:flow(br) for
+// v1 (-8.406e-4), ls (1.0145e-4), lv (1.0145e-4), e1 (-2.0325e-4), h1 (8.406e-5) and "Node
+// 'x:flow(br)' not found." for i1, rs, r2, cs, cv, g1, f1; p('x', i) prints x.i, the current
+// into the first terminal, for v1, i1 (1e-3), rs (8.406e-4), r2 (1.0162e-4), ls, e1, g1
+// (1.0162e-4), h1, f1 (-2.5219e-3) and "Output variable 'i' of instance 'x' not found." for
+// cs, cv (capacitors, both modules) and lv (inductor.osdi). This deck saves every form that runs.
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+load "spice/inductor.osdi"
+load "resistor.osdi"
+load "capacitor.osdi"
+load "inductor.osdi"
+model vs vsource
+model is isource
+model sr sp_resistor
+model sc sp_capacitor
+model sl sp_inductor
+model r resistor
+model c capacitor
+model l inductor
+model e vcvs
+model g vccs
+model h ccvs
+model f cccs
+v1 (1 0) vs dc=0 type="pulse" val0=0 val1=1 delay=1n rise=1n fall=1n width=10n period=40n
+i1 (7 0) is dc=1m
+ri (7 0) r r=1k
+rs (1 2) sr r=1k
+r2 (2 0) r r=1k
+cs (2 0) sc c=1p
+cv (2 0) c c=2p
+ls (2 8) sl l=1n
+r8 (8 0) r r=1k
+lv (2 9) l l=1n
+r9 (9 0) r r=1k
+e1 (3 0 2 0) e gain=2
+r3 (3 0) r r=1k
+g1 (4 0 2 0) g gain=1m
+r4 (4 0) r r=1k
+h1 (5 0) h ctlinst="v1" gain=100
+r5 (5 0) r r=1k
+f1 (6 0) f ctlinst="v1" gain=3
+r6 (6 0) r r=1k
+control
+  options rawfile="ascii"
+  save i(v1) i(ls) i(lv) i(e1) i(h1) p('v1', i) p('i1', i) p('rs', i) p('r2', i) p('ls', i) p('e1', i) p('g1', i) p('h1', i) p('f1', i)
+  analysis tr1 tran step=0.1n stop=3n
+endc
