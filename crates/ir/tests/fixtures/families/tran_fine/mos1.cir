@@ -1,0 +1,24 @@
+mos1 transient, 80 C, m=3, pulse 0..3 V on the gate through 10k, 2k load from 3 V
+.model nm nmos level=1 vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 lambda=0.02 tox=20n cgso=3e-10 cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 fc=0.5 rd=10 rs=10
+vdd dd 0 dc 3
+rl dd d 2k
+vin in 0 dc 0 pulse(0 3 1n 1n 1n 5n 20n)
+rg in g 10k
+vb b 0 dc -0.5
+m1 d g 0 b nm w=10u l=2u ad=20p as=20p pd=24u ps=24u m=3
+.temp 80
+.options reltol=1e-6 abstol=1e-15
+.control
+set numdgt=12
+tran 2.5p 40n 0 5p
+meas tran t2n find v(d) at=2n
+meas tran t3n find v(d) at=3n
+meas tran t4n find v(d) at=4n
+meas tran t6n find v(d) at=6n
+meas tran t8n find v(d) at=8n
+meas tran t9n find v(d) at=9n
+meas tran t12n find v(d) at=12n
+meas tran t20n find v(d) at=20n
+meas tran t30n find v(d) at=30n
+.endc
+.end

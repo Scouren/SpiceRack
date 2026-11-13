@@ -1,0 +1,25 @@
+vdmos_load transient, 80 C, m=x3, pulse 0..5 V on the gate through 10, 2k load from 3 V
+.model nm vdmos vto=2 kp=20 lambda=0.01 rd=10m rs=10m rg=1 cgdmin=50p cgdmax=500p a=0.5 cgs=1n cjo=1n vj=0.8 m=0.4 fc=0.5 is=1e-12 n=1.2 tt=50n
+vdd dd 0 dc 3
+rl dd d 2k
+vin in 0 dc 0 pulse(0 5 1n 1n 1n 5n 20n)
+rg in g 10
+m1 d g 0 nm 
+m2 d g 0 nm 
+m3 d g 0 nm 
+.temp 80
+.options reltol=1e-6 abstol=1e-12
+.control
+set numdgt=12
+tran 10p 40n 0 20p
+meas tran t2n find v(d) at=2n
+meas tran t3n find v(d) at=3n
+meas tran t4n find v(d) at=4n
+meas tran t6n find v(d) at=6n
+meas tran t8n find v(d) at=8n
+meas tran t9n find v(d) at=9n
+meas tran t12n find v(d) at=12n
+meas tran t20n find v(d) at=20n
+meas tran t30n find v(d) at=30n
+.endc
+.end
