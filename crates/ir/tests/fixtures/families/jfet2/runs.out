@@ -1,0 +1,37 @@
+Load decks of sp_jfet2 against ngspice-45, written by ../load.py jfet2.
+Builds on PATH: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n (source hfvpfb0bgw9819wkb7kzpdaasbd0hd5r, devices/jfet2),
+VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (devices/spice/jfet2.va, ngspice-47-159 vadng-pre-48).
+Run: `nix develop .#testing -c tests/fixtures/families/load_run.sh jfet2`. i(vd) in A, |i(vd)| at 1 GHz for acg/acd.
+nom is 27 C, m=1, the control of off (80 C, m=3); both give area=2. The Parker-Skellern model gives delta, xi, p, q, z, vbi and hfeta beside cgs and cgd.
+The oracle of the AC readings (fd.py, last lines): nom_sat's operating point moved 1e-4 V on the gate and the drain,
+whose central differences are gm and gds of the DC law, against |i(vd)| at 1 kHz.
+Result: no difference. DC agrees in every region (4.2e-5 at most, a cutoff pA current), AC to 3e-13, and both
+simulators' AC are their DC law's derivatives (fd.py: within the differences' own 1e-6).
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+nom_cut_acd            ngspice=1.145201291908e-02     vacask=0.011452012919082953     rel=2.58e-13 
+nom_cut_acg            ngspice=1.145201291908e-02     vacask=0.011452012919082953     rel=2.58e-13 
+nom_cut_dc             ngspice=-4.51999548901e-12     vacask=-4.520000042654293e-12   rel=1.01e-06 
+nom_lin_acd            ngspice=2.471465302247e-02     vacask=0.02471465302247143      rel=5.78e-14 
+nom_lin_acg            ngspice=2.481514436450e-02     vacask=0.024815144364504858     rel=1.96e-13 
+nom_lin_dc             ngspice=-1.51095630888e-04     vacask=-0.0001510956309342643   rel=3.06e-10 
+nom_sat_acd_1k         ngspice=4.203190068147e-06     vacask=4.203190068146709e-06    rel=6.91e-14 
+nom_sat_acd            ngspice=1.285354472056e-02     vacask=0.012853544720563144     rel=2.45e-13 
+nom_sat_acg_1k         ngspice=4.215759397063e-04     vacask=0.00042157593970631394   rel=3.30e-14 
+nom_sat_acg            ngspice=1.289857228934e-02     vacask=0.012898572289338134     rel=1.45e-13 
+nom_sat_dc             ngspice=-2.11366726324e-04     vacask=-0.0002113667263242896   rel=1.37e-12 
+nom_sat_dc_fd_dm       ngspice=-2.11366306005e-04     vacask=-0.0002113663060054069   rel=1.93e-12 
+nom_sat_dc_fd_dp       ngspice=-2.11367146639e-04     vacask=-0.0002113671466394738   rel=2.24e-12 
+nom_sat_dc_fd_gm       ngspice=-2.11324570811e-04     vacask=-0.0002113245708104662   rel=2.53e-12 
+nom_sat_dc_fd_gp       ngspice=-2.11408885998e-04     vacask=-0.0002114088859983601   rel=1.70e-12 
+off_cut_acd            ngspice=3.563215329262e-02     vacask=0.03563215329261895      rel=2.94e-14 
+off_cut_acg            ngspice=3.563215329262e-02     vacask=0.03563215329261896      rel=2.92e-14 
+off_cut_dc             ngspice=-5.11080067156e-11     vacask=-5.110820360670898e-11   rel=3.85e-06 
+off_lin_acd            ngspice=7.766085936146e-02     vacask=0.07766085936146878      rel=1.13e-13 
+off_lin_acg            ngspice=7.798017697459e-02     vacask=0.07798017697460032      rel=1.32e-13 
+off_lin_dc             ngspice=-4.53286906074e-04     vacask=-0.0004532869062119582   rel=3.04e-10 
+off_sat_acd            ngspice=3.986449659253e-02     vacask=0.03986449659253121      rel=3.05e-14 
+off_sat_acg            ngspice=4.000146921378e-02     vacask=0.04000146921377654      rel=8.64e-14 
+off_sat_dc             ngspice=-6.34100030420e-04     vacask=-0.000634100030420417    rel=6.58e-13 
+ngspice: gm(fd) 4.2157594e-04 acg_1k 0.0004215759397063 (1.12e-08);  gds(fd) 4.2031700e-06 acd_1k 4.203190068147e-06 (4.77e-06)
+vacask: gm(fd) 4.2157594e-04 acg_1k 0.00042157593970631394 (5.62e-10);  gds(fd) 4.2031703e-06 acd_1k 4.203190068146709e-06 (4.69e-06)

@@ -1,0 +1,11 @@
+mes1 off (80 C, m=3), cut (vgs=-1.5, vds=2.0), acd
+load "spice/mes1.osdi"
+model vs vsource
+model nm sp_mes1 type=1 vt0=-1 alpha=2 beta=2.5e-3 lambda=0.05 b=0.3 rd=5 rs=5 cgs=1p cgd=0.5p pb=0.8 is=1e-14 fc=0.5
+vd (d 0) vs dc=2.0 mag=1
+vg (g 0) vs dc=-1.5
+z1 (d g 0) nm area=2 $mfactor=3
+control
+  options temp=80 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis ac1 ac from=1e9 to=1e9 mode="lin" points=1
+endc

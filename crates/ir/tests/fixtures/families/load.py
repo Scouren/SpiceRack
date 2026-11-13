@@ -1,5 +1,6 @@
 """load.py FAMILY: writes a family's load decks beside it, one ngspice deck (.cir) and one VACASK
-deck (.sim) per (condition, region, reading). Conditions: `nom` (27 C, m=1) is the control of
+deck (.sim) per (condition, region, reading). Families: mos1, mos2, mos3, mos6, mos9 (a bulk at
+-0.5 V), jfet1, jfet2, mes1 (three terminals), passive. Conditions: `nom` (27 C, m=1) is the control of
 `off` (80 C, m=3); geometry is given in both. Readings: `dc` the operating-point current of `vd`,
 `acg` |i(vd)| at 1 GHz with the gate driven, `acd` |i(vd)| at 1 GHz with the drain driven.
 `load.py passive` writes the resistor, capacitor and inductor decks (PASSIVES).
@@ -37,6 +38,25 @@ FAMILIES = {
     )
     for k, own in MOS.items()
 }
+# the JFETs and the MESFET: three terminals, an area for the geometry; region (vgs, vds)
+FAMILIES['jfet1'] = dict(
+    load='spice/jfet1.osdi', letter='j', nodes='d g 0', geometry='area=2',
+    ng_model='.model nm njf level=1 {p}', va_model='model nm sp_jfet1 type=1 {p}',
+    params='vt0=-2 beta=1e-4 lambda=0.02 rd=10 rs=10 cgs=2p cgd=1p pb=0.8 is=1e-14 n=1 fc=0.5 '
+           'b=0.9 tcv=2e-3 bex=-1.5 xti=3 eg=1.11',
+    regions={'cut': (-2.5, 2.0), 'lin': (0.0, 0.2), 'sat': (-1.0, 3.0)})
+FAMILIES['jfet2'] = dict(
+    load='spice/jfet2.osdi', letter='j', nodes='d g 0', geometry='area=2',
+    ng_model='.model nm njf level=2 {p}', va_model='model nm sp_jfet2 type=1 {p}',
+    params='vt0=-2 beta=1e-4 lambda=0.02 rd=10 rs=10 cgs=2p cgd=1p is=1e-14 n=1 fc=0.5 delta=0.1 '
+           'xi=1000 p=2 q=2 z=1 vbi=1 hfeta=0.05',
+    regions={'cut': (-2.5, 2.0), 'lin': (0.0, 0.2), 'sat': (-1.0, 3.0)})
+FAMILIES['mes1'] = dict(
+    load='spice/mes1.osdi', letter='z', nodes='d g 0', geometry='area=2',
+    ng_model='.model nm nmf level=1 {p}', va_model='model nm sp_mes1 type=1 {p}',
+    params='vt0=-1 alpha=2 beta=2.5e-3 lambda=0.05 b=0.3 rd=5 rs=5 cgs=1p cgd=0.5p pb=0.8 is=1e-14 '
+           'fc=0.5',
+    regions={'cut': (-1.5, 2.0), 'lin': (0.0, 0.2), 'sat': (-0.5, 3.0)})
 CONDITIONS = {'nom': (27, 1), 'off': (80, 3)}
 
 # the passives: one region each, so per (condition, form) one reading of `vd` driving node a; an
@@ -70,14 +90,16 @@ def decks(name, f):
         for region, (vg, vd) in f['regions'].items():
             for reading in ('dc', 'acg', 'acd'):
                 stem = f'{cond}_{region}_{reading}'
-                title = (f'{name} {cond} ({temp} C, m={m}), {region} (vgs={vg}, vds={vd}, vbs=-0.5), '
-                         f'{reading}')
+                bulk = f['nodes'].endswith(' b')
+                vbs = ', vbs=-0.5' if bulk else ''
+                title = f'{name} {cond} ({temp} C, m={m}), {region} (vgs={vg}, vds={vd}{vbs}), {reading}'
+                x = f.get('letter', 'm') + '1'
                 gac = ' ac 1' if reading == 'acg' else ''
                 dac = ' ac 1' if reading == 'acd' else ''
                 inst = f['geometry'] + (f' m={m}' if m != 1 else '')
                 ng = [title, f['ng_model'].format(p=f['params']),
-                      f'vd d 0 dc {vd}{dac}', f'vg g 0 dc {vg}{gac}', 'vb b 0 dc -0.5',
-                      f'm1 {f["nodes"]} nm {inst}', f'.temp {temp}', '.options reltol=1e-9 abstol=1e-15',
+                      f'vd d 0 dc {vd}{dac}', f'vg g 0 dc {vg}{gac}'] + ['vb b 0 dc -0.5'] * bulk + [
+                      f'{x} {f["nodes"]} nm {inst}', f'.temp {temp}', '.options reltol=1e-9 abstol=1e-15',
                       '.control', 'set numdgt=12']
                 ng += ['op', 'print i(vd)'] if reading == 'dc' else \
                       ['ac lin 1 1g 1g', 'print mag(i(vd))']
@@ -87,8 +109,8 @@ def decks(name, f):
                       f['va_model'].format(p=f['params']),
                       f'vd (d 0) vs dc={vd}' + (' mag=1' if dac else ''),
                       f'vg (g 0) vs dc={vg}' + (' mag=1' if gac else ''),
-                      'vb (b 0) vs dc=-0.5',
-                      f'm1 ({f["nodes"]}) nm {va_inst}',
+                      ] + ['vb (b 0) vs dc=-0.5'] * bulk + [
+                      f'{x} ({f["nodes"]}) nm {va_inst}',
                       'control', f'  options temp={temp} tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"',
                       '  analysis op1 op' if reading == 'dc' else
                       '  analysis ac1 ac from=1e9 to=1e9 mode="lin" points=1', 'endc']
