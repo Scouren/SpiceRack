@@ -22,7 +22,8 @@
 //!   note: one after a run item (`MID_RUN`), one whose class a `Reset` of the walk restores
 //!   (`RESET_RESTORES`: a reset drops `FromHere` state, never `WholeRun`), one a `FromHere` item
 //!   of the walk sets the same thing as (`FROM_HERE_SAME`: which of the two holds is not
-//!   stated by the IR, so the item keeps its mode).
+//!   stated by the IR, so the item keeps its mode), one inside a subcircuit body (`IN_BODY`: there
+//!   only a whole-run placement has a meaning, R98, `ir::check`'s `RunOrderInSubckt`).
 //!
 //! Listed order is the IR's (`ir::run_walks`): per deck file its items depth first, each body
 //! right after its item, an `Include` read as the items of the file it names in place; a file
@@ -36,7 +37,8 @@
 //! `pub fn whole_run_node_set_to_from_here`, `pub fn whole_run_save_to_from_here` (each
 //! `(&mut ir::Design, &mut ir::Diags)`),
 //! `pub const STATE_ELSEWHERE: ir::Code`, `pub const MID_RUN: ir::Code`,
-//! `pub const RESET_RESTORES: ir::Code`, `pub const FROM_HERE_SAME: ir::Code`
+//! `pub const RESET_RESTORES: ir::Code`, `pub const FROM_HERE_SAME: ir::Code`,
+//! `pub const IN_BODY: ir::Code`
 
 use crate::ir;
 
@@ -48,6 +50,8 @@ pub const MID_RUN: ir::Code = ir::Code::new(b'U', 401);
 pub const RESET_RESTORES: ir::Code = ir::Code::new(b'U', 402);
 /// The note at a `WholeRun` item a `FromHere` item of its walk sets the same thing as.
 pub const FROM_HERE_SAME: ir::Code = ir::Code::new(b'U', 403);
+/// The note at a `WholeRun` item inside a subcircuit body (R98: `FromHere` has no meaning there).
+pub const IN_BODY: ir::Code = ir::Code::new(b'U', 446);
 
 /// Moves each walk's mid-run `WholeRun` options to just before its first run item.
 pub fn whole_run_option_first(design: &mut ir::Design, diags: &mut ir::Diags) {
@@ -156,6 +160,12 @@ fn holds(design: &ir::Design, item: ir::ItemRef) -> Option<ir::Applies> {
 /// The `WholeRun` items of `kind` before each walk's first run item made `FromHere`, or noted.
 fn to_from_here(design: &mut ir::Design, diags: &mut ir::Diags, kind: ir::ItemKind) {
     let mut change = Vec::new();
+    let reachable = design.reachable();
+    let in_body: Vec<ir::ItemRef> = reachable
+        .iter()
+        .filter(|&&(i, scope)| i.kind == kind && in_subckt(design, scope, reachable.len()))
+        .map(|&(i, _)| i)
+        .collect();
     for (_, order) in ir::run_walks(design) {
         let first = order
             .iter()
@@ -178,7 +188,9 @@ fn to_from_here(design: &mut ir::Design, diags: &mut ir::Diags, kind: ir::ItemKi
                 holds(design, other) == Some(ir::Applies::FromHere)
                     && same_thing(design, item, other)
             });
-            let code = if k > first {
+            let code = if in_body.contains(&item) {
+                Some(IN_BODY)
+            } else if k > first {
                 Some(MID_RUN)
             } else if restored {
                 Some(RESET_RESTORES)
@@ -243,6 +255,23 @@ fn to_from_here(design: &mut ir::Design, diags: &mut ir::Diags, kind: ir::ItemKi
             _ => unreachable!("only state items and saves are changed"),
         }
     }
+}
+
+/// Whether `scope` or an ancestor is a subcircuit body (`ir::check`'s chain); `bound` is the
+/// reachable item count: every scope but a file's top one is opened by a reachable item.
+fn in_subckt(design: &ir::Design, scope: ir::ScopeId, bound: usize) -> bool {
+    let mut at = scope;
+    for _ in 0..=bound + 1 {
+        if at.is_none() {
+            return false;
+        }
+        let s = design.scope(at);
+        if s.kind == ir::ScopeKind::Subckt {
+            return true;
+        }
+        at = s.parent;
+    }
+    unreachable!("a scope chain is shorter than the reachable items")
 }
 
 /// The `Reset` classes that would restore the item were it `FromHere` (`Restorable` docs).

@@ -302,4 +302,13 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             kind: ir::Kind::Note,
         },
     ),
+    (
+        wr::IN_BODY,
+        ir::Info {
+            title: "a whole-run state item inside a subcircuit body",
+            cite: "rewrite/RULINGS.md R98, R27",
+            explain: "Inside a subcircuit body a state item is a placement that holds for the whole run; holding from where it stands has no meaning there (a subcircuit is instantiated, not executed), so the target's positional form cannot state it and the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
 ];
