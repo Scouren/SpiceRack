@@ -317,8 +317,9 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
         l.body(*top, &root, None);
         l.comments_until(u32::MAX, true);
     }
-    bind::reads(out, &reads, diags);
-    bind::masters(out, &masters, diags);
+    let visible = super::visible::Visible::new(out.design());
+    bind::reads(out, &visible, &reads, diags);
+    bind::masters(out, &visible, &masters, diags);
 }
 
 /// Statement `n` as an `Opaque` of `class`, its text as written: the class's `S` note and,

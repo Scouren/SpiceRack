@@ -1,0 +1,7 @@
+b_incsec_sub (x1:r1 5000): a subckt inside a section reads the section's parameter and model
+load "spice/resistor.osdi"
+include "sub.lib" section=s
+x1 (n) w
+control
+  print instance("x1:r1")
+endc

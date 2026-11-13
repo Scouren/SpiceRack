@@ -30,6 +30,7 @@ mod read_run;
 mod read_sources;
 mod read_structure;
 mod tables;
+mod visible;
 mod write;
 mod write_elements;
 mod write_models;

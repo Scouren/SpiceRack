@@ -1,0 +1,9 @@
+b_incsec_top_before: a deck-top parameter the included section defines too ("Parameter redefinition.")
+load "spice/resistor.osdi"
+parameters pd=0.5
+include "lib.lib" section=mc
+model vsource vsource
+v1 (n 0) vsource dc=1
+control
+  analysis op1 op
+endc

@@ -1,0 +1,8 @@
+section dfl
+  parameters pd=0.1
+endsection
+section mc
+  parameters early=pd*10
+  include "b_include_bind--lib.lib" section=dfl
+  parameters late=pd+1
+endsection

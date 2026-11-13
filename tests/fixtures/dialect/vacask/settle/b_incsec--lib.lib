@@ -1,0 +1,16 @@
+section dfl
+  parameters pd=0.1 pt=2
+  model rm sp_resistor
+  subckt cell (a b)
+    parameters g=3
+    r1 (a b) rm r=1k*g
+  ends
+endsection
+section mc
+  parameters early=pd*10
+  include "lib.lib" section=dfl
+  parameters late=pt*(1+pd)
+  include "other.inc"
+  r9 (n 0) rm r=1k
+  x1 (n 0) cell
+endsection
