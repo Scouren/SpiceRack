@@ -3,13 +3,16 @@
 //! an RC and a MOSFET), every plot, vector and value equal; and `interp`, which the rule keeps,
 //! changes it (the control: the comparison sees a change). `klu` within its stated bound, 1e-7
 //! relative above ABSTOL (R83); and `drop_print`'s four combinations of `.print` and `.save`, the raw file
-//! identical.
+//! identical. And, on the IR alone, for every row and every Fourier analysis that may read its
+//! key (none, one with its count and grid, one without a count, one without a grid): `ir::check`
+//! clean after the row, and the option kept exactly where an IR row reads it.
 //!
 //! Contents: `pub fn inert_options_leave_the_raw_file_alone()`,
-//! `pub fn prints_leave_the_raw_file_alone()`, `pub fn klu_within_its_rounding()`
+//! `pub fn inert_options_keep_what_an_ir_row_reads()`, `pub fn prints_leave_the_raw_file_alone()`, `pub fn klu_within_its_rounding()`
 
 use std::path::Path;
 
+use spicerack::ir;
 use spicerack::result::RawData;
 
 use crate::sim::{self, Ran, Sim};
@@ -111,7 +114,86 @@ pub fn klu_within_its_rounding() {
     }
 }
 
+/// Each row over the Fourier forms that read or do not read its key: check clean, the option
+/// kept (`OPTION_KEPT`) exactly where a Four reads it.
+pub fn inert_options_keep_what_an_ir_row_reads() {
+    use spicerack::passes::run::inert_options::{INERT, OPTION_DROPPED, OPTION_KEPT};
+    let fours = [
+        ("", None),
+        (
+            "  analysis four fundamental=1k harmonics=9 periods=1 grid=100 (v (out))\n",
+            None,
+        ),
+        (
+            "  analysis four fundamental=1k periods=1 grid=100 (v (out))\n",
+            Some(ir::OptionKey::NFreqs),
+        ),
+        (
+            "  analysis four fundamental=1k harmonics=9 periods=1 (v (out))\n",
+            Some(ir::OptionKey::FourGridSize),
+        ),
+    ];
+    let mut ran = 0;
+    for &(name, key, run) in INERT {
+        for (four, reader) in fours {
+            let value = if key.is_flag() {
+                String::new()
+            } else {
+                " value=5".to_string()
+            };
+            // a count-less Four needs an nfreqs in force to be valid at all
+            let nfreqs = if reader == Some(ir::OptionKey::NFreqs) && key != ir::OptionKey::NFreqs {
+                "  option n_freqs value=5 whole_run\n"
+            } else {
+                ""
+            };
+            let text = format!(
+                "file \"a.sp\" deck\n  option {}{value} whole_run\n{nfreqs}  analysis tran stop=1u print_step=1n cap=none\n{four}",
+                snake(&format!("{key:?}"))
+            );
+            let mut design = ir::Design::new();
+            let mut diags = ir::Diags::new();
+            ir::parse(&text, &mut design.builder(), &mut diags);
+            ir::check(&design, &mut diags);
+            assert!(
+                diags.is_empty(),
+                "{name}: the input\n{text}{:?}",
+                diags.rows()
+            );
+            run(&mut design, &mut diags);
+            let codes: Vec<ir::Code> = diags.rows().iter().map(|d| d.code).collect();
+            let mut found = ir::Diags::new();
+            ir::check(&design, &mut found);
+            assert!(
+                found.is_empty(),
+                "{name}: check after the row\n{text}{:?}",
+                found.rows()
+            );
+            let want = if reader == Some(key) {
+                OPTION_KEPT
+            } else {
+                OPTION_DROPPED
+            };
+            assert_eq!(codes, [want], "{name}\n{text}");
+            ran += 1;
+        }
+    }
+    assert_eq!(ran, INERT.len() * fours.len(), "every row over every form");
+}
+
 // ---- private ----
+
+/// The IR's word for a key: snake case of its name (`NoAcct` → `no_acct`).
+fn snake(name: &str) -> String {
+    let mut out = String::new();
+    for (k, c) in name.chars().enumerate() {
+        if c.is_ascii_uppercase() && k > 0 {
+            out.push('_');
+        }
+        out.push(c.to_ascii_lowercase());
+    }
+    out
+}
 
 /// The probe deck with `line` in place of its `*OPTION` comment, run on ngspice-45.
 fn probe(line: &str) -> Vec<RawData> {

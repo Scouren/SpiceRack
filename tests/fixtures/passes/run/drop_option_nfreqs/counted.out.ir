@@ -1,0 +1,3 @@
+file "a.sp" deck
+  analysis tran stop=1u print_step=1n cap=none
+  analysis four fundamental=1k harmonics=9 periods=1 (v (out))
