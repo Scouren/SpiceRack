@@ -14,6 +14,9 @@ pub const PENDING_PAIRS: &[&str] = &[
     // its pair deck is Xyce -> ngspice, xyce-2's `tests/fixtures/pair/xyce-ngspice/noise.cir`
     // (branch dialect-xyce): the marker goes when that deck names it in `proves =`
     "noise_ref_source_ac_to_unit",
+    // its pair decks are ngspice -> Xyce, xyce-2's `ngspice-xyce/tran_uic.sp` and
+    // `tran_uic_float.sp` (branch dialect-xyce), once Xyce's reader holds a device `ic=`
+    "device_ic_uic_to_in_op",
     // proven on both simulators by `passes_run/dc_loops.rs`, not a pair deck: the pair harness
     // compares one DC plot with one, and the rule writes one op plot a pass
     // (dc_axis_device_param_to_loop's pair deck is vacask-ngspice/dc_device_param.sim)

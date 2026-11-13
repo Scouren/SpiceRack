@@ -19,7 +19,7 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod alter_at_reset`, `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod noise_ref_unit`, `pub mod param_arguments`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod alter_at_reset`, `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod device_ic_in_op`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod noise_ref_unit`, `pub mod param_arguments`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
 //! `codes.rs`)
@@ -28,6 +28,7 @@ pub mod alter_at_reset;
 mod codes;
 pub mod dc_axes_to_loops;
 pub mod device_ic;
+pub mod device_ic_in_op;
 pub mod drop_print;
 pub mod ic_next_only;
 pub mod inert_options;
@@ -171,6 +172,13 @@ pub(super) const PASSES: &[Pass] = &[
             .with(ir::Feature::Run(RunExtra::NodeSetMidRun)),
         notes: &[device_ic::DEVICE_IC_KEPT],
         run: device_ic::device_ic_to_tran_ic,
+    },
+    Pass {
+        name: "device_ic_uic_to_in_op",
+        removes: ir::Feature::Circuit(ir::CircuitExtra::IcUicOnly),
+        requires: ir::FeatureSet::EMPTY.with(ir::Feature::Circuit(ir::CircuitExtra::IcInOp)),
+        notes: &[device_ic_in_op::IC_OP_READ],
+        run: device_ic_in_op::device_ic_uic_to_in_op,
     },
     Pass {
         name: "ic_beyond_next_to_next_only",

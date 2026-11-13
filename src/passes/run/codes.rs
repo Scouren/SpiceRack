@@ -6,9 +6,9 @@
 //! Contents: `pub(crate) const CODES: &[(ir::Code, ir::Info)]`
 
 use super::{
-    alter_at_reset, dc_axes_to_loops, device_ic, drop_print, fs, ic_next_only, inert_options,
-    loop_end, names_dropped, names_given, noise_ref_unit, param_arguments, run_items_together,
-    save_set_to_all, sweep_forms, tc, tran_print_step, wr,
+    alter_at_reset, dc_axes_to_loops, device_ic, device_ic_in_op, drop_print, fs, ic_next_only,
+    inert_options, loop_end, names_dropped, names_given, noise_ref_unit, param_arguments,
+    run_items_together, save_set_to_all, sweep_forms, tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -290,6 +290,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a noise analysis referred to its source's AC magnitude, which is not surely 1",
             cite: "INV-semantics.md 8.10; crates/ir/src/dc_ac.rs (NoiseRef)",
             explain: "The input-referred noise is the output noise divided by a gain: to the input source's own AC magnitude here, to a unit input on the target. The two are one number only when that magnitude is 1. Here it is not a literal 1 (or the source is not one top-level source, or a loop or an alter may change it between runs), so the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        device_ic_in_op::IC_OP_READ,
+        ir::Info {
+            title: "a uic-only device initial condition an operating point of the design would read",
+            cite: "crates/ir/src/passive.rs (IcMode); xyce-2's run device_ic_op.cir",
+            explain: "The source applies this initial condition only to a transient that skips the operating point; the target holds it in every operating point too. The two agree only when the design solves no operating point, i.e. every analysis is a uic transient. Here some analysis solves one, so the item is refused.",
             kind: ir::Kind::Note,
         },
     ),
