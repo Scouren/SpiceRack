@@ -8,9 +8,9 @@
 //! (a question two builds answer differently); a point's variants exclude each other. Each row
 //! of the table (`Law::row`) gives the variant's point, the families whose models follow it, its
 //! member, its IR word and its point's exact rewriting (R92, R96, R93a: none, stated, negated,
-//! noted, guarded). *How many*: one set per design; `Law::COUNT` variants (44, two per point, 22
-//! points), one bit each in a `u64` (the compile-time assertions below fail the build when the
-//! enum outgrows 64 or a point gains a third variant). *Who writes*: a
+//! noted, guarded). *How many*: one set per design; `Law::COUNT` variants (45 in 22 points, two
+//! per point but F43's three), one bit each in a `u64` (the compile-time assertions below fail
+//! the build when the enum outgrows 64 or a point has fewer than two variants). *Who writes*: a
 //! reader, once per read, the constant of its simulator build (`Builder::set_laws`); the text's
 //! `laws` line; the generator; never a pass. *Who reads*: `features`, once per element or model
 //! row and once per expression node of dynamic form (R93a's function points) (O(the stated variants) ≤ `Law::COUNT`, each predicate O(the row's parameters and its one
@@ -191,6 +191,10 @@ pub enum Law {
     ExpClamp1e99,
     /// Point R93a F43: the exact function (VACASK). Noted toward ngspice.
     ExpExact,
+    /// Point R93a F43, LTspice's: `e^x` followed past 227.96 (`exp(236)` = 6.0e100) and the
+    /// result clamped at 1e200 (LTspice 26.1.1, `ltspice-2`). Guarded toward a target with the
+    /// exact law (`x > 460.517 ? 1e200 : exp(x)`), noted toward ngspice's.
+    ExpClamp1e200,
     /// Point R93a F44, a behavioural `ln`, `log10` of 0: -1e99 (ngspice-45's B source). Carried by
     /// `ln` or `log10` in a root of dynamic form. Guarded (`x == 0 ? -1e99 : ln(x)`).
     LogZeroMinus1e99,
@@ -343,11 +347,11 @@ const POINTS: [Point; 22] = [
 // 40 variants: a `u64`, one bit each (the build fails here when the enum outgrows it)
 const _: () = assert!(Law::COUNT <= u64::BITS as usize);
 const _: () = assert!(size_of::<Laws>() == 8);
-const _: () = assert!(Law::COUNT == 2 * POINTS.len());
+const _: () = assert!(every_point_has_two_variants());
 
 impl Law {
     /// Every variant, in declaration order (its bit in [`Laws`]).
-    pub const ALL: [Law; 44] = [
+    pub const ALL: [Law; 45] = [
         Law::BcSatAreaTimesAreab,
         Law::BcSatAreabOnly,
         Law::SubSatLastFactor,
@@ -382,6 +386,7 @@ impl Law {
         Law::TrigExact,
         Law::ExpClamp1e99,
         Law::ExpExact,
+        Law::ExpClamp1e200,
         Law::LogZeroMinus1e99,
         Law::LogZeroError,
         Law::DivGminGuard,
@@ -564,4 +569,27 @@ pub(crate) fn draw(g: &mut Gen, features: &FeatureSet) -> Laws {
         "a drawn set states each point once"
     );
     set
+}
+
+// ---- private ----
+
+/// Whether each point has at least two variants (a point is a question two builds answer
+/// differently; F43 has three, R93a and LTspice).
+const fn every_point_has_two_variants() -> bool {
+    let mut p = 0;
+    while p < POINTS.len() {
+        let mut n = 0;
+        let mut k = 0;
+        while k < Law::COUNT {
+            if Law::ALL[k].row().point as usize == POINTS[p] as usize {
+                n += 1;
+            }
+            k += 1;
+        }
+        if n < 2 {
+            return false;
+        }
+        p += 1;
+    }
+    true
 }

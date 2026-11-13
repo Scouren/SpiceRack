@@ -335,6 +335,8 @@ pub enum CircuitExtra {
     ExpClamp1e99,
     /// An expression node of dynamic form carrying R93a F43's point under `Law::ExpExact`.
     ExpExact,
+    /// The same under `Law::ExpClamp1e200` (LTspice).
+    ExpClamp1e200,
     /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroMinus1e99`.
     LogZeroMinus1e99,
     /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroError`.
@@ -359,7 +361,7 @@ pub enum CircuitExtra {
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 149] = [
+    pub const ALL: [CircuitExtra; 150] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -499,6 +501,7 @@ impl CircuitExtra {
         CircuitExtra::TrigExact,
         CircuitExtra::ExpClamp1e99,
         CircuitExtra::ExpExact,
+        CircuitExtra::ExpClamp1e200,
         CircuitExtra::LogZeroMinus1e99,
         CircuitExtra::LogZeroError,
         CircuitExtra::DivGminGuard,

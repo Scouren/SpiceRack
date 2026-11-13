@@ -52,7 +52,9 @@ mod tests {
             | L::DivExact
             | L::AsinEdgeZero
             | L::AsinEdgeFails => Want::Noted,
-            L::ExpClamp1e99 | L::LogZeroMinus1e99 | L::DivGminGuard => Want::Guarded,
+            L::ExpClamp1e99 | L::ExpClamp1e200 | L::LogZeroMinus1e99 | L::DivGminGuard => {
+                Want::Guarded
+            }
             L::BcSatAreaTimesAreab
             | L::BcSatAreabOnly
             | L::SubSatLastFactor
