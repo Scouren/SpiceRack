@@ -1,0 +1,3 @@
+file "a.sp" deck
+  param n = 2
+  analysis ac (dec stretch start=1k stop=5k points=n)

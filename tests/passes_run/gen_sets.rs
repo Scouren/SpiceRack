@@ -2,7 +2,7 @@
 //! rules' own tests.
 //!
 //! Contents: `pub const fn dc_loops(ir::RunExtra) -> ir::FeatureSet`,
-//! `pub const PARAM_ARGS: ir::FeatureSet`, `pub const fn behav_reads() -> ir::FeatureSet`,
+//! `pub const PARAM_ARGS: ir::FeatureSet`, `pub const fn one_kind_without(ir::ElemKind, ir::Law) -> ir::FeatureSet`, `pub const fn behav_reads() -> ir::FeatureSet`,
 //! `pub const fn sources_only(&[ir::WaveKind], ir::Feature) -> ir::FeatureSet` (the waves
 //! rows' set, moved here from `pass_laws.rs` to keep it under 500 lines)
 
@@ -53,6 +53,23 @@ pub const fn behav_reads() -> ir::FeatureSet {
     while j < items.len() {
         set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Item(items[j])));
         j += 1;
+    }
+    set
+}
+
+/// Every feature but the element kinds other than `kind` and the law variant `other`: the
+/// designs a stated rule of `other`'s point rewrites (the diode's `xom`: over every feature no
+/// seed of 96 carried either variant, with the diode alone 5 each).
+pub const fn one_kind_without(kind: ir::ElemKind, other: ir::Law) -> ir::FeatureSet {
+    let mut set =
+        ir::FeatureSet::ALL.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Circuit(other.member())));
+    let mut i = 0;
+    while i < ir::ElemKind::ALL.len() {
+        let k = ir::ElemKind::ALL[i];
+        if k as u8 != kind as u8 {
+            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)));
+        }
+        i += 1;
     }
     set
 }

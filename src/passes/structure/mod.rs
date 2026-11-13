@@ -20,7 +20,7 @@
 //! Contents: `pub mod constant_param_to_formal`, `pub mod deck_title`, `pub mod device_libraries`, `pub mod drop_builtin_models`,
 //! `pub mod drop_device_libraries`, `pub mod drop_unread_source_models`, `pub mod explicit_family_models`,
 //! `pub mod formal_defaults_to_instances`, `pub mod hoist_nested_subckts`, `pub mod name_with_letter`,
-//! `pub mod splice_elaborate`, `pub mod unused`,
+//! `pub mod splice_elaborate`, `pub mod stated`, `pub mod unused`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]`
 
 pub mod constant_param_to_formal;
@@ -34,6 +34,7 @@ pub mod formal_defaults_to_instances;
 pub mod hoist_nested_subckts;
 pub mod name_with_letter;
 pub mod splice_elaborate;
+pub mod stated;
 pub mod unused;
 
 use super::Pass;
@@ -174,6 +175,27 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[],
         run: drop_device_libraries::drop_device_libraries,
     },
+    // R92's stated law points, one row per variant (stated.rs)
+    stated::row(
+        ir::Law::DiodeXomAbsent1e4,
+        "stated_xom_1e4",
+        stated::stated_xom_1e4,
+    ),
+    stated::row(
+        ir::Law::DiodeXomAbsent1e14,
+        "stated_xom_1e14",
+        stated::stated_xom_1e14,
+    ),
+    stated::row(
+        ir::Law::VdmosKpAbsent35,
+        "stated_kp_35",
+        stated::stated_kp_35,
+    ),
+    stated::row(
+        ir::Law::VdmosKpAbsent20,
+        "stated_kp_20",
+        stated::stated_kp_20,
+    ),
 ];
 
 /// The group's catalogue rows (`U0300..=U0399`).
@@ -310,6 +332,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "an unused definition dropped for a refusal it held",
             cite: "rewrite/RULINGS.md R80",
             explain: "Nothing the deck runs uses this definition (no element, analysis, statement or used definition names it, reads it or calls it, and no unresolved name or opaque statement spells it), and it holds an item the target refuses (a feature the target lacks, or the target writer's own refusal), or it names a definition dropped for one, so it is dropped rather than refused. The note's argument packs the refusal's code and argument; a kit conversion keeps every definition.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        stated::STATED_KEPT,
+        ir::Info {
+            title: "a carrier of a stated law point that is no model",
+            cite: "rewrite/RULINGS.md R90, R92",
+            explain: "The design's simulator build gives this parameter a value when it is absent, and the target's build another; the rule writes the design's value on each model that carries the point. This carrier is no model row, so there is nothing to write it on, and the item is refused.",
             kind: ir::Kind::Note,
         },
     ),

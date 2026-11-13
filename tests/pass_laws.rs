@@ -168,6 +168,22 @@ const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     ("analysis_param_args_to_values", gen_sets::PARAM_ARGS),
     ("param_reads_to_typed", gen_sets::behav_reads()),
     (
+        "stated_xom_1e4",
+        gen_sets::one_kind_without(ir::ElemKind::Diode, ir::Law::DiodeXomAbsent1e14),
+    ),
+    (
+        "stated_kp_35",
+        gen_sets::one_kind_without(ir::ElemKind::Mosfet, ir::Law::VdmosKpAbsent20),
+    ),
+    (
+        "stated_kp_20",
+        gen_sets::one_kind_without(ir::ElemKind::Mosfet, ir::Law::VdmosKpAbsent35),
+    ),
+    (
+        "stated_xom_1e14",
+        gen_sets::one_kind_without(ir::ElemKind::Diode, ir::Law::DiodeXomAbsent1e4),
+    ),
+    (
         "sweep_dc_list_to_step",
         gen_sets::dc_loops(ir::RunExtra::DcAxisElementValue),
     ),

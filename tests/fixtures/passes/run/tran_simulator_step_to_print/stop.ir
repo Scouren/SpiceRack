@@ -1,0 +1,3 @@
+file "a.sp" deck
+  analysis tran stop=10u max_step=1u
+  analysis tran stop=(2 * 5u) max_step=(10u / 1024) uic

@@ -70,6 +70,11 @@ pub const PENDING_PAIRS: &[&str] = &[
     "device_ic_to_tran_ic",
     "loop_restore_to_keep_last",
     "loop_keep_last_to_restore",
+    // proven on both simulators by `passes_run/freq_grids.rs` (end_law_lists_run_the_source_
+    // simulators_points); the pair decks `ac_dec_offgrid` (both directions) name them once the
+    // readers state the end laws (ngspice-2, vacask2-2) and pair-2 re-records
+    "sweep_end_stretch_to_list",
+    "sweep_end_ng_decade_to_list",
 ];
 
 /// Every run pass has a pair deck naming it in `proves =` or a [`PENDING_PAIRS`] row, not

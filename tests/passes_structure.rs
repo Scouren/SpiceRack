@@ -35,6 +35,12 @@ use reads::{
 /// The structure passes whose simulator proof (a pair deck naming it in `proves =`,
 /// `rewrite/SPINE.md` §8a) is still to come: compared by name with the decks, both ways.
 const PENDING_PAIRS: &[&str] = &[
+    // R92's stated rules: proven by the law table's runs (`crates/ir/tests/fixtures/families/`),
+    // a pair deck each when a diode with wm or a VDMOS without kp is in a pair list
+    "stated_xom_1e4",
+    "stated_xom_1e14",
+    "stated_kp_35",
+    "stated_kp_20",
     "deck_title",
     "explicit_family_models",
     "device_libraries",
