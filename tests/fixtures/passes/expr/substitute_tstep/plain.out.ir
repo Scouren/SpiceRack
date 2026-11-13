@@ -1,3 +1,3 @@
 file "d.sp" deck
   param a = 1n * 2
-  analysis tran stop=1u print_step=1n cap=none
+  analysis tran stop=1u print_step=1n cap=span_over10

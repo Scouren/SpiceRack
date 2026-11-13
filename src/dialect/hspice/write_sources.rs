@@ -335,7 +335,9 @@ mod tests {
             wave(
                 "am(offset=0 amplitude=1 mod_offset=1 mod_index=1 pre=zero given_zero=spice_default)",
             ),
-            wave("sffm(offset=0 amplitude=1 law=spice3 pre=hold_delay_value given_zero=spice_default)"),
+            wave(
+                "sffm(offset=0 amplitude=1 law=spice3 pre=hold_delay_value given_zero=spice_default)",
+            ),
             wave("pwl(points=[0, 0, 1u, (k * 2)] delay=1u repeat_at=0 repeat=from)"),
             "element isource i1 (a 0) mult=2 wave=sffm(offset=0 amplitude=1 carrier_freq=1k \
              mod_index=1 signal_freq=1k law=spice3 pre=hold_delay_value given_zero=spice_default) \

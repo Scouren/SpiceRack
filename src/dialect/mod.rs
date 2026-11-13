@@ -553,7 +553,10 @@ fn restate_laws(design: &mut ir::Design, features: &ir::FeatureSet) {
     points.sort_unstable();
     points.dedup();
     for p in points {
-        let point: Vec<ir::Law> = ir::Law::ALL.into_iter().filter(|l| l.point() == p).collect();
+        let point: Vec<ir::Law> = ir::Law::ALL
+            .into_iter()
+            .filter(|l| l.point() == p)
+            .collect();
         let held: Vec<ir::Law> = point
             .iter()
             .copied()

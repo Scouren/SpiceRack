@@ -250,27 +250,21 @@ fn a_legal_design_ends_stating_the_targets_laws_and_a_refused_one_keeps_its_own(
     assert!(carried.laws().contains(ir::Law::LogZeroMinus1e99));
 }
 
-/// The pairing `restate_laws` relies on: `Law::ALL` lists each point's two variants adjacent,
-/// so a design stating an adjacent pair is a `LawConflict` for `ir::check`.
+/// The grouping `restate_laws` relies on: two variants are one point exactly when
+/// `Law::point` says so (two variants a point, F43 three), so a design stating two of one point
+/// is a `LawConflict` for `ir::check` and two of different points is not.
 #[test]
-fn law_all_lists_each_points_two_variants_adjacent() {
-    for pair in ir::Law::ALL.chunks(2) {
-        let mut design = ir::Design::new();
-        let mut diags = ir::Diags::new();
-        ir::parse("file \"a.sp\" deck\n", &mut design.builder(), &mut diags);
-        design.builder().set_laws(ir::Laws::of(pair));
-        let mut found = ir::Diags::new();
-        ir::check(&design, &mut found);
-        assert!(!found.is_empty(), "{pair:?}: one point, a conflict");
-    }
-    for k in (1..ir::Law::ALL.len() - 1).step_by(2) {
-        let across = [ir::Law::ALL[k], ir::Law::ALL[k + 1]];
-        let mut design = ir::Design::new();
-        let mut diags = ir::Diags::new();
-        ir::parse("file \"a.sp\" deck\n", &mut design.builder(), &mut diags);
-        design.builder().set_laws(ir::Laws::of(&across));
-        let mut found = ir::Diags::new();
-        ir::check(&design, &mut found);
-        assert!(found.is_empty(), "{across:?}: two points, no conflict");
+fn law_point_groups_each_points_variants() {
+    for (k, &a) in ir::Law::ALL.iter().enumerate() {
+        for &b in &ir::Law::ALL[k + 1..] {
+            let mut design = ir::Design::new();
+            let mut diags = ir::Diags::new();
+            ir::parse("file \"a.sp\" deck\n", &mut design.builder(), &mut diags);
+            design.builder().set_laws(ir::Laws::of(&[a, b]));
+            let mut found = ir::Diags::new();
+            ir::check(&design, &mut found);
+            let one = a.point() == b.point();
+            assert_eq!(!found.is_empty(), one, "{a:?}, {b:?}: one point {one}");
+        }
     }
 }

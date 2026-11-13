@@ -1,4 +1,4 @@
 file "a.sp" deck
   param ts = 1n
   analysis tran stop=1u print_step=ts max_step=(1u / 50)
-  analysis tran stop=2u print_step=1n cap=none
+  analysis tran stop=2u print_step=1n cap=span_over10

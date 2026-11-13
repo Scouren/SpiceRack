@@ -38,6 +38,8 @@ ngspice FuncDyn(Atan2) owed from=vacask
 ngspice FuncDyn(Hypot) owed from=vacask
 ngspice FuncDyn(Fmod) unspoken
 ngspice FuncDyn(Idt) owed from=vacask
+ngspice Binary(Xor) unspoken
+ngspice BinaryDyn(Xor) unspoken
 ngspice DrawPer(CallSite) owed from=vacask
 ngspice DrawPer(Instance) unspoken
 ngspice DrawPer(Run) unspoken
@@ -45,7 +47,6 @@ ngspice Extra(SectionLibrary) unspoken
 ngspice Extra(CaseSensitiveNames) owed from=vacask
 ngspice Extra(StringValue) owed from=vacask
 ngspice Extra(ListValue) unspoken
-ngspice Extra(FormalOuterRead) unspoken
 ngspice Extra(StringCompare) unspoken
 ngspice Circuit(MultVSource) owed from=vacask
 ngspice Circuit(MultControlledVoltage) owed from=vacask
@@ -105,9 +106,12 @@ ngspice Circuit(DiodeIsrSmallSignalExact) owed from=vacask
 ngspice Circuit(DiodeTtFactorClamped) owed from=vacask
 ngspice Circuit(TrigExact) owed from=vacask
 ngspice Circuit(ExpExact) owed from=vacask
+ngspice Circuit(ExpLin230) unspoken
 ngspice Circuit(LogZeroError) owed from=vacask
 ngspice Circuit(DivExact) owed from=vacask
 ngspice Circuit(AsinEdgeFails) owed from=vacask
+ngspice Circuit(Bsim4v45SmallSignalExact) owed from=vacask
+ngspice Run(TranCapVacask) unspoken
 ngspice Run(TranStartup) unspoken
 ngspice Run(TranNoise) owed from=vacask
 ngspice Run(TranSegments) unspoken
@@ -334,13 +338,13 @@ vacask Func(Atan2) unspoken
 vacask Func(Ddt) unspoken
 vacask Func(Idt) unspoken
 vacask FuncDyn(Fmod) unspoken
+vacask Binary(Xor) unspoken
+vacask BinaryDyn(Xor) unspoken
 vacask Dist(Limit) owed from=ngspice,hspice
 vacask DrawPer(Instance) unspoken
 vacask DrawPer(Run) unspoken
 vacask Extra(SectionLibrary) unspoken
 vacask Extra(ListValue) unspoken
-vacask Extra(FormalOuterRead) unspoken
-vacask Extra(FormalUnboundRead) owed from=ngspice,hspice
 vacask Extra(StringCompare) unspoken
 vacask Circuit(MultInstanceParallel) unspoken
 vacask Circuit(MultInstanceNgspiceAppend) owed from=ngspice,hspice
@@ -416,9 +420,12 @@ vacask Circuit(DiodeIsrSmallSignalHand) owed from=ngspice
 vacask Circuit(DiodeTtFactorUnclamped) owed from=ngspice
 vacask Circuit(TrigReduceCast) owed from=ngspice
 vacask Circuit(ExpClamp1e99) owed from=ngspice
+vacask Circuit(ExpLin230) unspoken
 vacask Circuit(LogZeroMinus1e99) owed from=ngspice
 vacask Circuit(DivGminGuard) owed from=ngspice
 vacask Circuit(AsinEdgeZero) owed from=ngspice
+vacask Circuit(Bsim4v45SmallSignalHand) owed from=ngspice
+vacask Run(TranCapVacask) unspoken
 vacask Run(TranStartup) unspoken
 vacask Run(TranSegments) unspoken
 vacask Run(DcAxisSubcktParam) unspoken
@@ -687,6 +694,8 @@ hspice FuncDyn(Hypot) owed from=vacask
 hspice FuncDyn(Fmod) unspoken
 hspice FuncDyn(Ddt) owed from=ngspice,vacask
 hspice FuncDyn(Idt) owed from=vacask
+hspice Binary(Xor) unspoken
+hspice BinaryDyn(Xor) unspoken
 hspice Unary(Not) owed from=ngspice,vacask
 hspice UnaryDyn(Not) owed from=ngspice,vacask
 hspice DrawPer(CallSite) owed from=vacask
@@ -696,7 +705,6 @@ hspice Extra(SectionLibrary) unspoken
 hspice Extra(CaseSensitiveNames) owed from=vacask
 hspice Extra(StringValue) owed from=vacask
 hspice Extra(ListValue) unspoken
-hspice Extra(FormalOuterRead) unspoken
 hspice Extra(StringCompare) unspoken
 hspice Circuit(MultVSource) owed from=vacask
 hspice Circuit(MultControlledVoltage) owed from=vacask
@@ -775,12 +783,16 @@ hspice Circuit(TrigReduceCast) owed from=ngspice
 hspice Circuit(TrigExact) owed from=vacask
 hspice Circuit(ExpClamp1e99) owed from=ngspice
 hspice Circuit(ExpExact) owed from=vacask
+hspice Circuit(ExpLin230) unspoken
 hspice Circuit(LogZeroMinus1e99) owed from=ngspice
 hspice Circuit(LogZeroError) owed from=vacask
 hspice Circuit(DivGminGuard) owed from=ngspice
 hspice Circuit(DivExact) owed from=vacask
 hspice Circuit(AsinEdgeZero) owed from=ngspice
 hspice Circuit(AsinEdgeFails) owed from=vacask
+hspice Circuit(Bsim4v45SmallSignalHand) owed from=ngspice
+hspice Circuit(Bsim4v45SmallSignalExact) owed from=vacask
+hspice Run(TranCapVacask) unspoken
 hspice Run(TranStartup) unspoken
 hspice Run(TranNoise) owed from=vacask
 hspice Run(TranSegments) unspoken

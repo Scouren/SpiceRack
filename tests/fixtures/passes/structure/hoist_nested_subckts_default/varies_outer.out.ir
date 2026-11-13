@@ -1,9 +1,0 @@
-file "a.sp" deck
-  subckt outer (a b) w=1
-    subckt inner (x y)
-      statistics process (w gauss spread=0.1)
-      element resistor r1 (x y) value=1k
-    element instance x1 (a b) model=inner
-    element resistor r2 (a b) value=w
-  element instance xo (n 0) model=outer
-  element vsource v1 (n 0) dc=1

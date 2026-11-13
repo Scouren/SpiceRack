@@ -1,4 +1,4 @@
 file "d.sp" deck
   param a = $tstep * 2
-  analysis tran stop=1u print_step=1n cap=none
-  analysis tran stop=2u print_step=1n cap=none
+  analysis tran stop=1u print_step=1n cap=span_over10
+  analysis tran stop=2u print_step=1n cap=span_over10

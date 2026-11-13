@@ -130,7 +130,7 @@ fn convertible(seed: u64) -> ir::Design {
     let a = 1 + seed % 9;
     let b = 1 + seed % 4;
     let text = format!(
-        "file \"a.sp\" deck\n  title \"t\"\n  param p1 = {a}u\n  param p2 = {b}n\n  param q = 1\n  element vsource v1 (in 0) dc=1\n  analysis tran stop=(p1 * 2) print_step=p2 cap=none\n  analysis dc (source_dc v1) (lin start=0 stop=p1 step=p2)\n  loop sweep (param q) (list values=[p1, (p2 + 1n)])\n    analysis op\n"
+        "file \"a.sp\" deck\n  title \"t\"\n  param p1 = {a}u\n  param p2 = {b}n\n  param q = 1\n  element vsource v1 (in 0) dc=1\n  analysis tran stop=(p1 * 2) print_step=p2 cap=span_over10\n  analysis dc (source_dc v1) (lin start=0 stop=p1 step=p2)\n  loop sweep (param q) (list values=[p1, (p2 + 1n)])\n    analysis op\n"
     );
     let mut design = ir::Design::new();
     let mut diags = ir::Diags::new();

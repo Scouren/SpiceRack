@@ -4,7 +4,8 @@
 //! Contents: `pub const fn dc_loops(ir::RunExtra) -> ir::FeatureSet`,
 //! `pub const PARAM_ARGS: ir::FeatureSet`, `pub const fn one_kind_without(ir::ElemKind, ir::Law) -> ir::FeatureSet`, `pub const fn behav_reads() -> ir::FeatureSet`,
 //! `pub const fn sources_only(&[ir::WaveKind], ir::Feature) -> ir::FeatureSet` (the waves
-//! rows' set, moved here from `pass_laws.rs` to keep it under 500 lines)
+//! rows' set, moved here from `pass_laws.rs` to keep it under 500 lines),
+//! `pub const fn one_option(ir::OptionKey) -> ir::FeatureSet`
 
 use spicerack::ir;
 
@@ -125,6 +126,22 @@ pub const fn sources_only(waves: &[ir::WaveKind], without: ir::Feature) -> ir::F
             set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Wave(w)));
         }
         j += 1;
+    }
+    set
+}
+
+/// Every feature but the option keys other than `key`: a rare key's row runs on designs whose
+/// options are all `key` (the inert rows; `drop_option_nomod` drew none over every feature once
+/// the placements moved the generator's draws, `Misplaced`).
+pub const fn one_option(key: ir::OptionKey) -> ir::FeatureSet {
+    let mut set = ir::FeatureSet::ALL;
+    let mut k = 0;
+    while k < ir::OptionKey::COUNT {
+        let other = ir::OptionKey::ALL[k];
+        if other as u8 != key as u8 {
+            set = set.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Option(other)));
+        }
+        k += 1;
     }
     set
 }

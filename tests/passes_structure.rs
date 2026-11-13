@@ -53,6 +53,10 @@ const PENDING_PAIRS: &[&str] = &[
     "formal_defaults_to_instances_unbound",
     "constant_param_to_formal",
     "name_with_letter",
+    "stated_temp_27",
+    "stated_temp_25",
+    "stated_tnom_27",
+    "stated_tnom_25",
 ];
 
 const SEEDS: std::ops::Range<u64> = 0..96;
@@ -284,6 +288,7 @@ fn drop_device_libraries_drops_only_libraries() {
 /// passes as a read of the old definition.
 #[test]
 fn hoist_nested_subckts_keeps_what_every_read_binds() {
+    use passes::structure::hoist_nested_subckts as hoist;
     let nested = ir::Feature::Placed(ir::ScopeKind::Subckt, ir::ItemKind::Subckt);
     let mut ran = 0;
     let mut refused = 0;
@@ -296,7 +301,7 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
         let refs_before = refs(&design);
         let reads_before = param_reads(&design);
         let mut diags = ir::Diags::new();
-        passes::structure::hoist_nested_subckts::hoist_nested_subckts_default(&mut design, &mut diags);
+        hoist::hoist_nested_subckts_default(&mut design, &mut diags);
         let mut found = ir::Diags::new();
         ir::check(&design, &mut found);
         assert!(found.is_empty(), "seed {seed}: {:?}", found.rows());
@@ -353,27 +358,21 @@ fn hoist_nested_subckts_keeps_what_every_read_binds() {
 fn formal_default_rows_give_the_values_each_simulator_printed() {
     use passes::structure::formal_defaults_to_instances as f;
     let base: Run = f::formal_defaults_to_instances_default;
-    let rows: [(&str, Run, &str, &str, f64); 5] = [
-        ("formal_defaults_to_instances_default/which1", base, "xs", "t", 3e3),
-        ("formal_defaults_to_instances_default/which2", base, "xs", "t", 3e3),
-        ("formal_defaults_to_instances_default/which3", base, "xs", "l", 6e3),
-        (
-            "formal_defaults_to_instances_outer/which1",
-            f::formal_defaults_to_instances_outer,
-            "x1",
-            "r",
-            2e3,
-        ),
-        (
-            "formal_defaults_to_instances_unbound/which2",
-            f::formal_defaults_to_instances_unbound,
-            "xs",
-            "t",
-            3e3,
-        ),
+    let (d, o, u) = ("default", "outer", "unbound");
+    let (outer, unbound): (Run, Run) = (
+        f::formal_defaults_to_instances_outer,
+        f::formal_defaults_to_instances_unbound,
+    );
+    let rows: [(&str, &str, Run, &str, &str, f64); 5] = [
+        (d, "which1", base, "xs", "t", 3e3),
+        (d, "which2", base, "xs", "t", 3e3),
+        (d, "which3", base, "xs", "l", 6e3),
+        (o, "which1", outer, "x1", "r", 2e3),
+        (u, "which2", unbound, "xs", "t", 3e3),
     ];
-    for (case, run, inst, formal, value) in rows {
-        let got = instance_actual(case, run, inst, formal);
+    for (row, case, run, inst, formal, value) in rows {
+        let case = format!("formal_defaults_to_instances_{row}/{case}");
+        let got = instance_actual(&case, run, inst, formal);
         assert_eq!(got, Ok(value), "{case}: {inst}'s {formal}");
     }
 }

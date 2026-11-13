@@ -72,6 +72,10 @@ const KNOWN: &[Known] = &[];
 /// competing features), as the IR owner who knows the generator states it; (pass name, set).
 const GEN_SETS: &[(&str, ir::FeatureSet)] = &[
     (
+        "drop_option_nomod",
+        gen_sets::one_option(ir::OptionKey::NoMod),
+    ),
+    (
         "pulse_spice_to_vacask",
         gen_sets::sources_only(
             &[ir::WaveKind::Pulse],

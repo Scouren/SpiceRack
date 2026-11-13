@@ -1,7 +1,7 @@
 //! Passes `div_typed_to_div` and `div_typed_to_div_dyn`: a design in, the same design out with
 //! every typed division (`DivTyped`, VACASK's `/`) of one form written with real division, by
 //! the tag table: an operand Real on every evaluation → `a / b`; both Int on every evaluation
-//! → `trunc(a / b)` (never `IntDiv`: ngspice's `\` is `trunc(|a / b|)`). The value is the same
+//! → `trunc(a / b)` (ngspice's `\` is `trunc(|a / b|)`). The value is the same
 //! bit for bit; an Int quotient becomes a Real whole number, which no reader can tell apart
 //! once no typed division reads it (only `DivTyped` reads a tag, A12 K1). Each row rewrites the
 //! roots of its own form (R65: its `requires` are what it writes there), deciding each division
@@ -19,8 +19,7 @@
 //! `div_typed_to_div` removes `Binary(DivTyped)` and requires `Binary(Div)`, `Func(Trunc)`;
 //! `_dyn` removes `BinaryDyn(DivTyped)` and requires `BinaryDyn(Div)`, `FuncDyn(Trunc)`.
 //!
-//! Cites: `rewrite/DIALECT-VACASK.md` §6.2; `rewrite/AMEND-A12.md` K1; `crates/ir/src/expr.rs`
-//! (`BinOp::IntDiv`).
+//! Cites: `rewrite/DIALECT-VACASK.md` §6.2; `rewrite/AMEND-A12.md` K1.
 //!
 //! Contents: `pub fn div_typed_to_div(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn div_typed_to_div_dyn(&mut ir::Design, &mut ir::Diags)`

@@ -148,7 +148,7 @@ pub fn inert_options_keep_what_an_ir_row_reads() {
                 ""
             };
             let text = format!(
-                "file \"a.sp\" deck\n  option {}{value} whole_run\n{nfreqs}  analysis tran stop=1u print_step=1n cap=none\n{four}",
+                "file \"a.sp\" deck\n  option {}{value} whole_run\n{nfreqs}  analysis tran stop=1u print_step=1n cap=span_over10\n{four}",
                 snake(&format!("{key:?}"))
             );
             let mut design = ir::Design::new();

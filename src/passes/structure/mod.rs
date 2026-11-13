@@ -196,6 +196,27 @@ pub(super) const PASSES: &[Pass] = &[
         "stated_kp_20",
         stated::stated_kp_20,
     ),
+    // R102's defaults, carried by the design: a run-wide `Env` written in the entry's top
+    stated::env_row(
+        ir::Law::DefaultTemp27,
+        "stated_temp_27",
+        stated::stated_temp_27,
+    ),
+    stated::env_row(
+        ir::Law::DefaultTemp25,
+        "stated_temp_25",
+        stated::stated_temp_25,
+    ),
+    stated::env_row(
+        ir::Law::DefaultTnom27,
+        "stated_tnom_27",
+        stated::stated_tnom_27,
+    ),
+    stated::env_row(
+        ir::Law::DefaultTnom25,
+        "stated_tnom_25",
+        stated::stated_tnom_25,
+    ),
 ];
 
 /// The group's catalogue rows (`U0300..=U0399`).

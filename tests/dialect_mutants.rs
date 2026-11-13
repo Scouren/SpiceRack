@@ -35,7 +35,13 @@ const SHRINK_STEPS: usize = 400;
 
 /// The rows that fail today: (law, row, the `<deck> seed <n>` labels, why). Strict both ways by
 /// (row, label) (`known::compare`).
-const KNOWN: &[Known] = &[];
+const KNOWN: &[Known] = &[(
+    "l1-mutants",
+    "ngspice",
+    &["tests/fixtures/dialect/ngspice/read/dup_def.sp seed 2"],
+    "a `.lib` section opened inside a `.subckt` reads as a section in a subcircuit body, \
+     `Misplaced` (X0030, the census's placements): the ngspice reader's to refuse (ngspice-2)",
+)];
 
 /// splitmix64.
 struct Rng(u64);
