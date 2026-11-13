@@ -42,6 +42,9 @@ pub struct Corpus {
     pub keep: fn(&str) -> bool,
     /// The cross-sim corpus name.
     pub source_list: &'static str,
+    /// The census's name: its expected list `tests/fixtures/pair/<list>.txt` and its file
+    /// `pair-<list>-census.txt` (a cell may run several corpora).
+    pub list: &'static str,
 }
 
 /// Step 6 runs on every this-many-th written deck of a corpus.
@@ -132,7 +135,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
     let partial_path = format!(
         "{}/pair-{}-census.partial.txt",
         env!("CARGO_TARGET_TMPDIR"),
-        c.name
+        corpus.list
     );
     let partial =
         std::fs::File::create(&partial_path).unwrap_or_else(|e| panic!("{partial_path}: {e}"));
@@ -222,7 +225,11 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
             again.push((k, name, h));
         }
     }
-    let file = format!("{}/pair-{}-census.txt", env!("CARGO_TARGET_TMPDIR"), c.name);
+    let file = format!(
+        "{}/pair-{}-census.txt",
+        env!("CARGO_TARGET_TMPDIR"),
+        corpus.list
+    );
     std::fs::write(&file, lines.join("\n") + "\n").unwrap_or_else(|e| panic!("{file}: {e}"));
     // Step 6, on every STRIDE_SIX-th written deck: converted again on one job, against the
     // bytes the workers wrote.
@@ -238,7 +245,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
         paths.len(),
         table(&seen, &paths.iter().map(|p| rel(p)).collect::<Vec<_>>())
     );
-    crate::judge(&format!("{}-corpus", c.name), &seen)
+    crate::judge(corpus.list, &seen)
 }
 
 // ---- private ----
@@ -413,7 +420,81 @@ fn table(seen: &BTreeMap<(String, u8), Fail>, names: &[String]) -> String {
             .collect();
         out += &format!("  {k}: {n} decks, {pass} pass; {}\n", top.join(", "));
     }
+    out + &solves(seen)
+}
+
+/// The census's solve differences (rulings R96 (3)), one block a class: its name, its decks
+/// by name, and the first deck's message as the run printed it. Classified from what the
+/// steps captured, nothing run again: a step-4 run that failed with a solver's message (which
+/// side, which analysis), a transient that agrees only with the step capped
+/// (`simulator-differs:refinement`), a step-2 refusal for continuation (`Run(DcOuter…)`). A
+/// step-4 run failure that is no solver message is listed as `…-fails:not-a-solve` with its
+/// message, so a pattern this misses shows.
+fn solves(seen: &BTreeMap<(String, u8), Fail>) -> String {
+    let mut classes: BTreeMap<String, Vec<(&String, String)>> = BTreeMap::new();
+    for ((deck, step), f) in seen {
+        let class = match (*step, f.class.as_str()) {
+            (4, "simulator-differs:refinement") => "step-control:refined-step".to_string(),
+            (4, side @ ("target-fails" | "source-fails")) => match solve_analysis(&f.said) {
+                Some(a) => format!("solve:{side}:{a}"),
+                None => format!("{side}:not-a-solve"),
+            },
+            (2, c) if c.contains("Run(DcOuter") => "continuation".to_string(),
+            _ => continue,
+        };
+        // A refusal quotes every refused item: its continuation lines alone.
+        let said = if class == "continuation" {
+            let lines: Vec<&str> = f
+                .said
+                .split(" | ")
+                .filter(|l| l.contains("DcOuter"))
+                .collect();
+            lines.join(" | ")
+        } else {
+            f.said.clone()
+        };
+        classes.entry(class).or_default().push((deck, said));
+    }
+    let mut out =
+        "solve differences (R96), by class: decks, the first one's message:\n".to_string();
+    for (class, decks) in &classes {
+        let names: Vec<&str> = decks.iter().map(|(d, _)| d.as_str()).collect();
+        out += &format!("  {class}: {}\n    said: {}\n", names.join(" "), decks[0].1);
+    }
     out
+}
+
+/// The analysis a solver's failure message names (`tran`, `ac`, `dc`, `op`, `noise`, or
+/// `unnamed`), or `None` when `said` is no solve failure. The forms, as ngspice-45 and VACASK
+/// print them: a step too small, a singular matrix, gmin or source stepping, an iteration limit,
+/// no convergence, homotopy.
+fn solve_analysis(said: &str) -> Option<&'static str> {
+    let low = said.to_ascii_lowercase();
+    let solver = [
+        "timestep too small",
+        "time step too small",
+        "singular",
+        "gmin stepping",
+        "source stepping",
+        "iteration limit",
+        "convergence",
+        "converge",
+        "homotopy",
+    ];
+    if !solver.iter().any(|w| low.contains(w)) {
+        return None;
+    }
+    let words: Vec<&str> = low
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect();
+    let named = ["tran", "ac", "dc", "op", "noise"].into_iter().find(|a| {
+        words.iter().any(|w| {
+            w.strip_prefix(a)
+                .is_some_and(|r| r.chars().all(|c| c.is_ascii_digit()))
+        })
+    });
+    Some(named.unwrap_or("unnamed"))
 }
 
 /// Files ending in `.ext` under `dir`, recursively.
@@ -428,5 +509,31 @@ fn walk(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) {
         } else if p.extension().is_some_and(|x| x == ext) {
             out.push(p);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::solve_analysis;
+
+    #[test]
+    fn a_solver_message_names_its_analysis_and_nothing_else_is_a_solve() {
+        // Oracle: the forms written out by hand (ngspice-45's "doAnalyses: TRAN:  Timestep too
+        // small", VACASK's analysis name `tran1`), and two failures that are no solve.
+        let tran = "Error: doAnalyses: TRAN:  Timestep too small; time = 1e-9 | tran simulation(s) aborted";
+        assert_eq!(solve_analysis(tran), Some("tran"));
+        assert_eq!(
+            solve_analysis("Analysis tran1 failed: Homotopy failed."),
+            Some("tran")
+        );
+        assert_eq!(
+            solve_analysis("Error: doAnalyses: matrix is singular"),
+            Some("unnamed")
+        );
+        assert_eq!(solve_analysis("Device '__behavioral_B2' not found"), None);
+        assert_eq!(
+            solve_analysis("Unexpected format: Unexpected EOF in header"),
+            None
+        );
     }
 }

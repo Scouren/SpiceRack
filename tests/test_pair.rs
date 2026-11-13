@@ -164,8 +164,30 @@ fn spice_bench_to_vacask() {
         var: "SPICE_BENCH",
         keep: |p| !p.contains("/src") && !p.contains("/."),
         source_list: "spice-bench",
+        list: "ngspice-vacask-corpus",
     };
     let wrong = corpus::census(&CELLS[0], &spice_bench);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn spice_bench_twinless_to_vacask() {
+    // The spice-bench decks under `src.assets` that no adapted twin under ngspice/examples or
+    // ngspice/paranoia carries, by the list (its header states the rule): every other
+    // `/src` deck stays out, as in `spice_bench_to_vacask`.
+    let twinless = corpus::Corpus {
+        var: "SPICE_BENCH",
+        keep: twinless,
+        source_list: "spice-bench",
+        list: "ngspice-vacask-twinless",
+    };
+    let wrong = corpus::census(&CELLS[0], &twinless);
     assert!(
         wrong.is_empty(),
         "{} differ:\n{}",
@@ -188,8 +210,53 @@ fn vacask_corpus_to_ngspice() {
                 .any(|seg| other.iter().any(|o| seg.starts_with(o)))
         },
         source_list: "vacask",
+        list: "vacask-ngspice-corpus",
     };
     let wrong = corpus::census(&CELLS[1], &vacask);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn ngspice_examples_to_ngspice() {
+    // The same-dialect cell over spice-bench's ngspice examples (the cross-sim keep rule, under
+    // `ngspice/examples/`).
+    let examples = corpus::Corpus {
+        var: "SPICE_BENCH",
+        keep: |p| p.contains("/ngspice/examples/") && !p.contains("/src") && !p.contains("/."),
+        source_list: "spice-bench",
+        list: "ngspice-ngspice-corpus",
+    };
+    let wrong = corpus::census(&CELLS[2], &examples);
+    assert!(
+        wrong.is_empty(),
+        "{} differ:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn vacask_corpus_to_vacask() {
+    // The same-dialect cell over the VACASK corpus, VACASK's own text only (as
+    // `vacask_corpus_to_ngspice`).
+    let vacask = corpus::Corpus {
+        var: "VACASK_CORPUS",
+        keep: |p| {
+            let other = ["ngspice", "xyce", "gnucap"];
+            !p.split('/')
+                .any(|seg| other.iter().any(|o| seg.starts_with(o)))
+        },
+        source_list: "vacask",
+        list: "vacask-vacask-corpus",
+    };
+    let wrong = corpus::census(&CELLS[3], &vacask);
     assert!(
         wrong.is_empty(),
         "{} differ:\n{}",
@@ -381,4 +448,23 @@ fn stem(p: &Path) -> String {
         .expect("a file name")
         .to_string_lossy()
         .into_owned()
+}
+
+/// Whether the absolute path `p` is one of `tests/fixtures/pair/spice-bench-twinless.txt`'s
+/// decks (paths relative to the corpus root).
+#[cfg(feature = "corpus")]
+fn twinless(p: &str) -> bool {
+    static LIST: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    let list = LIST.get_or_init(|| {
+        let f = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/pair/spice-bench-twinless.txt"
+        );
+        let text = std::fs::read_to_string(f).unwrap_or_else(|e| panic!("{f}: {e}"));
+        text.lines()
+            .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+            .map(|l| format!("/{}", l.trim()))
+            .collect()
+    });
+    list.iter().any(|rel| p.ends_with(rel.as_str()))
 }

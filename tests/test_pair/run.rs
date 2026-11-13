@@ -91,6 +91,16 @@ struct Spine {
     uic: bool,
 }
 
+/// A source simulator's words for a file it cannot open, lower case (ngspice-45: "Error opening
+/// osdi lib … No such file or directory!", "Library … couldn't be loaded!", "Could not find
+/// include file"; VACASK: "No such file or directory").
+const ABSENT: [&str; 4] = [
+    "no such file or directory",
+    "couldn't be loaded",
+    "could not find include file",
+    "cannot open",
+];
+
 /// `names_dropped`'s note at an item whose statement name the target cannot spell, `arg` the
 /// old name (`src/passes/run/names_dropped.rs` `NAME_DROPPED`): for a DC analysis, the name of
 /// each axis, which VACASK writes as the axis's swept vector.
@@ -523,7 +533,25 @@ fn ran_fail(a: Ran, b: Ran) -> Fail {
             "slow",
             "past the CPU budget or the output cap (512 MiB a file)".into(),
         ),
-        (Ran::Failed(why), _) => fail("source-fails", why),
+        // The target's outcome beside it: "source does not solve, target does" is a census
+        // class of its own (R96).
+        (Ran::Failed(why), b) => {
+            let target = match b {
+                Ran::Plots(_) => "ran".to_string(),
+                Ran::Failed(w) => format!("failed too: {w}"),
+                Ran::Timeout => "past its budget".to_string(),
+            };
+            // A file the deck names that is not where it runs (an include, an `.osdi` the
+            // corpus does not ship): the deck cannot run as it stands, a fact of the corpus.
+            let low = why.to_ascii_lowercase();
+            let absent = ABSENT.iter().any(|w| low.contains(w));
+            let class = if absent {
+                "source-environment"
+            } else {
+                "source-fails"
+            };
+            fail(class, format!("{why} | target: {target}"))
+        }
         (_, Ran::Failed(why)) => fail("target-fails", why),
         (Ran::Plots(_), Ran::Plots(_)) => unreachable!("a run without plots"),
     }
