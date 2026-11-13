@@ -60,8 +60,10 @@ impl DetailFacts for Pac {
             RunExtra::PeriodicRelative,
         );
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(sweep_valid(&self.sweep) && axis_ok(self.axis, self.relharm))
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(
+            sweep_valid(design, &self.sweep, SweepUse::Freq) && axis_ok(self.axis, self.relharm),
+        )
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -92,9 +94,12 @@ impl DetailFacts for Pnoise {
             RunExtra::PeriodicRelative,
         );
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
+    fn fault(&self, design: &Design) -> Option<Violation> {
         let ok = output_valid(&self.output) && !self.source.is_none();
-        domain_unless(ok && sweep_valid(&self.sweep) && axis_ok(self.axis, self.relharm))
+        domain_unless(
+            ok && sweep_valid(design, &self.sweep, SweepUse::Freq)
+                && axis_ok(self.axis, self.relharm),
+        )
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -129,8 +134,8 @@ impl DetailFacts for Pxf {
             RunExtra::PeriodicRelative,
         );
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        let ok = output_valid(&self.output) && sweep_valid(&self.sweep);
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        let ok = output_valid(&self.output) && sweep_valid(design, &self.sweep, SweepUse::Freq);
         domain_unless(ok && axis_ok(self.axis, self.relharm))
     }
     #[cfg(any(test, feature = "gen"))]
@@ -163,8 +168,8 @@ impl DetailFacts for Pstb {
             RunExtra::PeriodicRelative,
         );
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        let ok = !self.probe.is_none() && sweep_valid(&self.sweep);
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        let ok = !self.probe.is_none() && sweep_valid(design, &self.sweep, SweepUse::Freq);
         domain_unless(ok && axis_ok(self.axis, self.relharm))
     }
     #[cfg(any(test, feature = "gen"))]
@@ -192,8 +197,8 @@ impl DetailFacts for Stb {
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(!self.probe.is_none() && sweep_valid(&self.sweep))
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(!self.probe.is_none() && sweep_valid(design, &self.sweep, SweepUse::Freq))
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(

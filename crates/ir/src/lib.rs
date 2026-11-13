@@ -44,7 +44,7 @@
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
 //!   `ProbeKind`, `ProbeList`, `Statistics`, `Vary`, `VaryDist`, `SweepBounds`, `SweepEnd`,
-//!   `SweepKind`, `SweepSpec`
+//!   `SweepKind`, `SweepSpec`, `SweepCount`, `on_grid`
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -197,7 +197,7 @@ pub use run_extra::RunExtra;
 pub use span::Span;
 pub use state_order::{Listed, Setting, in_force, listed, run_walks};
 pub use stats::{Statistics, Vary, VaryDist};
-pub use sweep::{SweepBounds, SweepEnd, SweepKind, SweepSpec};
+pub use sweep::{SweepBounds, SweepCount, SweepEnd, SweepKind, SweepSpec, on_grid};
 pub use table::Table;
 pub use text::{dump, parse, parse_unchecked};
 

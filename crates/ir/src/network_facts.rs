@@ -110,8 +110,8 @@ impl DetailFacts for Sp {
         flag(set, self.ports.len > 0, RunExtra::SpPorts);
         flag(set, self.noise, RunExtra::SpNoise);
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(sweep_valid(&self.sweep))
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(sweep_valid(design, &self.sweep, SweepUse::Freq))
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -174,8 +174,8 @@ impl DetailFacts for Disto {
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(sweep_valid(&self.sweep))
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(sweep_valid(design, &self.sweep, SweepUse::Freq))
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(

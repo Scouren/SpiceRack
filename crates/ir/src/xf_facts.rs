@@ -77,8 +77,10 @@ impl DetailFacts for Xf {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(
+            output_valid(&self.output) && sweep_valid(design, &self.sweep, SweepUse::Freq),
+        )
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -100,8 +102,10 @@ impl DetailFacts for SensAc {
         probe_features(&self.output, set);
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(output_valid(&self.output) && sweep_valid(&self.sweep))
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(
+            output_valid(&self.output) && sweep_valid(design, &self.sweep, SweepUse::Freq),
+        )
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
