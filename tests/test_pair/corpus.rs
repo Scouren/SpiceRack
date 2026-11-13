@@ -111,7 +111,7 @@ pub fn census(c: &'static Cell, corpus: &Corpus) -> Vec<String> {
             }
             text
         };
-        let src = Sources::load(&[&rel(p)], ir::Role::Deck, reader, &mut read);
+        let src = Sources::load(&[&rel(p)], ir::Role::Deck, reader, None, &mut read);
         Deck {
             name: rel(p),
             path: p.to_path_buf(),

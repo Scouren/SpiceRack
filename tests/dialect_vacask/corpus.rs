@@ -38,6 +38,7 @@ fn sources(name: &str, text: &str, role: ir::Role) -> Sources {
         &[name],
         role,
         row.read.expect("a reader"),
+        None,
         &mut |p: &str| (p == name).then(|| loader(p)).flatten(),
     )
 }
