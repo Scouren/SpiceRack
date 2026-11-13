@@ -1,5 +1,5 @@
 file "d.sp" deck
-  param t = "w"
-  param s = to_real("two words")
+  param t = "two words"
+  param l = [1, 2]
   param u = to_real(t)
-  param v = to_real([1, 2])
+  param v = to_real(l)

@@ -18,6 +18,9 @@ mod memcap;
 mod bindings;
 #[path = "passes_expr/compare.rs"]
 mod compare;
+#[path = "passes_run/gen_sets.rs"]
+#[allow(dead_code)] // the run rules' sets beside the one used here
+mod gen_sets;
 #[path = "passes_expr/towers.rs"]
 mod towers;
 #[path = "passes_expr/typed.rs"]
@@ -523,16 +526,10 @@ fn param_reads_to_typed_keeps_every_value_and_tag() {
         let points = keeps_boundary_values("param_reads_to_typed", &text, tags);
         eprintln!("param_reads_to_typed (x = {x}): {points} boundary points");
     }
-    // over every feature the generator reaches few behavioural sources: every element kind
-    // but Behav taken out
+    // over every feature the generator reaches few behavioural sources (gen_sets.rs)
     let read = |e| matches!(e, ir::Expr::Param(_));
-    let behav_only = ir::ElemKind::ALL
-        .into_iter()
-        .filter(|&k| k != ir::ElemKind::Behav)
-        .fold(ir::FeatureSet::ALL, |s, k| {
-            s.minus(ir::FeatureSet::EMPTY.with(ir::Feature::Elem(k)))
-        });
-    let generated = keeps_values_over("param_reads_to_typed", read, true, behav_only);
+    let set = gen_sets::behav_reads();
+    let generated = keeps_values_over("param_reads_to_typed", read, true, set);
     eprintln!("param_reads_to_typed: {generated} generated roots");
     assert!(generated > 0);
     assert_eq!(notes("param_reads_to_typed", "mixed"), [code(115)]);
