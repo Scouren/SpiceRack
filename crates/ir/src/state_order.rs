@@ -409,19 +409,23 @@ pub(crate) fn order_in_subckt(design: &Design, out: &mut Diags) {
 
 // ---- private ----
 
-/// Whether `item` acts from where it stands in the run order: an alter, a loop, a reset, or an
-/// option, environment value, node set or save that holds from here.
+/// Whether `item` acts from where it stands in the run order: an alter, a loop, a reset, a print,
+/// a measure, or an option, environment value, node set or save that holds from here.
 fn order_dependent(design: &Design, item: ItemRef) -> bool {
     let i = item.index;
     match item.kind {
-        ItemKind::Alter | ItemKind::Loop | ItemKind::Reset => true,
+        // a print or a measure in a body: the same case, and no reader produces one (the lead
+        // on R98; an analysis there is the ngspice reader's R26 reading, `run_in_subckt.sp`)
+        ItemKind::Alter
+        | ItemKind::Loop
+        | ItemKind::Reset
+        | ItemKind::Print
+        | ItemKind::Measure => true,
         ItemKind::Option => design.row::<OptionRow>(i).holds == Applies::FromHere,
         ItemKind::Env => design.row::<Env>(i).holds == Applies::FromHere,
         ItemKind::NodeSet => design.row::<NodeSet>(i).holds == Applies::FromHere,
         ItemKind::Save => design.row::<Save>(i).holds == Applies::FromHere,
         ItemKind::Analysis
-        | ItemKind::Print
-        | ItemKind::Measure
         | ItemKind::Elaborate
         | ItemKind::Title
         | ItemKind::Comment

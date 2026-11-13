@@ -136,8 +136,8 @@ pub enum Violation {
     /// see a sibling's names). `arg`: the definition.
     RefScope,
     /// A run item whose effect depends on its place in the run order (an alter, a loop, a
-    /// reset, or an option, environment value, node set or save that holds from where it
-    /// stands) inside a subcircuit body (R98: a subcircuit is instantiated, not executed; no
+    /// reset, a print, a measure, or an option, environment value, node set or save that holds
+    /// from where it stands) inside a subcircuit body (R98: a subcircuit is instantiated, not executed; no
     /// simulator gives such an item a meaning). Whole-run items there are placements (R27). The
     /// run owner's (`state_order::order_in_subckt`). `arg`: the item's row.
     RunOrderInSubckt,

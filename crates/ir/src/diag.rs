@@ -317,7 +317,7 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
         ),
         Violation::RunOrderInSubckt => (
             "a run-order item inside a subcircuit",
-            "an alter, a loop, a reset, or an option, temperature, node set or save that holds from where it stands has a meaning only in the run's order; a subcircuit is instantiated, not executed, so no simulator gives it one there (R98).",
+            "an alter, a loop, a reset, a print, a measure, or an option, temperature, node set or save that holds from where it stands has a meaning only in the run's order; a subcircuit is instantiated, not executed, so no simulator gives it one there (R98).",
         ),
         Violation::TargetAlias => (
             "a device-parameter target that names an element's value or a source's dc",

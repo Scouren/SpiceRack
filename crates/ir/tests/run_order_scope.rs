@@ -1,5 +1,6 @@
 //! R98: a run item whose effect depends on its place in the run order, inside a subcircuit body,
-//! is `RunOrderInSubckt`; the same item at the top, and a whole-run item in the body, are not.
+//! is `RunOrderInSubckt`, and so is a print or a measure there (no reader produces one); the same
+//! item at the top, and a whole-run item in the body, are not.
 //!
 //! Oracle: the ruling's list (an option, environment value or save from here, an alter, a loop,
 //! a reset; whole-run items are placements, R27), each deck read by hand.
@@ -35,6 +36,8 @@ fn a_run_order_item_in_a_subcircuit_is_refused() {
         "env temp=85",
         "save from_here (v (a))",
         "loop sweep (temp) (lin start=1 stop=2 step=1)\n{in}  analysis op",
+        "print tran (v (a))",
+        "measure m tran find (v (a)) (at value=1n)",
     ];
     for item in order {
         let top = format!("  param p = 1\n  {}", item.replace("{in}", "  "));
