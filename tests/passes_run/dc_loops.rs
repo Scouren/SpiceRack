@@ -2,9 +2,9 @@
 //! run on VACASK, against the loops of operating points the rule writes for ngspice, run on
 //! ngspice-45. Each op plot, in loop order, holds the source's DC point of the same index.
 //!
-//! The source's sweep continues from point to point (`Dc::restart` false) and the rule
-//! converts only a restarting one, so the test sets `restart` on the read design: the stand-in
-//! for a source that restarts. The axis is a diode's area, a device parameter by the reader's
+//! The source's sweep continues from point to point and the rule converts only a restarting
+//! one, so the test sets the axis afresh on the read design: a stand-in, removed when the VACASK
+//! reader reads `continuation=0` as `DcAxis::afresh` (the deck then says `continuation=0`). The axis is a diode's area, a device parameter by the reader's
 //! one kind per meaning (a resistor's `r` is an element value, which no row converts). The
 //! circuit (a resistor into a diode) has one operating point, the same however a point starts,
 //! so the two runs still compare. Tolerance: 2·(RELTOL·|v| + VNTOL) with RELTOL 1e-3, VNTOL
@@ -182,6 +182,10 @@ pub fn a_loop_of_ops_is_no_continued_sweep() {
 /// written for ngspice as loops of operating points and run on ngspice-45, against VACASK on
 /// `latch_c0_both.sim`: the fourteen v(c) points, in the same order, within 2·(RELTOL·|v| +
 /// VNTOL). A carried outer axis is the case the rule refuses (`latch.sim` as read).
+///
+/// Stand-in: the axes are set afresh by hand. What removes it: the VACASK reader reading
+/// `continuation=0` as `DcAxis::afresh` (the second VACASK agent's item after the IR round);
+/// then this test reads `latch_c0_both.sim` as written and converts it.
 pub fn restart_loops_give_vacasks_afresh_points() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/passes_run/decks");
     let text = std::fs::read_to_string(dir.join("latch.sim")).expect("the deck");
