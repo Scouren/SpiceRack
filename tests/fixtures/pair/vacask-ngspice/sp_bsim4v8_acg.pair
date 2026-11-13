@@ -1,0 +1,4 @@
+# ir-2 fca01394 (ir-rewrite, crates/ir/tests/fixtures/families/bsim4/nom_sat_acg.sim): ngspice-45 level 14 and VACASK sp_bsim4v8 on VACASK demo/spice/bsim4v82.inc's n1 agree (DC and AC to 4e-12, the transient to step control).
+owner = vacask
+proves = families::PROVEN
+# points=0 (one frequency) for ir-2's points=1 (1 GHz twice: a two-point grid on one frequency, F32/R97).

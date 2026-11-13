@@ -1,0 +1,3 @@
+# ir-2 fca01394 (ir-rewrite, crates/ir/tests/fixtures/families/tran/bsim3.sim): ngspice-45 level 8 and VACASK sp_bsim3v3 on the ngspice examples/mos card agree (DC and AC to 4e-12, the transient to step control).
+owner = vacask
+proves = families::PROVEN

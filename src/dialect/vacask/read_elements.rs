@@ -276,6 +276,15 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
         },
     ),
     (
+        write_models::VERSION,
+        ir::Info {
+            title: "a model version the VACASK module does not run",
+            cite: "F85; the version switch of spice/bsim4v8.va (pinned store); sp_bsim3v3 has no version parameter",
+            explain: "sp_bsim3v3 is BSIM3v3.3.0 alone and sp_bsim4v8 runs 4.8.0 to 4.8.3; another version (the gf180 cards' BSIM4 4.5) would run as 4.8.3 (\"unknown BSIM4 version. Working now with BSIM4.8.3.\"), up to 2.4 % off.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
         write_models::LACKED,
         ir::Info {
             title: "a parameter the VACASK module does not have",

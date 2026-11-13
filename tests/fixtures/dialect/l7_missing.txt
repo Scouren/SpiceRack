@@ -542,8 +542,6 @@ vacask Family(Mos0) unspoken
 vacask Family(Mos2) owed from=ngspice,hspice
 vacask Family(Bsim1) owed from=ngspice,hspice
 vacask Family(Bsim2) owed from=ngspice,hspice
-vacask Family(Bsim3) owed from=ngspice,hspice
-vacask Family(Bsim4) owed from=ngspice,hspice
 vacask Family(BsimSoi) unspoken
 vacask Family(B3SoiFd) owed from=ngspice,hspice
 vacask Family(B3SoiDd) owed from=ngspice,hspice
