@@ -34,7 +34,6 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("osdi/mixed-models/bsimbulk_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
     ("osdi/mixed-models/psp_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
     ("osdi/psp103/psp_inverter.sp", "legalize", "as osdi/bsimbulk/bsimbulk_inverter.sp (W1305)"),
-    ("various/bjt_ac_par.sp", "legalize", "W1350: `save @q1[pi] @q1[go]`, names the bjt has no output for (outputs.txt; ngspice keeps an empty vector, settle device_outputs.sp); waits for the reader to read such a probe as what ngspice saves (nothing), R49"),
 ];
 
 /// The step names, in order.
