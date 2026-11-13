@@ -1,0 +1,9 @@
+string compared in a value
+.param s="tt"
+v1 a 0 1
+r1 a 0 {s=="tt" ? 1k : 2k}
+.control
+op
+print i(v1)
+.endc
+.end

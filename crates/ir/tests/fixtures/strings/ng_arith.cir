@@ -1,0 +1,9 @@
+string under an arithmetic operator
+.param s="tt"
+v1 a 0 1
+r1 a 0 {s+1k}
+.control
+op
+print i(v1)
+.endc
+.end

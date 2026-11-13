@@ -560,6 +560,8 @@ formal stands in that function. The trunk's ngspice reader bound `.subckt a w=1 
 to another subcircuit's `w`, invisible to every law that compares text. The IR text reader
 refuses such a row like every other `check` row (`refuse_invalid`).
 
+**Strings as operands (2026-11-13, the lead's rule on the runs in `crates/ir/tests/fixtures/strings/`).** VACASK computes a string parameter under `==` and `!=` in a value and in `@if`, and refuses one under `+` ("Operation not supported for string and real."); ngspice-45 refuses a string `.param` itself ("Undefined parameter [s]"). So a string operand of `==`/`!=` is `Extra::StringCompare`, and a string under any other operator, as a function's, user call's or draw's argument, or as a conditional's condition is `Violation::StringOperand` (X0029). A string root, a list element and a conditional's branch stay values (A25 item 4). The generator draws a string below the root only in those places.
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

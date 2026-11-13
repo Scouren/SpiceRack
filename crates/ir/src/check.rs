@@ -141,6 +141,12 @@ pub enum Violation {
     /// simulator gives such an item a meaning). Whole-run items there are placements (R27). The
     /// run owner's (`state_order::order_in_subckt`). `arg`: the item's row.
     RunOrderInSubckt,
+    /// A string operand of an operator other than `==` and `!=`, a function's, a user call's or
+    /// a draw's argument, or a conditional's condition (VACASK: "Operation not supported for
+    /// string and real."; ngspice-45 has no string parameter: `tests/fixtures/strings/`). A
+    /// string root, a list element and a conditional's branch are values (A25 item 4); under
+    /// `==`/`!=` it is `Extra::StringCompare`. `arg`: the string's expression.
+    StringOperand,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -151,7 +157,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::RunOrderInSubckt as usize + 1] = [
+    pub const ALL: [Violation; Violation::StringOperand as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -180,6 +186,7 @@ impl Violation {
         Violation::LawConflict,
         Violation::RefScope,
         Violation::RunOrderInSubckt,
+        Violation::StringOperand,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -559,6 +566,9 @@ fn expression(
     for &node in walk.tree(d, e) {
         if bad[node.index()] {
             continue;
+        }
+        for s in crate::check_scopes::misplaced_strings(d, node) {
+            out.report(Violation::StringOperand, item, s.0);
         }
         match d.expr(node) {
             Expr::V(..) | Expr::I(_) | Expr::Time | Expr::Freq if !dynamic => {
