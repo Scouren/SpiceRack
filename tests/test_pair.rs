@@ -178,7 +178,7 @@ fn vacask_to_ngspice() {
 #[test]
 fn a_pair_file_tightens_and_never_loosens() {
     // Oracle: the defaults of `cmp.rs` (RELTOL 1e-3, VNTOL 1e-6, ABSTOL 1e-12, tube 0.01),
-    // written out by hand. Checks: 5.
+    // written out by hand; ABSTOL and VNTOL are floors as well (cmp.rs). Checks: 6.
     let ok = files::pair_text("owner = me\nreltol = 1e-4 # tighter\nvectors = v(out) in\n");
     let ok = ok.expect("a tightening reads");
     assert_eq!(ok.tightened, [("reltol".to_string(), 1e-4)]);
@@ -189,6 +189,10 @@ fn a_pair_file_tightens_and_never_loosens() {
         "a looser reltol"
     );
     assert!(files::pair_text("tube = 0.05\n").is_err(), "a wider tube");
+    assert!(
+        files::pair_text("abstol = 1e-15\n").is_err(),
+        "below the solvers' floor"
+    );
     assert!(files::pair_text("speed = 2\n").is_err(), "an unknown key");
 }
 

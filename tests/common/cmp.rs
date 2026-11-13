@@ -55,7 +55,8 @@
 //!
 //! Contents:
 //! - `pub struct Tol`, `Tol::of(decks: &[&str]) -> Tol` (an autonomous deck's transient by period
-//!   and peak-to-peak), `Tol::tighten(&mut self, key: &str, value: f64) -> Result<(), String>`
+//!   and peak-to-peak), `Tol::tighten(&mut self, key: &str, value: f64) -> Result<(), String>`,
+//!   `Tol::scaled(self, f: f64) -> Tol`
 //! - `pub fn compare(a: &[RawData], b: &[RawData], tol: Tol) -> Result<(), String>`
 //! - `pub fn kind(p: &RawData) -> &'static str`, `pub fn normal(name: &str) -> String`
 //! - `pub fn without_start(plots: &mut [RawData])` (the `uic` rule)
@@ -204,21 +205,42 @@ impl Tol {
     /// `key` (`reltol`, `vntol`, `abstol`, `tube`) set to `value`, which
     /// may only tighten: `Err` for an unknown key, a negative value, or one
     /// above the default (RELTOL 1e-3, VNTOL 1e-6 V, ABSTOL 1e-12 A, tube
-    /// 0.01), which would loosen the simulators' own accuracy.
+    /// 0.01), which would loosen the simulators' own accuracy. VNTOL and
+    /// ABSTOL may not go below the default either: they are each simulator's
+    /// own solver floor (a MOSFET in cutoff carries -2.502e-12 A on ngspice-45
+    /// at any abstol and -2.693e-12 A on VACASK at its default 1e-12, the same
+    /// once VACASK's abstol is 1e-15), so a deck asking for less than the
+    /// solvers give would fail on their tolerance, not on the conversion.
     #[allow(dead_code)] // `test_cross_sim` tightens nothing; `test_pair` does
     pub fn tighten(&mut self, key: &str, value: f64) -> Result<(), String> {
-        let (slot, default) = match key {
-            "reltol" => (&mut self.reltol, RELTOL),
-            "vntol" => (&mut self.vntol, VNTOL),
-            "abstol" => (&mut self.abstol, ABSTOL),
-            "tube" => (&mut self.tube, 0.01),
+        let (slot, default, floor) = match key {
+            "reltol" => (&mut self.reltol, RELTOL, 0.0),
+            "vntol" => (&mut self.vntol, VNTOL, VNTOL),
+            "abstol" => (&mut self.abstol, ABSTOL, ABSTOL),
+            "tube" => (&mut self.tube, 0.01, 0.0),
             _ => return Err(format!("{key}: not a tolerance")),
         };
-        if !(0.0..=default).contains(&value) {
+        if value > default {
             return Err(format!("{key} = {value:e} loosens the default {default:e}"));
+        }
+        if value.is_nan() || value < floor {
+            return Err(format!(
+                "{key} = {value:e} is below the simulators' own floor {floor:e}"
+            ));
         }
         *slot = value;
         Ok(())
+    }
+
+    /// Every value tolerance (RELTOL, VNTOL, ABSTOL) times `f`, for the pair
+    /// test's margin probe only (`PAIR_MARGINS`, triage): not a deck's key.
+    #[allow(dead_code)] // `test_cross_sim` has no margin probe
+    pub fn scaled(mut self, f: f64) -> Tol {
+        assert!((0.0..=1.0).contains(&f), "a fraction of the tolerance");
+        self.reltol *= f;
+        self.vntol *= f;
+        self.abstol *= f;
+        self
     }
 }
 
