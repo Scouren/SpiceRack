@@ -284,7 +284,7 @@ class that holds it (or `gap: <why>`). A row with no home is a finding, not a fa
   - F28 `Mos6SmallSignalAbsent` / `Mos6SmallSignalExact`: a MOSFET on `Mos6`.
   - F29 `BjtIrbSmallSignalFrozen` / `BjtIrbSmallSignalExact`: a BJT on `GummelPoon` whose `irb` is given and not literally 0.
 - R95/R96 (rulings db257325, b41f81d8): four more points; `Laws` holds 30 variants in 15 points (a `u32`). The rewriting kinds gain `Rewrite::Noted` (a difference under 1e-3 everywhere measured: the rule restates the variant and leaves one note per carrier).
-  - F30 `VdmosMultSmallSignalHand` / `…Exact` (none): the small-signal carrier, a MOSFET on `Vdmos` whose `m` is given and not literally 1.
+  - F30 `VdmosMultChargesOff` / `…Copies` (none; R95a restates it as the charges at m ≠ 1, was `VdmosMultSmallSignal…`): a MOSFET on `Vdmos` whose `m` is given and not literally 1, in a design holding an analysis that uses charges (`AnalysisKind::uses_charges`: all but `Op` and `Dc`) or none (`analysis::charge_design`). Runs: `families/vdmos_load/`, `families/tran/` (vdmos_load, vdmos_m1, vdmos_x3).
   - F31 `DiodeIsrReverseNone` / `…Present` (none): a diode on a `Diode`/`DiodeLevel3` model whose `isr` is given and not literally 0 (or unresolved), in any design.
   - `DiodeIsrSmallSignalHand` / `…Exact` (noted): the small-signal carrier, a diode on a model whose `isr` is given and not literally 0.
   - `DiodeTtFactorUnclamped` / `…Clamped` (noted, R91's clamp): a `Diode`/`DiodeLevel3` model whose `ttt1` or `ttt2` is given and not literally 0.

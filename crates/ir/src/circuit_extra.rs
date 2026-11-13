@@ -319,10 +319,10 @@ pub enum CircuitExtra {
     BjtIrbSmallSignalFrozen,
     /// The same under `Law::BjtIrbSmallSignalExact` (the VACASK module the flake pins).
     BjtIrbSmallSignalExact,
-    /// A VDMOS carrying R95 F30's point under `Law::VdmosMultSmallSignalHand` (ngspice-45).
-    VdmosMultSmallSignalHand,
-    /// The same under `Law::VdmosMultSmallSignalExact` (the VACASK module the flake pins).
-    VdmosMultSmallSignalExact,
+    /// A VDMOS carrying R95 F30's point under `Law::VdmosMultChargesOff` (ngspice-45).
+    VdmosMultChargesOff,
+    /// The same under `Law::VdmosMultChargesCopies` (the VACASK module the flake pins).
+    VdmosMultChargesCopies,
     /// A diode carrying R95 F31's point under `Law::DiodeIsrReverseNone` (ngspice-45).
     DiodeIsrReverseNone,
     /// The same under `Law::DiodeIsrReversePresent` (the VACASK module the flake pins).
@@ -471,8 +471,8 @@ impl CircuitExtra {
         CircuitExtra::Mos6SmallSignalExact,
         CircuitExtra::BjtIrbSmallSignalFrozen,
         CircuitExtra::BjtIrbSmallSignalExact,
-        CircuitExtra::VdmosMultSmallSignalHand,
-        CircuitExtra::VdmosMultSmallSignalExact,
+        CircuitExtra::VdmosMultChargesOff,
+        CircuitExtra::VdmosMultChargesCopies,
         CircuitExtra::DiodeIsrReverseNone,
         CircuitExtra::DiodeIsrReversePresent,
         CircuitExtra::DiodeIsrSmallSignalHand,

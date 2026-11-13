@@ -206,7 +206,7 @@ fn columns_of(d: &mut Design) -> Vec<&mut dyn Column> {
         forms: _,
         element_names: _,
         name_index: _,
-        small_signal: _,
+        analysis_reach: _,
         #[cfg(any(test, feature = "gen"))]
             class_computes: _,
     } = d;

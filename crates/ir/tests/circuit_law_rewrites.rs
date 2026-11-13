@@ -54,8 +54,8 @@ mod tests {
             | L::Mos6SmallSignalExact
             | L::BjtIrbSmallSignalFrozen
             | L::BjtIrbSmallSignalExact
-            | L::VdmosMultSmallSignalHand
-            | L::VdmosMultSmallSignalExact
+            | L::VdmosMultChargesOff
+            | L::VdmosMultChargesCopies
             | L::DiodeIsrReverseNone
             | L::DiodeIsrReversePresent => Want::None,
         }

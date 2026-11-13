@@ -42,21 +42,42 @@ pub(crate) fn carries(design: &Design, law: &Row, row: Carrier<'_>) -> bool {
         (Point::BcSatArea, Carrier::Element(e)) => bc_sat_area(design, e, f),
         (Point::DiodeWlMult, Carrier::Element(e)) => diode_wl_mult(design, e, f),
         (Point::DiodeSidewallKnee, Carrier::Element(e)) => diode_sidewall(design, e, f),
-        (Point::MosSmallSignal | Point::Mos6SmallSignal, Carrier::Element(e)) => {
-            small_signal(design, e, ElemKind::Mosfet, f, |_, _| true, |_, _| true)
-        }
+        (Point::MosSmallSignal | Point::Mos6SmallSignal, Carrier::Element(e)) => small_signal(
+            design,
+            e,
+            ElemKind::Mosfet,
+            f,
+            |_, _| true,
+            |_, _| true,
+            crate::analysis::small_signal_design,
+        ),
         (Point::BjtIrbSmallSignal, Carrier::Element(e)) => {
             let irb = |d: &Design, m: &Model| given_not(d, param(d, m.params, &["irb"]), 0.0);
-            small_signal(design, e, ElemKind::Bjt, f, irb, |_, _| true)
+            small_signal(
+                design,
+                e,
+                ElemKind::Bjt,
+                f,
+                irb,
+                |_, _| true,
+                crate::analysis::small_signal_design,
+            )
         }
-        (Point::VdmosMultSmallSignal, Carrier::Element(e)) => {
+        (Point::VdmosMultCharges, Carrier::Element(e)) => {
             let mult =
                 |d: &Design, e: &Element| !e.mult.is_none() && !crate::run_words::is_one(d, e.mult);
-            small_signal(design, e, ElemKind::Mosfet, f, |_, _| true, mult)
+            let charges = crate::analysis::charge_design;
+            small_signal(design, e, ElemKind::Mosfet, f, |_, _| true, mult, charges)
         }
-        (Point::DiodeIsrSmallSignal, Carrier::Element(e)) => {
-            small_signal(design, e, ElemKind::Diode, f, isr, |_, _| true)
-        }
+        (Point::DiodeIsrSmallSignal, Carrier::Element(e)) => small_signal(
+            design,
+            e,
+            ElemKind::Diode,
+            f,
+            isr,
+            |_, _| true,
+            crate::analysis::small_signal_design,
+        ),
         (Point::DiodeIsrReverse, Carrier::Element(e)) => {
             e.kind == ElemKind::Diode
                 && match model_of(design, e) {
@@ -86,7 +107,7 @@ pub(crate) fn carries(design: &Design, law: &Row, row: Carrier<'_>) -> bool {
             | Point::MosSmallSignal
             | Point::Mos6SmallSignal
             | Point::BjtIrbSmallSignal
-            | Point::VdmosMultSmallSignal
+            | Point::VdmosMultCharges
             | Point::DiodeIsrReverse
             | Point::DiodeIsrSmallSignal,
             Carrier::Model(_),
@@ -194,9 +215,10 @@ fn diode_sidewall(design: &Design, e: &Element, families: &[ModelFamily]) -> boo
     }
 }
 
-/// The small-signal points' one carrier (R94, R94a, R95, R96): an element of `kind` meeting
-/// `instance_ok` on a model of `families` meeting `model_ok` (or an unresolved model, whose
-/// conditions are unknown) in a design that holds a linearised analysis or no analysis at all.
+/// The small-signal and charge points' one carrier (R94, R94a, R95, R95a, R96): an element of
+/// `kind` meeting `instance_ok` on a model of `families` meeting `model_ok` (or an unresolved
+/// model, whose conditions are unknown) in a design `analyses` admits (a linearised analysis or
+/// none; for F30's charges, an analysis using charges or none).
 fn small_signal(
     design: &Design,
     e: &Element,
@@ -204,6 +226,7 @@ fn small_signal(
     families: &[ModelFamily],
     model_ok: fn(&Design, &Model) -> bool,
     instance_ok: fn(&Design, &Element) -> bool,
+    analyses: fn(&Design) -> bool,
 ) -> bool {
     if e.kind != kind || !instance_ok(design, e) {
         return false;
@@ -213,7 +236,7 @@ fn small_signal(
         Ok(Some(m)) => families.contains(&m.family) && model_ok(design, &m),
         Err(()) => false,
     };
-    model && crate::analysis::small_signal_design(design)
+    model && analyses(design)
 }
 
 /// Whether a diode model's `isr` is given and not literally 0.

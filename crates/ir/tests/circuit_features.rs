@@ -1567,11 +1567,11 @@ mod tests {
             irb(b, t, on, Law::BjtIrbSmallSignalExact)
         }),
         // R95 F30: a VDMOS of m = 2 against m = 1, no analysis
-        (X::VdmosMultSmallSignalHand, |b, t, on| {
-            vdmos_mult(b, t, on, Law::VdmosMultSmallSignalHand)
+        (X::VdmosMultChargesOff, |b, t, on| {
+            vdmos_mult(b, t, on, Law::VdmosMultChargesOff)
         }),
-        (X::VdmosMultSmallSignalExact, |b, t, on| {
-            vdmos_mult(b, t, on, Law::VdmosMultSmallSignalExact)
+        (X::VdmosMultChargesCopies, |b, t, on| {
+            vdmos_mult(b, t, on, Law::VdmosMultChargesCopies)
         }),
         // R95 F31: a diode on a model of `isr = 1` against `isr = 0`, beside an operating point
         (X::DiodeIsrReverseNone, |b, t, on| {
@@ -1846,6 +1846,40 @@ mod tests {
             true,
         );
         assert!(!no_isr.contains(law(Law::DiodeIsrSmallSignalHand)));
+        // R95a: F30 is the charges at m != 1, carried beside a transient (which uses charges),
+        // not beside operating points alone
+        let tran = used(
+            |b, t, _| {
+                vdmos_mult(b, t, true, Law::VdmosMultChargesOff);
+                let (stop, step) = (b.num(1e-6), b.num(1e-9));
+                let row = spicerack_ir::tran::Tran {
+                    stop,
+                    record_start: ExprId::NONE,
+                    print_step: step,
+                    initial_step: ExprId::NONE,
+                    noise_fmax: ExprId::NONE,
+                    noise_fmin: ExprId::NONE,
+                    noise_seed: ExprId::NONE,
+                    segments: spicerack_ir::List::EMPTY,
+                    ceiling: spicerack_ir::tran::StepCeiling::Rule(
+                        spicerack_ir::tran::StepCap::None,
+                    ),
+                    uic: false,
+                    startup: false,
+                };
+                b.analysis(t, None, row, Span::NONE);
+            },
+            true,
+        );
+        assert!(tran.contains(law(Law::VdmosMultChargesOff)));
+        let op = used(
+            |b, t, _| {
+                vdmos_mult(b, t, true, Law::VdmosMultChargesOff);
+                b.op(t, None, Span::NONE);
+            },
+            true,
+        );
+        assert!(!op.contains(law(Law::VdmosMultChargesOff)));
     }
 
     #[test]

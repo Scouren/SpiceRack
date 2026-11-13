@@ -206,18 +206,18 @@ impl Law {
                 "bjt_irb_small_signal_exact",
                 N,
             ),
-            Law::VdmosMultSmallSignalHand => (
-                P::VdmosMultSmallSignal,
+            Law::VdmosMultChargesOff => (
+                P::VdmosMultCharges,
                 VDMOS,
-                X::VdmosMultSmallSignalHand,
-                "vdmos_mult_small_signal_hand",
+                X::VdmosMultChargesOff,
+                "vdmos_mult_charges_off",
                 N,
             ),
-            Law::VdmosMultSmallSignalExact => (
-                P::VdmosMultSmallSignal,
+            Law::VdmosMultChargesCopies => (
+                P::VdmosMultCharges,
                 VDMOS,
-                X::VdmosMultSmallSignalExact,
-                "vdmos_mult_small_signal_exact",
+                X::VdmosMultChargesCopies,
+                "vdmos_mult_charges_copies",
                 N,
             ),
             Law::DiodeIsrReverseNone => (

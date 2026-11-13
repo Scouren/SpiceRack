@@ -20,7 +20,7 @@
 //! A built design states nothing, carries nothing and goes to any target under the target's law.
 //! Ceiling (R90): a design whose models follow two builds of one module cannot say so.
 //!
-//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R94, R94a, R95, R96 (on the `rulings`
+//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R94, R94a, R95, R95a, R96 (on the `rulings`
 //! branch); the
 //! runs in `crates/ir/tests/fixtures/bjt_substrate/` and `crates/ir/tests/fixtures/families/`.
 //! The carrier predicates are `laws_carry.rs`, the table's rows `laws_table.rs`.
@@ -148,13 +148,16 @@ pub enum Law {
     BjtIrbSmallSignalFrozen,
     /// Point R94a F29: the DC law's own derivatives (the VACASK module the flake pins, 5e-9).
     BjtIrbSmallSignalExact,
-    /// Point R95 F30, the small-signal of a VDMOS at a multiplier not 1: not m copies of one
-    /// (ngspice-45; `families/vdmos_load/runs.out`: m3/nom 2.63 to 8.15 where DC is 3). Carried as
-    /// F27, by a MOSFET on a `Vdmos` model (or an unresolved one) whose `m` is given and not
-    /// literally 1.
-    VdmosMultSmallSignalHand,
-    /// Point R95 F30: m copies, 3 to 1e-9 (the VACASK module the flake pins).
-    VdmosMultSmallSignalExact,
+    /// Point R95/R95a F30, a VDMOS's charges at a multiplier not 1: not m copies of one
+    /// (ngspice-45; `families/vdmos_load/runs.out`: small-signal m3/nom 2.63 to 8.15 where DC is
+    /// 3; `families/tran/runs.out`: at m = 3, 2.4655 V at 30 ns against its own three copies'
+    /// 3.2708 V). Carried by a MOSFET on a `Vdmos` model (or an unresolved one) whose `m` is
+    /// given and not literally 1, in a design that holds an analysis using charges (any but an
+    /// operating point and a DC sweep) or no analysis (`analysis::charge_design`).
+    VdmosMultChargesOff,
+    /// Point R95/R95a F30: m copies (the VACASK module the flake pins: small-signal 3 to 1e-9,
+    /// the transient its three copies' to 1e-6).
+    VdmosMultChargesCopies,
     /// Point R95 F31, a diode's recombination current (`isr`) under reverse bias: none (ngspice-45;
     /// `families/diode_load/runs.out`: 2.020e-12 A here against 3.679e-12 A at -2 V, the control
     /// without `isr` equal). Carried by a diode on a `Diode` or `DiodeLevel3` model whose `isr` is
@@ -234,7 +237,7 @@ pub(crate) enum Point {
     MosSmallSignal,
     Mos6SmallSignal,
     BjtIrbSmallSignal,
-    VdmosMultSmallSignal,
+    VdmosMultCharges,
     DiodeIsrReverse,
     DiodeIsrSmallSignal,
     DiodeTtFactor,
@@ -263,7 +266,7 @@ const POINTS: [Point; 15] = [
     Point::MosSmallSignal,
     Point::Mos6SmallSignal,
     Point::BjtIrbSmallSignal,
-    Point::VdmosMultSmallSignal,
+    Point::VdmosMultCharges,
     Point::DiodeIsrReverse,
     Point::DiodeIsrSmallSignal,
     Point::DiodeTtFactor,
@@ -299,8 +302,8 @@ impl Law {
         Law::Mos6SmallSignalExact,
         Law::BjtIrbSmallSignalFrozen,
         Law::BjtIrbSmallSignalExact,
-        Law::VdmosMultSmallSignalHand,
-        Law::VdmosMultSmallSignalExact,
+        Law::VdmosMultChargesOff,
+        Law::VdmosMultChargesCopies,
         Law::DiodeIsrReverseNone,
         Law::DiodeIsrReversePresent,
         Law::DiodeIsrSmallSignalHand,

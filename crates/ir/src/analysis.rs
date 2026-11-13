@@ -15,7 +15,7 @@
 //!
 //! Contents:
 //! - `pub enum AnalysisKind` (`ALL`, `COUNT`, `AnalysisKind::has_detail(self) -> bool`,
-//!   `AnalysisKind::linearised(self) -> bool`),
+//!   `AnalysisKind::linearised(self) -> bool`, `AnalysisKind::uses_charges(self) -> bool`),
 //!   `pub struct Analysis`, `pub struct RunDetails`
 //! - `pub struct AnalysisKinds` (`EMPTY`, `ALL`, `AnalysisKinds::of(&[AnalysisKind]) -> Self`,
 //!   `AnalysisKinds::contains(self, AnalysisKind) -> bool`, `AnalysisKinds::len(self) -> u32`,
@@ -26,7 +26,7 @@
 //! - (`RowFacts` for `Analysis` and every detail row's facts: `analysis_facts.rs`); crate:
 //!   `pub(crate) fn design_features(&Design, &mut FeatureSet)`,
 //!   `pub(crate) fn feature_items(&Design, &mut Vec<(Feature, ItemRef)>)`,
-//!   `pub(crate) fn small_signal_design(&Design) -> bool`
+//!   `pub(crate) fn small_signal_design(&Design) -> bool`, `pub(crate) fn charge_design(&Design) -> bool`
 
 use crate::dc_ac::{
     Ac, Dc, DcAxis, DcXf, Disto, Net, Noise, Pz, Sens, SensAc, Sp, Tf, TimedOp, Xf,
@@ -307,24 +307,26 @@ impl AnalysisKind {
             K::Op | K::Dc | K::Tran | K::Four | K::Hb | K::Pss | K::TimedOp => false,
         }
     }
+
+    /// Whether the kind uses the devices' charges (R95a): every kind but the operating point and
+    /// the DC sweep (the transient and what reads it, the periodic steady state, harmonic
+    /// balance, and every linearised kind).
+    pub const fn uses_charges(self) -> bool {
+        !matches!(self, AnalysisKind::Op | AnalysisKind::Dc)
+    }
 }
 
 /// Whether `design` holds an analysis linearised about an operating point, or no analysis at
 /// all (a library: any may follow), R94's design condition. O(items) once per design state (a
 /// cache `derived_changed` clears). An `Opaque` analysis is not an analysis here.
 pub(crate) fn small_signal_design(design: &Design) -> bool {
-    *design.small_signal.get_or_init(|| {
-        let mut any = false;
-        for list in &design.scope_items {
-            for item in list.iter().filter(|i| i.kind == ItemKind::Analysis) {
-                any = true;
-                if design.row::<Analysis>(item.index).kind.linearised() {
-                    return true;
-                }
-            }
-        }
-        !any
-    })
+    analysis_reach(design).0
+}
+
+/// Whether `design` holds an analysis that uses the devices' charges, or no analysis at all,
+/// R95a's design condition (F30). Cached as `small_signal_design`.
+pub(crate) fn charge_design(design: &Design) -> bool {
+    analysis_reach(design).1
 }
 
 impl AnalysisKinds {
@@ -432,4 +434,22 @@ pub(crate) fn feature_items(design: &Design, out: &mut Vec<(Feature, ItemRef)>) 
             }
         }
     }
+}
+
+// ---- private ----
+
+/// Both design conditions, (linearised or none, charges or none), once per design state.
+fn analysis_reach(design: &Design) -> (bool, bool) {
+    *design.analysis_reach.get_or_init(|| {
+        let (mut any, mut lin, mut charges) = (false, false, false);
+        for list in &design.scope_items {
+            for item in list.iter().filter(|i| i.kind == ItemKind::Analysis) {
+                let kind = design.row::<Analysis>(item.index).kind;
+                any = true;
+                lin |= kind.linearised();
+                charges |= kind.uses_charges();
+            }
+        }
+        (lin || !any, charges || !any)
+    })
 }
