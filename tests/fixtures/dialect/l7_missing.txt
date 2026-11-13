@@ -348,7 +348,6 @@ vacask Extra(FormalOuterRead) unspoken
 vacask Extra(FormalUnboundRead) owed from=ngspice
 vacask Circuit(MultInstanceParallel) unspoken
 vacask Circuit(MultInstanceNgspiceAppend) owed from=ngspice
-vacask Circuit(IcUicOnly) owed from=ngspice
 vacask Circuit(IcInOp) unspoken
 vacask Circuit(PassiveDynamicValue) owed from=ngspice
 vacask Circuit(PassiveAc) owed from=ngspice
@@ -493,7 +492,6 @@ vacask Run(AnalysisParamArgument) owed from=ngspice
 vacask Run(PssArgumentOmitted) unspoken
 vacask Run(AlterParamAtReset) owed from=ngspice
 vacask Run(DcOuterAfresh) owed from=ngspice
-vacask Option(TrTol) owed from=ngspice
 vacask Option(PivTol) owed from=ngspice
 vacask Option(PivRel) owed from=ngspice
 vacask Option(MethodGear) owed from=ngspice

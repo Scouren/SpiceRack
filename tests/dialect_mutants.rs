@@ -34,13 +34,6 @@ const SHRINK_STEPS: usize = 400;
 const KNOWN: &[(&str, &str, &str)] = &[
     (
         "l1-mutants",
-        "ngspice",
-        "the ngspice reader lets a recursive instantiation through; the IR refuses it (X0024, \
-     ir-rewrite 1512e4af; default_which.sp seed 2, `.subckt w a b` / `xw n1 0 w`); goes with the \
-     reader's refusal as invalid in source",
-    ),
-    (
-        "l1-mutants",
         "vacask",
         "the VACASK reader lets a recursive instantiation through; the IR refuses it (X0024, \
          ir-rewrite 1512e4af; devices/masters.sim seed 6, `x1 (n1 n2) sub` moved into `subckt \

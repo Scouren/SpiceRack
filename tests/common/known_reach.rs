@@ -25,10 +25,11 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Wave(Am)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(TrNoise)", FIXPOINT, SOURCES),
     ("ngspice", "Wave(TrRandom)", FIXPOINT, SOURCES),
-    ("ngspice", "Analysis(Ac)", "generated_script_plans_read_back_to_their_meaning", SCRIPT_FIELD),
-    ("ngspice", "Analysis(Tran)", "generated_script_plans_read_back_to_their_meaning", SCRIPT_FIELD),
-    ("ngspice", "Analysis(Sp)", "generated_script_plans_read_back_to_their_meaning", SCRIPT_FIELD),
+    ("ngspice", "Analysis(Dc)", FIXPOINT, RUN),
+    ("ngspice", "Analysis(Noise)", FIXPOINT, RUN),
+    ("ngspice", "Analysis(Four)", FIXPOINT, RUN),
     ("ngspice", "Analysis(Disto)", "generated_script_plans_read_back_to_their_meaning", SCRIPT_FIELD),
+    ("ngspice", "Analysis(Pss)", FIXPOINT, RUN),
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
     ("ngspice", "Family(CodeModel)", "code_models_of_the_build_round_trip_by_meaning", CODE_MODELS),
     ("vacask", "Item(Save)", "generated_save_plans_read_back_to_their_meaning", "W2303: VACASK spells two save shapes only (R29/S12)"),
@@ -50,6 +51,7 @@ const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
 const ELEMENTS: &str =
     "interim: dialect_ngspice_elements' fixtures (resistor, capacitor_inductor, controlled)";
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
+const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, sens, four, pss)";
 const SCRIPT_FIELD: &str = "the generator draws an analysis field as an expression, which a script command cannot spell (W1305, settle script_tran_brace.sp); the control area's property builds script plans with number fields";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VC_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
