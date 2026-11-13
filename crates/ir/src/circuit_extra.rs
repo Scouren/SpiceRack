@@ -357,11 +357,15 @@ pub enum CircuitExtra {
     DefaultTnom27,
     /// The same under `Law::DefaultTnom25` (HSPICE).
     DefaultTnom25,
+    /// A MOSFET carrying the BSIM4 4.5 small-signal point under `Law::Bsim4v45SmallSignalHand`.
+    Bsim4v45SmallSignalHand,
+    /// The same under `Law::Bsim4v45SmallSignalExact`.
+    Bsim4v45SmallSignalExact,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 150] = [
+    pub const ALL: [CircuitExtra; 152] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -512,6 +516,8 @@ impl CircuitExtra {
         CircuitExtra::DefaultTemp25,
         CircuitExtra::DefaultTnom27,
         CircuitExtra::DefaultTnom25,
+        CircuitExtra::Bsim4v45SmallSignalHand,
+        CircuitExtra::Bsim4v45SmallSignalExact,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

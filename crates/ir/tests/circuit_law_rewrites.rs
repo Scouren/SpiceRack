@@ -73,6 +73,7 @@ mod tests {
             | L::VdmosMultChargesCopies
             | L::DiodeIsrReverseNone
             | L::DiodeIsrReversePresent => Want::None,
+            L::Bsim4v45SmallSignalHand | L::Bsim4v45SmallSignalExact => Want::Noted,
         }
     }
 

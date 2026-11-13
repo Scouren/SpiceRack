@@ -10,7 +10,7 @@
 //! literally v" is given with a value that is not the literal v (a parameter read is not
 //! literal). An unresolved model is a carrier: its law is unknown.
 //!
-//! Cites: `rewrite/RULINGS.md` R86, R88, R91, R92, R93a, R94, R94a, R95, R95a, R96, R102 (on the `rulings` branch); the runs
+//! Cites: `rewrite/RULINGS.md` R86, R88, R91, R92, R93a, R94, R94a, R95, R95a, R96, R102 (on the `rulings` branch); the BSIM4 4.5 point, gf180's runs; the runs
 //! each `Law` variant's doc names.
 //!
 //! Contents (crate-private): `pub(crate) fn carries(&Design, &Row, Carrier) -> bool`,
@@ -87,6 +87,15 @@ pub(crate) fn carries(design: &Design, law: &Row, row: Carrier<'_>) -> bool {
                     Err(()) => false,
                 }
         }
+        (Point::Bsim4v45SmallSignal, Carrier::Element(e)) => small_signal(
+            design,
+            e,
+            ElemKind::Mosfet,
+            f,
+            bsim4_v45,
+            |_, _| true,
+            crate::analysis::small_signal_design,
+        ),
         (point, Carrier::Node(e)) => node(point, e),
         (point, Carrier::Design) => whole(design, point),
         (Point::DiodeTtFactor, Carrier::Model(m)) => {
@@ -119,7 +128,8 @@ pub(crate) fn carries(design: &Design, law: &Row, row: Carrier<'_>) -> bool {
             | Point::DivGuard
             | Point::AsinEdge
             | Point::DefaultTemp
-            | Point::DefaultTnom,
+            | Point::DefaultTnom
+            | Point::Bsim4v45SmallSignal,
             Carrier::Model(_),
         )
         | (
@@ -169,7 +179,8 @@ fn node(point: Point, e: Expr) -> bool {
         | Point::DiodeIsrSmallSignal
         | Point::DiodeTtFactor
         | Point::DefaultTemp
-        | Point::DefaultTnom => false,
+        | Point::DefaultTnom
+        | Point::Bsim4v45SmallSignal => false,
     }
 }
 
@@ -204,7 +215,8 @@ fn whole(design: &Design, point: Point) -> bool {
         | Point::ExpClamp
         | Point::LogZero
         | Point::DivGuard
-        | Point::AsinEdge => false,
+        | Point::AsinEdge
+        | Point::Bsim4v45SmallSignal => false,
     }
 }
 
@@ -319,6 +331,19 @@ fn small_signal(
         Err(()) => false,
     };
     model && analyses(design)
+}
+
+/// Whether a model's version is 4.5 (BSIM4's 4.5 code on ngspice-45): the literal 4.5 or the
+/// string "4.5"; a read is not literal.
+fn bsim4_v45(design: &Design, m: &Model) -> bool {
+    if m.version.is_none() {
+        return false;
+    }
+    match design.expr(m.version) {
+        Expr::Num(_) => literal(design, m.version) == Some(4.5),
+        Expr::Str(s) => design.str(s) == "4.5",
+        _ => false,
+    }
 }
 
 /// Whether a diode model's `isr` is given and not literally 0.

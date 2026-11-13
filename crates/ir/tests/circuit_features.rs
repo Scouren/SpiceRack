@@ -1631,7 +1631,31 @@ mod tests {
         (X::DefaultTnom25, |b, t, on| {
             default_temp(b, t, on, Law::DefaultTnom25, false)
         }),
+        // R96: a MOSFET on a BSIM4 model of version 4.5 against one of version 4.8, no analysis
+        (X::Bsim4v45SmallSignalHand, |b, t, on| {
+            bsim4_version(b, t, on, Law::Bsim4v45SmallSignalHand)
+        }),
+        (X::Bsim4v45SmallSignalExact, |b, t, on| {
+            bsim4_version(b, t, on, Law::Bsim4v45SmallSignalExact)
+        }),
     ];
+
+    /// Under `law`, a MOSFET `m1` on a BSIM4 model `m` of version 4.5 (`on`) or 4.8.
+    fn bsim4_version(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let version = b.num(if on { 4.5 } else { 4.8 });
+        let name = b.name("m");
+        let row = spicerack_ir::Model {
+            version,
+            ..model(name, ModelFamily::Bsim4, Polarity::N)
+        };
+        b.model(t, row, Span::NONE);
+        let name = b.design().find_name("m");
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mut h = b.head("m1", &["d", "g", "s", "b"], Some("m"), &[], ExprId::NONE);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Mosfet, h, semi(), Span::NONE);
+    }
 
     /// Under `law`, a design with a resistor and, off, an `Env` stating the temperature (`temp`)
     /// or the nominal temperature; on, none (the other one stated, so only this point carries).

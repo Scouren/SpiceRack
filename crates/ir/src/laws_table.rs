@@ -16,6 +16,7 @@ const DIODES: &[ModelFamily] = &[ModelFamily::Diode, ModelFamily::DiodeLevel3];
 const VDMOS: &[ModelFamily] = &[ModelFamily::Vdmos];
 const MOS239: &[ModelFamily] = &[ModelFamily::Mos2, ModelFamily::Mos3, ModelFamily::Mos9];
 const MOS6: &[ModelFamily] = &[ModelFamily::Mos6];
+const BSIM4: &[ModelFamily] = &[ModelFamily::Bsim4];
 /// R93a's function points: carried by an expression node, no model family.
 const NONE: &[ModelFamily] = &[];
 const XOM_1E4: &[Stated] = &[
@@ -373,6 +374,20 @@ impl Law {
                 X::DefaultTnom25,
                 "default_tnom_25",
                 Rewrite::Stated(TNOM_25),
+            ),
+            Law::Bsim4v45SmallSignalHand => (
+                P::Bsim4v45SmallSignal,
+                BSIM4,
+                X::Bsim4v45SmallSignalHand,
+                "bsim4v45_small_signal_hand",
+                Rewrite::Noted,
+            ),
+            Law::Bsim4v45SmallSignalExact => (
+                P::Bsim4v45SmallSignal,
+                BSIM4,
+                X::Bsim4v45SmallSignalExact,
+                "bsim4v45_small_signal_exact",
+                Rewrite::Noted,
             ),
         };
         Row {

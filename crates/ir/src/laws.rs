@@ -228,6 +228,13 @@ pub enum Law {
     DefaultTnom27,
     /// Point R102: 25 °C (HSPICE).
     DefaultTnom25,
+    /// Point (R96), the small-signal of BSIM4 at version 4.5: ngspice-45's 4.5 code, its AC
+    /// output conductance 2e-4 off the slope of its own DC current in saturation (gf180mcuD's
+    /// nfet_03v3, `families/gf180_n1/runs.out`; its 4.8 code 1.5e-7). Carried as F27, by a
+    /// MOSFET on a `Bsim4` model of version 4.5 (or an unresolved one). Noted both ways.
+    Bsim4v45SmallSignalHand,
+    /// The DC law's own derivative (ngspice's 4.8 code; VACASK, which has no 4.5).
+    Bsim4v45SmallSignalExact,
 }
 
 /// LTspice's `exp` knee (`Law::ExpLin230`): solved from F82's readings at x = 236 and 300
@@ -313,6 +320,7 @@ pub(crate) enum Point {
     AsinEdge,
     DefaultTemp,
     DefaultTnom,
+    Bsim4v45SmallSignal,
 }
 
 /// One variant's row: its point, the families whose models follow it, its member, its word,
@@ -326,7 +334,7 @@ pub(crate) struct Row {
 }
 
 /// Every point, in declaration order.
-const POINTS: [Point; 22] = [
+const POINTS: [Point; 23] = [
     Point::BcSatArea,
     Point::SubSatTemp,
     Point::DiodeWlMult,
@@ -349,6 +357,7 @@ const POINTS: [Point; 22] = [
     Point::AsinEdge,
     Point::DefaultTemp,
     Point::DefaultTnom,
+    Point::Bsim4v45SmallSignal,
 ];
 
 // 40 variants: a `u64`, one bit each (the build fails here when the enum outgrows it)
@@ -358,7 +367,7 @@ const _: () = assert!(every_point_has_two_variants());
 
 impl Law {
     /// Every variant, in declaration order (its bit in [`Laws`]).
-    pub const ALL: [Law; 45] = [
+    pub const ALL: [Law; 47] = [
         Law::BcSatAreaTimesAreab,
         Law::BcSatAreabOnly,
         Law::SubSatLastFactor,
@@ -404,6 +413,8 @@ impl Law {
         Law::DefaultTemp25,
         Law::DefaultTnom27,
         Law::DefaultTnom25,
+        Law::Bsim4v45SmallSignalHand,
+        Law::Bsim4v45SmallSignalExact,
     ];
     /// Variant count.
     pub const COUNT: usize = Self::ALL.len();
