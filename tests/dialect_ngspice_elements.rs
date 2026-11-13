@@ -40,6 +40,7 @@ const READ: &[&str] = &[
     "lines",
     "mosfet_jfet_mesfet",
     "mosfet_soi3",
+    "names_hash",
     "osdi_codemodel",
     "passive_model_order",
     "rcl_dynamic",

@@ -21,7 +21,7 @@
 //! `pub(super) enum Def`,
 //! `pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags)`,
 //! `pub(super) fn references(text: &str) -> Vec<Reference>`,
-//! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, deck_card_analyses, unread, note, framing, span, raw, text, rest, keyword, expr, number, wins,
+//! `Lower::{open, opaque, opaque_text, deck_script, script_index, deck_has_card_analysis, deck_card_analyses, unread, note, framing, span, raw, text, rest, card_head, keyword, expr, number, wins,
 //! class, subckt_head, subckt_cycle, refer, pending, rescope, unqueue_reads, measure_reads, include_path}`; the CST reads are `cst.rs`
 
 use std::collections::HashSet;
@@ -331,6 +331,22 @@ impl<'a, 'd> Lower<'a, 'd> {
         rest(self.toks, self.ast, n)
     }
 
+    /// An element card's name and the text after it: the name runs on through every token
+    /// that touches it (ngspice cuts a card at blanks only: `rs#1` and `xCMP#1` are names, the
+    /// spice-bench decks circuitsim90 arom.sp, dac.sp that ngspice-45 runs).
+    pub(super) fn card_head(&self, n: Node) -> (String, String) {
+        let main = self.ast.main_token(n);
+        let mut name = self.toks.text(main).to_string();
+        let mut text = self.rest(n);
+        let (_, last) = line(self.toks, main);
+        if last > main && self.toks.start(main + 1) == self.toks.end(main) {
+            let cut = text.find(char::is_whitespace).unwrap_or(text.len());
+            name.push_str(&text[..cut]);
+            text = text[cut..].trim_start().to_string();
+        }
+        (name, text)
+    }
+
     /// The lowercased text of a statement's head token (`.param`, `r1`).
     pub(super) fn keyword(&self, n: Node) -> String {
         self.toks.text(self.ast.main_token(n)).to_ascii_lowercase()
@@ -522,7 +538,7 @@ fn lower(lw: &mut Lower<'_, '_>, top: ir::ScopeId) {
 /// scope has already is no element: ngspice bails out ("device already exists", run dup.cir).
 fn dispatch(lw: &mut Lower<'_, '_>, st: Stmt) {
     if lw.ast.tag(st.node) == Tag::Instance {
-        let name = name::key(&lw.keyword(st.node));
+        let name = name::key(&lw.card_head(st.node).0);
         if !lw.elements.insert((st.scope, name)) {
             return lw.opaque(
                 st,

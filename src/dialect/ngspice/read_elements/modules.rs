@@ -17,7 +17,8 @@
 
 use super::super::read::{Lower, Stmt};
 use super::{
-    Card, INSTANCE_CYCLE, Item, Kind, MALFORMED, PORT_COUNT, PRIVATE_FORM, head, push_done, val,
+    Card, INSTANCE_CYCLE, Item, Kind, MALFORMED, PORT_COUNT, PRIVATE_FORM, TERMINALS, head,
+    push_done, val,
 };
 use crate::ir::{self, ElemKind as K};
 
@@ -50,6 +51,9 @@ pub(super) fn x(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
     }
     let declares_m = sub_head.is_some_and(|(_, f)| f.iter().any(|p| p.eq_ignore_ascii_case("m")));
     card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();
+    if too_many(lw, st, &card, K::Instance) {
+        return;
+    }
     card.model = Some(sub);
     if !keyed(lw, st, &mut card, rest, !declares_m) {
         return;
@@ -71,6 +75,9 @@ pub(super) fn n(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
         return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
     }
     card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();
+    if too_many(lw, st, &card, K::ModuleModel) {
+        return;
+    }
     card.model = Some(items[words - 1].text.clone());
     if !keyed(lw, st, &mut card, &items[words..], true) {
         return;
@@ -92,6 +99,9 @@ pub(super) fn a(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
     }
     let (model, nodes) = items.split_last().expect("one item");
     card.nodes = nodes.iter().map(|i| i.text.clone()).collect();
+    if too_many(lw, st, &card, K::CodeModel) {
+        return;
+    }
     card.model = Some(model.text.clone());
     let h = head(lw, st, &card);
     let span = lw.span(st.node);
@@ -100,6 +110,16 @@ pub(super) fn a(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]
 }
 
 // ---- private ----
+
+/// More terminals than an IR row of `kind` holds (255): ngspice runs such a card (a spice-bench
+/// deck's X line of 266 nodes), the IR cannot state it: `Unread` with [`TERMINALS`], pushed.
+fn too_many(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card, kind: K) -> bool {
+    let over = card.nodes.len() > usize::from(kind.terminals().1);
+    if over {
+        lw.opaque(st, ir::OpaqueClass::Unread, TERMINALS);
+    }
+    over
+}
 
 /// Reads `k=v` parameters into `card` (`m` into `mult` when `mult` says so); on a refusal
 /// pushes the opaque and returns false.
