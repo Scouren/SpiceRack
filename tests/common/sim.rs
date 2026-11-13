@@ -199,6 +199,7 @@ fn run_in(
     }
     for (name, body) in files {
         let at = dir.join(name);
+        materialize(dir, name);
         if let Some(parent) = at.parent() {
             std::fs::create_dir_all(parent).unwrap_or_else(|e| harness(&e));
         }
@@ -388,6 +389,28 @@ fn same_vectors(a: &RawData, b: &RawData) -> bool {
 /// disk, a missing `timeout`): no verdict on the deck, so the test stops.
 fn harness(e: &std::io::Error) -> ! {
     panic!("cross_sim harness: {e}")
+}
+
+/// Each folder on `name`'s path under `dir` that is a link to the deck's read-only original (a
+/// subfolder of the deck's folder) made a real folder of links to the original's entries, so a
+/// written file can be placed inside it beside the originals it does not replace.
+fn materialize(dir: &Path, name: &str) {
+    let mut at = dir.to_path_buf();
+    let parts: Vec<&str> = name.split('/').collect();
+    // Bounded: one step a folder of `name`.
+    for part in &parts[..parts.len().saturating_sub(1)] {
+        at.push(part);
+        let Ok(target) = std::fs::read_link(&at) else {
+            continue;
+        };
+        std::fs::remove_file(&at).unwrap_or_else(|e| harness(&e));
+        std::fs::create_dir(&at).unwrap_or_else(|e| harness(&e));
+        if let Ok(rd) = std::fs::read_dir(&target) {
+            for e in rd.flatten() {
+                let _ = std::os::unix::fs::symlink(e.path(), at.join(e.file_name()));
+            }
+        }
+    }
 }
 
 /// Each bare `pre_osdi <name>.osdi` of `text` that is not beside the deck,
