@@ -26,7 +26,7 @@
 //! The carrier predicates are `laws_carry.rs`, the table's rows `laws_table.rs`.
 //!
 //! Contents:
-//! - `pub enum Law` (`ALL`, `COUNT`), `Law::member(self) -> CircuitExtra`,
+//! - `pub enum Law` (`ALL`, `COUNT`), `pub const LTSPICE_EXP_KNEE`, `Law::member(self) -> CircuitExtra`,
 //!   `Law::word(self) -> &'static str`, `Law::rewrite(self) -> Rewrite`
 //! - `pub enum Rewrite`, `pub struct Stated`
 //! - `pub struct Laws`, `Laws::EMPTY`, `Laws::of(&[Law]) -> Laws`, `Laws::with(self, Law) -> Laws`,
@@ -191,10 +191,13 @@ pub enum Law {
     ExpClamp1e99,
     /// Point R93a F43: the exact function (VACASK). Noted toward ngspice.
     ExpExact,
-    /// Point R93a F43, LTspice's: `e^x` followed past 227.96 (`exp(236)` = 6.0e100) and the
-    /// result clamped at 1e200 (LTspice 26.1.1, `ltspice-2`). Guarded toward a target with the
-    /// exact law (`x > 460.517 ? 1e200 : exp(x)`), noted toward ngspice's.
-    ExpClamp1e200,
+    /// Point R93a F43, LTspice's (F82, LTspice 26.1.1, the same in `{…}` and a B source): exact
+    /// `e^x` up to the knee `k` = [`LTSPICE_EXP_KNEE`], above it the straight line
+    /// `e^k·(1 + x − k)` (no clamp: `exp(236)` = 6.01505852692e100, `exp(300)` = 6.20086770814e101,
+    /// `exp(710)` = 4.20717795946e102), the shape of ngspice's `ngbehavior=ps` `ExpLin14` with
+    /// another knee. Guarded toward a target with the exact law (`x > k ? e^k*(1+x-k) : exp(x)`),
+    /// noted toward ngspice's clamp.
+    ExpLin230,
     /// Point R93a F44, a behavioural `ln`, `log10` of 0: -1e99 (ngspice-45's B source). Carried by
     /// `ln` or `log10` in a root of dynamic form. Guarded (`x == 0 ? -1e99 : ln(x)`).
     LogZeroMinus1e99,
@@ -226,6 +229,10 @@ pub enum Law {
     /// Point R102: 25 °C (HSPICE).
     DefaultTnom25,
 }
+
+/// LTspice's `exp` knee (`Law::ExpLin230`): solved from F82's readings at x = 236 and 300
+/// (`e^k` = 8.749002899e99); the line through it reproduces the readings at 231 and 710 to 6e-12.
+pub const LTSPICE_EXP_KNEE: f64 = 230.124_863_945_9;
 
 /// A set of stated laws, one bit per [`Law`]. Two variants of one point may stand in the set;
 /// `check` refuses that design (`Violation::LawConflict`).
@@ -386,7 +393,7 @@ impl Law {
         Law::TrigExact,
         Law::ExpClamp1e99,
         Law::ExpExact,
-        Law::ExpClamp1e200,
+        Law::ExpLin230,
         Law::LogZeroMinus1e99,
         Law::LogZeroError,
         Law::DivGminGuard,

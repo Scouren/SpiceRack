@@ -1596,8 +1596,8 @@ mod tests {
         (X::ExpExact, |b, t, on| {
             func_point(b, t, on, Law::ExpExact, Some(Func::Exp))
         }),
-        (X::ExpClamp1e200, |b, t, on| {
-            func_point(b, t, on, Law::ExpClamp1e200, Some(Func::Exp))
+        (X::ExpLin230, |b, t, on| {
+            func_point(b, t, on, Law::ExpLin230, Some(Func::Exp))
         }),
         (X::LogZeroMinus1e99, |b, t, on| {
             func_point(b, t, on, Law::LogZeroMinus1e99, Some(Func::Ln))

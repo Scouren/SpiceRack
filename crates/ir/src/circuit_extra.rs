@@ -335,8 +335,8 @@ pub enum CircuitExtra {
     ExpClamp1e99,
     /// An expression node of dynamic form carrying R93a F43's point under `Law::ExpExact`.
     ExpExact,
-    /// The same under `Law::ExpClamp1e200` (LTspice).
-    ExpClamp1e200,
+    /// The same under `Law::ExpLin230` (LTspice, F82: linear above its knee).
+    ExpLin230,
     /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroMinus1e99`.
     LogZeroMinus1e99,
     /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroError`.
@@ -501,7 +501,7 @@ impl CircuitExtra {
         CircuitExtra::TrigExact,
         CircuitExtra::ExpClamp1e99,
         CircuitExtra::ExpExact,
-        CircuitExtra::ExpClamp1e200,
+        CircuitExtra::ExpLin230,
         CircuitExtra::LogZeroMinus1e99,
         CircuitExtra::LogZeroError,
         CircuitExtra::DivGminGuard,

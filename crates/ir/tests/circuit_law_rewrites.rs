@@ -52,9 +52,7 @@ mod tests {
             | L::DivExact
             | L::AsinEdgeZero
             | L::AsinEdgeFails => Want::Noted,
-            L::ExpClamp1e99 | L::ExpClamp1e200 | L::LogZeroMinus1e99 | L::DivGminGuard => {
-                Want::Guarded
-            }
+            L::ExpClamp1e99 | L::ExpLin230 | L::LogZeroMinus1e99 | L::DivGminGuard => Want::Guarded,
             L::BcSatAreaTimesAreab
             | L::BcSatAreabOnly
             | L::SubSatLastFactor
@@ -96,5 +94,28 @@ mod tests {
             };
             assert_eq!(got, want(law), "{law:?}");
         }
+    }
+
+    /// F82 (LTspice 26.1.1, `rewrite/DIFFERENCES.md` on `differences`): above the knee LTspice's
+    /// `exp` is the line `e^k·(1 + x − k)`; its readings at 231, 236, 300 and 710.
+    #[test]
+    fn ltspices_exp_is_linear_above_its_knee() {
+        let k = spicerack_ir::LTSPICE_EXP_KNEE;
+        for (x, read) in [
+            (231.0, 1.64055707736e100),
+            (236.0, 6.01505852692e100),
+            (300.0, 6.20086770814e101),
+            (710.0, 4.20717795946e102),
+        ] {
+            let line = k.exp() * (1.0 + x - k);
+            assert!(
+                (line / read - 1.0).abs() < 1e-10,
+                "x = {x}: {line} against {read}"
+            );
+        }
+        assert!(
+            k.exp() < 230.2f64.exp(),
+            "the knee lies below 230.2, where it is still exact"
+        );
     }
 }

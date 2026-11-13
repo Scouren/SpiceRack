@@ -303,11 +303,11 @@ impl Law {
                 Rewrite::Guarded,
             ),
             Law::ExpExact => (P::ExpClamp, NONE, X::ExpExact, "exp_exact", Rewrite::Noted),
-            Law::ExpClamp1e200 => (
+            Law::ExpLin230 => (
                 P::ExpClamp,
                 NONE,
-                X::ExpClamp1e200,
-                "exp_clamp_1e200",
+                X::ExpLin230,
+                "exp_lin_230",
                 Rewrite::Guarded,
             ),
             Law::LogZeroMinus1e99 => (
