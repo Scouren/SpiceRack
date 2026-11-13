@@ -55,8 +55,6 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// listed seed that passes. Each dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[Known] = &[
-    ("l5", "ngspice", &["seed 2", "seed 9"], "a whole-run option in a subcircuit body (seed 2 `option no_acct`, seed 9 `option interp`) is written as `.control` / `option …` / `.endc` there and reads back as one Script opaque; a finding for the ngspice run/control area (the writer spells a whole-run option inside a body it cannot be read back from). The class of the seed 19 row the last round deleted: a whole-row entry hid seed 2 until rows named their seeds"),
-    ("l5", "vacask", &["seed 0", "seed 3", "seed 4", "seed 5", "seed 6", "seed 7", "seed 10", "seed 11", "seed 17", "seed 20", "seed 30", "seed 31", "seed 32", "seed 35", "seed 36", "seed 37", "seed 42", "seed 50", "seed 53", "seed 56", "seed 59", "seed 61", "seed 62"], "a device_library of a family whose module is not proven (bsim3, bsim4, bsim_bulk, psp103, vdmos, mos2, mesfet, gummel_poon, vbic, jfet_parker_skellern) is written `load \"<its file>.osdi\"` and reads back as a plain load (tables::library, da95fe25): write_structure::admit lets through a library the reader cannot read back. Fixed on step2-vacask (admit agrees with tables::library), goes with its hash. The evidence also shows `peta` read back as `e15` and `c` as `e-2`: equal by meaning (R28; eq_meaning's literal_eq_across: Literal::eq_value), not a cause. A whole-row entry hid every seed but the first until rows named their seeds"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the

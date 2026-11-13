@@ -1,0 +1,11 @@
+* sp_diode at area 0: ngspice-45's side of diode_area_zero.sim (R91 F23)
+.model dm d is=1e-14
+v1 a 0 0.5
+d1 a 0 dm area=0
+.options reltol=1e-9
+.control
+set numdgt=12
+op
+print i(v1)
+.endc
+.end

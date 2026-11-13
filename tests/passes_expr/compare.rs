@@ -274,12 +274,7 @@ pub fn keeps_every_root_value(name: &str) -> usize {
                 };
                 let was = ir::eval_typed(&before, old, &at(&before));
                 let now = ir::eval_typed(&design, new, &at(&design));
-                let same = match (was, now) {
-                    (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits(),
-                    (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
-                    (Err(ir::Domain::OutOfDomain(e)), Ok(_)) => int_capable(before.expr(e)),
-                    _ => false,
-                };
+                let same = kept(&before, was, now);
                 assert!(
                     same,
                     "{name} seed {seed} trial {trial}: {was:?} before, {now:?} after"
@@ -291,6 +286,24 @@ pub fn keeps_every_root_value(name: &str) -> usize {
 }
 
 // ---- private ----
+
+/// Whether a root's value after a rule is what the rule owes for its value `was` before:
+/// the same bits for a value; the same kind of error for an error; and where the source has
+/// no value because an Int result is out of range (R12, the lead's ruling on seed 98), any
+/// error, or a value only where the out-of-range row is one an Int computes (the widening).
+fn kept(
+    before: &ir::Design,
+    was: Result<ir::Value, ir::Domain>,
+    now: Result<ir::Value, ir::Domain>,
+) -> bool {
+    match (was, now) {
+        (Ok(x), Ok(y)) => x.number.to_bits() == y.number.to_bits(),
+        (Err(ir::Domain::OutOfDomain(_)), Err(_)) => true,
+        (Err(ir::Domain::OutOfDomain(e)), Ok(_)) => int_capable(before.expr(e)),
+        (Err(x), Err(y)) => std::mem::discriminant(&x) == std::mem::discriminant(&y),
+        (Ok(_), Err(_)) | (Err(_), Ok(_)) => false,
+    }
+}
 
 /// The operands of `e`.
 fn operands(design: &ir::Design, e: ir::ExprId) -> Vec<ir::ExprId> {
@@ -416,4 +429,25 @@ fn tagged(v: f64, int: bool) -> ir::Value {
         true => ir::Value::int(v),
         false => ir::Value::real(v),
     }
+}
+
+#[test]
+fn kept_is_strict_where_the_source_has_a_value() {
+    let d = ir::Design::new();
+    let none = ir::ExprId::NONE;
+    let one = || Ok(ir::Value::real(1.0));
+    assert!(kept(&d, one(), one()));
+    assert!(!kept(&d, one(), Ok(ir::Value::real(2.0))));
+    assert!(!kept(&d, one(), Err(ir::Domain::NotANumber(none))));
+    assert!(!kept(&d, one(), Err(ir::Domain::OutOfDomain(none))));
+    assert!(kept(
+        &d,
+        Err(ir::Domain::OutOfDomain(none)),
+        Err(ir::Domain::NotANumber(none))
+    ));
+    assert!(!kept(
+        &d,
+        Err(ir::Domain::DivideByZero(none)),
+        Err(ir::Domain::NotANumber(none))
+    ));
 }

@@ -1,0 +1,13 @@
+sp_diode at area 0: VACASK warns and uses 1, ngspice-45 has no device (R91 F23, run115)
+// VACASK (dhxz6l3…-vacask-unstable-2026): "area must be positive, using 1 instead", v1:flow(br) = -2.485624539216190e-06; ngspice-45 (diode_area_zero.cir): i(v1) = -5.00000000000e-13.
+load "spice/diode.osdi"
+load "spice/capacitor.osdi"
+model vs vsource
+model c sp_capacitor
+model dm sp_diode is=1e-14
+v1 (a 0) vs dc=0.5
+d1 (a 0) dm area=0
+control
+  options rawfile="ascii" reltol=1e-9
+  analysis op1 op
+endc

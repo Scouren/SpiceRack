@@ -17,6 +17,7 @@
 mod atan2;
 mod bind;
 mod codes;
+mod diode_law;
 mod expr_read;
 mod expr_write;
 mod families;
@@ -117,6 +118,7 @@ impl Write for Vacask {
                 K::Model => write_models::admit(design, &index.words, at, diags),
                 K::Element => {
                     write_elements::admit(design, &index, at, scope, diags);
+                    diode_law::admit(design, at, diags);
                     write_sources::admit(design, at, diags);
                 }
                 K::Analysis | K::Loop | K::Alter | K::NodeSet | K::Option | K::Reset => {
