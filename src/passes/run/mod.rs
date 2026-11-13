@@ -297,6 +297,7 @@ pub(super) const PASSES: &[Pass] = &[
     inert(inert_options::INERT[12]),
     inert(inert_options::INERT[13]),
     inert(inert_options::INERT[14]),
+    inert(inert_options::INERT[15]),
     Pass {
         name: "drop_print",
         removes: ir::Feature::Item(ir::ItemKind::Print),

@@ -2,7 +2,8 @@
 //! (`OPTION_DROPPED`, its argument the key's index). One row per key, each removing its
 //! `Option(<key>)` and requiring nothing: `noacct`, `acct`, `list`, `nomod`, `nopage`,
 //! `node`, `opts`, `warn`, `maxwarns`, `norefvalue`, `noinit`, `nfreqs`, `fourgridsize`, and
-//! the two solver selections `klu`, `sparse` (rows `drop_option_<key>`; R83).
+//! the two solver selections `klu`, `sparse`, and the step-selection hint `trtol` (rows
+//! `drop_option_<key>`; R83, R84).
 //!
 //! Exact by runs, never by a manual (`tests/passes_run/decks/options_probe.sp`: a pulse into an
 //! RC, a diode through an inductor to a load, a level-1 MOSFET with no W, L, AD or AS; op, dc,
@@ -10,7 +11,11 @@
 //! first thirteen as without it (the `Date:` line aside); `nfreqs` and `fourgridsize` change
 //! only the log's Fourier table. The solver selections within a stated bound (R60): `sparse` is
 //! the default solver and identical; `klu` moves values by at most 1e-7 relative (above ABSTOL,
-//! 1e-12), another solver's rounding. `tests/passes_run/options.rs` reruns all fifteen.
+//! 1e-12), another solver's rounding. `tests/passes_run/options.rs` reruns those fifteen. `trtol` is a hint (R84):
+//! a factor on the truncation-error test picks steps only; set to VACASK's `tran_lteratio`
+//! value it does not give both simulators the same steps (`pair`'s lossless-LC corpus decks
+//! differ unrefined and agree refined, with and without it), so it is never mapped, and the
+//! pair test's refinement oracle is its evidence.
 //!
 //! An option in a loop's body or a branch, or one a loop or alter targets, is left with
 //! `OPTION_KEPT`: dropping it changes the body's shape (a loop of one op, `LoopOverOp`). So is
@@ -32,7 +37,7 @@
 //! | `interp` | the transient's points (243 → 201, resampled) | the print step as an output interval (R67) |
 //! | `keepopinfo` | an extra plot, the AC's operating point | output shape |
 //! | `autostop` | the transient stops at its first point (243 → 1) | output shape |
-//! | `trtol=10`, `method=gear` | the transient's step count (243 → 246) | error control, ruled with the lossless-LC reading |
+//! | `method=gear` | the transient's step count (243 → 246) | the integration method is meaning where the target states it (R84) |
 //! | `seed=7`, `pivtol`, `pivrel`, `itl2` | identical | the deck does not exercise them (no draw, no near-singular pivot, no DC point near the iteration limit) |
 //!
 //! Cites: `crates/ir/src/option_key.rs` (`OptionClass::Output`); R67.
@@ -100,6 +105,9 @@ pub const INERT: &[Row] = &[
     ("drop_option_klu", K::Klu, |d, g| drop_option(d, g, K::Klu)),
     ("drop_option_sparse", K::Sparse, |d, g| {
         drop_option(d, g, K::Sparse)
+    }),
+    ("drop_option_trtol", K::TrTol, |d, g| {
+        drop_option(d, g, K::TrTol)
     }),
 ];
 
