@@ -32,6 +32,7 @@ pub const PENDING_PAIRS: &[&str] = &[
     "drop_option_fourgridsize",
     "drop_option_klu",
     "drop_option_sparse",
+    "drop_option_trtol",
     // proven on ngspice by `passes_run/options.rs` (prints): no VACASK deck holds a print
     "drop_print",
     "whole_run_option_first",
