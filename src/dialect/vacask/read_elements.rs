@@ -55,6 +55,7 @@ pub(super) const FEATURES: ir::FeatureSet = ir::FeatureSet::EMPTY
     .with(ir::Feature::Elem(ir::ElemKind::Inductor))
     .with(ir::Feature::Elem(ir::ElemKind::Diode))
     .with(ir::Feature::Elem(ir::ElemKind::Mosfet))
+    .with(ir::Feature::Elem(ir::ElemKind::Bjt))
     .with(ir::Feature::Elem(ir::ElemKind::Jfet))
     .with(ir::Feature::Elem(ir::ElemKind::Mesfet))
     .with(ir::Feature::Elem(ir::ElemKind::ModuleModel))

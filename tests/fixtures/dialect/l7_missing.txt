@@ -315,7 +315,6 @@ vacask Elem(Table) owed from=ngspice,hspice
 vacask Elem(Laplace) unspoken
 vacask Elem(FreqTable) unspoken
 vacask Elem(Delay) unspoken
-vacask Elem(Bjt) owed from=ngspice,hspice
 vacask Elem(Igbt) unspoken
 vacask Elem(VSwitch) owed from=ngspice
 vacask Elem(ISwitch) owed from=ngspice
@@ -555,7 +554,6 @@ vacask Family(DiodeIdeal) unspoken
 vacask Family(DiodeSpectre) unspoken
 vacask Family(Juncap200) unspoken
 vacask Family(DiodeCmc) unspoken
-vacask Family(GummelPoon) owed from=ngspice,hspice
 vacask Family(Vbic) owed from=ngspice,hspice
 vacask Family(Hicum0) unspoken
 vacask Family(Hicum2) owed from=ngspice,hspice

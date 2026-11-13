@@ -26,9 +26,12 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("ngspice", "Family(Mesa)", FIXPOINT, MODELS),
     ("ngspice", "Family(CodeModel)", "code_models_of_the_build_round_trip_by_meaning", CODE_MODELS),
     ("vacask", "Item(Save)", "generated_save_plans_read_back_to_their_meaning", "W2303: VACASK spells two save shapes only (R29/S12)"),
-    ("vacask", "Elem(Cccs)", VC_FIXPOINT, VC_SOURCES_INTERIM),
+    ("vacask", "Elem(Coupling)", "property_am_and_mutual_round_trip", "the generator makes no coupling over seeds 0..512 (it needs two inductor names and a Mutual model), so none is generated, let alone refused"),
+    ("vacask", "Elem(VSource)", VC_FIXPOINT, VC_SOURCES_INTERIM),
+    ("vacask", "Elem(Mesfet)", "proven_device_kinds_round_trip", VC_DRAWS),
     ("vacask", "Wave(Pulse)", VC_FIXPOINT, VC_SOURCES_INTERIM),
-    ("vacask", "Wave(Pwl)", VC_FIXPOINT, VC_SOURCES_INTERIM),
+    ("vacask", "Wave(Sin)", VC_FIXPOINT, VC_SOURCES_INTERIM),
+    ("vacask", "Wave(Exp)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Sffm)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Am)", "property_am_and_mutual_round_trip", VC_SOURCES),
     ("hspice", "Elem(Table)", FIXPOINT, HS_CARRIED),
@@ -54,6 +57,7 @@ const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, four, noise, pss
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VC_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
 const VC_SOURCES: &str = "W2104 for sources (law L5 seed 1): VACASK takes a source's kind from its master, and the generator names a source's model with a fresh name no model statement defines, so every generated source is refused";
+const VC_DRAWS: &str = "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws; none over REACH_SEEDS since FEATURES changed (sp_bjt proven) and moved every later draw";
 const VC_SOURCES_INTERIM: &str = "interim: dialect_vacask_sources' fixtures (sources, controlled, pulse, sine, exp, pwl); the generator names a source's model with a fresh name: waits for the generator binding it";
 const CODE_MODELS: &str = "the generator's code-model words name none of the build's (W1206); a seeded property of the build's code models covers it (tests/dialect_ngspice_models.rs)";
 // hspice (tests/dialect_hspice.rs's read fixtures; its gate is goal 2's)

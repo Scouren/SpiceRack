@@ -292,10 +292,11 @@ mod tests {
             admit(&design, at, &mut diags);
             diags.rows().iter().any(|d| d.code == NO_LIBRARY)
         };
-        assert!(refused(ir::ModelFamily::GummelPoon));
+        assert!(refused(ir::ModelFamily::Psp103));
         assert!(refused(ir::ModelFamily::Vbic));
         assert!(!refused(ir::ModelFamily::Diode));
         assert!(!refused(ir::ModelFamily::JfetShichman));
         assert!(!refused(ir::ModelFamily::JfetParkerSkellern));
+        assert!(!refused(ir::ModelFamily::GummelPoon));
     }
 }
