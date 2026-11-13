@@ -1,0 +1,5 @@
+file "a.sp" deck
+  param a = 1
+  analysis op
+  alter (param a) value=2
+  analysis op

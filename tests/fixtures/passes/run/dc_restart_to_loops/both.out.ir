@@ -1,0 +1,7 @@
+file "a.sp" deck
+  element vsource v1 (in 0) dc=1
+  element vsource v2 (b 0) dc=1
+  element resistor r1 (in b) value=1k
+  loop sweep keep_last (source_dc v2) (list values=[1, 2])
+    loop sweep keep_last (source_dc v1) (list values=[0, 0.5, 1])
+      analysis op

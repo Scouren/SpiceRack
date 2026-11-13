@@ -18,7 +18,10 @@
 //! intervals: run, `.dc v1 1e-12 10e-12 1.8e-13` writes 52 points; `.dc v1 0 1.8 0.018` 101); the rule runs that loop in `f64` and keeps the axis unless it counts
 //! `n`. Its linear AC sweep of one point (`acan.c`: `ACnumberSteps − 1 > 1` else a delta of 0)
 //! computes the start frequency alone. Two or more listed frequencies are left: ngspice's linear
-//! AC sweep of two points runs one (the same test), and its end test scales with `reltol`.
+//! AC sweep of two points runs one (the same test; F32, R97: enforced by the ngspice dialect, whose
+//! reader reads a literal `lin 2` as the one value ngspice runs and whose `admits` refuses a
+//! linear AC or SP sweep of a literal count 2; runs: `tests/passes_run/decks/f32_*`), and its
+//! end test scales with `reltol`.
 //! A value that is no literal (a parameter, an expression) is left.
 //!
 //! Left items carry a note: `SWEEP_KEPT` at a DC analysis, `FREQ_LIST_KEPT` at an analysis
@@ -32,7 +35,8 @@
 //! `pub fn sweep_dc_list_to_step(&mut ir::Design, &mut ir::Diags)`,
 //! `pub fn sweep_freq_list_to_lin_points(&mut ir::Design, &mut ir::Diags)`,
 //! `pub const SWEEP_KEPT: ir::Code`, `pub const FREQ_LIST_KEPT: ir::Code`,
-//! `pub(super) fn values(&ir::Design, &ir::SweepSpec) -> Option<Vec<ir::Literal>>`
+//! `pub(super) fn values(&ir::Design, &ir::SweepSpec) -> Option<Vec<ir::Literal>>`,
+//! `pub(super) struct Nothing`
 
 use super::names_dropped::of_kind;
 use crate::ir;
@@ -41,6 +45,10 @@ use crate::ir;
 pub const SWEEP_KEPT: ir::Code = ir::Code::new(b'U', 413);
 /// The note at an analysis whose frequency list is not one value of an AC analysis.
 pub const FREQ_LIST_KEPT: ir::Code = ir::Code::new(b'U', 414);
+
+/// Bindings that bind nothing: an expression with a value under them is a constant (shared
+/// with `param_arguments`).
+pub(super) struct Nothing;
 
 /// ngspice-45's DC end test: `DBL_EPSILON * 1e+03` (`dctrcurv.c`).
 const NG_DC_FUZZ: f64 = f64::EPSILON * 1e3;
@@ -55,9 +63,6 @@ struct Dec {
     m: i128,
     e: i32,
 }
-
-/// Bindings that bind nothing: an expression with a value under them is a constant.
-struct Nothing;
 
 impl ir::Bindings for Nothing {
     fn param(&self, _: ir::Ref) -> Option<f64> {

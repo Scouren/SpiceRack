@@ -102,7 +102,6 @@ ngspice Circuit(TcBaseTnom) unspoken
 ngspice Run(TranStartup) unspoken
 ngspice Run(TranNoise) owed from=vacask
 ngspice Run(TranSegments) unspoken
-ngspice Run(DcRestart) unspoken
 ngspice Run(DcAxisParam) owed from=vacask
 ngspice Run(DcAxisSubcktParam) unspoken
 ngspice Run(DcAxisOption) owed from=vacask
@@ -133,7 +132,6 @@ ngspice Run(PssDriven) unspoken
 ngspice Run(PeriodicRelative) unspoken
 ngspice Run(LoopTable) unspoken
 ngspice Run(LoopMonteCarlo) owed from=vacask
-ngspice Run(LoopRestore) owed from=vacask
 ngspice Run(LoopTemp) owed from=vacask
 ngspice Run(LoopSubcktParam) unspoken
 ngspice Run(LoopOption) owed from=vacask
@@ -171,7 +169,6 @@ ngspice Run(NodeSetMidRun) owed from=vacask
 ngspice Run(NodeSetFromHere) owed from=vacask
 ngspice Run(PssOscDiff) unspoken
 ngspice Run(PssArgumentOmitted) unspoken
-ngspice Run(AlterParamAtOnce) owed from=vacask
 ngspice Run(DcOuterCarries) owed from=vacask
 ngspice Option(MethodEuler) owed from=vacask
 ngspice Option(MaxStep) unspoken
@@ -487,7 +484,6 @@ vacask Run(ResetValues) owed from=ngspice
 vacask Run(ResetOptions) owed from=ngspice
 vacask Run(ResetTemp) owed from=ngspice
 vacask Run(ResetTnom) owed from=ngspice
-vacask Run(AnalysisParamArgument) owed from=ngspice
 vacask Run(PssArgumentOmitted) unspoken
 vacask Run(AlterParamAtReset) owed from=ngspice
 vacask Run(DcOuterAfresh) owed from=ngspice
