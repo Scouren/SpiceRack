@@ -1,0 +1,30 @@
+Load decks of sp_mos1 against ngspice-45 (the lead's load-deck item): one deck per (condition, region, reading),
+written by ../load.py mos1. Builds on PATH: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n (source hfvpfb0bgw9819wkb7kzpdaasbd0hd5r,
+devices/mos1), VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (devices/spice/mos1.va, ngspice-47-159 vadng-pre-48).
+Run: `nix develop .#testing -c tests/fixtures/families/load_run.sh mos1`. i(vd) in A, |i(vd)| at 1 GHz for acg/acd.
+nom is 27 C, m=1, the control of off (80 C, m=3); both give w, l, ad, as, pd, ps, a bulk at -0.5 V, junctions (cj, cjsw,
+js) and Meyer capacitances (tox, cgso, cgdo, cgbo). Regions: cut vgs=0.3 vds=2, lin vgs=3 vds=0.2, sat vgs=1.5 vds=3.
+The capacitances are read: nom_cut_acg is w*cgdo (3.0e-15 F at 1 GHz), nom_cut_acd w*cgdo plus the reverse-biased
+drain junction (1.09e-14 F). Result: no difference. The cutoff currents (gmin across the drain junction plus js*ad)
+stand 2.6e-17 A apart at abstol 1e-15 (and 2.96e-17 A with js=1, a current 1e4 times larger: a constant, not the
+junction law); at VACASK's default abstol nom_cut_dc reads -2.693e-12 against -2.502e-12 (the solver's tolerance).
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+nom_cut_acd      ngspice=6.868012279114e-05     vacask=6.868012279113571e-05    rel=6.24e-14 
+nom_cut_acg      ngspice=1.884955147572e-05     vacask=1.884955147572036e-05    rel=1.91e-14 
+nom_cut_dc       ngspice=-2.50202636387e-12     vacask=-2.50199999997498e-12    rel=1.05e-05 
+nom_lin_acd      ngspice=9.923096248345e-04     vacask=0.0009923096248344576    rel=4.26e-14 
+nom_lin_acg      ngspice=1.570490052021e-04     vacask=0.00015704900520214043   rel=2.58e-13 
+nom_lin_dc       ngspice=-2.03594292035e-04     vacask=-0.0002035942920354267   rel=2.10e-12 
+nom_sat_acd      ngspice=6.330800928518e-05     vacask=6.330800928518025e-05    rel=3.85e-15 
+nom_sat_acg      ngspice=3.536196881655e-04     vacask=0.0003536196881655425    rel=1.20e-13 
+nom_sat_dc       ngspice=-1.18651626069e-04     vacask=-0.0001186516260690983   rel=8.28e-13 
+off_cut_acd      ngspice=2.085182796340e-04     vacask=0.0002085182796339715    rel=1.37e-13 
+off_cut_acg      ngspice=5.654865410482e-05     vacask=5.65486541048212e-05     rel=2.12e-14 
+off_cut_dc       ngspice=-8.84248230193e-12     vacask=-8.842435598854603e-12   rel=5.28e-06 
+off_lin_acd      ngspice=2.447394887148e-03     vacask=0.0024473948871480845    rel=3.46e-14 
+off_lin_acg      ngspice=4.366754265062e-04     vacask=0.00043667542650623444   rel=7.88e-14 
+off_lin_dc       ngspice=-4.96283434923e-04     vacask=-0.000496283434922958    rel=8.45e-14 
+off_sat_acd      ngspice=1.917500378422e-04     vacask=0.00019175003784223905   rel=2.04e-13 
+off_sat_acg      ngspice=9.169347179311e-04     vacask=0.0009169347179310703    rel=3.24e-14 
+off_sat_dc       ngspice=-3.38659478978e-04     vacask=-0.0003386594789780862   rel=2.55e-13 

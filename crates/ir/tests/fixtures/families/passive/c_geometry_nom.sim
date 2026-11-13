@@ -1,0 +1,10 @@
+passive c_geometry nom (27 C, m=1), ac (1 V on a, 1 MHz)
+load "spice/capacitor.osdi"
+model vs vsource
+model cm sp_capacitor cj=1e-3 cjsw=1e-9 narrow=0.1u short=0.2u model_tc1=1e-3 model_tc2=1e-5
+vd (a 0) vs dc=1 mag=1
+c1 (a 0) cm w=10u l=20u
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis ac1 ac from=1e6 to=1e6 mode="lin" points=1
+endc

@@ -1,0 +1,21 @@
+Load decks of sp_resistor, sp_capacitor, sp_inductor against ngspice-45: one deck per (form, condition), written by
+../load.py passive. Builds as in ../mos1/runs.out (devices/res, cap, ind; devices/spice/{resistor,capacitor,inductor}.va).
+Run: `nix develop .#testing -c tests/fixtures/families/load_run.sh passive`. i(vd) in A for r_*, |i(vd)| at 1 MHz
+for c_* and l_* (an inductor behind 1 ohm). nom is 27 C, m=1, the control of off (80 C, m=3); every deck gives tc1 and
+tc2 (instance on the value forms, model on the geometry forms); geometry: rsh, narrow, short, l, w (r); cj, cjsw, narrow,
+short, w, l (c); csect, length, mu, nt (l). Both simulators shorten and narrow a resistor by twice short and narrow
+(r_geometry_nom: 100*(10u-0.4u)/(2u-0.2u) = 533.3 ohm). Result: no difference.
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+c_geometry_nom   ngspice=1.604851191160e-06     vacask=1.604851191159809e-06    rel=1.19e-13 
+c_geometry_off   ngspice=5.204965722753e-06     vacask=5.204965722752875e-06    rel=2.39e-14 
+c_value_nom      ngspice=6.283185307180e-06     vacask=6.283185307179586e-06    rel=6.59e-14 
+c_value_off      ngspice=2.037806641122e-05     vacask=2.037806641121633e-05    rel=1.80e-13 
+l_geometry_nom   ngspice=1.914058688238e-02     vacask=0.019140586882384826     rel=2.52e-13 
+l_geometry_off   ngspice=5.304961699436e-02     vacask=0.05304961699436042      rel=7.98e-15 
+l_value_nom      ngspice=1.571767254776e-01     vacask=0.15717672547758985      rel=6.46e-14 
+l_value_off      ngspice=4.040037790861e-01     vacask=0.40400377908609914      rel=2.20e-15 
+r_geometry_nom   ngspice=-1.87500000000e-03     vacask=-0.001875                rel=0.00e+00 
+r_geometry_off   ngspice=-5.20308207457e-03     vacask=-0.005203082074572885    rel=5.54e-13 
+r_value_nom      ngspice=-1.00000000000e-03     vacask=-0.001                   rel=0.00e+00 
+r_value_off      ngspice=-2.77497710644e-03     vacask=-0.002774977106438872    rel=4.06e-13 

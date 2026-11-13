@@ -1,0 +1,10 @@
+passive c_value nom (27 C, m=1), ac (1 V on a, 1 MHz)
+load "spice/capacitor.osdi"
+model vs vsource
+model c sp_capacitor
+vd (a 0) vs dc=1 mag=1
+c1 (a 0) c c=1p tc1=1e-3 tc2=1e-5
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis ac1 ac from=1e6 to=1e6 mode="lin" points=1
+endc
