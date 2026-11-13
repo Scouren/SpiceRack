@@ -67,13 +67,10 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Elem(K::Mosfet),
     Feature::Elem(K::Jfet),
     Feature::Elem(K::Mesfet),
-    Feature::Elem(K::VSwitch),
-    Feature::Elem(K::ISwitch),
     Feature::Elem(K::LosslessLine),
     Feature::Elem(K::LossyLine),
     Feature::Elem(K::RcLine),
     Feature::Elem(K::SingleLossyLine),
-    Feature::Elem(K::CoupledLines),
     Feature::Elem(K::CodeModel),
     Feature::Elem(K::ModuleModel),
     Feature::Elem(K::Instance),
@@ -104,7 +101,6 @@ pub(super) const FEATURES: FeatureSet = tables::feature_set(&[
     Feature::Circuit(X::SemiArea),
     Feature::Circuit(X::SemiInitialOff),
     Feature::Circuit(X::DiodeThermal),
-    Feature::Circuit(X::SwitchInitial),
     Feature::Circuit(X::LineFreqNl),
     Feature::Circuit(X::LineLumps),
 ])
@@ -246,12 +242,15 @@ pub(super) fn element(lw: &mut Lower<'_, '_>, st: Stmt) {
         b'r' | b'c' | b'l' => passive::rcl(lw, st, card, &items, &text),
         b'k' => passive::coupling(lw, st, card, &items),
         b'd' | b'q' | b'm' | b'j' | b'z' => semi::semi(lw, st, card, &items),
-        b's' | b'w' => semi::switch(lw, st, card, &items),
+        // HSPICE's S is an S-parameter block, its W a lossy line, its P a port (the suite's
+        // s_element.sp, w_element.sp, port_series_z0.sp run on ESPice), not ngspice's switches
+        // and coupled lines: no rule yet
+        b's' | b'w' | b'p' => lw.unread(st),
         b'e' | b'g' | b'f' | b'h' => controlled::efgh(lw, st, card, &items, &text),
         // B is an IBIS buffer in HSPICE, no behavioural source (settle b_element.sp: ESPice
         // refuses it)
         b'b' => lw.opaque(st, ir::OpaqueClass::InvalidInSource, B_CARD),
-        b't' | b'o' | b'u' | b'y' | b'p' => lines::line(lw, st, card, &items),
+        b't' | b'o' | b'u' | b'y' => lines::line(lw, st, card, &items),
         b'x' => modules::x(lw, st, card, &items),
         b'n' => modules::n(lw, st, card, &items),
         b'a' => modules::a(lw, st, card, &items),

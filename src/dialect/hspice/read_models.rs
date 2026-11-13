@@ -410,6 +410,9 @@ fn head(lw: &Lower<'_, '_>, card: &Card, notes: &mut Vec<Code>) -> Result<Head, 
         "numd" | "nbjt" | "numos" => Err((OpaqueClass::Private, CIDER)),
         // `INPtypelook("POLY")`: no such device in this binary
         "poly" => Err((OpaqueClass::InvalidInSource, NO_DEVICE)),
+        // HSPICE's S-parameter and W-line models, `.model … s|sp|w` (the suite's s_element.sp,
+        // w_element.sp run on ESPice): no family yet, never a module
+        "s" | "sp" | "w" => Err(unread()),
         _ if families::device_name(word) => Err(unread()),
         _ if families::code_model(word) => Ok(Head::Code(word.to_string())),
         _ => Ok(Head::Module(word.to_string())),

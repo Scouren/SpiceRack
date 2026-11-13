@@ -116,7 +116,14 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
     // FieldDomain (R68, A42); a `.pss` missing an argument is `PssArgumentOmitted`, which
     // FEATURES lack: what is left is ngspice's own card form, and in a script a field that is
     // no number (W4305); a sweep's form is a feature (`Sweep{Dc,Freq}*`, A24)
-    let freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
+    // a literal count must be whole (settle ac_frac.sp: ESPice refuses `dec 2.5`)
+    let mut whole = true;
+    let mut count = |e: ir::ExprId| {
+        whole &= e.is_none()
+            || !matches!(design.expr(e), ir::Expr::Num(n) if design.literal_value(design.num(n)).fract() != 0.0);
+    };
+    let mut freq = |s: ir::SweepSpec, values: &mut Vec<ir::ExprId>| {
+        count(s.points);
         values.extend([s.start, s.stop, s.points]);
     };
     match a.kind {
@@ -133,8 +140,8 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
                     ir::TargetKind::ElementValue => name == Some(b'r'),
                     _ => true,
                 };
-                let s = axis.sweep;
-                values.extend([s.start, s.stop, s.step]);
+                freq(axis.sweep, &mut values);
+                values.push(axis.sweep.step);
             }
         }
         AnalysisKind::Ac => freq(design.detail::<Ac>(a.detail).sweep, &mut values),
@@ -182,7 +189,7 @@ pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Dia
         }
         _ => {}
     }
-    form_ok &= outs.iter().all(|p| write_outputs::probe_admits(design, p));
+    form_ok &= whole && outs.iter().all(|p| write_outputs::probe_admits(design, p));
     if !form_ok {
         refuse(CARD_FORM);
     }
