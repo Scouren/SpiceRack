@@ -1,0 +1,47 @@
+SPICE VDMOS CMOS inverter
+
+load "spice/vdmos.osdi"
+load "resistor.osdi"
+load "capacitor.osdi"
+
+model v vsource
+model r resistor
+model c capacitor
+
+model nm sp_vdmos ( type=1 
+  vto=4 kp=5.9 lambda=0.001 theta=0.015 ksubthres=0.27
+  rd=61m rs=18m rg=3 rds=1e7
+  cgdmax=2.45n cgdmin=10p a=0.3 cgs=1.2n
+  is=60p n=1.1 rb=14m xti=3
+  cjo=1.5n vj=0.8 m=0.5
+  mu=-1.27 texp0=1.5
+  rthjc=0.4 cthj=5e-3
+  mtriode=0.8 vq=100 rq=0.5
+  kf=0.032f af=1
+)
+
+model pm sp_vdmos ( type=-1 
+  vto=-4 kp=5.9 lambda=0.001 theta=0.015 ksubthres=0.27
+  rd=61m rs=18m rg=3 rds=1e7
+  cgdmax=2.45n cgdmin=10p a=0.3 cgs=1.2n
+  is=60p n=1.1 rb=14m xti=3
+  cjo=1.5n vj=0.8 m=0.5
+  mu=-1.27 texp0=1.5
+  rthjc=0.4 cthj=5e-3
+  mtriode=0.8 vq=100 rq=0.5
+  kf=0.032f af=1
+)
+
+vdd (1 0) v dc=10
+m1 (out in 0 0 0) nm
+m2 (out in 1 0 0) pm
+r1 (out 0) r r=100k
+vin (in 0) v dc=0 type="pulse" val0=0 val1=10 delay=1u rise=100n fall=100n width=1u period=2u
+
+control
+  analysis tran1 tran step=1n stop=5u maxstep=1n
+ 
+endc
+
+
+

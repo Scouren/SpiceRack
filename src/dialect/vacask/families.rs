@@ -160,6 +160,9 @@ pub(super) const PROVEN: &[&str] = &[
     // (R86: base-collector saturation current under an area, run semi_bjt's 0.2 %; R94a: irb in
     // small signal) the design states this build's law (`LAWS`) and legalize keeps them apart.
     "sp_bjt",
+    // By pair deck sp_vdmosinv; F24-F26 (kp default, tcvth sign, body-diode clamp) and the
+    // multiplicity of charges are law points the design states (LAWS).
+    "sp_vdmos",
 ];
 
 /// A shipped module's parameter names, as `params.txt` lists them.

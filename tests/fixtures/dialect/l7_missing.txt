@@ -569,7 +569,6 @@ vacask Family(Hisim2) owed from=ngspice,hspice
 vacask Family(HisimHv) owed from=ngspice,hspice
 vacask Family(Psp103) unspoken
 vacask Family(BsimBulk) unspoken
-vacask Family(Vdmos) owed from=ngspice,hspice
 vacask Family(VdmosRpi) unspoken
 vacask Family(JfetShockley) unspoken
 vacask Family(JfetHspice2) unspoken
