@@ -7,8 +7,8 @@
 
 use super::{
     alter_at_reset, dc_axes_to_loops, device_ic, drop_print, fs, ic_next_only, inert_options,
-    loop_end, names_dropped, names_given, param_arguments, run_items_together, save_set_to_all,
-    sweep_forms, tc, tran_print_step, wr,
+    loop_end, names_dropped, names_given, noise_ref_unit, param_arguments, run_items_together,
+    save_set_to_all, sweep_forms, tc, tran_print_step, wr,
 };
 use crate::ir;
 
@@ -281,6 +281,15 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a device initial condition the target's node conditions cannot state",
             cite: "rewrite/AMEND-A12.md A22",
             explain: "Under uic SPICE starts each storage element from its own state; the target starts from node voltages. They agree only when the node voltages the conditions assign give every capacitor exactly its own initial condition (zero without one) and leave every other element with a state of its own, and every voltage source, on nodes at zero. Here they do not (or the condition is an inductor's or a semiconductor's, inside a subcircuit, or not a literal), so the item is refused.",
+            kind: ir::Kind::Note,
+        },
+    ),
+    (
+        noise_ref_unit::NOISE_REF_KEPT,
+        ir::Info {
+            title: "a noise analysis referred to its source's AC magnitude, which is not surely 1",
+            cite: "INV-semantics.md 8.10; crates/ir/src/dc_ac.rs (NoiseRef)",
+            explain: "The input-referred noise is the output noise divided by a gain: to the input source's own AC magnitude here, to a unit input on the target. The two are one number only when that magnitude is 1. Here it is not a literal 1 (or the source is not one top-level source, or a loop or an alter may change it between runs), so the item is refused.",
             kind: ir::Kind::Note,
         },
     ),
