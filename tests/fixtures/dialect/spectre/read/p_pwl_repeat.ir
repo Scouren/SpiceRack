@@ -1,0 +1,8 @@
+# tests/spectre/p_pwl_repeat.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "p_pwl_repeat.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  element vsource v1 (a 0) dc=0 wave=pwl(points=[0, 0, 1m, 1, 2m, 0] delay=500u repeat_at=2m join_width=(2m / 1000) repeat=period join=ramp_width)
+  element resistor r1 (a 0) value=1k
+  analysis tran name=tran1 stop=2.25m print_step=10u cap=span_over50

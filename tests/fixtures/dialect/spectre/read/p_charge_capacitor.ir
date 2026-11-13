@@ -1,0 +1,8 @@
+# tests/spectre/p_charge_capacitor.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "p_charge_capacitor.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  element isource iq (0 q) dc=1u
+  element charge_capacitor cq (q 0) expr=(1n * v(q)) output=charge
+  analysis tran name=tran1 stop=1m print_step=10u cap=span_over50 uic

@@ -1,0 +1,14 @@
+// t
+
+simulator lang=spectre
+
+
+v1 (a 0) vsource dc=0 type=sine sinedc=0 ampl=1 freq=1k
+r1 (a 0) resistor r=1k
+myopts options reltol=100u
+save a
+simulator lang=spice
+.measure tran vmax max v(a)
+simulator lang=spectre
+
+tran1 tran step=1u stop=1m

@@ -1,0 +1,19 @@
+# tests/spectre/p_models.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "p_models.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  model dmod diode_spectre params=(is=10f n=1)
+  model qn gummel_poon polarity=n params=(is=1f bf=100)
+  model nm mos1 polarity=n params=(vto=1 kp=20u lambda=50m)
+  element vsource v1 (vin 0) dc=1
+  element resistor r1 (vin a) value=1k
+  element diode d1 (a 0) model=dmod
+  element vsource vcc (vcc 0) dc=5
+  element resistor rb (vcc base) value=470k
+  element resistor rc (vcc coll) value=1k
+  element bjt q1 (coll base 0) model=qn
+  element vsource vg (gate 0) dc=3
+  element resistor rd (vcc drain) value=1k
+  element mosfet m1 (drain gate 0 0) model=nm params=(w=10u l=1u)
+  analysis op name=op1

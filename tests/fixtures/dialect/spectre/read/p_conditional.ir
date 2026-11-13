@@ -1,0 +1,13 @@
+# tests/spectre/p_conditional.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "p_conditional.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  param sel = 1
+  element vsource v1 (in 0) dc=2
+  element resistor r1 (in out) value=1k
+  if (sel == 1)
+    element resistor r2 (out 0) value=1k
+  else
+    element resistor r2 (out 0) value=3k
+  analysis op name=op1

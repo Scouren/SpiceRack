@@ -1,0 +1,16 @@
+# tests/spectre/t_s1_nominal.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "t_s1_nominal.scs" deck
+  title "// t_s1_nominal.scs"
+  opaque spectre inert "simulator lang=spectre"
+  func rack_agauss(nom, avar, sigma, z) = nom + (avar > 0 && sigma > 0 ? avar : 0) / (sigma > 0 ? sigma : 1) * z
+  func rack_aunif(nom, avar, u) = nom + avar * u
+  func rack_limit(nom, avar, u) = u > 0 ? nom + avar : u < 0 ? nom - avar : nom
+  param rack_r1_r_1 = 0
+  param rack_r1_r_2 = 0
+  param rack_r1_r_3 = 0
+  statistics process (rack_r1_r_1 gauss spread=1) (rack_r1_r_2 unif spread=1) (rack_r1_r_3 unif spread=1)
+  element vsource v1 (in 0) dc=1
+  element resistor r1 (in out) value=(@rack_agauss(1k, 100, 3, rack_r1_r_1) + @rack_aunif(0, 100, rack_r1_r_2) + @rack_limit(0, 50, rack_r1_r_3))
+  element resistor r2 (out 0) value=1k
+  analysis op name=op1

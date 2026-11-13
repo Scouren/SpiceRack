@@ -1,0 +1,10 @@
+# tests/spectre/t_m4_dependent.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "t_m4_dependent.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  model resbody resistor params=(tc1=1m tnom=25 l=10u w=10u r=1m af=1 wdexp=0 ldexp=0 leexp=1 weexp=1)
+  element isource i1 (0 a) dc=1m
+  element resistor rb (a 0) value=(1k * (1 + 0.1 * abs(v(a)))) noisy=false
+  env temp=60 whole_run
+  analysis op name=op1

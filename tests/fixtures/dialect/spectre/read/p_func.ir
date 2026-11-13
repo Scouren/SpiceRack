@@ -1,0 +1,11 @@
+# tests/spectre/p_func.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "p_func.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  func dbl(x) = 2 * x
+  param rb = 1k
+  element vsource v1 (in 0) dc=2
+  element resistor r1 (in out) value=(@dbl(500))
+  element resistor r2 (out 0) value=rb
+  analysis op name=op1

@@ -1,0 +1,9 @@
+// t
+
+simulator lang=spectre
+
+
+v1 (a 0) vsource dc=0 type=pwl wave=[0 0 1m 1 2m 0] delay=500u pwlperiod=2m
+r1 (a 0) resistor r=1k
+
+tran1 tran step=10u stop=2.25m

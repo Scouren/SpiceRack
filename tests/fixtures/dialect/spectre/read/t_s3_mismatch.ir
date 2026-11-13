@@ -1,0 +1,20 @@
+# tests/spectre/t_s3_mismatch.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "t_s3_mismatch.scs" deck
+  title "// t_s3_mismatch.scs"
+  opaque spectre inert "simulator lang=spectre"
+  func rack_agauss(nom, avar, sigma, z) = nom + (avar > 0 && sigma > 0 ? avar : 0) / (sigma > 0 ? sigma : 1) * z
+  param g_r = @rack_agauss(0, 100, 1, rack_g_r_1)
+  param g = g_r
+  param rack_g_r_1 = 0
+  param rack_s_rl_1 = 0
+  statistics process (rack_g_r_1 gauss spread=1) mismatch (rack_s_rl_1 gauss spread=1)
+  subckt s (a b) rl=(@rack_agauss(1k, 100, 1, rack_s_rl_1))
+    element resistor r1 (a b) value=(rl + g)
+    element resistor r2 (b 0) value=1k
+  element vsource v1 (in 0) dc=1
+  element instance x1 (in o1) model=s
+  element instance x2 (in o2) model=s
+  analysis op name=op1
+  loop monte_carlo name=mc1 runs=2000 seed=1 mismatch nominal
+    analysis op name=dcmc

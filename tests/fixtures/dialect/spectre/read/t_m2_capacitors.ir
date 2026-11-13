@@ -1,0 +1,18 @@
+# tests/spectre/t_m2_capacitors.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "t_m2_capacitors.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  model cmim capacitor params=(cj=2m cjsw=100p tc1=100u tnom=27 w=10u)
+  model cfix capacitor params=(c=3p w=10u)
+  element isource i1 (0 b1) dc=0 wave=pulse(v1=0 v2=1u delay=0 rise=1f fall=1f width=1 period=2)
+  element capacitor c1 (b1 0) model=cmim params=(w=10u l=20u)
+  element resistor rb1 (b1 0) value=1t
+  element isource i2 (0 b2) dc=0 wave=pulse(v1=0 v2=1u delay=0 rise=1f fall=1f width=1 period=2)
+  element capacitor c2 (b2 0) model=cfix mult=(1 * 2)
+  element resistor rb2 (b2 0) value=1t
+  element isource i3 (0 b3) dc=0 wave=pulse(v1=0 v2=1u delay=0 rise=1f fall=1f width=1 period=2)
+  element capacitor c3 (b3 0) model=cmim params=(l=5u)
+  element resistor rb3 (b3 0) value=1t
+  env temp=60 whole_run
+  analysis tran name=tran1 stop=1u print_step=10n cap=span_over50

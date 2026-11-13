@@ -1,0 +1,14 @@
+# tests/spectre/t_s2_limit.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "t_s2_limit.scs" deck
+  title "// t_s2_limit.scs"
+  opaque spectre inert "simulator lang=spectre"
+  func rack_limit(nom, avar, u) = u > 0 ? nom + avar : u < 0 ? nom - avar : nom
+  param rack_r1_r_1 = 0
+  statistics process (rack_r1_r_1 unif spread=1)
+  element vsource v1 (in 0) dc=1
+  element resistor r1 (in out) value=(@rack_limit(1k, 50, rack_r1_r_1))
+  element resistor r2 (out 0) value=1k
+  analysis op name=op1
+  loop monte_carlo name=mc1 runs=2000 seed=1 all nominal
+    analysis op name=dcmc

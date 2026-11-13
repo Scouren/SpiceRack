@@ -1,0 +1,24 @@
+# tests/spectre/t_m1_resistors.scs read by the spectre row; checked by hand against the deck and its RUN-SP outcome (tests/spectre/pending.json, expected.json).
+# codes: S0003 P6008
+file "t_m1_resistors.scs" deck
+  title "// t"
+  opaque spectre inert "simulator lang=spectre"
+  param wr = 2u
+  model rpoly resistor params=(rsh=100 etch=100n etchl=200n tc1=1m tc2=2u tnom=25 l=10u w=10u af=1 wdexp=0 ldexp=0 leexp=1 weexp=1)
+  model rvia resistor params=(r=50 tc1=2m l=10u w=10u af=1 wdexp=0 ldexp=0 leexp=1 weexp=1)
+  model rnone resistor params=(l=10u w=10u r=1m af=1 wdexp=0 ldexp=0 leexp=1 weexp=1)
+  model rdef resistor params=(rsh=10 l=10u w=10u af=1 wdexp=0 ldexp=0 leexp=1 weexp=1)
+  element isource i1 (0 a1) dc=1m
+  element resistor r1 (a1 0) model=rpoly params=(w=wr l=10u)
+  element isource i2 (0 a2) dc=1m
+  element resistor r2 (a2 0) model=rvia dtemp=10
+  element isource i3 (0 a3) dc=1m
+  element resistor r3 (a3 0) model=rnone
+  element isource i4 (0 a4) dc=1m
+  element resistor r4 (a4 0) mult=(4 / 2) value=1k
+  element isource i5 (0 a5) dc=1m
+  element resistor r5 (a5 0) model=rdef
+  element isource i6 (0 a6) dc=1m
+  element resistor r6 (a6 0) model=rpoly params=(l=20u)
+  env temp=60 whole_run
+  analysis op name=op1
