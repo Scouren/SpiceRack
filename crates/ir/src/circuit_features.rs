@@ -27,7 +27,7 @@ use crate::item::ItemKind;
 use crate::letter::spice_letters;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
-use crate::model::{BcSatArea, Model, ModelFamily};
+use crate::model::{Model, ModelFamily};
 use crate::passive::{Coupling, IcMode, Passive, TcBase, TcLaw};
 use crate::semi::{InitialState, Semi, Switch};
 use crate::source::{DcRule, PortSpec, Source};
@@ -167,7 +167,7 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
                 if some(s.area) {
                     add(X::SemiArea);
                 }
-                bc_sat_area(design, e, s.area, &mut add);
+                crate::bjt_laws::bc_sat_area(design, e, s.area, &mut add);
                 match s.initial {
                     InitialState::Unset => {}
                     InitialState::Off => add(X::SemiInitialOff),
@@ -216,7 +216,10 @@ pub(crate) fn element_features(e: &Element, design: &Design, set: &mut FeatureSe
 }
 
 /// Adds the model's family (`Feature::Family`) and its circuit extras.
-pub(crate) fn model_features(m: &Model, set: &mut FeatureSet) {
+pub(crate) fn model_features(m: &Model, design: &Design, set: &mut FeatureSet) {
+    if let Some(x) = crate::bjt_laws::sub_sat_temp(design, m) {
+        *set = set.with(Feature::Circuit(x));
+    }
     // A15 K5 (R32): every model is a feature of its family
     *set = set.with(Feature::Family(m.family));
     if m.bin_of != NameId::NONE {
@@ -271,39 +274,6 @@ pub(crate) fn library_features(design: &Design, set: &mut FeatureSet) {
 }
 
 // ---- private ----
-
-/// R86: a BJT's base-collector saturation member, when the two laws differ on it: its area is
-/// not literally 1 and its model gives neither `ibe` nor `ibc` (`BcSatArea`). Reads the one
-/// model row the instance names (O(the model's parameters)), never another instance. An
-/// unresolved model's law is unknown: both members.
-fn bc_sat_area(design: &Design, e: &Element, area: ExprId, add: &mut impl FnMut(X)) {
-    if e.kind != ElemKind::Bjt || area.is_none() || crate::run_words::is_one(design, area) {
-        return;
-    }
-    let def = e.model.def;
-    let Some(d) = def.index_checked(design.defs.len()).map(|k| design.defs[k]) else {
-        add(X::BjtBcSatAreaTimesAreab);
-        add(X::BjtBcSatAreabOnly);
-        return;
-    };
-    if d.item.kind != ItemKind::Model {
-        return;
-    }
-    let m: Model = design.row(d.item.index);
-    let given = |key: &str| {
-        design
-            .params(m.params)
-            .iter()
-            .any(|p| design.str(p.0) == key)
-    };
-    if m.family != ModelFamily::GummelPoon || given("ibe") && given("ibc") {
-        return;
-    }
-    add(match m.bc_sat_area {
-        BcSatArea::AreaTimesAreab => X::BjtBcSatAreaTimesAreab,
-        BcSatArea::AreabOnly => X::BjtBcSatAreabOnly,
-    });
-}
 
 fn tc_base(base: TcBase) -> X {
     match base {

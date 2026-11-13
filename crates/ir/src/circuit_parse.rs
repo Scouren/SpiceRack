@@ -27,7 +27,7 @@ use crate::id::{ExprId, ItemRef, List, NameId, Ref, ScopeId};
 use crate::item::DefKind;
 use crate::library::DeviceLibrary;
 use crate::line::Line;
-use crate::model::{BcSatArea, Model, ModelFamily, Polarity};
+use crate::model::{BcSatArea, Model, ModelFamily, Polarity, SubSatTemp};
 use crate::passive::{Coupling, Parasitics, Passive};
 use crate::semi::{Semi, Switch};
 use crate::source::{Distof, PortSpec, Source};
@@ -156,6 +156,7 @@ pub(crate) fn parse_model(
         family,
         polarity: Polarity::None,
         bc_sat_area: BcSatArea::AreaTimesAreab,
+        sub_sat_temp: SubSatTemp::LastFactor,
     };
     // bounded: each pass consumes at least one word of the line
     while !words.at_end() {
@@ -167,6 +168,10 @@ pub(crate) fn parse_model(
         match key {
             "bc_sat" => match words.next() {
                 Some("areab_only") => m.bc_sat_area = BcSatArea::AreabOnly,
+                _ => words.error(diags),
+            },
+            "sub_sat" => match words.next() {
+                Some("emission_ns") => m.sub_sat_temp = SubSatTemp::EmissionNs,
                 _ => words.error(diags),
             },
             "polarity" => match words.next() {

@@ -280,11 +280,19 @@ pub enum CircuitExtra {
     BjtBcSatAreaTimesAreab,
     /// The same under `BcSatArea::AreabOnly` (the VACASK module the flake pins; R86).
     BjtBcSatAreabOnly,
+    /// A Gummel-Poon model on which the two substrate temperature laws differ (it gives `iss`,
+    /// its `tlev` is absent or literally 0 or 1, and its `ns` is not literally the exponent the
+    /// last-set factor uses: 1 without both `ibe` and `ibc`, `nr` with them; an absent `ns` or
+    /// `nr` is literally 1, a parameter read or any other expression is not literal) under
+    /// `SubSatTemp::LastFactor` (ngspice-45; R88, `SubSatTemp`'s doc).
+    ModelSubSatLastFactor,
+    /// The same under `SubSatTemp::EmissionNs` (the VACASK module the flake pins; R88).
+    ModelSubSatEmissionNs,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 111] = [
+    pub const ALL: [CircuitExtra; 113] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -396,6 +404,8 @@ impl CircuitExtra {
         CircuitExtra::GivenZeroSpiceDefault,
         CircuitExtra::BjtBcSatAreaTimesAreab,
         CircuitExtra::BjtBcSatAreabOnly,
+        CircuitExtra::ModelSubSatLastFactor,
+        CircuitExtra::ModelSubSatEmissionNs,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

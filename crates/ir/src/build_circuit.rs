@@ -14,7 +14,7 @@
 //! use spicerack_ir::source::{DcRule, Source};
 //! use spicerack_ir::wave::{GivenZero, Pulse, PulseLaw};
 //! use spicerack_ir::{
-//!     check, BcSatArea, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, MultLaw, NameId,
+//!     check, BcSatArea, SubSatTemp, Design, Diags, ElemHead, ElemKind, ExprId, List, Literal, Model, ModelFamily, MultLaw, NameId,
 //!     NumForm, Polarity, Ref, Role, Span, NO_ROW,
 //! };
 //!
@@ -63,7 +63,7 @@
 //! b.model(top, Model {
 //!     name, params, bin_of: NameId::NONE, ako: none, module: none, version: ExprId::NONE,
 //!     word: NameId::NONE, family: ModelFamily::Diode, polarity: Polarity::None,
-//!     bc_sat_area: BcSatArea::AreaTimesAreab,
+//!     bc_sat_area: BcSatArea::AreaTimesAreab, sub_sat_temp: SubSatTemp::LastFactor,
 //! }, span);
 //!
 //! let mut diags = Diags::new();

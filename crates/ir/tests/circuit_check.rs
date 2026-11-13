@@ -1104,10 +1104,11 @@ mod tests {
         assert_eq!(params, only(Violation::FieldDomain));
     }
 
-    /// R86: a base-collector law of its own (`AreabOnly`) only on a Gummel-Poon model; on a
-    /// diode model it is `FieldDomain`, and either law is legal on Gummel-Poon.
+    /// R86, R88: a base-collector or substrate law of its own (`AreabOnly`, `EmissionNs`) only on
+    /// a Gummel-Poon model; on a diode model it is `FieldDomain`, and either law is legal on
+    /// Gummel-Poon.
     #[test]
-    fn only_a_gummel_poon_model_states_a_base_collector_area_law() {
+    fn only_a_gummel_poon_model_states_a_bjt_law_of_its_own() {
         let with = |family: ModelFamily, polarity: Polarity, law: spicerack_ir::BcSatArea| {
             checked(move |b, top| {
                 let name = b.name("m");
@@ -1129,6 +1130,25 @@ mod tests {
         );
         assert_eq!(
             with(ModelFamily::Diode, Polarity::None, AreabOnly),
+            only(Violation::FieldDomain)
+        );
+        // R88: likewise the substrate temperature law
+        let sub = |family: ModelFamily, polarity: Polarity| {
+            checked(move |b, top| {
+                let name = b.name("m");
+                let row = spicerack_ir::Model {
+                    sub_sat_temp: spicerack_ir::SubSatTemp::EmissionNs,
+                    ..model(name, family, polarity)
+                };
+                b.push(top, row, Span::NONE);
+            })
+        };
+        assert_eq!(
+            sub(ModelFamily::GummelPoon, Polarity::N),
+            Vec::<Code>::new()
+        );
+        assert_eq!(
+            sub(ModelFamily::Diode, Polarity::None),
             only(Violation::FieldDomain)
         );
     }

@@ -1494,7 +1494,28 @@ mod tests {
         (X::BjtBcSatAreabOnly, |b, t, on| {
             bjt_law(b, t, on, spicerack_ir::BcSatArea::AreabOnly)
         }),
+        // R88: a Gummel-Poon model giving `iss` with `ns = 2` against its neighbour `ns = 1`
+        // (where the two substrate laws agree), under each law
+        (X::ModelSubSatLastFactor, |b, t, on| {
+            substrate_law(b, t, on, spicerack_ir::SubSatTemp::LastFactor)
+        }),
+        (X::ModelSubSatEmissionNs, |b, t, on| {
+            substrate_law(b, t, on, spicerack_ir::SubSatTemp::EmissionNs)
+        }),
     ];
+
+    fn substrate_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: spicerack_ir::SubSatTemp) {
+        let iss = n(b, 1);
+        let ns = n(b, if on { 2 } else { 1 });
+        let params = b.params(&[("iss", iss), ("ns", ns)]);
+        let name = b.name("m");
+        let row = spicerack_ir::Model {
+            params,
+            sub_sat_temp: law,
+            ..model(name, ModelFamily::GummelPoon, Polarity::N)
+        };
+        b.model(t, row, Span::NONE);
+    }
 
     fn bjt_law(b: &mut Builder<'_>, t: ScopeId, on: bool, law: spicerack_ir::BcSatArea) {
         let name = b.name("m");

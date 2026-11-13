@@ -1,0 +1,19 @@
+R88 (finding F18): a BJT's substrate saturation current away from the nominal temperature.
+Run with `nix develop .#testing -c tests/fixtures/bjt_substrate/run.sh` (light lane), on the builds
+that shell puts on PATH: ngspice-45 /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45,
+VACASK /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026 (its bjt.va: vadng-pre-48;
+the older /nix/store/g5ial84gcp2da9h7y63r4c6dc1iqip57-vacask-unstable-2026, vadng-pre-46, follows
+ngspice-45's law). Deck: one NPN, is=1e-15 bf=100 iss=1e-12 subs=1, c/b/e at 0 V, substrate at
+0.6 V (forward); tnom 27 C, reltol 1e-9; i(vs) the substrate source's current (A).
+
+T(C) ns ibe,ibc nr  ngspice-45      VACASK
+27   2  none    1   -1.08958e-07    -1.089581375125359e-07
+27   2  both    1   -1.08958e-07    -1.089581375125359e-07
+27   1  none    1   -1.18720e-02    -1.187196289647068e-02
+27   1  both    1   -1.18720e-02    -1.187196289647068e-02
+100  2  none    1   -9.58448e-05    -1.039134492520374e-06
+100  2  both    1   -9.58448e-05    -1.039134492520374e-06
+100  1  none    1   -1.07999e+00    -1.079990936251987e+00
+100  1  both    1   -1.07999e+00    -1.079990936251987e+00
+100  2  both    2   -1.03913e-06    -1.039134492520374e-06
+100  1  both    2   -1.17091e-02    -1.079990936251987e+00

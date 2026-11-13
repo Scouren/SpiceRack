@@ -92,6 +92,7 @@ pub mod text_parse;
 pub mod text_words;
 
 // circuit owner
+mod bjt_laws;
 pub mod build_circuit;
 mod circuit_check;
 pub mod circuit_extra;
@@ -120,7 +121,7 @@ pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
 pub use letter::{spice_letter, spice_letters};
 pub use library::DeviceLibrary;
-pub use model::{BcSatArea, Model, ModelFamily, Polarity};
+pub use model::{BcSatArea, Model, ModelFamily, Polarity, SubSatTemp};
 pub use wave::{Wave, WaveKind, WaveRef, WaveRow};
 pub use wave_eval::{At, WaveDomain, source_value, wave_value};
 
