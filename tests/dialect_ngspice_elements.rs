@@ -379,15 +379,20 @@ fn an_instance_temperature_on_a_family_without_one_is_refused_by_the_writer() {
     // Oracle: runs fam (ngspice-45): `temp=`/`dtemp=` on a BSIM4 instance is "unknown
     // parameter"; on MOS1 it runs. The writer refuses the first (W1100), writes the second.
     let ir = |family: &str| {
+        let version = match family {
+            "bsim4" => " version=\"4.8.3\"",
+            "hicum2" => " version=\"2.4.0\"",
+            _ => "",
+        };
         format!(
-            "file \"t.sp\" deck\n  title \"t\"\n  model m {family} polarity=n\n  element mosfet M1 (d g 0 0) model=m temp_abs=30\n"
+            "file \"t.sp\" deck\n  title \"t\"\n  model m {family} polarity=n{version}\n  element mosfet M1 (d g 0 0) model=m temp_abs=30\n"
         )
     };
     for (family, refused) in [("bsim4", true), ("mos1", false), ("hicum2", false)] {
-        // unchecked: a BSIM4 model with no version is X0015 for `check`, which `text::parse`
-        // now runs (the case is the writer's refusal, not the invariant)
         let mut design = ir::Design::new();
-        ir::parse_unchecked(&ir(family), &mut design.builder(), &mut ir::Diags::new());
+        let mut parsed = ir::Diags::new();
+        ir::parse(&ir(family), &mut design.builder(), &mut parsed);
+        assert!(parsed.is_empty(), "{family}: {parsed:?}");
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut design, row(), &mut diags);
         let got = diags.rows().iter().any(|d| d.code.to_string() == "W1100");
