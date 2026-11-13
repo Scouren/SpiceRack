@@ -9,7 +9,6 @@
 # (tran_print_step_to_simulator, R67) the eight transients pass all six steps.
 dc_sweep_pulse 2 refused:W2007 ruling=R64 # R64a: a .dc over a source with a PULSE is refused, not swept (VACASK ignores a waveform source's dc)
 unresolved_param 1 refused:S0104 ruling=A38 # the strict read refuses a parameter read no definition binds (R63); ngspice rejects the deck too
-latch 4 mismatch finding=F8 # not a number: step 4's reverse check (cmp::compare(b, a), the F51 two-way agree in run.rs) takes VACASK's first vector, the outer sweep (sweep rin), as the grid and finds it among none of ngspice's leading vectors: "dc: sweep grid changed (14 -> 14 points)". The values agree (VACASK at outer 2, vin 2: 3.49009901, ngspice's 3.490099). latch_vdd passes only because ngspice's v(vdd) equals VACASK's outer vector. Goes with tests/common/cmp.rs's grid check accepting any leading vector of either run (pair-2's)
 mos3_ac 4 mismatch finding=F27 # R94: ngspice-45 level 3 small-signal gm is not the derivative of its DC law: ac i(vd) at 1 kHz -2.4088571e-4 (ngspice) vs -2.53380719e-4 (VACASK), 4.9%; DC agrees
 mos9_ac 4 mismatch finding=F27 # R94: as mos3_ac for level 9 (the same numbers)
 diode_isr 4 mismatch finding=F31 # R95: under reverse bias (-2 V) ngspice-45 carries no recombination current (isr=1e-9, nr=2): op i(vd) 2.0199e-12 (ngspice) vs 1.66074e-9 A (VACASK); diode_noisr, the same deck without isr, passes
