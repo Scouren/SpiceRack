@@ -164,7 +164,13 @@ fn loops_alters_and_state() {
         );
         let dev = b.target(TargetKind::DeviceParam, &["x1"], "r1", Some("r"));
         let v = n(b, "2k");
-        b.alter(body, dev, v, Span::NONE);
+        b.alter(
+            body,
+            dev,
+            v,
+            spicerack_ir::plan::AlterEffect::AtOnce,
+            Span::NONE,
+        );
         b.op(body, None, Span::NONE);
         let a = b.target(TargetKind::Param, &[], "a", None);
         let columns = b.targets(&[a, Target::TEMP]);
@@ -191,7 +197,13 @@ fn loops_alters_and_state() {
         b.loop_(top, None, mc, LoopEnd::Restore, Span::NONE);
         let m = b.target(TargetKind::ModelParam, &[], "nch", Some("vth0"));
         let v = n(b, "10");
-        b.alter(top, m, v, Span::NONE);
+        b.alter(
+            top,
+            m,
+            v,
+            spicerack_ir::plan::AlterEffect::AtOnce,
+            Span::NONE,
+        );
         b.reset(top, ResetSet::ALL, Span::NONE);
         b.reset(top, ResetSet::of(&[Restorable::Saves]), Span::NONE);
         let v = n(b, "1");

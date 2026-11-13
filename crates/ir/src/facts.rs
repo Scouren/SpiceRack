@@ -9,10 +9,10 @@
 //!
 //! Cites: `rewrite/IR-KERNEL.md` §7.2 (Addenda A2, A4, A9).
 //!
-//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`, `RowFacts::refs`,
+//! Contents: `pub trait RowFacts` (`RowFacts::handles`, `RowFacts::map_refs`,
 //! `RowFacts::map_exprs`, `RowFacts::map_element_names`, `RowFacts::string_roots`, `RowFacts::features`, `RowFacts::check`, `RowFacts::dump`, `RowFacts::parse`,
 //! `RowFacts::generate`), `pub enum ExprUse`, `pub enum Handle`,
-//! `macro for_kind` (crate-internal: the one exhaustive dispatch from an `ItemKind` to its row
+//! `macro for_kind`, `macro with_item_kinds` (crate-internal: the one list of item kinds and the one exhaustive dispatch from an `ItemKind` to its row
 //! type)
 
 use crate::build::Builder;
@@ -32,21 +32,22 @@ use crate::text_expr::Ctx;
 /// the row's file; the kernel reaches every kind through one exhaustive dispatch.
 pub trait RowFacts: ItemRow {
     /// Appends every handle the row and its detail rows hold, in field order (the kernel checks
-    /// their ranges and reads the expression features from them).
-    fn handles(&self, design: &Design, out: &mut Vec<Handle>);
+    /// their ranges and reads the expression features from them). Default: none, for a row
+    /// that holds no handle.
+    fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
+        let _ = (design, out);
+    }
 
     /// Calls `f` on every `Ref` the item `at` owns (its header row, its detail rows, its pools),
     /// in a fixed order, with the definition kind each field expects, and stores them back (A4,
     /// A9). An associated function, so a row reaches references outside its header. The linker
     /// binds through it, `check` reads through it, `Builder::bind_ref` addresses its k-th slot,
     /// and a pass that renumbers definitions rewrites through it. Must not change anything but
-    /// the references `f` changes.
-    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
-
-    /// Appends every `Ref` the item `at` owns, with the kind its field expects, in `map_refs`'s
-    /// order, changing nothing: the read-only twin for readers (`check`) that hold `&Design`
-    /// (M5). `kernel_gen`'s drift property holds the two lists equal for every generated item.
-    fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>);
+    /// the references `f` changes. Default: none, for a row with no reference field
+    /// (`kernel_gen`'s drift property fails a row whose `refs` lists one this does not visit).
+    fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind)) {
+        let _ = (design, at, f);
+    }
 
     /// Calls `f` on every expression root the item `at` owns, exactly the roots `handles` lists
     /// and in its order (`NONE` roots included): a single `Expr`/`ExprDyn` field, each element of
@@ -77,8 +78,11 @@ pub trait RowFacts: ItemRow {
     /// Adds what the row uses beyond `Feature::Item(Self::KIND)`: its element, wave or analysis
     /// kind and its `Extra`, `CircuitExtra` or `RunExtra` features; `at` is the item, `scope` the
     /// scope that lists it (A9). The kernel adds the expression and placement features; features
-    /// of the whole design are the owners' `design_features` hooks.
-    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
+    /// of the whole design are the owners' `design_features` hooks. Default: none beyond the
+    /// kernel's, for a row whose kind is its only feature.
+    fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet) {
+        let _ = (design, at, scope, set);
+    }
 
     /// Appends the violations of the row's own invariants (counts, a detail row present exactly
     /// when the kind has one, field domains); `at` is the item (for the span), `scope` the scope
@@ -137,8 +141,11 @@ pub enum Handle {
     ExprDyn(ExprId),
     /// A name.
     Name(NameId),
-    /// A reference to a definition.
-    Ref(Ref),
+    /// A reference to a definition, with the kind of definition its field expects: exactly the
+    /// references `RowFacts::map_refs` visits, in its order (`Design::item_refs` lists them;
+    /// `kernel_gen`'s drift property holds the two equal). A reference field `map_refs` skips
+    /// (an element's or a model's absent master, named `NONE`) is listed as its `Name`.
+    Ref(Ref, DefKind),
     /// A name list.
     Names(NameList),
     /// An expression list.
@@ -159,111 +166,54 @@ pub enum Handle {
 /// `generate`) goes through it, so a new kind is one arm here.
 macro_rules! for_kind {
     ($kind:expr, $R:ident => $body:expr) => {
+        with_item_kinds!(for_kind_arms!($kind, $R, $body))
+    };
+}
+
+/// The one list of item kinds: each `ItemKind` member, its row type and its `Design` table,
+/// handed to the callback `$cb` after `$args` (`for_kind!`'s arms, `design.rs`'s `ItemRow`
+/// impls). A new kind is one line here; every other site is a compile error until it agrees.
+macro_rules! with_item_kinds {
+    ($cb:ident ! $args:tt) => {
+        $cb! { $args
+            Title => $crate::item::Title, titles;
+            Comment => $crate::item::Comment, comments;
+            Include => $crate::item::Include, includes;
+            Global => $crate::item::Global, globals;
+            Load => $crate::item::Load, loads;
+            Opaque => $crate::item::Opaque, opaques;
+            Subckt => $crate::item::Subckt, subckts;
+            Section => $crate::item::Section, sections;
+            If => $crate::item::If, ifs;
+            Param => $crate::item::Param, params;
+            Func => $crate::item::Func, funcs;
+            Model => $crate::model::Model, models;
+            DeviceLibrary => $crate::library::DeviceLibrary, device_libraries;
+            Statistics => $crate::stats::Statistics, statistics;
+            Element => $crate::element::Element, elements;
+            Analysis => $crate::analysis::Analysis, analyses;
+            Loop => $crate::plan::Loop, loops;
+            Alter => $crate::plan::Alter, alters;
+            Option => $crate::option::OptionRow, options;
+            Env => $crate::option::Env, envs;
+            NodeSet => $crate::option::NodeSet, node_sets;
+            Save => $crate::output::Save, saves;
+            Print => $crate::output::Print, prints;
+            Measure => $crate::output::Measure, measures;
+            Elaborate => $crate::plan::Elaborate, elaborates;
+            Reset => $crate::reset::Reset, resets;
+        }
+    };
+}
+
+/// `for_kind!`'s match over the list of `with_item_kinds!`.
+macro_rules! for_kind_arms {
+    (($kind:expr, $R:ident, $body:expr) $($k:ident => $row:ty, $field:ident;)*) => {
         match $kind {
-            $crate::ItemKind::Title => {
-                type $R = $crate::item::Title;
+            $($crate::ItemKind::$k => {
+                type $R = $row;
                 $body
-            }
-            $crate::ItemKind::Comment => {
-                type $R = $crate::item::Comment;
-                $body
-            }
-            $crate::ItemKind::Include => {
-                type $R = $crate::item::Include;
-                $body
-            }
-            $crate::ItemKind::Global => {
-                type $R = $crate::item::Global;
-                $body
-            }
-            $crate::ItemKind::Load => {
-                type $R = $crate::item::Load;
-                $body
-            }
-            $crate::ItemKind::Opaque => {
-                type $R = $crate::item::Opaque;
-                $body
-            }
-            $crate::ItemKind::Subckt => {
-                type $R = $crate::item::Subckt;
-                $body
-            }
-            $crate::ItemKind::Section => {
-                type $R = $crate::item::Section;
-                $body
-            }
-            $crate::ItemKind::If => {
-                type $R = $crate::item::If;
-                $body
-            }
-            $crate::ItemKind::Param => {
-                type $R = $crate::item::Param;
-                $body
-            }
-            $crate::ItemKind::Func => {
-                type $R = $crate::item::Func;
-                $body
-            }
-            $crate::ItemKind::Model => {
-                type $R = $crate::model::Model;
-                $body
-            }
-            $crate::ItemKind::DeviceLibrary => {
-                type $R = $crate::library::DeviceLibrary;
-                $body
-            }
-            $crate::ItemKind::Statistics => {
-                type $R = $crate::stats::Statistics;
-                $body
-            }
-            $crate::ItemKind::Element => {
-                type $R = $crate::element::Element;
-                $body
-            }
-            $crate::ItemKind::Analysis => {
-                type $R = $crate::analysis::Analysis;
-                $body
-            }
-            $crate::ItemKind::Loop => {
-                type $R = $crate::plan::Loop;
-                $body
-            }
-            $crate::ItemKind::Alter => {
-                type $R = $crate::plan::Alter;
-                $body
-            }
-            $crate::ItemKind::Option => {
-                type $R = $crate::option::OptionRow;
-                $body
-            }
-            $crate::ItemKind::Env => {
-                type $R = $crate::option::Env;
-                $body
-            }
-            $crate::ItemKind::NodeSet => {
-                type $R = $crate::option::NodeSet;
-                $body
-            }
-            $crate::ItemKind::Save => {
-                type $R = $crate::output::Save;
-                $body
-            }
-            $crate::ItemKind::Print => {
-                type $R = $crate::output::Print;
-                $body
-            }
-            $crate::ItemKind::Measure => {
-                type $R = $crate::output::Measure;
-                $body
-            }
-            $crate::ItemKind::Elaborate => {
-                type $R = $crate::plan::Elaborate;
-                $body
-            }
-            $crate::ItemKind::Reset => {
-                type $R = $crate::reset::Reset;
-                $body
-            }
+            })*
         }
     };
 }

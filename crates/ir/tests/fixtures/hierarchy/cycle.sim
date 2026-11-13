@@ -1,0 +1,17 @@
+cycle of subcircuits
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+subckt p(a)
+  r1 (a 0) res r=1k
+  x1 (a) q
+ends
+subckt q(a)
+  r1 (a 0) res r=1k
+  x1 (a) p
+ends
+v1 (n 0) vsource dc=1
+x0 (n) p
+control
+  analysis op1 op
+endc

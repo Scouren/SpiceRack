@@ -11,6 +11,38 @@ use spicerack_ir::{
     link, parse, unbound_reads,
 };
 
+/// The A43 fixture deck: one alter, loop, DC axis or elaborate per case of `unbound_targets`.
+const TARGETS: &str = "file \"t.sp\" deck
+  param p = 1
+  subckt t (a b)
+    element resistor r3 (a b) value=1
+  subckt s (a b)
+    element resistor r2 (a b) value=1
+    element instance y1 (a b) model=t
+  element resistor r1 (n1 0) value=1
+  element resistor r4 (n1 0) value=1
+  element instance x1 (n1 0) model=s
+  element instance xu (n1 0) model=nokit
+  alter (param p) value=2
+  alter (param q) value=2
+  alter (device_param r1 r) value=2
+  alter (device_param __topinst__ a) value=2
+  alter (device_param r2 r path=(x1)) value=2
+  alter (device_param r3 r path=(x1 y1)) value=2
+  alter (device_param r9 r path=(x1 y1)) value=2
+  alter (device_param r5 r path=(xu)) value=2
+  alter (device_param r5 r path=(r4)) value=2
+  elaborate (s nosuch)
+  loop sweep (param zz) (list values=[1])
+    analysis op
+  analysis dc (source_dc vmissing) (lin start=0 stop=1 step=1)
+  alter (element_value r9) value=2
+  loop sweep (device_param r9 r) (list values=[1])
+    analysis op
+  analysis noise (v (n1)) source=vnoise (lin start=1 stop=2 step=1)
+  analysis noise (v (n1)) source=r4 (lin start=1 stop=2 step=1)
+";
+
 // ---- private ----
 
 fn param_def(d: &Design, scope: ScopeId, name: &str) -> DefId {
@@ -220,4 +252,96 @@ fn the_unbound_reads_are_listed_at_their_items_held_ones_apart() {
             (items[3], "ww", true)
         ]
     );
+}
+
+/// `unbound_targets` of `d` as (the item's position in the deck's top, the name).
+fn unbound_at(d: &Design) -> Vec<(usize, String)> {
+    let top = d.file(d.entry()).top;
+    spicerack_ir::unbound_targets(d)
+        .iter()
+        .map(|u| {
+            let k = d
+                .items(top)
+                .iter()
+                .position(|&i| i == u.item)
+                .expect("a top item");
+            (k, d.str(u.name).to_string())
+        })
+        .collect()
+}
+
+fn targets_deck() -> Design {
+    let mut d = Design::new();
+    let mut diags = Diags::new();
+    parse(TARGETS, &mut d.builder(), &mut diags);
+    assert!(diags.is_empty(), "{:?}", diags.rows());
+    d
+}
+
+#[test]
+fn the_unbound_targets_are_the_ones_that_provably_name_nothing() {
+    // A43 (R70); oracle: the expected list written out by hand, case by case (positions in the
+    // deck's top: 0 p, 1 t, 2 s, 3 r1, 4 r4, 5 x1, 6 xu, then the items in order from 7)
+    let d = targets_deck();
+    let want: Vec<(usize, String)> = [
+        (8, "q"),            // an unresolved parameter
+        (10, "__topinst__"), // F7's shape: no such element at the top
+        (13, "r9"),          // no such element two levels down
+        (15, "r5"),          // nothing lives below a resistor
+        (16, "nosuch"),      // an elaborate of no subcircuit
+        (17, "zz"),          // a loop over no parameter
+        (18, "vmissing"),    // a DC axis over no source
+        (19, "r9"),          // an alter of an element's value, no such element
+        (20, "r9"),          // a loop over a device nothing defines
+        (21, "vnoise"),      // a noise analysis whose source names no element
+    ]
+    .into_iter()
+    .map(|(k, n)| (k, n.to_string()))
+    .collect();
+    // not listed: p (bound), r1, r2 through x1, r3 through x1 y1 (bound), r5 through xu (an
+    // unresolved master: the absent kit may hold it; the spine's interim walk listed it), s
+    // (bound), the second noise analysis's source r4 (bound)
+    assert_eq!(unbound_at(&d), want);
+}
+
+#[test]
+fn deleting_a_bound_target_s_element_lists_exactly_its_item() {
+    // the metamorphic check: removing the element a bound target names makes exactly that
+    // item appear, with the element's name
+    for (element, at, alter) in [
+        ("r1", None, 9),
+        ("r2", Some("s"), 11),
+        ("r3", Some("t"), 12),
+    ] {
+        let mut d = targets_deck();
+        let top = d.file(d.entry()).top;
+        let alter = d.items(top)[alter];
+        let listed = |d: &Design| -> Vec<(spicerack_ir::ItemRef, String)> {
+            let all = spicerack_ir::unbound_targets(d);
+            all.iter()
+                .map(|u| (u.item, d.str(u.name).to_string()))
+                .collect()
+        };
+        let before = listed(&d);
+        let scope = match at {
+            None => top,
+            Some(sub) => {
+                let def = d.lookup(top, DefKind::Subckt, d.find_name(sub));
+                d.row::<spicerack_ir::item::Subckt>(d.def(def).item.index)
+                    .body
+            }
+        };
+        let item = *d
+            .items(scope)
+            .iter()
+            .find(|i| {
+                i.kind == spicerack_ir::ItemKind::Element
+                    && d.row::<spicerack_ir::Element>(i.index).name == d.find_name(element)
+            })
+            .expect("the element");
+        d.editor().remove_item(scope, item);
+        let mut after = listed(&d);
+        after.retain(|r| !before.contains(r));
+        assert_eq!(after, vec![(alter, element.to_string())], "{element}");
+    }
 }

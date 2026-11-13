@@ -227,7 +227,8 @@ pub(super) const PASSES: &[Pass] = &[
         requires: ir::FeatureSet::EMPTY
             .with(ir::Feature::Run(ir::RunExtra::LoopKeepLast))
             .with(ir::Feature::Item(ir::ItemKind::Alter))
-            .with(ir::Feature::Run(ir::RunExtra::AlterParam)),
+            .with(ir::Feature::Run(ir::RunExtra::AlterParam))
+            .with(ir::Feature::Run(ir::RunExtra::AlterParamAtOnce)),
         notes: &[loop_end::LOOP_END_KEPT],
         run: loop_end::loop_restore_to_keep_last,
     },
@@ -237,7 +238,8 @@ pub(super) const PASSES: &[Pass] = &[
         requires: ir::FeatureSet::EMPTY
             .with(ir::Feature::Run(ir::RunExtra::LoopRestore))
             .with(ir::Feature::Item(ir::ItemKind::Alter))
-            .with(ir::Feature::Run(ir::RunExtra::AlterParam)),
+            .with(ir::Feature::Run(ir::RunExtra::AlterParam))
+            .with(ir::Feature::Run(ir::RunExtra::AlterParamAtOnce)),
         notes: &[loop_end::LOOP_END_KEPT],
         run: loop_end::loop_keep_last_to_restore,
     },

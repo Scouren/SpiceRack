@@ -43,10 +43,8 @@ use crate::item::ItemKind;
 use crate::option::OptionRow;
 #[cfg(any(test, feature = "gen"))]
 use crate::option_key::OptionKey;
-#[cfg(any(test, feature = "gen"))]
-use crate::probe::gen_probe;
 use crate::probe::{
-    ProbeList, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
+    AcPart, Probe, ProbeList, dump_probe, parse_probe, probe_features, probe_handles, probe_valid,
 };
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
@@ -414,7 +412,9 @@ impl DetailFacts for Four {
         let given = !self.fundamental.is_none() && !self.periods.is_none();
         // An absent count is the `nfreqs` option in force at the analysis: its walk's, checked
         // once per design (`state_order::four_counts`), not here.
-        domain_unless(given && !outputs.is_empty() && outputs.iter().all(probe_valid))
+        // R68/A42: an output is a transient vector, so it carries no part (ruled for Fourier)
+        let plain = |p: &Probe| probe_valid(p) && p.part == AcPart::None;
+        domain_unless(given && !outputs.is_empty() && outputs.iter().all(plain))
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -488,7 +488,7 @@ impl DetailFacts for Four {
         } else {
             ExprId::NONE
         };
-        let p = [gen_probe(g, b, features, true)];
+        let p = [crate::dc_ac_facts::gen_output(g, b, features)];
         let outputs = b.probes(&p);
         Some(Four {
             fundamental,

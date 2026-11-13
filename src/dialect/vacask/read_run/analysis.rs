@@ -133,18 +133,17 @@ pub(super) fn analysis(l: &mut Lower<'_, '_, '_>, sweeps: &[Node], n: Node) {
             let target = target(l, &s.aim);
             let sweep = spec(l, s.spec);
             let name = l.b.name(&s.name);
+            // VACASK carries every level (R75, latch.sim); `continuation=0` stays Private
             axes.push(ir::dc_ac::DcAxis {
                 target,
                 sweep,
                 name,
+                afresh: false,
             });
         }
         let axes = l.b.dc_axes(&axes);
         read_outputs::node_sets(l, &plan.lists);
-        let dc = ir::dc_ac::Dc {
-            axes,
-            restart: false,
-        };
+        let dc = ir::dc_ac::Dc { axes };
         l.b.analysis(scope, Some(&plan.name), dc, span);
         return;
     }

@@ -5,7 +5,7 @@
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator); `rewrite/AMEND-A12.md` C5; `circuit_gen.rs`.
 //!
 //! Contents: `R::terminals`, `R::reference`, `R::master`, `R::has_visible`, `R::element_names`,
-//! `R::element_name`, `R::bound_subckt`, `R::fresh_names` (`pub(super)`)
+//! `R::element_name`, `R::bound_subckt`, `R::fresh_names`, `R::fitting_model`, `fn takes` (`pub(super)`)
 
 use super::{BUILTINS, NONE_REF, R};
 use crate::circuit_check::{bound_family, builtin_fits, builtin_kind};
@@ -14,6 +14,85 @@ use crate::element::ElemKind;
 use crate::id::{DefId, List, NameId, NameList, Ref};
 use crate::item::{DefKind, ItemKind};
 use crate::model::{Model, ModelFamily};
+
+/// Whether an element of `kind` takes a model of `family` (the generator's data, R48 d: a
+/// family whose own docs name the kind; the IR itself admits any non-builtin family, C5).
+pub(super) fn takes(kind: ElemKind, family: ModelFamily) -> bool {
+    use ModelFamily as F;
+    if let Some(k) = builtin_kind(family) {
+        return k == kind;
+    }
+    match kind {
+        ElemKind::Resistor => matches!(family, F::Resistor | F::ResistorMultiplier),
+        ElemKind::Capacitor => matches!(family, F::Capacitor | F::CapacitorMultiplier),
+        ElemKind::Inductor => matches!(family, F::Inductor | F::InductorMultiplier),
+        ElemKind::Coupling => family == F::CoreJilesAtherton,
+        ElemKind::Diode => matches!(
+            family,
+            F::Diode
+                | F::DiodeLevel3
+                | F::DiodePspice
+                | F::DiodePspiceTemp
+                | F::DiodeLtspice
+                | F::DiodeIdeal
+                | F::DiodeSpectre
+                | F::Juncap200
+                | F::DiodeCmc
+        ),
+        ElemKind::Bjt => matches!(
+            family,
+            F::GummelPoon | F::Vbic | F::Hicum0 | F::Hicum2 | F::Mextram | F::HbtUcsd
+        ),
+        ElemKind::Mosfet => matches!(
+            family,
+            F::Mos0
+                | F::Mos1
+                | F::Mos2
+                | F::Mos3
+                | F::Mos6
+                | F::Mos9
+                | F::Bsim1
+                | F::Bsim2
+                | F::Bsim3
+                | F::Bsim4
+                | F::BsimSoi
+                | F::B3SoiFd
+                | F::B3SoiDd
+                | F::B3SoiPd
+                | F::B4Soi
+                | F::Soi3
+                | F::Ekv
+                | F::Hisim1
+                | F::Hisim2
+                | F::HisimHv
+                | F::Psp103
+                | F::BsimBulk
+                | F::Vdmos
+                | F::VdmosRpi
+        ),
+        ElemKind::Jfet => matches!(
+            family,
+            F::JfetShichman | F::JfetParkerSkellern | F::JfetShockley | F::JfetHspice2
+        ),
+        ElemKind::Mesfet => matches!(family, F::Mesfet | F::Gaas | F::Mesa | F::Hfet1 | F::Hfet2),
+        ElemKind::Igbt => family == F::Igbt,
+        ElemKind::VSwitch => matches!(
+            family,
+            F::SwitchHyst | F::SwitchHystSmooth | F::SwitchLogCubic | F::Relay
+        ),
+        ElemKind::ISwitch => matches!(
+            family,
+            F::CurrentSwitchHyst | F::CurrentSwitchHystSmooth | F::CurrentSwitchLogCubic
+        ),
+        ElemKind::LossyLine => family == F::Ltra,
+        ElemKind::RcLine => family == F::Urc,
+        ElemKind::SingleLossyLine => family == F::Txl,
+        ElemKind::CoupledLines => matches!(family, F::Cpl | F::HspiceW),
+        ElemKind::CodeModel => family == F::CodeModel,
+        ElemKind::ModuleModel => matches!(family, F::Module | F::Other),
+        _ => false,
+    }
+}
 
 impl R<'_, '_> {
     pub(super) fn terminals(
@@ -118,8 +197,15 @@ impl R<'_, '_> {
     }
 
     /// A visible definition of `dk` that `kind` may name (a builtin model only by its kind),
-    /// else a fresh unresolved name.
+    /// else a fresh unresolved name. A model is one of a family the kind takes (`takes`), seven
+    /// times in eight when one is visible (R48 d: an absent kit stays legal, a small share).
     fn fitting_reference(&mut self, kind: ElemKind, dk: DefKind) -> Ref {
+        if dk == DefKind::Model {
+            return match self.fitting_model(kind) {
+                Some(r) if self.g.below(8) != 0 => r,
+                _ => Ref::unresolved(self.g.fresh_name(self.b)),
+            };
+        }
         let r = self.reference(dk);
         match bound_family(self.b.design(), r) {
             Some(f)
@@ -130,6 +216,32 @@ impl R<'_, '_> {
             }
             _ => r,
         }
+    }
+
+    /// A visible model of a family `kind` takes (`takes`; a builtin one only with
+    /// `BuiltinMaster`), drawn as `Gen::pick_def` draws, or none found.
+    pub(super) fn fitting_model(&mut self, kind: ElemKind) -> Option<Ref> {
+        if let Some(r) = self.drawn {
+            return Some(r);
+        }
+        let design = self.b.design();
+        let def = self.g.pick_model_for(design, self.scope, kind);
+        let builtin = bound_family(
+            design,
+            Ref {
+                name: NameId::NONE,
+                def,
+            },
+        )
+        .and_then(builtin_kind);
+        if def.is_none() || builtin.is_some() && !self.has(X::BuiltinMaster) {
+            return None;
+        }
+        let design = self.b.design();
+        Some(Ref {
+            name: design.def(def).name,
+            def,
+        })
     }
 
     /// A model of `family` that lookup from this scope binds, chosen uniformly, or none.
@@ -221,7 +333,10 @@ impl R<'_, '_> {
         let def = self
             .g
             .pick_def(self.b.design(), self.scope, DefKind::Subckt);
-        (!def.is_none()).then(|| Ref {
+        // never an instance that closes a cycle of subcircuits (`Violation::InstanceCycle`)
+        let cycle =
+            !def.is_none() && crate::hierarchy::closes_cycle(self.b.design(), self.scope, def);
+        (!def.is_none() && !cycle).then(|| Ref {
             name: self.b.design().def(def).name,
             def,
         })

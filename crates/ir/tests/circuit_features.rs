@@ -450,7 +450,24 @@ mod tests {
             let dc = n(b, 0);
             vsrc(b, t, ElemKind::ISource, m, source(dc))
         }),
-        (X::MultControlled, |b, t, on| {
+        // R58's evidence: ngspice holds `m` on a current output (parallel copies) and lacks it on
+        // a voltage output (its writer's admit refuses `m` on E, H, a voltage POLY, table or B)
+        (X::MultControlledCurrent, |b, t, on| {
+            let m = opt(b, on);
+            let g = n(b, 1);
+            let h = b.head("g1", &["a", "0", "c", "0"], None, &[], m);
+            b.controlled(
+                t,
+                ElemKind::Vccs,
+                h,
+                spicerack_ir::controlled::Controlled {
+                    gain: g,
+                    sense: NameId::NONE,
+                },
+                Span::NONE,
+            );
+        }),
+        (X::MultControlledVoltage, |b, t, on| {
             let m = opt(b, on);
             let g = n(b, 1);
             let h = b.head("e1", &["a", "0", "c", "0"], None, &[], m);
@@ -1824,5 +1841,33 @@ mod tests {
         assert!(!with(lit(1, 0, NumForm::Plain)), "1");
         assert!(with(lit(1, 0, NumForm::Int)), "1i");
         assert!(with(lit(15, 1, NumForm::Plain)), "1.5");
+    }
+
+    /// The split follows the output quantity, not the kind: a behavioural source's `mult` is
+    /// the voltage member on a voltage output and the current member on any other (ngspice's
+    /// admit refuses `m` on a voltage B only). Oracle: the ruling's evidence, case by case.
+    #[test]
+    fn a_behavioural_multiplier_follows_its_output() {
+        let cases = [
+            (OutKind::Voltage, X::MultControlledVoltage),
+            (OutKind::Current, X::MultControlledCurrent),
+            (OutKind::Resistance, X::MultControlledCurrent),
+        ];
+        for (out, want) in cases {
+            let mut d = Design::new();
+            let t = deck(&mut d);
+            let mut b = d.builder();
+            let (e, m) = (n(&mut b, 1), n(&mut b, 2));
+            let h = b.head("b1", &["a", "0"], None, &[], m);
+            b.behav(t, ElemKind::Behav, h, behav(e, out), Span::NONE);
+            let used = features_used(&d);
+            let other = if want == X::MultControlledVoltage {
+                X::MultControlledCurrent
+            } else {
+                X::MultControlledVoltage
+            };
+            assert!(used.contains(Feature::Circuit(want)), "{out:?}");
+            assert!(!used.contains(Feature::Circuit(other)), "{out:?}");
+        }
     }
 }

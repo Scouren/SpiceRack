@@ -449,6 +449,9 @@
             # `cargo nextest run`: every test binary's tests in one pool, not
             # one binary after another (.config/nextest.toml).
             pkgs.cargo-nextest
+            # the IR's scaling gate counts instructions (`perf stat`), which load
+            # does not inflate; `.#testing` inherits it through `inputsFrom`.
+            pkgs.perf
             pythonEnv
             pkgs.pkg-config
           ];

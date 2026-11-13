@@ -22,9 +22,7 @@
 use crate::analysis::{Analysis, AnalysisKind};
 #[cfg(any(test, feature = "gen"))]
 use crate::analysis_facts::gen_of;
-use crate::analysis_facts::{
-    detail_get, dump_of, fault_of, features_of, handles_of, parse_of, report,
-};
+use crate::analysis_facts::{dump_of, fault_of, features_of, handles_of, parse_of, report};
 use crate::build::Builder;
 use crate::check::Violation;
 use crate::design::Design;
@@ -40,9 +38,9 @@ use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, ItemRef, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::plan::{
-    Alter, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop, TableLoop,
-    TargetKind, TargetUse, dump_target, parse_target, target_features, target_handles, target_refs,
-    target_refs_into, target_valid,
+    Alter, AlterEffect, Elaborate, LOOP_DEPTH_MAX, Loop, LoopEnd, LoopKind, MonteCarlo, SweepLoop,
+    TableLoop, TargetKind, TargetUse, dump_target, parse_target, target_features, target_handles,
+    target_refs, target_valid,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::plan::{gen_ref, gen_target, target_kinds};
@@ -50,8 +48,8 @@ use crate::run_exprs::exprs_of;
 use crate::run_extra::RunExtra;
 use crate::run_names::{names, names_of};
 use crate::run_words::{
-    get, loop_depth, pool, put_expr, put_flag, put_name, take_enum, take_expr, take_name,
-    take_word, trim_lead, word, write_ref,
+    get, loop_depth, put_expr, put_flag, put_name, take_enum, take_expr, take_name, take_word,
+    trim_lead, word,
 };
 #[cfg(any(test, feature = "gen"))]
 use crate::span::Span;
@@ -97,37 +95,13 @@ impl RowFacts for Loop {
                 }
             }
             LoopKind::Table => {
-                let Some(t) = detail_get::<TableLoop>(design, row.detail) else {
+                let Some(t) = crate::circuit_text::get_row::<TableLoop>(design, row.detail) else {
                     return;
                 };
                 let start = t.columns.start as usize;
                 let end = (start + t.columns.len as usize).min(design.run.targets.len());
                 for target in &mut design.run.targets[start.min(end)..end] {
                     target_refs(target, f);
-                }
-            }
-            LoopKind::MonteCarlo => {}
-        }
-    }
-
-    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        // `map_refs`'s order
-        match self.kind {
-            LoopKind::Sweep => {
-                if let Some(d) =
-                    <SweepLoop as crate::design::DetailRow>::rows(design).get(self.detail as usize)
-                {
-                    target_refs_into(&d.target, out);
-                }
-            }
-            LoopKind::Table => {
-                let Some(t) = detail_get::<TableLoop>(design, self.detail) else {
-                    return;
-                };
-                let start = t.columns.start as usize;
-                let end = (start + t.columns.len as usize).min(design.run.targets.len());
-                for target in &design.run.targets[start.min(end)..end] {
-                    target_refs_into(target, out);
                 }
             }
             LoopKind::MonteCarlo => {}
@@ -146,11 +120,11 @@ impl RowFacts for Loop {
             LoopEnd::KeepLast => RunExtra::LoopKeepLast,
         });
         // `LoopScoped` is a fact of the whole design: `analysis::design_features`.
-        let body = design.items(self.body);
         let over_op = self.kind == LoopKind::Sweep
-            && body.len() == 1
-            && body[0].kind == ItemKind::Analysis
-            && Analysis::table(design).get(body[0].index).kind == AnalysisKind::Op;
+            && only_run(design, self.body).is_some_and(|i| {
+                i.kind == ItemKind::Analysis
+                    && Analysis::table(design).get(i.index).kind == AnalysisKind::Op
+            });
         if over_op {
             add(RunExtra::LoopOverOp);
         }
@@ -162,6 +136,13 @@ impl RowFacts for Loop {
         if self.kind == LoopKind::Sweep && !one_run(design, self.body) {
             add(RunExtra::SweepBodyNotOne);
         }
+        // R68/A42: every loop row's expression field is evaluated before any analysis runs, as
+        // an analysis's own argument (ruled for table and Monte Carlo rows too)
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        if crate::analysis_facts::run_arguments_read_param(design, &handles) {
+            add(RunExtra::AnalysisParamArgument);
+        }
         by_loop!(self.kind, features_of(design, self.detail, set));
     }
 
@@ -172,6 +153,9 @@ impl RowFacts for Loop {
         if loop_depth(design, self.body) > LOOP_DEPTH_MAX {
             report(design, at, Violation::FieldDomain, out);
         }
+        let mut handles = Vec::new();
+        self.handles(design, &mut handles);
+        crate::analysis_facts::check_run_arguments(design, at, &handles, out);
     }
 
     fn dump(&self, design: &Design, ctx: &Ctx, out: &mut String) {
@@ -277,8 +261,11 @@ impl RowFacts for Loop {
             4,
         )
         .expect("a naming feature is in the set");
-        let detail = by_loop!(kind, gen_of(g, scope, b, features))
-            .expect("a possible loop kind's detail generates");
+        // R68/A42: a loop row's fields are drawn as an analysis's own arguments
+        let detail = crate::analysis_facts::run_arguments(g, features, |g| {
+            by_loop!(kind, gen_of(g, scope, b, features))
+        })
+        .expect("a possible loop kind's detail generates");
         let row = |body| Loop {
             kind,
             after,
@@ -346,21 +333,26 @@ impl RowFacts for Alter {
         design.editor().set(at.index, row);
     }
 
-    fn refs(&self, _design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        target_refs_into(&self.target, out);
-    }
-
     fn features(&self, design: &Design, _at: ItemRef, _scope: ScopeId, set: &mut FeatureSet) {
         target_features(&self.target, TargetUse::Alter, set);
         if !self.value.is_none() && matches!(design.expr(self.value), Expr::Str(_)) {
             *set = set.with(Feature::Run(RunExtra::AlterString));
+        }
+        // R70/A43: each parameter alter states when it takes effect
+        if self.target.kind.is_parameter() {
+            *set = set.with(Feature::Run(match self.effect {
+                AlterEffect::AtOnce => RunExtra::AlterParamAtOnce,
+                AlterEffect::AtReset => RunExtra::AlterParamAtReset,
+            }));
         }
     }
 
     fn check(&self, design: &Design, at: ItemRef, _scope: ScopeId, out: &mut Diags) {
         // A28: the temperature and options change through `Env` and `OptionRow`
         let state = matches!(self.target.kind, TargetKind::Temp | TargetKind::Option);
-        if !target_valid(&self.target) || self.value.is_none() || state {
+        // only a parameter alter waits for a reset (R70)
+        let effect = self.effect == AlterEffect::AtOnce || self.target.kind.is_parameter();
+        if !target_valid(&self.target) || self.value.is_none() || state || !effect {
             report(design, at, Violation::FieldDomain, out);
         }
     }
@@ -369,6 +361,7 @@ impl RowFacts for Alter {
         let at = out.len();
         dump_target(design, ctx, &self.target, out);
         put_expr(out, design, ctx, "value", self.value);
+        put_flag(out, self.effect == AlterEffect::AtReset, "at_reset");
         trim_lead(out, at);
     }
 
@@ -382,7 +375,20 @@ impl RowFacts for Alter {
             return ItemRef::NONE;
         };
         let value = take_expr(words, "value", scope, b, diags);
-        b.push(scope, Alter { target, value }, words.span())
+        let effect = if take_word(words, "at_reset") {
+            AlterEffect::AtReset
+        } else {
+            AlterEffect::AtOnce
+        };
+        b.push(
+            scope,
+            Alter {
+                target,
+                value,
+                effect,
+            },
+            words.span(),
+        )
     }
 
     #[cfg(any(test, feature = "gen"))]
@@ -413,14 +419,31 @@ impl RowFacts for Alter {
             let no_str = features.minus(FeatureSet::EMPTY.with(Feature::Expr(ExprTag::Str)));
             g.expr(b, &no_str, Reads::Constant)
         };
-        b.push(scope, Alter { target, value }, Span::NONE)
+        // R70/A43: a parameter alter's effect, by which twin the set holds (both: a coin)
+        let at_once = features.contains(Feature::Run(RunExtra::AlterParamAtOnce));
+        let at_reset = features.contains(Feature::Run(RunExtra::AlterParamAtReset));
+        let effect = match (at_once, at_reset) {
+            _ if !target.kind.is_parameter() => AlterEffect::AtOnce,
+            (true, true) if g.chance(2) => AlterEffect::AtReset,
+            (false, true) => AlterEffect::AtReset,
+            _ => AlterEffect::AtOnce,
+        };
+        b.push(
+            scope,
+            Alter {
+                target,
+                value,
+                effect,
+            },
+            Span::NONE,
+        )
     }
 }
 
 impl RowFacts for Elaborate {
     fn handles(&self, design: &Design, out: &mut Vec<Handle>) {
         for &r in get(&design.run.refs, self.circuits).unwrap_or(&[]) {
-            out.push(Handle::Ref(r));
+            out.push(Handle::Ref(r, DefKind::Subckt));
         }
     }
 
@@ -430,14 +453,6 @@ impl RowFacts for Elaborate {
         let end = (start + row.circuits.len as usize).min(design.run.refs.len());
         for r in &mut design.run.refs[start.min(end)..end] {
             f(r, DefKind::Subckt);
-        }
-    }
-
-    fn refs(&self, design: &Design, _at: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        let start = self.circuits.start as usize;
-        let end = (start + self.circuits.len as usize).min(design.run.refs.len());
-        for r in &design.run.refs[start.min(end)..end] {
-            out.push((*r, DefKind::Subckt));
         }
     }
 
@@ -457,7 +472,7 @@ impl RowFacts for Elaborate {
             if k > 0 {
                 out.push(' ');
             }
-            write_ref(out, design, ctx, r, DefKind::Subckt);
+            crate::text_expr::write_ref(design, r, DefKind::Subckt, ctx, out);
         }
         out.push(')');
     }
@@ -478,7 +493,7 @@ impl RowFacts for Elaborate {
         if !words.expect(")", diags) {
             return ItemRef::NONE;
         }
-        let circuits = pool(&mut b.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut b.design.run.refs, &refs);
         b.push(scope, Elaborate { circuits }, words.span())
     }
 
@@ -496,27 +511,35 @@ impl RowFacts for Elaborate {
         let refs: Vec<Ref> = (0..n)
             .map(|_| gen_ref(g, b, Some(DefKind::Subckt)))
             .collect();
-        let circuits = pool(&mut b.design.run.refs, &refs);
+        let circuits = crate::build::pooled(&mut b.design.run.refs, &refs);
         b.push(scope, Elaborate { circuits }, Span::NONE)
     }
 }
 
 // ---- private ----
 
-/// Whether `body` holds, comments aside, exactly one analysis or one sweep loop (VACASK's
+/// Whether `body` holds, among its run items, exactly one analysis or one sweep loop (VACASK's
 /// one analysis per sweep, A22).
 fn one_run(design: &Design, body: ScopeId) -> bool {
-    let mut runs = design
-        .items(body)
-        .iter()
-        .filter(|i| i.kind != ItemKind::Comment);
-    let one = match (runs.next(), runs.next()) {
-        (Some(only), None) => Some(*only),
-        _ => None,
-    };
-    one.is_some_and(|i| {
+    only_run(design, body).is_some_and(|i| {
         i.kind == ItemKind::Analysis
             || (i.kind == ItemKind::Loop
                 && Loop::table(design).get(i.index).kind == LoopKind::Sweep)
     })
+}
+
+/// The one item of `body` that may run, when there is exactly one: run items and opaques (an
+/// opaque may be a run statement) count; comments and the circuit's and definitions' items
+/// (a function, a parameter, a subcircuit) run nothing, their place in a loop is their
+/// `Placed(Loop, _)` feature (the lead's finding on `drop_unused_funcs`, pass_laws p3 seed 47).
+fn only_run(design: &Design, body: ScopeId) -> Option<ItemRef> {
+    use crate::state_order::{Listed, listed};
+    let mut runs = design
+        .items(body)
+        .iter()
+        .filter(|i| listed(i.kind) == Listed::Run || i.kind == ItemKind::Opaque);
+    match (runs.next(), runs.next()) {
+        (Some(&only), None) => Some(only),
+        _ => None,
+    }
 }

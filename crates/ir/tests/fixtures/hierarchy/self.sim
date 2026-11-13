@@ -1,0 +1,13 @@
+recursive subcircuit: s instantiates itself
+load "spice/resistor.osdi"
+model res sp_resistor
+model vsource vsource
+subckt s(a)
+  r1 (a 0) res r=1k
+  x1 (a) s
+ends
+v1 (n 0) vsource dc=1
+x0 (n) s
+control
+  analysis op1 op
+endc
