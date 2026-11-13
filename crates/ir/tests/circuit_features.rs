@@ -1614,7 +1614,43 @@ mod tests {
         (X::AsinEdgeFails, |b, t, on| {
             func_point(b, t, on, Law::AsinEdgeFails, Some(Func::Acos))
         }),
+        // R102: a design with no temperature (nominal temperature) statement against one with
+        // an `Env` stating it
+        (X::DefaultTemp27, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTemp27, true)
+        }),
+        (X::DefaultTemp25, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTemp25, true)
+        }),
+        (X::DefaultTnom27, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTnom27, false)
+        }),
+        (X::DefaultTnom25, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTnom25, false)
+        }),
     ];
+
+    /// Under `law`, a design with a resistor and, off, an `Env` stating the temperature (`temp`)
+    /// or the nominal temperature; on, none (the other one stated, so only this point carries).
+    fn default_temp(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law, temp: bool) {
+        b.set_laws(Laws::of(&[law]));
+        let fifty = n(b, 50);
+        let (stated, other) = if temp {
+            (fifty, ExprId::NONE)
+        } else {
+            (ExprId::NONE, fifty)
+        };
+        if on {
+            let other_only = if temp {
+                (ExprId::NONE, fifty)
+            } else {
+                (fifty, ExprId::NONE)
+            };
+            b.env(t, other_only.0, other_only.1, Span::NONE);
+        } else {
+            b.env(t, stated, other, Span::NONE);
+        }
+    }
 
     /// A behavioural source `b1` under `law` whose expression is `f(v(a))` (a division `1/v(a)`
     /// when `f` is `None`); off, `sqrt(v(a))` (a product `1*v(a)`).

@@ -6,7 +6,8 @@
 //! Oracle: the rulings' text (R92: F21 `xom`/`xoi` absent 1e4 Å in ngspice-45 and 1e14 Å in the
 //! pinned VACASK; F24 `kp` absent 25+10·type against 15+5·type; F25 `tcvth`/`vtotc` negated;
 //! R96: F40 and F41 noted; R93a: F43, F44, F45 guarded under ngspice-45's law and noted under
-//! the exact one, F42 and F46 noted both ways; every other point none).
+//! the exact one, F42 and F46 noted both ways; R102: the default temperature and nominal
+//! temperature stated, 27 °C or 25 °C; every other point none).
 //!
 //! Contents: tests only.
 
@@ -36,6 +37,10 @@ mod tests {
             L::VdmosKpAbsent35 => Want::Stated(vec![(vec!["kp"], 35.0, 15.0)]),
             L::VdmosKpAbsent20 => Want::Stated(vec![(vec!["kp"], 20.0, 10.0)]),
             L::VdmosTcvthLowers | L::VdmosTcvthRaises => Want::Negated(vec!["tcvth", "vtotc"]),
+            L::DefaultTemp27 => Want::Stated(vec![(vec!["temp"], 27.0, 27.0)]),
+            L::DefaultTemp25 => Want::Stated(vec![(vec!["temp"], 25.0, 25.0)]),
+            L::DefaultTnom27 => Want::Stated(vec![(vec!["tnom"], 27.0, 27.0)]),
+            L::DefaultTnom25 => Want::Stated(vec![(vec!["tnom"], 25.0, 25.0)]),
             L::DiodeIsrSmallSignalHand
             | L::DiodeIsrSmallSignalExact
             | L::DiodeTtFactorUnclamped

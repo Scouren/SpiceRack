@@ -296,3 +296,4 @@ class that holds it (or `gap: <why>`). A row with no home is a finding, not a fa
   - F44 `LogZeroMinus1e99` / `LogZeroError` (`ln`, `log10`; guarded / noted).
   - F45 `DivGminGuard` / `DivExact` (`/`, typed division; guarded / noted).
   - F46 `AsinEdgeZero` / `AsinEdgeFails` (`asin`, `acos`; noted both ways).
+- R102 (rulings): the default temperature and nominal temperature, two design points (`Carrier::Design`, reported by the circuit owner's `design_features`): `DefaultTemp27`/`DefaultTemp25` carried by a design whose listed `Env` items state no `temp`, `DefaultTnom27`/`DefaultTnom25` by one stating no `tnom`; 27 °C ngspice, VACASK, Xyce, LTspice, ESPice, 25 °C HSPICE. Stated: the rule writes the value as a run-wide `Env` item (`Stated { names: ["temp"] | ["tnom"], absent }`). `Laws` holds 44 variants in 22 points.

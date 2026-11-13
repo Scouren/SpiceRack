@@ -1,4 +1,4 @@
-//! The law table's rows (R90, R92, R93a, R94, R94a, R95, R96): a `Law` in, its `Row` out (point,
+//! The law table's rows (R90, R92, R93a, R94, R94a, R95, R96, R102): a `Law` in, its `Row` out (point,
 //! families, member, IR word, rewriting kind), exhaustive over the variants. Split from `laws.rs`
 //! at its size limit; each variant's doc there carries its build, run and carriers.
 //!
@@ -45,6 +45,23 @@ const KP_35: &[Stated] = &[Stated {
 const KP_20: &[Stated] = &[Stated {
     names: &["kp"],
     absent: |m| 15.0 + 5.0 * channel(m),
+}];
+/// R102: the run-wide `Env` field each default fills in, °C (a design point: the model is unused).
+const TEMP_27: &[Stated] = &[Stated {
+    names: &["temp"],
+    absent: |_| 27.0,
+}];
+const TEMP_25: &[Stated] = &[Stated {
+    names: &["temp"],
+    absent: |_| 25.0,
+}];
+const TNOM_27: &[Stated] = &[Stated {
+    names: &["tnom"],
+    absent: |_| 27.0,
+}];
+const TNOM_25: &[Stated] = &[Stated {
+    names: &["tnom"],
+    absent: |_| 25.0,
 }];
 const TCVTH: Rewrite = Rewrite::Negated(&["tcvth", "vtotc"]);
 
@@ -321,6 +338,34 @@ impl Law {
                 X::AsinEdgeFails,
                 "asin_edge_fails",
                 Rewrite::Noted,
+            ),
+            Law::DefaultTemp27 => (
+                P::DefaultTemp,
+                NONE,
+                X::DefaultTemp27,
+                "default_temp_27",
+                Rewrite::Stated(TEMP_27),
+            ),
+            Law::DefaultTemp25 => (
+                P::DefaultTemp,
+                NONE,
+                X::DefaultTemp25,
+                "default_temp_25",
+                Rewrite::Stated(TEMP_25),
+            ),
+            Law::DefaultTnom27 => (
+                P::DefaultTnom,
+                NONE,
+                X::DefaultTnom27,
+                "default_tnom_27",
+                Rewrite::Stated(TNOM_27),
+            ),
+            Law::DefaultTnom25 => (
+                P::DefaultTnom,
+                NONE,
+                X::DefaultTnom25,
+                "default_tnom_25",
+                Rewrite::Stated(TNOM_25),
             ),
         };
         Row {

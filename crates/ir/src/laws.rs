@@ -8,7 +8,7 @@
 //! (a question two builds answer differently); a point's variants exclude each other. Each row
 //! of the table (`Law::row`) gives the variant's point, the families whose models follow it, its
 //! member, its IR word and its point's exact rewriting (R92, R96, R93a: none, stated, negated,
-//! noted, guarded). *How many*: one set per design; `Law::COUNT` variants (40, two per point, 20
+//! noted, guarded). *How many*: one set per design; `Law::COUNT` variants (44, two per point, 22
 //! points), one bit each in a `u64` (the compile-time assertions below fail the build when the
 //! enum outgrows 64 or a point gains a third variant). *Who writes*: a
 //! reader, once per read, the constant of its simulator build (`Builder::set_laws`); the text's
@@ -20,7 +20,7 @@
 //! A built design states nothing, carries nothing and goes to any target under the target's law.
 //! Ceiling (R90): a design whose models follow two builds of one module cannot say so.
 //!
-//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R93a, R94, R94a, R95, R95a, R96 (on the `rulings`
+//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R93a, R94, R94a, R95, R95a, R96, R102 (on the `rulings`
 //! branch); the
 //! runs in `crates/ir/tests/fixtures/bjt_substrate/` and `crates/ir/tests/fixtures/families/`.
 //! The carrier predicates are `laws_carry.rs`, the table's rows `laws_table.rs`.
@@ -209,6 +209,18 @@ pub enum Law {
     AsinEdgeZero,
     /// Point R93a F46: fails loudly (VACASK).
     AsinEdgeFails,
+    /// Point R102, the temperature a design with no temperature statement runs at: 27 °C
+    /// (ngspice, VACASK, Xyce, LTspice, ESPice). Carried by the design when no `Env` sets a
+    /// temperature. Stated: the rule writes `temp` as a run-wide `Env` item.
+    DefaultTemp27,
+    /// Point R102: 25 °C (HSPICE; `hspice-2`, dialect-hspice 88cd9649).
+    DefaultTemp25,
+    /// Point R102, the nominal temperature (`tnom`) of a design with no nominal temperature
+    /// statement: 27 °C (ngspice, VACASK, Xyce, LTspice, ESPice). Carried by the design when no
+    /// `Env` sets `tnom`. Stated: the rule writes `tnom` as a run-wide `Env` item.
+    DefaultTnom27,
+    /// Point R102: 25 °C (HSPICE).
+    DefaultTnom25,
 }
 
 /// A set of stated laws, one bit per [`Law`]. Two variants of one point may stand in the set;
@@ -244,7 +256,8 @@ pub enum Rewrite {
 
 /// One parameter a stated variant fills in: its spellings in the family's own names (ngspice's
 /// and the pinned VACASK module's, which agree on every name below) and the value its absence
-/// means under the variant, as a function of the model's row.
+/// means under the variant, as a function of the model's row. For a design point (R102's
+/// default temperatures) the name is the run-wide `Env` field and the model is unused.
 #[derive(Clone, Copy, Debug)]
 pub struct Stated {
     /// The parameter's spellings; a model carries the point when it gives none of them.
@@ -260,6 +273,8 @@ pub(crate) enum Carrier<'a> {
     Model(&'a Model),
     /// An expression node in a root of dynamic form (R93a's function points).
     Node(crate::expr::Expr),
+    /// The design as a whole (R102's default temperatures).
+    Design,
 }
 
 /// A law point: the question its variants answer. `LawConflict`'s `arg` is its index.
@@ -285,6 +300,8 @@ pub(crate) enum Point {
     LogZero,
     DivGuard,
     AsinEdge,
+    DefaultTemp,
+    DefaultTnom,
 }
 
 /// One variant's row: its point, the families whose models follow it, its member, its word,
@@ -298,7 +315,7 @@ pub(crate) struct Row {
 }
 
 /// Every point, in declaration order.
-const POINTS: [Point; 20] = [
+const POINTS: [Point; 22] = [
     Point::BcSatArea,
     Point::SubSatTemp,
     Point::DiodeWlMult,
@@ -319,6 +336,8 @@ const POINTS: [Point; 20] = [
     Point::LogZero,
     Point::DivGuard,
     Point::AsinEdge,
+    Point::DefaultTemp,
+    Point::DefaultTnom,
 ];
 
 // 40 variants: a `u64`, one bit each (the build fails here when the enum outgrows it)
@@ -328,7 +347,7 @@ const _: () = assert!(Law::COUNT == 2 * POINTS.len());
 
 impl Law {
     /// Every variant, in declaration order (its bit in [`Laws`]).
-    pub const ALL: [Law; 40] = [
+    pub const ALL: [Law; 44] = [
         Law::BcSatAreaTimesAreab,
         Law::BcSatAreabOnly,
         Law::SubSatLastFactor,
@@ -369,6 +388,10 @@ impl Law {
         Law::DivExact,
         Law::AsinEdgeZero,
         Law::AsinEdgeFails,
+        Law::DefaultTemp27,
+        Law::DefaultTemp25,
+        Law::DefaultTnom27,
+        Law::DefaultTnom25,
     ];
     /// Variant count.
     pub const COUNT: usize = Self::ALL.len();

@@ -347,11 +347,19 @@ pub enum CircuitExtra {
     AsinEdgeZero,
     /// An expression node of dynamic form carrying R93a F46's point under `Law::AsinEdgeFails`.
     AsinEdgeFails,
+    /// A design with no temperature statement under `Law::DefaultTemp27` (R102).
+    DefaultTemp27,
+    /// The same under `Law::DefaultTemp25` (HSPICE).
+    DefaultTemp25,
+    /// A design with no nominal temperature statement under `Law::DefaultTnom27` (R102).
+    DefaultTnom27,
+    /// The same under `Law::DefaultTnom25` (HSPICE).
+    DefaultTnom25,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 145] = [
+    pub const ALL: [CircuitExtra; 149] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -497,6 +505,10 @@ impl CircuitExtra {
         CircuitExtra::DivExact,
         CircuitExtra::AsinEdgeZero,
         CircuitExtra::AsinEdgeFails,
+        CircuitExtra::DefaultTemp27,
+        CircuitExtra::DefaultTemp25,
+        CircuitExtra::DefaultTnom27,
+        CircuitExtra::DefaultTnom25,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();
