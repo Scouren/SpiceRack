@@ -22,3 +22,6 @@ mos3_ac 4 mismatch finding=F27 # R94: ngspice-45 level 3 small-signal gm is not 
 mos9_ac 4 mismatch finding=F27 # R94: as mos3_ac for level 9
 mos6_ac 4 target-fails finding=F28 # R94: ngspice-45 has no AC for MOS level 6 ("doAnalyses: matrix is singular"), its raw file ends in the header
 diode_isr 4 mismatch finding=F31 # R95: as ngspice-vacask: op vd:flow(br) 1.66074e-9 (VACASK) vs 2.0199e-12 A (ngspice), tol 9.321e-12; held to the current floor since the vector typing fix, at the voltage floor (2e-6) it passed
+ac_lin_two 4 mismatch finding=F32 # R97: VACASK `mode="lin" points=1` runs 1 and 2 kHz, ngspice-45 the `.ac lin 2 1e3 2e3` written for it 1 kHz alone: "ac: sweep grid changed (2 -> 1 points)"
+ac_dec_offgrid 4 mismatch finding=F33 # VACASK `mode="dec" points=2` 1k to 5k runs 1000, 2236.07, 5000; ngspice-45 stops below the stop (1000, 3162.28): "ac: sweep grid changed (3 -> 2 points)"
+mos6_ac_nocap 4 mismatch finding=F28 # R94, the silent form: no capacitance, so ngspice-45 runs and prints 0: ac vd:flow(br) -3.0412009e-4 (VACASK) vs 0 at 1 kHz (tol 6.082e-7)

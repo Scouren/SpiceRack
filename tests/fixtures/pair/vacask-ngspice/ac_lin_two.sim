@@ -1,0 +1,12 @@
+ac_lin_two: F32 (R97): an RC low-pass swept linearly over one interval, 1 kHz to 2 kHz (points=1): VACASK runs both ends, the ngspice deck written for it (.ac lin 2 1e3 2e3) runs 1 kHz alone (acan.c: a linear sweep of two points has no step), so the grid changes
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=1.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  analysis ac1 ac from=1e3 to=2e3 mode="lin" points=1
+endc
