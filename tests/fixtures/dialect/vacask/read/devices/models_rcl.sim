@@ -6,4 +6,4 @@ model rn sp_resistor tc1=0.01
 model rb sp_resistor bogus=1
 model c capacitor
 model l sp_inductor
-model nm sp_mos2 type=-1 vto=0.7
+model nm psp103va type=-1 toxo=2n

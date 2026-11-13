@@ -1,0 +1,4 @@
+# VACASK corpus demo/spice/mos2inv.sim (F11: the shipped SPICE module as its IR family).
+owner = vacask
+proves = families::PROVEN
+# The default tolerances: F93 (upstream gap; the tight variant sp_mos2inv_tight is the proof).

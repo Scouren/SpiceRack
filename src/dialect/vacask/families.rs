@@ -169,6 +169,9 @@ pub(super) const PROVEN: &[&str] = &[
     // By pair decks sp_bsim4v8_tran, sp_bsim4v8_acg (ir-2's fca01394 load decks); a version it
     // does not run as written is refused (F85, `versions`).
     "sp_bsim4v8",
+    // Level 2 by pair deck sp_mos2inv_tight (tight tolerances, all six steps); at the default
+    // tolerances its switching edge differs by the simulators' tolerances (F93, upstream gap).
+    "sp_mos2",
 ];
 
 /// A versioned family's versions in its VACASK module (A19): the version a silent card means,

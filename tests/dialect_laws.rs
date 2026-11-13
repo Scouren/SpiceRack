@@ -55,6 +55,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// listed seed that passes. Each dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[Known] = &[
+    ("l5", "vacask", &["seed 26", "seed 36", "seed 63"], "R99b/F61: the generator draws a sweep count that is a Real expression of no whole value (`acos(…)`, `(… /: atanh(…))`); VACASK truncates it, so its reader reads `to_int(e)` back, which is VACASK's number and not the design's. Waits for the IR owner: a count is an integer (R99b: \"writers only ever see an integer\"), so the generator draws Int counts or `check` names a non-integer one"),
 ];
 
 /// The rows whose L6 runs in their own test file over the corpus their area pins: (row, the
