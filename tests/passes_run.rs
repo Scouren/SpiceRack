@@ -146,6 +146,11 @@ fn linear_frequency_sweeps_run_what_each_simulator_counts() {
 }
 
 #[test]
+fn log_frequency_sweeps_run_each_simulators_law() {
+    freq_grids::log_frequency_sweeps_run_each_simulators_law();
+}
+
+#[test]
 fn a_loop_of_ops_is_no_continued_sweep() {
     dc_loops::a_loop_of_ops_is_no_continued_sweep();
 }
