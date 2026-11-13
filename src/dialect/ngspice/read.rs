@@ -117,6 +117,7 @@ struct Frame<'a> {
 /// Every file of `src` into `out`, in `src`'s order; then the bind step.
 pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Diags) {
     assert!(!src.files().is_empty(), "ngspice read: a file to read");
+    out.set_laws(super::LAWS);
     let lex = lexicon();
     let roles: Vec<ir::Role> = (0..src.files().len())
         .map(|k| {
