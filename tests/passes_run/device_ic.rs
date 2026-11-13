@@ -33,6 +33,9 @@ fn device_ic_to_tran_ic_moves_whole_or_keeps_every_one() {
         .with(ir::Feature::Elem(ir::ElemKind::Capacitor))
         .with(ir::Feature::Elem(ir::ElemKind::Resistor))
         .with(ir::Feature::Elem(ir::ElemKind::Diode))
+        // without it the generator draws a passive only beside a model of its family (IR
+        // a74298cd), and this set has none: no capacitor at all
+        .with(ir::Feature::Circuit(ir::CircuitExtra::ElementWithoutModel))
         .with(ir::Feature::Expr(ir::ExprTag::Num))
         .with(ir::Feature::Circuit(ir::CircuitExtra::IcUicOnly))
         .with(ir::Feature::Analysis(ir::AnalysisKind::Tran))
