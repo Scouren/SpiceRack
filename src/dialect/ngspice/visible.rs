@@ -47,7 +47,7 @@ impl Visible {
         let mut seen = HashMap::new();
         // a definition its item does not stand beside (a subcircuit's formal: its scope is the
         // body, its item the `.subckt` in the parent) is seen from its own scope first (F34)
-        for (k, def) in d.definitions().iter().enumerate() {
+        for (k, def) in d.definitions_all().iter().enumerate() {
             if holder.get(&def.item).is_some_and(|&h| h != def.scope) {
                 let id = ir::DefId(u32::try_from(k).expect("definitions fit a u32"));
                 seen.entry((def.scope, def.kind, def.name)).or_insert(id);
