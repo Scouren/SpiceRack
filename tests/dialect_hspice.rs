@@ -33,10 +33,6 @@ use spicerack::ir;
 /// Settle decks ESPice runs whose read still leaves a statement `Unread`, with why.
 const KNOWN_UNREAD: &[(&str, &str)] = &[
     (
-        "data_sweep.sp",
-        "`.data` and `sweep data=`: a table loop around the analysis, no rule yet (P4303)",
-    ),
-    (
         "expr_logic.sp",
         "`sign(-3,2)`: ESPice gives 0, the manual lead 3; unsettled on HSPICE (P4003)",
     ),
@@ -44,23 +40,17 @@ const KNOWN_UNREAD: &[(&str, &str)] = &[
         "expr_power.sp",
         "`pwr(-2,3)`: ESPice gives 8, the manual lead -8; unsettled on HSPICE (P4003)",
     ),
-    (
-        "temp_list.sp",
-        "`.temp 27 50`: a loop around every analysis of the deck, no rule yet (P4308)",
-    ),
 ];
 
 /// Settle decks whose refusal verdict differs from ESPice's (refused by one side only).
-const KNOWN_REFUSE: &[(&str, &str)] = &[(
-    "alter.sp",
-    "`.alter` reruns every analysis with its block's changes: no rule yet, the card is read as \
-     InvalidInSource (P4301)",
-)];
+const KNOWN_REFUSE: &[(&str, &str)] = &[];
 
 /// The read fixtures, by name.
 const READ: &[&str] = &[
     "ac_poi_sorted",
+    "alter",
     "am_form",
+    "data_sweep",
     "dc_forms",
     "dc_poi",
     "dc_sweep_param",
@@ -77,6 +67,7 @@ const READ: &[&str] = &[
     "pulse_zero_rise",
     "sffm_order",
     "subckt_params",
+    "temp_list",
     "timed_op",
 ];
 

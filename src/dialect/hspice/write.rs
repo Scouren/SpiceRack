@@ -14,9 +14,10 @@
 //! `pub(super) fn write(&ir::Design, ir::FileId, &mut String, &mut ir::Diags)`,
 //! `pub(super) fn admits(&ir::Design, &mut ir::Diags)`,
 //! `Out::open(&mut self, ir::ScopeId, String)`, `Out::line(&mut self, &str)`,
+//! `Out::before_end(&mut self, &str)`,
 //! `Out::path(&mut self, ir::ItemRef, &str) -> String`
 
-use super::{write_elements, write_models, write_outputs, write_run, write_structure};
+use super::{write_elements, write_models, write_outputs, write_plan, write_run, write_structure};
 use crate::ir;
 
 /// The writing state of one file, handed to every area function.
@@ -135,6 +136,17 @@ impl<'a> Out<'a> {
         self.frames.push(Frame { items, at: 0, tail });
     }
 
+    /// Puts `text` (whole lines) before the deck's `.end`, after everything else it writes (a
+    /// deck's `.alter` blocks).
+    pub(super) fn before_end(&mut self, text: &str) {
+        let deck = self.frames.first_mut().expect("the file's frame");
+        debug_assert!(
+            deck.tail.ends_with(".end\n"),
+            "a deck's frame ends with .end"
+        );
+        deck.tail.insert_str(0, text);
+    }
+
     /// Appends `text` and a line break.
     pub(super) fn line(&mut self, text: &str) {
         self.out.push_str(text);
@@ -180,7 +192,7 @@ fn dispatch(w: &mut Out<'_>, item: ir::ItemRef) {
         ir::ItemKind::Save => write_outputs::save(w, item),
         ir::ItemKind::Print => write_outputs::print(w, item),
         ir::ItemKind::Measure => write_outputs::measure(w, item),
-        ir::ItemKind::Loop => write_run::loop_(w, item),
+        ir::ItemKind::Loop => write_plan::loop_(w, item),
         ir::ItemKind::Load
         | ir::ItemKind::Alter
         | ir::ItemKind::Reset

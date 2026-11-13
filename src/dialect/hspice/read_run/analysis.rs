@@ -18,7 +18,8 @@
 //! (`ac_poi.sp`, `ac_poi_sorted.sp`); a fractional count refused (`ac_frac.sp`).
 //!
 //! Contents: `pub(in super::super) enum Card`, `pub(in super::super) enum Swept`,
-//! `pub(in super::super) enum Sweep`, `pub(in super::super) enum Axis`, `pub(in super::super) fn read(&mut Lower, Stmt, &str,
+//! `pub(in super::super) enum Sweep`, `pub(in super::super) enum Axis`,
+//! `pub(in super::super) enum Outer`, `pub(in super::super) fn read(&mut Lower, Stmt, &str,
 //! &[String]) -> Result<Card, Fail>`
 
 use super::super::expr_read::Fail;
@@ -40,7 +41,7 @@ pub(in super::super) enum Card {
     TimedOp(Vec<Val>),
     /// `dc`: the axes, innermost first (what is swept and its values), and the parameter a
     /// `sweep` tail runs the analysis over (an outer loop).
-    Dc(Vec<(Swept, Axis)>, Option<(String, Axis)>),
+    Dc(Vec<(Swept, Axis)>, Option<Outer>),
     /// `ac`.
     Ac(Sweep),
     /// `tran tstep tstop [tstart [tmax]] [uic]` (a zero `tmax` already dropped).
@@ -114,6 +115,16 @@ pub(in super::super) enum Sweep {
     },
     /// The values in run order (`poi`: settle `dc_poi.sp` keeps order and repeats).
     List(Vec<Val>),
+}
+
+/// A `sweep` tail: a parameter over values, or a `.data` table's rows (`sweep data=name`:
+/// the table's name, its columns, its values row-major).
+#[derive(Clone, Debug)]
+pub(in super::super) enum Outer {
+    /// `sweep p values`.
+    Param(String, Axis),
+    /// `sweep data=name` (settle `data_sweep.sp`: one plot per row; ESPice only).
+    Data(String, Vec<String>, Vec<Val>),
 }
 
 /// The values of a DC axis: `start stop step` (or `start= stop= step=`), or a [`Sweep`].
@@ -342,14 +353,26 @@ fn dc(lw: &mut Lower<'_, '_>, st: Stmt, w: &[String]) -> Result<Card, Fail> {
     }
     let outer = match outer {
         None => None,
-        Some([name, rest @ ..]) if !name.eq_ignore_ascii_case("data") && !rest.is_empty() => {
+        Some([data, eq, table]) if data.eq_ignore_ascii_case("data") && eq == "=" => {
+            let (name, columns, texts) = lw
+                .data
+                .iter()
+                .find(|d| d.1.eq_ignore_ascii_case(table))
+                .map(|d| (d.1.clone(), d.2.clone(), d.3.clone()))
+                .ok_or_else(no_field)?;
+            let values = texts
+                .iter()
+                .map(|v| words::value(lw, st, v))
+                .collect::<Result<Vec<_>, _>>()?;
+            Some(Outer::Data(name, columns, values))
+        }
+        Some([name, rest @ ..]) if !rest.is_empty() => {
             let (values, used) = axis(lw, st, rest)?;
             if used != rest.len() {
                 return Err(invalid());
             }
-            Some((name.clone(), values))
+            Some(Outer::Param(name.clone(), values))
         }
-        // `sweep data=table` (settle data_sweep.sp) has no rule yet
         Some(_) => return Err(no_field()),
     };
     Ok(Card::Dc(axes, outer))

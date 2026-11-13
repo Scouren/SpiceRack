@@ -13,7 +13,8 @@
 //!
 //! Contents: `pub(super) const FEATURES: ir::FeatureSet`, `pub(super) const CODES: &[Row]`,
 //! `pub(super) fn admits(&ir::Design, ir::ItemRef, &mut ir::Diags)`,
-//! `pub(super) fn analysis`, `loop_`, `option`, `env`, `node_set`, `statistics`
+//! `pub(super) fn analysis`, `option`, `env`, `node_set`, `statistics`, `card`, `value`, `axis`
+//! (the loops' writer `write_plan.rs` spells cards with them)
 
 use super::codes::Row;
 use super::expr_write;
@@ -84,7 +85,7 @@ const READS_TEMP: ir::Code = ir::Code::new(b'W', 4302);
 pub(super) fn admits(design: &ir::Design, item: ir::ItemRef, diags: &mut ir::Diags) {
     let mut refuse = |code| diags.push_at(code, design, item, 0);
     if item.kind == ir::ItemKind::Loop {
-        if swept_card(design, item).is_none() {
+        if !super::write_plan::spells(design, item) {
             refuse(LOOP_FORM);
         }
         return;
@@ -193,18 +194,6 @@ pub(super) fn analysis(w: &mut Out<'_>, item: ir::ItemRef) {
     w.line(&t);
 }
 
-/// A `Loop` as its body's one analysis card with a `sweep param values` tail (settle
-/// `dc_sweep_param.sp`); `admits` refused every other loop.
-pub(super) fn loop_(w: &mut Out<'_>, item: ir::ItemRef) {
-    let d = w.design;
-    let (body, s) = swept_card(d, item).expect("HSPICE write: an admitted loop");
-    let mut t = card(d, body);
-    t.push_str(" sweep ");
-    t.push_str(d.str(s.target.a.name));
-    axis(d, s.sweep, &mut t);
-    w.line(&t);
-}
-
 /// An `Option` as `.options key[=value]` (`method=trap|gear` for the method flags), or the
 /// script command `option key[=value]` when it holds from its place on.
 pub(super) fn option(w: &mut Out<'_>, item: ir::ItemRef) {
@@ -283,32 +272,8 @@ pub(super) fn statistics(_w: &mut Out<'_>, _item: ir::ItemRef) {
     unreachable!("HSPICE write: FEATURES lacks Item(Statistics): ngspice has no such block")
 }
 
-// ---- private ----
-
-/// The one analysis card a sweep loop wraps and its sweep, when HSPICE's tail spells it: a
-/// sweep of a parameter, restored after, unnamed, around one `.dc`, `.ac` or `.tran`.
-fn swept_card(d: &ir::Design, item: ir::ItemRef) -> Option<(ir::ItemRef, ir::plan::SweepLoop)> {
-    let l: ir::Loop = d.row(item.index);
-    if l.kind != ir::LoopKind::Sweep || l.after != ir::LoopEnd::Restore || !l.name.is_none() {
-        return None;
-    }
-    let s: ir::plan::SweepLoop = d.detail(l.detail);
-    let body = d.items(l.body);
-    let one = match body {
-        [one] if one.kind == ir::ItemKind::Analysis => *one,
-        _ => return None,
-    };
-    let a: ir::Analysis = d.row(one.index);
-    let kind_ok = matches!(
-        a.kind,
-        AnalysisKind::Dc | AnalysisKind::Ac | AnalysisKind::Tran
-    );
-    (kind_ok && s.target.kind == ir::TargetKind::Param && s.target.path.len == 0)
-        .then_some((one, s))
-}
-
 /// An analysis's card text.
-fn card(d: &ir::Design, item: ir::ItemRef) -> String {
+pub(super) fn card(d: &ir::Design, item: ir::ItemRef) -> String {
     let a: ir::Analysis = d.row(item.index);
     assert!(
         a.name.is_none(),
@@ -462,6 +427,32 @@ fn card(d: &ir::Design, item: ir::ItemRef) -> String {
     t
 }
 
+/// ` v`: a literal bare, any other expression in `'…'`.
+pub(super) fn value(d: &ir::Design, e: ir::ExprId, out: &mut String) {
+    out.push(' ');
+    if let ir::Expr::Num(n) = d.expr(e) {
+        number::spell(d, d.num(n), out);
+        return;
+    }
+    out.push('\'');
+    expr_write::expr(d, e, out);
+    out.push('\'');
+}
+
+/// A DC axis's or a sweep tail's values: ` start stop step` for a linear sweep by step, else
+/// [`sweep`]'s form.
+pub(super) fn axis(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
+    if s.kind == ir::SweepKind::Lin && !s.step.is_none() {
+        for e in [s.start, s.stop, s.step] {
+            value(d, e, out);
+        }
+    } else {
+        sweep(d, s, out);
+    }
+}
+
+// ---- private ----
+
 /// Refuses a card value that reads the temperature (numparam evaluates a dot card's `{…}` once,
 /// with no `temper`; a value that reads the circuit is `ir::check`'s `ProbeContext` in these
 /// constant fields; a literal is never refused: R28).
@@ -523,30 +514,6 @@ const fn refusal(
             kind: ir::Kind::Refusal,
         },
     )
-}
-
-/// ` v`: a literal bare, any other expression in `'…'`.
-fn value(d: &ir::Design, e: ir::ExprId, out: &mut String) {
-    out.push(' ');
-    if let ir::Expr::Num(n) = d.expr(e) {
-        number::spell(d, d.num(n), out);
-        return;
-    }
-    out.push('\'');
-    expr_write::expr(d, e, out);
-    out.push('\'');
-}
-
-/// A DC axis's or a sweep tail's values: ` start stop step` for a linear sweep by step, else
-/// [`sweep`]'s form.
-fn axis(d: &ir::Design, s: ir::SweepSpec, out: &mut String) {
-    if s.kind == ir::SweepKind::Lin && !s.step.is_none() {
-        for e in [s.start, s.stop, s.step] {
-            value(d, e, out);
-        }
-    } else {
-        sweep(d, s, out);
-    }
 }
 
 /// ` probe`, as the outputs area spells it (one spelling of probes: `write_outputs::probe`).

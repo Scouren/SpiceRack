@@ -211,10 +211,13 @@ pub(super) fn options(lw: &mut Lower<'_, '_>, st: Stmt) {
     }
 }
 
-/// `.temp t` or `.temp=t`: one `Env` setting the temperature. A list (`.temp 27 50`) runs every
-/// analysis at each temperature (settle `temp_list.sp`): a loop around the deck's analyses,
-/// which this reader does not build yet (`Unread`).
+/// `.temp t` or `.temp=t`: one `Env` setting the temperature. The deck's one top-level list
+/// (`.temp 27 50`) is the loop around its analyses (`read_run::deck_loop`; the card itself is
+/// framing); a list anywhere else, or one whose values do not read, is `Unread`.
 pub(super) fn temp(lw: &mut Lower<'_, '_>, st: Stmt) {
+    if lw.temp_card == Some(st.node) && super::deck_loop(lw, st).is_some() {
+        return lw.framing();
+    }
     let rest = lw.rest(st.node);
     let text = rest.trim().strip_prefix('=').unwrap_or(rest.trim()).trim();
     let w = words::split(text);

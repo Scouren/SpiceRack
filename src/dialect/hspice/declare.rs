@@ -14,6 +14,7 @@
 //! Contents: `pub(super) struct Declared`, `pub(super) enum Class`,
 //! `pub(super) fn declare(&Ast, &Tokens) -> Declared`, `Declared::wins`, `Declared::redefault`, `Declared::head`, `Declared::top_head`, `Declared::arity`, `Declared::class`,
 //! `pub(super) fn cycles(&[Declared], usize, Node, &str) -> bool`,
+//! `pub(super) fn assigns(&Ast, &Tokens, Node) -> Vec<(String, String)>`
 
 use std::collections::HashMap;
 
@@ -80,8 +81,9 @@ pub(super) fn declare(ast: &Ast<'_>, toks: &Tokens<'_>) -> Declared {
     let mut stack: Vec<Node> = vec![ast.root()];
     // Bounded: each block is pushed once.
     while let Some(container) = stack.pop() {
+        // nothing after a deck's first `.alter` defines a name: its blocks are reruns
         let items: &[u32] = if container == ast.root() {
-            ast.fields(ast.root())
+            &ast.fields(ast.root())[..super::read_plan::first_alter(ast, toks)]
         } else {
             body(ast, container)
         };
@@ -297,6 +299,19 @@ pub(super) fn cycles(files: &[Declared], here: usize, block: Node, name: &str) -
     false
 }
 
+/// The `(name, value text)` of each `key = value` field of a statement.
+pub(super) fn assigns(ast: &Ast<'_>, toks: &Tokens<'_>, n: Node) -> Vec<(String, String)> {
+    ast.fields(n)
+        .iter()
+        .map(|&f| Node(f))
+        .filter(|&f| ast.tag(f) == Tag::Assign && ast.rhs(f) != NONE)
+        .map(|f| {
+            let key = joined(toks, ast, Node(ast.lhs(f)));
+            (key, joined(toks, ast, Node(ast.rhs(f))))
+        })
+        .collect()
+}
+
 // ---- private ----
 
 impl Declared {
@@ -363,19 +378,6 @@ impl Declared {
         }
         None
     }
-}
-
-/// The `(name, value text)` of each `key = value` field of a statement.
-fn assigns(ast: &Ast<'_>, toks: &Tokens<'_>, n: Node) -> Vec<(String, String)> {
-    ast.fields(n)
-        .iter()
-        .map(|&f| Node(f))
-        .filter(|&f| ast.tag(f) == Tag::Assign && ast.rhs(f) != NONE)
-        .map(|f| {
-            let key = joined(toks, ast, Node(ast.lhs(f)));
-            (key, joined(toks, ast, Node(ast.rhs(f))))
-        })
-        .collect()
 }
 
 /// How many ports a `.subckt` node's head names: the words after its name, before `params:` or

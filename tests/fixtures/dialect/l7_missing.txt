@@ -126,9 +126,9 @@ ngspice Run(HbDiamond) unspoken
 ngspice Run(HbHybrid) unspoken
 ngspice Run(PssDriven) unspoken
 ngspice Run(PeriodicRelative) unspoken
-ngspice Run(LoopTable) unspoken
+ngspice Run(LoopTable) owed from=hspice
 ngspice Run(LoopMonteCarlo) owed from=vacask
-ngspice Run(LoopTemp) owed from=vacask
+ngspice Run(LoopTemp) owed from=vacask,hspice
 ngspice Run(LoopSubcktParam) unspoken
 ngspice Run(LoopOption) owed from=vacask
 ngspice Run(AlterSubcktParam) unspoken
@@ -421,7 +421,7 @@ vacask Run(PssAutonomous) owed from=ngspice,hspice
 vacask Run(PssDriven) unspoken
 vacask Run(PssUic) owed from=ngspice,hspice
 vacask Run(PeriodicRelative) unspoken
-vacask Run(LoopTable) unspoken
+vacask Run(LoopTable) owed from=hspice
 vacask Run(LoopSubcktParam) unspoken
 vacask Run(AlterSubcktParam) unspoken
 vacask Run(AlterString) unspoken
@@ -462,14 +462,14 @@ vacask Run(StatsTruncate) unspoken
 vacask Run(VaryLogNormal) unspoken
 vacask Run(VaryPercent) unspoken
 vacask Run(VaryMean) unspoken
-vacask Run(LoopOverOp) owed from=ngspice
+vacask Run(LoopOverOp) owed from=ngspice,hspice
 vacask Run(MeasStatAt) owed from=ngspice,hspice
 vacask Run(MeasUntil) owed from=ngspice,hspice
 vacask Run(MeasSkipInitial) owed from=ngspice,hspice
 vacask Run(PssScIter) owed from=ngspice,hspice
 vacask Run(PssSteadyCoeff) owed from=ngspice,hspice
 vacask Run(FourHarmonicsOption) owed from=ngspice,hspice
-vacask Run(SweepBodyNotOne) owed from=ngspice
+vacask Run(SweepBodyNotOne) owed from=ngspice,hspice
 vacask Run(PssOscDiff) unspoken
 vacask Run(ResetValues) owed from=ngspice
 vacask Run(ResetOptions) owed from=ngspice
@@ -759,11 +759,9 @@ hspice Run(HbDiamond) unspoken
 hspice Run(HbHybrid) unspoken
 hspice Run(PssDriven) unspoken
 hspice Run(PeriodicRelative) unspoken
-hspice Run(LoopTable) unspoken
 hspice Run(LoopMonteCarlo) owed from=vacask
 hspice Run(LoopKeepLast) owed from=ngspice
 hspice Run(LoopScoped) owed from=ngspice,vacask
-hspice Run(LoopTemp) owed from=vacask
 hspice Run(LoopSubcktParam) unspoken
 hspice Run(LoopSourceDc) owed from=ngspice,vacask
 hspice Run(LoopElementValue) owed from=ngspice,vacask
@@ -806,13 +804,11 @@ hspice Run(StatsTruncate) unspoken
 hspice Run(VaryLogNormal) unspoken
 hspice Run(VaryPercent) unspoken
 hspice Run(VaryMean) unspoken
-hspice Run(LoopOverOp) owed from=ngspice
 hspice Run(EnvMidRun) owed from=ngspice,vacask
 hspice Run(NodeSetMidRun) owed from=vacask
 hspice Run(OptionFromHere) owed from=ngspice,vacask
 hspice Run(EnvFromHere) owed from=ngspice,vacask
 hspice Run(NodeSetFromHere) owed from=vacask
-hspice Run(SweepBodyNotOne) owed from=ngspice
 hspice Run(PssOscDiff) unspoken
 hspice Run(ResetValues) owed from=ngspice
 hspice Run(ResetOptions) owed from=ngspice
