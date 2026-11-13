@@ -1,0 +1,13 @@
+f33_frac_vacask_lin1p6: VACASK `mode="lin" points=1.6` from 1k to 2k runs 1000, 2000 (points=1): points truncates
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model vsource vsource
+model resistor sp_resistor
+model capacitor sp_capacitor
+v1 (in 0) vsource dc=0.0 mag=1.0
+r1 (in out) resistor r=1k
+c1 (out 0) capacitor c=1u
+control
+  options rawfile="ascii"
+  analysis ac1 ac from=1k to=2k mode="lin" points=1.6
+endc
