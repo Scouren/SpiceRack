@@ -1,6 +1,6 @@
 """load.py FAMILY: writes a family's load decks beside it, one ngspice deck (.cir) and one VACASK
 deck (.sim) per (condition, region, reading). Families: mos1, mos2, mos3, mos6, mos9 (a bulk at
--0.5 V), mos6_nocap, jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, diode_load and diode_noisr (two terminals),
+-0.5 V), mos6_nocap, bsim3, bsim4, bsim4_nf (corpus cards), jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, diode_load and diode_noisr (two terminals),
 vdmos_load, passive. Conditions: `nom` (27 C, m=1) is the control of `off` (80 C, m=3) and of
 `m3` (27 C, m=3); geometry is given in all. Readings: `dc` the operating-point current of `vd`,
 `acg` |i(vd)| at 1 GHz with the gate driven, `acd` |i(vd)| at 1 GHz with the drain driven.
@@ -97,6 +97,50 @@ FAMILIES['vdmos_load'] = dict(
     regions={'cut': (1.0, 10.0), 'lin': (6.0, 0.5), 'sat': (3.0, 10.0)})
 CONDITIONS = {'nom': (27, 1), 'm3': (27, 3), 'off': (80, 3)}
 
+def card(name):
+    """A model card's parameters from cards/<name>.params (its first line the provenance)."""
+    here = __import__('os').path.dirname(__import__('os').path.abspath(__file__))
+    return open(f'{here}/cards/{name}.params').read().split('\n', 1)[1].strip()
+
+
+# BSIM3v3 and BSIM4v8 on corpus cards (cards/*.params name their sources): ngspice-45 level 8 and
+# 14 against VACASK's sp_bsim3v3 and sp_bsim4v8; bsim4_nf the same BSIM4 at nf=3 (fingers)
+FAMILIES['bsim3'] = dict(
+    load='spice/bsim3v3.osdi', nodes='d g 0 b',
+    ng_model='.model nm nmos level=8 version=3.3.0 {p}', va_model='model nm sp_bsim3v3 type=1 {p}',
+    params=card('bsim3'), geometry='w=10u l=0.35u ad=10p as=10p pd=22u ps=22u',
+    regions={'cut': (0.3, 2.0), 'lin': (3.0, 0.2), 'sat': (1.5, 3.0)})
+FAMILIES['bsim4'] = dict(
+    load='spice/bsim4v8.osdi', nodes='d g 0 b',
+    ng_model='.model nm nmos level=14 version=4.8.2 {p}',
+    va_model='model nm sp_bsim4v8 type=1 version="4.8.2" {p}',
+    params=card('bsim4'), geometry='w=1u l=0.1u ad=0.1p as=0.1p pd=2.2u ps=2.2u',
+    regions={'cut': (0.1, 1.0), 'lin': (1.0, 0.05), 'sat': (0.6, 1.0)})
+FAMILIES['bsim4_nf'] = dict(FAMILIES['bsim4'], geometry='w=1u l=0.1u nf=3 ad=0.1p as=0.1p pd=2.2u ps=2.2u')
+# gf180mcuD's BSIM4 nfet_03v3 as the kit has it (typical corner, its binned models and corner
+# expressions; the mismatch switch 0 as design.ngspice sets it): ngspice-45 reads the kit's own
+# ngspice files, VACASK the same files converted by VACASK's own gf180tovc (gf180_run.sh makes
+# kit/ from $PDK_ROOT). Two geometries in two bins; nf=3 in a third family; m is the wrapper's
+# parameter on both
+GF180_NG = ('.include "../kit/gf180mcuD/libs.tech/ngspice/design.ngspice"\n'
+            '.lib "../kit/gf180mcuD/libs.tech/ngspice/sm141064.ngspice" typical')
+GF180_VA = ('include "../kit/gf180mcuD/libs.tech/vacask/models/gf180_vacask_common.lib"\n'
+            'include "../kit/gf180mcuD/libs.tech/vacask/models/design.lib"\n'
+            'include "../kit/gf180mcuD/libs.tech/vacask/models/mos_tt.lib"')
+FAMILIES['gf180_n1'] = dict(
+    load='', letter='x', master='nfet_03v3', va_mult='m', nodes='d g 0 b', params='',
+    ng_model=GF180_NG, va_model=GF180_VA, geometry='w=1u l=0.28u',
+    regions={'cut': (0.3, 3.3), 'lin': (3.3, 0.1), 'sat': (1.5, 3.3)})
+FAMILIES['gf180_n10'] = dict(FAMILIES['gf180_n1'], geometry='w=10u l=2u')
+FAMILIES['gf180_nf'] = dict(FAMILIES['gf180_n1'], geometry='w=10u l=0.5u nf=3')
+# the typical bin card that gf180_n1's instance selects, flat (no wrapper, no expressions): ngspice
+# level 54 version 4.5 as the kit has it against VACASK's sp_bsim4v8
+FAMILIES['gf180_flat'] = dict(
+    load='spice/bsim4v8.osdi', nodes='d g 0 b',
+    ng_model='.model nm nmos level=54 version=4.5 {p}', va_model='model nm sp_bsim4v8 type=1 {p}',
+    params=card('gf180_nfet_03v3_4'), geometry='w=1u l=0.28u',
+    regions={'cut': (0.3, 3.3), 'lin': (3.3, 0.1), 'sat': (1.5, 3.3)})
+
 # the passives: one region each, so per (condition, form) one reading of `vd` driving node a; an
 # inductor stands behind a 1-ohm resistor (a source across it alone has no operating point).
 # (ngspice model and instance, VACASK load, model and instance); {m} is the multiplier's text
@@ -140,19 +184,20 @@ def decks(name, f):
                 ng = [title, f['ng_model'].format(p=f['params']),
                       f'vd d 0 dc {vd}{dac}'] + [f'vg g 0 dc {vg}{gac}'] * gate + [
                       'vb b 0 dc -0.5'] * bulk + [
-                      f'{x} {f["nodes"]} nm {inst}', f'.temp {temp}',
+                      f'{x} {f["nodes"]} {f.get("master", "nm")} {inst}', f'.temp {temp}',
                       f'.options reltol=1e-9 abstol={f.get("abstol", "1e-15")}',
                       '.control', 'set numdgt=12']
                 ng += ['op', 'print i(vd)'] if reading == 'dc' else \
                       ['ac lin 1 1g 1g', 'print mag(i(vd))']
                 ng += ['.endc', '.end']
-                va_inst = f['geometry'] + (f' $mfactor={m}' if m != 1 else '')
-                va = [title, f'load "{f["load"]}"', 'model vs vsource',
+                va_mult = f.get('va_mult', '$mfactor')
+                va_inst = f['geometry'] + (f' {va_mult}={m}' if m != 1 else '')
+                va = [title] + [f'load "{f["load"]}"'] * bool(f['load']) + ['model vs vsource',
                       f['va_model'].format(p=f['params']),
                       f'vd (d 0) vs dc={vd}' + (' mag=1' if dac else ''),
                       ] + [f'vg (g 0) vs dc={vg}' + (' mag=1' if gac else '')] * gate + [
                       ] + ['vb (b 0) vs dc=-0.5'] * bulk + [
-                      f'{x} ({f.get("va_nodes", f["nodes"])}) nm {va_inst}',
+                      f'{x} ({f.get("va_nodes", f["nodes"])}) {f.get("master", "nm")} {va_inst}',
                       'control', f'  options temp={temp} tnom=27 reltol=1e-9 '
                       f'abstol={f.get("abstol", "1e-15")} rawfile="ascii"',
                       '  analysis op1 op' if reading == 'dc' else

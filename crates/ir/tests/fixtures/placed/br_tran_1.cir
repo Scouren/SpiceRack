@@ -1,0 +1,10 @@
+placed br_tran sel=1
+.param sel=1
+v1 a 0 1
+r1 a 0 1k
+.if (sel==1)
+.tran 1u 2u
+.meas tran va find v(a) at=1u
+.endif
+.op
+.end

@@ -121,7 +121,7 @@ pub mod wave_eval;
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
-pub use laws::{Law, Laws, Rewrite, Stated};
+pub use laws::{LTSPICE_EXP_KNEE, Law, Laws, Rewrite, Stated};
 pub use letter::{spice_letter, spice_letters};
 pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};

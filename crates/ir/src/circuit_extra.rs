@@ -105,20 +105,14 @@ pub enum CircuitExtra {
     PulseCycles,
     /// A sine cycle count (`Sin::cycles`, lt, 5.06).
     SinCycles,
-    /// A sine that is its offset before the delay (`PreDelay::Offset`).
-    SinPreOffset,
     /// A sine that holds its t = delay value before the delay (`PreDelay::HoldDelayValue`).
     SinPreHold,
-    /// A sine that is 0 before the delay (`PreDelay::Zero`).
-    SinPreZero,
     /// A sine's second tone (`Sin::amplitude2`, sp, 5.07).
     SinSecondTone,
     /// An SFFM under `SffmLaw::Spice3`.
     SffmSpice3,
     /// An SFFM under `SffmLaw::Ngspice`.
     SffmNgspice,
-    /// An AM that is its offset before the delay.
-    AmPreOffset,
     /// An AM that holds its t = delay value before the delay (va).
     AmPreHold,
     /// An AM that is 0 before the delay (ng).
@@ -213,8 +207,6 @@ pub enum CircuitExtra {
     ExpTd2FromZero,
     /// An exponential whose `td2` counts from `td1` (`TdFrom::Td1`, va; A12 C2).
     ExpTd2FromTd1,
-    /// An SFFM that is its offset before the delay (A12 C3).
-    SffmPreOffset,
     /// An SFFM that holds its t = delay value before the delay (va; A12 C3).
     SffmPreHold,
     /// An SFFM that is 0 before the delay (ng; A12 C3).
@@ -343,6 +335,8 @@ pub enum CircuitExtra {
     ExpClamp1e99,
     /// An expression node of dynamic form carrying R93a F43's point under `Law::ExpExact`.
     ExpExact,
+    /// The same under `Law::ExpLin230` (LTspice, F82: linear above its knee).
+    ExpLin230,
     /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroMinus1e99`.
     LogZeroMinus1e99,
     /// An expression node of dynamic form carrying R93a F44's point under `Law::LogZeroError`.
@@ -355,11 +349,23 @@ pub enum CircuitExtra {
     AsinEdgeZero,
     /// An expression node of dynamic form carrying R93a F46's point under `Law::AsinEdgeFails`.
     AsinEdgeFails,
+    /// A design with no temperature statement under `Law::DefaultTemp27` (R102).
+    DefaultTemp27,
+    /// The same under `Law::DefaultTemp25` (HSPICE).
+    DefaultTemp25,
+    /// A design with no nominal temperature statement under `Law::DefaultTnom27` (R102).
+    DefaultTnom27,
+    /// The same under `Law::DefaultTnom25` (HSPICE).
+    DefaultTnom25,
+    /// A MOSFET carrying F86's point (BSIM4 4.5 small-signal) under `Law::Bsim4v45SmallSignalHand`.
+    Bsim4v45SmallSignalHand,
+    /// The same under `Law::Bsim4v45SmallSignalExact`.
+    Bsim4v45SmallSignalExact,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 149] = [
+    pub const ALL: [CircuitExtra; 152] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -396,13 +402,10 @@ impl CircuitExtra {
         CircuitExtra::PortPower,
         CircuitExtra::PulseCycles,
         CircuitExtra::SinCycles,
-        CircuitExtra::SinPreOffset,
         CircuitExtra::SinPreHold,
-        CircuitExtra::SinPreZero,
         CircuitExtra::SinSecondTone,
         CircuitExtra::SffmSpice3,
         CircuitExtra::SffmNgspice,
-        CircuitExtra::AmPreOffset,
         CircuitExtra::AmPreHold,
         CircuitExtra::AmPreZero,
         CircuitExtra::AmModCarrierPhase,
@@ -446,7 +449,6 @@ impl CircuitExtra {
         CircuitExtra::PulseVacask,
         CircuitExtra::ExpTd2FromZero,
         CircuitExtra::ExpTd2FromTd1,
-        CircuitExtra::SffmPreOffset,
         CircuitExtra::SffmPreHold,
         CircuitExtra::SffmPreZero,
         CircuitExtra::DcGivenWithWave,
@@ -503,12 +505,19 @@ impl CircuitExtra {
         CircuitExtra::TrigExact,
         CircuitExtra::ExpClamp1e99,
         CircuitExtra::ExpExact,
+        CircuitExtra::ExpLin230,
         CircuitExtra::LogZeroMinus1e99,
         CircuitExtra::LogZeroError,
         CircuitExtra::DivGminGuard,
         CircuitExtra::DivExact,
         CircuitExtra::AsinEdgeZero,
         CircuitExtra::AsinEdgeFails,
+        CircuitExtra::DefaultTemp27,
+        CircuitExtra::DefaultTemp25,
+        CircuitExtra::DefaultTnom27,
+        CircuitExtra::DefaultTnom25,
+        CircuitExtra::Bsim4v45SmallSignalHand,
+        CircuitExtra::Bsim4v45SmallSignalExact,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

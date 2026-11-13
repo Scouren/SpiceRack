@@ -6,7 +6,8 @@
 //! Oracle: the rulings' text (R92: F21 `xom`/`xoi` absent 1e4 Å in ngspice-45 and 1e14 Å in the
 //! pinned VACASK; F24 `kp` absent 25+10·type against 15+5·type; F25 `tcvth`/`vtotc` negated;
 //! R96: F40 and F41 noted; R93a: F43, F44, F45 guarded under ngspice-45's law and noted under
-//! the exact one, F42 and F46 noted both ways; every other point none).
+//! the exact one, F42 and F46 noted both ways; R102: the default temperature and nominal
+//! temperature stated, 27 °C or 25 °C; every other point none).
 //!
 //! Contents: tests only.
 
@@ -36,6 +37,10 @@ mod tests {
             L::VdmosKpAbsent35 => Want::Stated(vec![(vec!["kp"], 35.0, 15.0)]),
             L::VdmosKpAbsent20 => Want::Stated(vec![(vec!["kp"], 20.0, 10.0)]),
             L::VdmosTcvthLowers | L::VdmosTcvthRaises => Want::Negated(vec!["tcvth", "vtotc"]),
+            L::DefaultTemp27 => Want::Stated(vec![(vec!["temp"], 27.0, 27.0)]),
+            L::DefaultTemp25 => Want::Stated(vec![(vec!["temp"], 25.0, 25.0)]),
+            L::DefaultTnom27 => Want::Stated(vec![(vec!["tnom"], 27.0, 27.0)]),
+            L::DefaultTnom25 => Want::Stated(vec![(vec!["tnom"], 25.0, 25.0)]),
             L::DiodeIsrSmallSignalHand
             | L::DiodeIsrSmallSignalExact
             | L::DiodeTtFactorUnclamped
@@ -47,7 +52,7 @@ mod tests {
             | L::DivExact
             | L::AsinEdgeZero
             | L::AsinEdgeFails => Want::Noted,
-            L::ExpClamp1e99 | L::LogZeroMinus1e99 | L::DivGminGuard => Want::Guarded,
+            L::ExpClamp1e99 | L::ExpLin230 | L::LogZeroMinus1e99 | L::DivGminGuard => Want::Guarded,
             L::BcSatAreaTimesAreab
             | L::BcSatAreabOnly
             | L::SubSatLastFactor
@@ -68,6 +73,7 @@ mod tests {
             | L::VdmosMultChargesCopies
             | L::DiodeIsrReverseNone
             | L::DiodeIsrReversePresent => Want::None,
+            L::Bsim4v45SmallSignalHand | L::Bsim4v45SmallSignalExact => Want::Noted,
         }
     }
 
@@ -89,5 +95,28 @@ mod tests {
             };
             assert_eq!(got, want(law), "{law:?}");
         }
+    }
+
+    /// F82 (LTspice 26.1.1, `rewrite/DIFFERENCES.md` on `differences`): above the knee LTspice's
+    /// `exp` is the line `e^k·(1 + x − k)`; its readings at 231, 236, 300 and 710.
+    #[test]
+    fn ltspices_exp_is_linear_above_its_knee() {
+        let k = spicerack_ir::LTSPICE_EXP_KNEE;
+        for (x, read) in [
+            (231.0, 1.64055707736e100),
+            (236.0, 6.01505852692e100),
+            (300.0, 6.20086770814e101),
+            (710.0, 4.20717795946e102),
+        ] {
+            let line = k.exp() * (1.0 + x - k);
+            assert!(
+                (line / read - 1.0).abs() < 1e-10,
+                "x = {x}: {line} against {read}"
+            );
+        }
+        assert!(
+            k.exp() < 230.2f64.exp(),
+            "the knee lies below 230.2, where it is still exact"
+        );
     }
 }

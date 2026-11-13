@@ -323,6 +323,10 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a string as an operand",
             "a string is a value, or one side of `==` or `!=`; under any other operator, as a function's argument or as a condition it has no meaning: VACASK refuses it (\"Operation not supported for string and real.\"), ngspice has no string parameter.",
         ),
+        Violation::Misplaced => (
+            "an item in a scope where no simulator has it",
+            "a title stands only at a deck's top, a section only outside every body; a subcircuit holds no load, device library, statistics block or elaborate; a conditional branch keeps a function, global, option, save, print or script command as if unconditional (ngspice-45) or refuses it (VACASK, Spectre); a loop body holds run items only.",
+        ),
         Violation::TargetAlias => (
             "a device-parameter target that names an element's value or a source's dc",
             "a resistor's r, a capacitor's c, an inductor's l is an element-value target and an independent source's dc a source-dc target: one meaning has one form, so the text reads back as what was written.",

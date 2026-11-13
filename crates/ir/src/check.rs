@@ -147,6 +147,14 @@ pub enum Violation {
     /// string root, a list element and a conditional's branch are values (A25 item 4); under
     /// `==`/`!=` it is `Extra::StringCompare`. `arg`: the string's expression.
     StringOperand,
+    /// An item of a kind no dialect expresses inside a scope of a given kind, at any depth (the
+    /// lead's ruling on the census's placements, 2026-11-13; `check_scopes::misplaced` holds the
+    /// table and `rewrite/IR-PRUNE.md` group 6 each row's evidence): a title anywhere but a deck's
+    /// top; a section in any body; a load, device library, statistics block or elaborate in a
+    /// subcircuit; a function, global, device library, statistics block, option, save, print or
+    /// script item (alter, loop, reset, elaborate) in a conditional branch; anything but a run
+    /// item in a loop body. `arg`: the item's row.
+    Misplaced,
 }
 
 /// The design under check and where its rows go (crate: `check_scopes` reports through it).
@@ -157,7 +165,7 @@ pub(crate) struct Out<'a> {
 
 impl Violation {
     /// Every invariant, in declaration order (the order of the `X` codes).
-    pub const ALL: [Violation; Violation::StringOperand as usize + 1] = [
+    pub const ALL: [Violation; Violation::Misplaced as usize + 1] = [
         Violation::HandleRange,
         Violation::ScopeTree,
         Violation::ScopeOwner,
@@ -187,6 +195,7 @@ impl Violation {
         Violation::RefScope,
         Violation::RunOrderInSubckt,
         Violation::StringOperand,
+        Violation::Misplaced,
     ];
     /// Invariant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -222,7 +231,9 @@ pub fn check(design: &Design, diags: &mut Diags) {
             out.report(Violation::InstanceCycle, at, at.index);
         }
         crate::check_scopes::reference_scopes(&mut out);
+        crate::check_scopes::dynamic_conditions(&mut out);
         crate::state_order::order_in_subckt(design, out.diags);
+        crate::check_scopes::placements(&mut out);
         for (at, element) in crate::link::target_aliases(design) {
             out.report(Violation::TargetAlias, at, element.0);
         }

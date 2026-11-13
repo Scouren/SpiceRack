@@ -1,0 +1,9 @@
+.lib sa
+.print dc v(a)
+.meas dc va find v(a) at=1
+.endl
+.lib sb
+.control
+echo CONTROL_IN_SECTION
+.endc
+.endl

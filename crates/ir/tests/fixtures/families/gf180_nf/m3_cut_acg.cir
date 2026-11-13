@@ -1,0 +1,15 @@
+gf180_nf m3 (27 C, m=3), cut (vgs=0.3, vds=3.3, vbs=-0.5), acg
+.include "../kit/gf180mcuD/libs.tech/ngspice/design.ngspice"
+.lib "../kit/gf180mcuD/libs.tech/ngspice/sm141064.ngspice" typical
+vd d 0 dc 3.3
+vg g 0 dc 0.3 ac 1
+vb b 0 dc -0.5
+x1 d g 0 b nfet_03v3 w=10u l=0.5u nf=3 m=3
+.temp 27
+.options reltol=1e-9 abstol=1e-15
+.control
+set numdgt=12
+ac lin 1 1g 1g
+print mag(i(vd))
+.endc
+.end

@@ -1,0 +1,7 @@
+placed lib sections
+v1 a 0 1
+r1 a 0 1k
+.lib lib.lib sa
+.lib lib.lib sb
+.dc v1 0 1 0.5
+.end

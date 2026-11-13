@@ -606,7 +606,9 @@ pub(crate) fn target_kinds(features: &FeatureSet, used: TargetUse) -> Vec<Target
                 .iter()
                 .any(|&x| features.contains(Feature::Run(x)));
             let effect = used != TargetUse::Alter || !k.is_parameter() || effect;
-            ok && !state && effect && (k != TargetKind::Option || any_key)
+            // R100: no simulator loops over a subcircuit's default (the loop rows' `fault`)
+            let pruned = used == TargetUse::Loop && k == TargetKind::SubcktParam;
+            ok && !state && !pruned && effect && (k != TargetKind::Option || any_key)
         })
         .collect()
 }
@@ -648,7 +650,7 @@ const fn target_extra(used: TargetUse, kind: TargetKind) -> Option<RunExtra> {
         (TargetUse::Dc, K::Option) => Some(X::DcAxisOption),
         (TargetUse::Loop, K::Temp) => Some(X::LoopTemp),
         (TargetUse::Loop, K::Param) => Some(X::LoopParam),
-        (TargetUse::Loop, K::SubcktParam) => Some(X::LoopSubcktParam),
+        (TargetUse::Loop, K::SubcktParam) => None, // refused by `check` (R100)
         (TargetUse::Loop, K::SourceDc) => Some(X::LoopSourceDc),
         (TargetUse::Loop, K::ElementValue) => Some(X::LoopElementValue),
         (TargetUse::Loop, K::DeviceParam) => Some(X::LoopDeviceParam),

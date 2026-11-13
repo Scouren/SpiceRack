@@ -26,14 +26,14 @@ pub enum RunExtra {
     TranMaxStep,
     /// A transient with a first-step size (`initial_step` set; Xyce).
     TranInitialStep,
-    /// A transient whose default step ceiling is none (`StepCeiling::Rule(StepCap::None)`).
-    TranCapNone,
     /// A transient whose default step ceiling is ngspice's `min(print_step, span/50)`.
     TranCapNgspice,
-    /// A transient whose default step ceiling is `span/50` (Spectre, VACASK).
+    /// A transient whose default step ceiling is `span/50` (Spectre).
     TranCapSpan50,
     /// A transient whose default step ceiling is `span/10` (Xyce).
     TranCapSpan10,
+    /// A transient whose default step ceiling is VACASK's (`StepCeiling::Rule(StepCap::VacaskRule)`).
+    TranCapVacask,
     /// A transient that skips the operating point (`uic`).
     TranUic,
     /// A transient that ramps the DC sources (LTspice `startup`).
@@ -158,8 +158,6 @@ pub enum RunExtra {
     LoopTemp,
     /// A loop over a parameter.
     LoopParam,
-    /// A loop over a subcircuit's parameter default.
-    LoopSubcktParam,
     /// A loop over a source's DC value.
     LoopSourceDc,
     /// A loop over an element's value.
@@ -282,8 +280,6 @@ pub enum RunExtra {
     VaryLogNormal,
     /// A variation given in percent.
     VaryPercent,
-    /// A variation around another centre than the parameter's value.
-    VaryMean,
     /// A sweep loop whose body is exactly one operating point (VACASK's spelling of a DC
     /// sweep; R20: a `Dc` is another meaning, one result over the grid, each point continued).
     LoopOverOp,
@@ -418,16 +414,16 @@ pub enum RunExtra {
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 177] = [
+    pub const ALL: [RunExtra; 175] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
         RunExtra::TranMaxStep,
         RunExtra::TranInitialStep,
-        RunExtra::TranCapNone,
         RunExtra::TranCapNgspice,
         RunExtra::TranCapSpan50,
         RunExtra::TranCapSpan10,
+        RunExtra::TranCapVacask,
         RunExtra::TranUic,
         RunExtra::TranStartup,
         RunExtra::TranNoise,
@@ -488,7 +484,6 @@ impl RunExtra {
         RunExtra::LoopScoped,
         RunExtra::LoopTemp,
         RunExtra::LoopParam,
-        RunExtra::LoopSubcktParam,
         RunExtra::LoopSourceDc,
         RunExtra::LoopElementValue,
         RunExtra::LoopDeviceParam,
@@ -549,7 +544,6 @@ impl RunExtra {
         RunExtra::StatsTruncate,
         RunExtra::VaryLogNormal,
         RunExtra::VaryPercent,
-        RunExtra::VaryMean,
         RunExtra::LoopOverOp,
         RunExtra::EnvMidRun,
         RunExtra::NodeSetMidRun,

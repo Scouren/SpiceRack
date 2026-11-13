@@ -166,13 +166,17 @@ pub enum ModelFamily {
     /// LTspice voltage switch: as `SwitchHyst` for vh ≥ 0, a smooth transition for vh < 0 (lt
     /// `SW`; 6.19).
     SwitchHystSmooth,
-    /// Xyce voltage switch, log-cubic resistance blend (xy `VSWITCH`; 6.19, D117).
+    /// The PSpice voltage switch: the resistance blended log-cubically from `roff` to `ron` as
+    /// the control moves from `voff` to `von` (xy `VSWITCH`, 6.19, D117; PSpice `VSWITCH`;
+    /// ngspice's XSPICE `pswitch log=TRUE`, which `ngbehavior=ltpsa` makes of a `VSWITCH`: one
+    /// law, R103, `tests/fixtures/pspice_switch/`, the same bits as Xyce's closed form).
     SwitchLogCubic,
     /// Abrupt hysteretic current switch (ng `csw`).
     CurrentSwitchHyst,
     /// LTspice current switch (lt `CSW`), negative `ih` smooth as `SwitchHystSmooth`.
     CurrentSwitchHystSmooth,
-    /// Xyce current switch, log-cubic (xy `ISWITCH`).
+    /// The PSpice current switch, log-cubic as `SwitchLogCubic` over `ioff`..`ion` (xy and PSpice
+    /// `ISWITCH`; ngspice `ltpsa`'s `pswitch` on a current control, R103).
     CurrentSwitchLogCubic,
     /// Spectre relay: cubic conductance between `vt1` and `vt2`, clamps on `ropen`/`rclosed`
     /// (sp `relay`; 6.19).

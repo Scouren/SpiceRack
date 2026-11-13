@@ -99,8 +99,8 @@ pub struct Gen {
     /// Whether a fresh name may differ from an earlier one only by ASCII case (the set has
     /// `Extra::CaseSensitiveNames`).
     pub(crate) case_ok: bool,
-    /// Whether the expression being built must be of class `Constant` (cleared around an `If`
-    /// condition when the set lacks `Extra::IfConditionDynamic`).
+    /// Whether the expression being built must be of class `Constant` (set around an `If`
+    /// condition, R100, and a constant head default).
     pub(crate) constant_only: bool,
     /// Whether the expression being built is a behavioural source's own expression
     /// (`ExprUse::Behavioural`): its operators take the dynamic form whatever its class (R66).
@@ -422,13 +422,16 @@ impl Gen {
 }
 
 /// Whether an item of `kind` may be listed in `scope` under `features`: `Placed(S, kind)` is in
-/// the set for every scope kind S on `scope`'s chain but a file's top (A15 K1). For a row's own
-/// generator that pushes into a body it opened.
+/// the set for every scope kind S on `scope`'s chain but a file's top (A15 K1), and no dialect
+/// refuses it there (`Misplaced`). For a row's own generator that pushes into a body it opened.
 pub(crate) fn placeable(d: &Design, scope: ScopeId, kind: ItemKind, features: &FeatureSet) -> bool {
     let chain = crate::feature::chain_kinds(d, scope);
-    ScopeKind::ALL.into_iter().all(|s| {
-        s == ScopeKind::File || !chain[s as usize] || features.contains(Feature::Placed(s, kind))
-    })
+    !crate::check_scopes::misplaced_in(d, scope, kind)
+        && ScopeKind::ALL.into_iter().all(|s| {
+            s == ScopeKind::File
+                || !chain[s as usize]
+                || features.contains(Feature::Placed(s, kind))
+        })
 }
 
 // ---- private ----

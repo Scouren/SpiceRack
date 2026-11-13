@@ -1,0 +1,11 @@
+pswitch log=TRUE, R from v(out)/i: control swept 0..1 (Voff=0 Von=1, Ron=1, Roff=1meg)
+vc ctl 0 dc 0
+vo out 0 dc 1
+a1 %gd(ctl 0) %gd(out 0) psw
+.model psw pswitch(cntl_on=1 cntl_off=0 r_on=1 r_off=1meg log=TRUE)
+.control
+set numdgt=15
+dc vc -0.2 1.2 0.1
+print -1/i(vo)
+.endc
+.end

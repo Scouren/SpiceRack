@@ -153,7 +153,7 @@ fn faults(text: &str) -> usize {
 fn a_fourier_count_comes_from_the_nfreqs_option_in_force_in_its_walk() {
     // spine's L8 finding (seed 41): an option in an unrelated file gives the count nothing,
     // whatever the file order
-    let four = "  analysis tran stop=1u print_step=1n cap=none\n  analysis four fundamental=1k periods=1 (v (out))\n";
+    let four = "  analysis tran stop=1u print_step=1n cap=ngspice_rule\n  analysis four fundamental=1k periods=1 (v (out))\n";
     let lib = "file \"l.sp\" library\n  option n_freqs value=10 whole_run\n";
     let alone = format!("file \"t.sp\" deck\n{four}{lib}");
     assert_eq!(faults(&alone), 1, "{alone}");

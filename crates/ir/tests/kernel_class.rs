@@ -263,8 +263,6 @@ fn an_argument_no_formal_reads_adds_no_class() {
         ExprClass::Constant,
         "and a reads as constant"
     );
-    let used = features_used(&d);
-    assert!(!used.contains(Feature::Extra(spicerack_ir::Extra::IfConditionDynamic)));
     assert_eq!(
         root_form(&d, value(&d, "a"), spicerack_ir::ExprUse::Constant),
         Form::Static

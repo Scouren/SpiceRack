@@ -151,10 +151,6 @@ pub enum BinOp {
     Mul,
     /// `a / b`; `b == 0` is a domain error.
     Div,
-    /// `trunc(a / b)`, toward zero; `b == 0` is a domain error. Not ngspice's `\` (which is
-    /// `trunc(|a / b|)`, read as `Trunc(Abs(Div))`, A11); no speaker yet: removed if no reader
-    /// produces it.
-    IntDiv,
     /// `a == b` (exact).
     Eq,
     /// `a != b` (exact).
@@ -171,6 +167,10 @@ pub enum BinOp {
     And,
     /// Either non-zero. `b` is evaluated only when `a` is zero (C).
     Or,
+    /// Exactly one non-zero, 0 or 1; both operands evaluated (Xyce `^`: `0.4^0.7` = 0, `0^1` =
+    /// 1, `1^1` = 0, `2^3` = 0, `rewrite/DIALECT-XYCE.md` on `differences`, `expr_xor`). Not
+    /// `BitXor`, VACASK's integer one.
+    Xor,
     /// Bitwise AND of integer-valued operands (VACASK `&`); a fractional operand is a domain
     /// error.
     BitAnd,
@@ -208,9 +208,6 @@ pub enum Func {
     Abs,
     /// `√x`; `x < 0` is a domain error.
     Sqrt,
-    /// `√|x|`. Not ngspice-45's B-source `sqrt`, which errors below zero (A11); speaker to be
-    /// confirmed by the HSPICE and LTspice slices: removed if no reader produces it.
-    SqrtAbs,
     /// `eˣ`, exact; a non-finite result is a domain error.
     Exp,
     /// `eˣ` for `x <= 14`, `e¹⁴·(1 + x − 14)` beyond (ngspice's B-source `exp` under
@@ -218,10 +215,6 @@ pub enum Func {
     ExpLin14,
     /// Natural logarithm; `x <= 0` is a domain error.
     Ln,
-    /// `ln|x|`; `x == 0` is a domain error. Not ngspice-45's B-source `ln`/`log`, which error
-    /// below zero (A11); speaker to be confirmed by the HSPICE and LTspice slices: removed if no
-    /// reader produces it.
-    LnAbs,
     /// Base-10 logarithm; `x <= 0` is a domain error.
     Log10,
     /// `pow(x, y)`, the signed real power: `x < 0` with a whole `y` is `(−1)ʸ·|x|ʸ`; `x < 0`
@@ -296,9 +289,6 @@ pub enum Func {
     Fmod,
     /// `clamp(x, lo, hi)` = `min(max(x, lo), hi)`; `lo > hi` is a domain error.
     Clamp,
-    /// The unit step: 1 for `x > 0`, else 0. Not ngspice's `u` (that is `StepHalf`, A11);
-    /// speaker to be confirmed by the LTspice and Xyce slices.
-    Step,
     /// The unit ramp: `x` for `x > 0`, else 0 (ngspice `uramp`).
     Ramp,
     /// `d x / dt`, the time derivative. Reads the circuit (only in an expression that may).
@@ -454,7 +444,6 @@ impl BinOp {
         BinOp::Sub,
         BinOp::Mul,
         BinOp::Div,
-        BinOp::IntDiv,
         BinOp::Eq,
         BinOp::Ne,
         BinOp::Lt,
@@ -463,6 +452,7 @@ impl BinOp {
         BinOp::Ge,
         BinOp::And,
         BinOp::Or,
+        BinOp::Xor,
         BinOp::BitAnd,
         BinOp::BitOr,
         BinOp::BitXor,
@@ -486,11 +476,9 @@ impl Func {
     pub const ALL: [Func; Func::ToReal as usize + 1] = [
         Func::Abs,
         Func::Sqrt,
-        Func::SqrtAbs,
         Func::Exp,
         Func::ExpLin14,
         Func::Ln,
-        Func::LnAbs,
         Func::Log10,
         Func::Pow,
         Func::PowAbs,
@@ -522,7 +510,6 @@ impl Func {
         Func::Hypot,
         Func::Fmod,
         Func::Clamp,
-        Func::Step,
         Func::Ramp,
         Func::Ddt,
         Func::Idt,
@@ -540,11 +527,9 @@ impl Func {
         match self {
             Func::Abs
             | Func::Sqrt
-            | Func::SqrtAbs
             | Func::Exp
             | Func::ExpLin14
             | Func::Ln
-            | Func::LnAbs
             | Func::Log10
             | Func::Floor
             | Func::Ceil
@@ -564,7 +549,6 @@ impl Func {
             | Func::Asinh
             | Func::Acosh
             | Func::Atanh
-            | Func::Step
             | Func::StepHalf
             | Func::Sqr
             | Func::Ramp

@@ -1,0 +1,63 @@
+`include "constants.vams"
+`include "disciplines.vams"
+
+module __behavioral_pplus_u_m2_rb(__nt1, __nt2, __v0_1, __v1_2);
+  inout __nt1, __nt2, __v0_1, __v1_2;
+  electrical __nt1, __nt2, __v0_1, __v1_2;
+  branch (__nt1, __nt2) br;
+  (*desc="r_temp", units=""*) parameter real __p3_r_temp = 0;
+  (*desc="r_n", units=""*) parameter real __p4_r_n = 0;
+  (*desc="r_rsh0", units=""*) parameter real __p6_r_rsh0 = 0;
+  (*desc="r_vc1", units=""*) parameter real __p7_r_vc1 = 0;
+  (*desc="r_vc2", units=""*) parameter real __p16_r_vc2 = 0;
+  analog begin
+    I(br) <+ (V(__v0_1,__v1_2))/((__p3_r_temp*__p4_r_n)*((__p6_r_rsh0+((__p7_r_vc1*(abs(V(__v0_1,__v1_2))))/__p4_r_n))+((((__p16_r_vc2*(abs(V(__v0_1,__v1_2))))*(abs(V(__v0_1,__v1_2))))/__p4_r_n)/__p4_r_n)));
+  end
+endmodule
+
+
+module __behavioral_nplus_u_m2_rb(__nt1, __nt2, __v0_1, __v1_2);
+  inout __nt1, __nt2, __v0_1, __v1_2;
+  electrical __nt1, __nt2, __v0_1, __v1_2;
+  branch (__nt1, __nt2) br;
+  (*desc="r_temp", units=""*) parameter real __p3_r_temp = 0;
+  (*desc="r_n", units=""*) parameter real __p4_r_n = 0;
+  (*desc="r_rsh0", units=""*) parameter real __p6_r_rsh0 = 0;
+  (*desc="r_vc1", units=""*) parameter real __p7_r_vc1 = 0;
+  (*desc="r_vc2", units=""*) parameter real __p16_r_vc2 = 0;
+  analog begin
+    I(br) <+ (V(__v0_1,__v1_2))/((__p3_r_temp*__p4_r_n)*((__p6_r_rsh0+((__p7_r_vc1*(abs(V(__v0_1,__v1_2))))/__p4_r_n))+((((__p16_r_vc2*(abs(V(__v0_1,__v1_2))))*(abs(V(__v0_1,__v1_2))))/__p4_r_n)/__p4_r_n)));
+  end
+endmodule
+
+
+module __behavioral_pplus_u_m1_rb(__nt1, __nt2, __v0_1, __v1_2);
+  inout __nt1, __nt2, __v0_1, __v1_2;
+  electrical __nt1, __nt2, __v0_1, __v1_2;
+  branch (__nt1, __nt2) br;
+  (*desc="r_temp", units=""*) parameter real __p3_r_temp = 0;
+  (*desc="r_n", units=""*) parameter real __p4_r_n = 0;
+  (*desc="r_rsh0", units=""*) parameter real __p6_r_rsh0 = 0;
+  (*desc="r_vc1", units=""*) parameter real __p7_r_vc1 = 0;
+  (*desc="r_vc2", units=""*) parameter real __p16_r_vc2 = 0;
+  analog begin
+    I(br) <+ (V(__v0_1,__v1_2))/((__p3_r_temp*__p4_r_n)*((__p6_r_rsh0+((__p7_r_vc1*(abs(V(__v0_1,__v1_2))))/__p4_r_n))+((((__p16_r_vc2*(abs(V(__v0_1,__v1_2))))*(abs(V(__v0_1,__v1_2))))/__p4_r_n)/__p4_r_n)));
+  end
+endmodule
+
+
+module __behavioral_nplus_u_m1_rb(__nt1, __nt2, __v0_1, __v1_2);
+  inout __nt1, __nt2, __v0_1, __v1_2;
+  electrical __nt1, __nt2, __v0_1, __v1_2;
+  branch (__nt1, __nt2) br;
+  (*desc="r_temp", units=""*) parameter real __p3_r_temp = 0;
+  (*desc="r_n", units=""*) parameter real __p4_r_n = 0;
+  (*desc="r_rsh0", units=""*) parameter real __p6_r_rsh0 = 0;
+  (*desc="r_vc1", units=""*) parameter real __p7_r_vc1 = 0;
+  (*desc="r_vc2", units=""*) parameter real __p16_r_vc2 = 0;
+  analog begin
+    I(br) <+ (V(__v0_1,__v1_2))/((__p3_r_temp*__p4_r_n)*((__p6_r_rsh0+((__p7_r_vc1*(abs(V(__v0_1,__v1_2))))/__p4_r_n))+((((__p16_r_vc2*(abs(V(__v0_1,__v1_2))))*(abs(V(__v0_1,__v1_2))))/__p4_r_n)/__p4_r_n)));
+  end
+endmodule
+
+

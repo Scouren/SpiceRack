@@ -250,7 +250,7 @@ const BROKEN: &[Fixture] = &[
     }),
     ("vary without a spread", Violation::FieldDomain, |b, s| {
         let p = Ref::unresolved(b.name("p"));
-        let process = b.varies(&[Vary { param: p, dist: VaryDist::Gauss, percent: false, mean: NO, spread: NO }]);
+        let process = b.varies(&[Vary { param: p, dist: VaryDist::Gauss, percent: false, spread: NO }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);
     }),
     // R68/A42 (3), ruled for Fourier: its outputs are transient vectors, a part means nothing
@@ -292,7 +292,7 @@ fn tran(b: &mut Builder<'_>) -> Tran {
         noise_fmin: NO,
         noise_seed: NO,
         segments: List::EMPTY,
-        ceiling: StepCeiling::Rule(StepCap::None),
+        ceiling: StepCeiling::Rule(StepCap::NgspiceRule),
         uic: false,
         startup: false,
     }
@@ -460,7 +460,6 @@ fn a_valid_run_reports_nothing() {
             param: q,
             dist: VaryDist::Gauss,
             percent: false,
-            mean: NO,
             spread: one,
         }]);
         b.statistics(s, Statistics { process, ..stats() }, Span::NONE);

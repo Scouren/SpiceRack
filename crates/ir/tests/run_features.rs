@@ -17,18 +17,18 @@ use spicerack_ir::{
 #[rustfmt::skip]
 const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::SeveralAnalyses, "  analysis op\n  analysis op", "  analysis op"),
-    (RunExtra::TranSimulatorStep, "  analysis tran stop=1u cap=none", T),
-    (RunExtra::TranRecordStart, "  analysis tran stop=1u record_start=1n print_step=1n cap=none", T),
+    (RunExtra::TranSimulatorStep, "  analysis tran stop=1u cap=ngspice_rule", T),
+    (RunExtra::TranRecordStart, "  analysis tran stop=1u record_start=1n print_step=1n cap=ngspice_rule", T),
     (RunExtra::TranMaxStep, "  analysis tran stop=1u print_step=1n max_step=1n", T),
-    (RunExtra::TranInitialStep, "  analysis tran stop=1u print_step=1n initial_step=1n cap=none", T),
-    (RunExtra::TranCapNone, T, "  analysis tran stop=1u print_step=1n cap=span_over10"),
-    (RunExtra::TranCapNgspice, "  analysis tran stop=1u print_step=1n cap=ngspice_rule", T),
+    (RunExtra::TranInitialStep, "  analysis tran stop=1u print_step=1n initial_step=1n cap=ngspice_rule", T),
+    (RunExtra::TranCapNgspice, "  analysis tran stop=1u print_step=1n cap=ngspice_rule", "  analysis tran stop=1u print_step=1n cap=span_over50"),
     (RunExtra::TranCapSpan50, "  analysis tran stop=1u print_step=1n cap=span_over50", T),
     (RunExtra::TranCapSpan10, "  analysis tran stop=1u print_step=1n cap=span_over10", T),
-    (RunExtra::TranUic, "  analysis tran stop=1u print_step=1n cap=none uic", T),
-    (RunExtra::TranStartup, "  analysis tran stop=1u print_step=1n cap=none startup", T),
-    (RunExtra::TranNoise, "  analysis tran stop=1u print_step=1n noise_fmax=1g noise_fmin=1meg cap=none", T),
-    (RunExtra::TranSegments, "  analysis tran stop=1u print_step=1n segments=[1n, 2u] cap=none", T),
+    (RunExtra::TranCapVacask, "  analysis tran stop=1u print_step=1n cap=vacask_rule", T),
+    (RunExtra::TranUic, "  analysis tran stop=1u print_step=1n cap=ngspice_rule uic", T),
+    (RunExtra::TranStartup, "  analysis tran stop=1u print_step=1n cap=ngspice_rule startup", T),
+    (RunExtra::TranNoise, "  analysis tran stop=1u print_step=1n noise_fmax=1g noise_fmin=1meg cap=ngspice_rule", T),
+    (RunExtra::TranSegments, "  analysis tran stop=1u print_step=1n segments=[1n, 2u] cap=ngspice_rule", T),
     (RunExtra::DcNested, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (source_dc v2) (lin start=0 stop=1 step=1)", D),
     (RunExtra::DcRestart, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) afresh", D),
     (RunExtra::DcAxisTemp, "  analysis dc (temp) (lin start=0 stop=1 step=1)", D),
@@ -85,7 +85,6 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::LoopScoped, "  loop sweep (temp) (list values=[1])\n    analysis op\n  analysis op", L),
     (RunExtra::LoopTemp, L, "  loop sweep (param p) (list values=[1])\n    analysis op"),
     (RunExtra::LoopParam, "  loop sweep (param p) (list values=[1])\n    analysis op", L),
-    (RunExtra::LoopSubcktParam, "  loop sweep (subckt_param div r) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopSourceDc, "  loop sweep (source_dc v1) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopElementValue, "  loop sweep (element_value r1) (list values=[1])\n    analysis op", L),
     (RunExtra::LoopDeviceParam, "  loop sweep (device_param m1 w) (list values=[1])\n    analysis op", L),
@@ -146,7 +145,6 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::StatsTruncate, "  statistics process (p gauss spread=1) truncate=4", ST),
     (RunExtra::VaryLogNormal, "  statistics process (p log_normal spread=1)", ST),
     (RunExtra::VaryPercent, "  statistics process (p gauss percent spread=1)", ST),
-    (RunExtra::VaryMean, "  statistics process (p gauss mean=2 spread=1)", ST),
     (RunExtra::LoopOverOp, L, "  loop sweep (temp) (list values=[1])\n    analysis dc_inc"),
     (RunExtra::EnvMidRun, "  analysis op\n  env temp=1", "  env temp=1\n  analysis op"),
     (RunExtra::NodeSetMidRun, "  analysis op\n  nodeset ic transient node=(a) value=1", "  analysis op\n  nodeset ic transient node=(a) value=1 whole_run"),
@@ -186,10 +184,10 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::AnalysisUnnamed, "  analysis op", "  analysis op name=o1"),
     (RunExtra::DcAxisUnnamed, D, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) name=s1"),
     (RunExtra::LoopUnnamed, L, "  loop sweep name=s1 (temp) (list values=[1])\n    analysis op"),
-    (RunExtra::TranPrintStep, T, "  analysis tran stop=1u cap=none"),
+    (RunExtra::TranPrintStep, T, "  analysis tran stop=1u cap=ngspice_rule"),
     // R68/A42: an analysis argument or sweep range that reads a parameter; a pss that omits one
     // of its four optional arguments
-    (RunExtra::AnalysisParamArgument, "  param k = 1\n  analysis tran stop=(1u * k) print_step=1n cap=none", "  param k = 1\n  analysis tran stop=1u print_step=1n cap=none"),
+    (RunExtra::AnalysisParamArgument, "  param k = 1\n  analysis tran stop=(1u * k) print_step=1n cap=ngspice_rule", "  param k = 1\n  analysis tran stop=1u print_step=1n cap=ngspice_rule"),
     (RunExtra::PssArgumentOmitted, "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10", PF),
     // R70/A43: when a parameter alter takes effect
     (RunExtra::AlterParamAtOnce, AL, "  alter (param p) value=1 at_reset"),
@@ -199,7 +197,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::DcOuterAfresh, "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1) (temp) (list values=[1]) afresh", D2),
 ];
 
-const T: &str = "  analysis tran stop=1u print_step=1n cap=none";
+const T: &str = "  analysis tran stop=1u print_step=1n cap=ngspice_rule";
 const PF: &str = "  analysis pss driven fundamental=1meg tstab=1u harmonics=5 points=64 sc_iter=10 steady_coeff=1m";
 const D: &str = "  analysis dc (source_dc v1) (lin start=0 stop=1 step=1)";
 const D2: &str =
@@ -254,7 +252,7 @@ fn every_run_extra_has_a_setter_and_a_neighbour() {
 #[test]
 fn a_hand_built_deck_uses_the_hand_listed_run_features() {
     let used = features(
-        "  option klu\n  analysis tran stop=1u print_step=1n cap=none uic\n  save (v (out))",
+        "  option klu\n  analysis tran stop=1u print_step=1n cap=ngspice_rule uic\n  save (v (out))",
     );
     let ours: Vec<Feature> = used
         .iter()
@@ -271,7 +269,7 @@ fn a_hand_built_deck_uses_the_hand_listed_run_features() {
         .with(Feature::Item(ItemKind::Save))
         .with(Feature::Analysis(AnalysisKind::Tran))
         .with(Feature::Option(OptionKey::Klu))
-        .with(Feature::Run(RunExtra::TranCapNone))
+        .with(Feature::Run(RunExtra::TranCapNgspice))
         .with(Feature::Run(RunExtra::TranUic))
         .with(Feature::Run(RunExtra::SaveWholeRunMidRun))
         .with(Feature::Run(RunExtra::OptionFromHere))

@@ -146,7 +146,7 @@ choices! {
     FreqLaw: ["complex_linear", "db_log_freq"];
     FreqUnit: ["db", "magnitude", "re_im"];
     DelayLaw: ["ideal", "sampled"];
-    PreDelay: ["offset", "hold_delay_value", "zero"];
+    PreDelay: ["hold_delay_value", "zero"];
     SffmLaw: ["spice3", "ngspice"];
     PwlRepeat: ["never", "from", "period"];
     PwlJoin: ["jump", "ramp", "ramp_width", "extrapolate"];
@@ -219,7 +219,7 @@ fields! {
     Sin {
         offset: Expr = N, amplitude: Expr = N, freq: Expr = N, delay: Expr = N,
         damping: Expr = N, phase_deg: Expr = N, cycles: Expr = N, amplitude2: Expr = N,
-        freq2: Expr = N, pre: Choice = PreDelay::Offset, given_zero: Choice = GivenZero::AsGiven,
+        freq2: Expr = N, pre: Choice = PreDelay::HoldDelayValue, given_zero: Choice = GivenZero::AsGiven,
     }
     Exp {
         v1: Expr = N, v2: Expr = N, td1: Expr = N, tau1: Expr = N, td2: Expr = N, tau2: Expr = N,
@@ -233,13 +233,13 @@ fields! {
     Sffm {
         offset: Expr = N, amplitude: Expr = N, carrier_freq: Expr = N, mod_index: Expr = N,
         signal_freq: Expr = N, delay: Expr = N, phase_c_deg: Expr = N, phase_m_deg: Expr = N,
-        law: Choice = SffmLaw::Spice3, pre: Choice = PreDelay::Offset,
+        law: Choice = SffmLaw::Spice3, pre: Choice = PreDelay::HoldDelayValue,
         given_zero: Choice = GivenZero::AsGiven,
     }
     Am {
         offset: Expr = N, amplitude: Expr = N, mod_offset: Expr = N, mod_index: Expr = N,
         mod_freq: Expr = N, carrier_freq: Expr = N, delay: Expr = N, phase_m_deg: Expr = N,
-        phase_c_deg: Expr = N, mod_time: Choice = AmModTime::Delay, pre: Choice = PreDelay::Offset,
+        phase_c_deg: Expr = N, mod_time: Choice = AmModTime::Delay, pre: Choice = PreDelay::HoldDelayValue,
         given_zero: Choice = GivenZero::AsGiven,
     }
     TrNoise {

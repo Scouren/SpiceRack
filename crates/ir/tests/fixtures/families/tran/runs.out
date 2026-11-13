@@ -21,6 +21,9 @@ The m relation accuses ngspice-45: its m=3 deck is not its own three copies (t=3
 VACASK's is (3.270941728 against 3.270942842 V). DC at m=3 agrees on both (vdmos_load/), so the difference is in the
 charges or their time derivative at m != 1. Class: F30's point holds beyond linearised analyses (its carrier today
 requires a linearised analysis or none).
+Result, BSIM3v3 and BSIM4v8 (bsim3, bsim4, bsim4_nf: the corpus cards of ../cards/; the BSIM4 deck on a 1 V supply and
+drive, so |d|/3V reads a third of its relative size): no difference beyond step control. Worst |d|/3V, 20 ps -> 5 ps:
+  bsim3 1.08e-05 -> 8.59e-07    bsim4 3.08e-07 -> 7.85e-08    bsim4_nf 1.66e-06 -> 5.91e-08
 
 ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
 ## bjt 
@@ -43,6 +46,36 @@ ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vaca
   t=12n  ngspice=3.043534e+00       vacask=3.0435323967312544     |d|/3V=5.34e-07
   t=20n  ngspice=2.997642e+00       vacask=2.9976421725728213     |d|/3V=5.75e-08
   t=30n  ngspice=3.015764e+00       vacask=3.0157596018459403     |d|/3V=1.47e-06
+## bsim3 
+  t=2n   ngspice=1.670223e-01       vacask=0.1670127931787087     |d|/3V=3.17e-06
+  t=3n   ngspice=1.296847e-01       vacask=0.12968515049355148    |d|/3V=1.50e-07
+  t=4n   ngspice=1.286855e-01       vacask=0.1286855239852195     |d|/3V=8.00e-09
+  t=6n   ngspice=1.286330e-01       vacask=0.12863296986427994    |d|/3V=1.00e-08
+  t=8n   ngspice=2.880635e-01       vacask=0.2880960246204        |d|/3V=1.08e-05
+  t=9n   ngspice=2.972061e+00       vacask=2.97207629991305       |d|/3V=5.10e-06
+  t=12n  ngspice=2.999882e+00       vacask=2.9998824601437057     |d|/3V=1.53e-07
+  t=20n  ngspice=2.999883e+00       vacask=2.999882515308099      |d|/3V=1.62e-07
+  t=30n  ngspice=2.999625e+00       vacask=2.9996252715653093     |d|/3V=9.05e-08
+## bsim4 
+  t=2n   ngspice=1.343494e-01       vacask=0.1343503228257055     |d|/3V=3.08e-07
+  t=3n   ngspice=1.165575e-01       vacask=0.11655747181284574    |d|/3V=9.40e-09
+  t=4n   ngspice=1.165575e-01       vacask=0.11655745813830015    |d|/3V=1.40e-08
+  t=6n   ngspice=1.165575e-01       vacask=0.11655745813616175    |d|/3V=1.40e-08
+  t=8n   ngspice=9.982073e-01       vacask=0.9982073104519892     |d|/3V=3.48e-09
+  t=9n   ngspice=9.999844e-01       vacask=0.9999843792937441     |d|/3V=6.90e-09
+  t=12n  ngspice=9.999844e-01       vacask=0.9999843792948062     |d|/3V=6.90e-09
+  t=20n  ngspice=9.999844e-01       vacask=0.9999843792973288     |d|/3V=6.90e-09
+  t=30n  ngspice=9.999844e-01       vacask=0.9999843793396918     |d|/3V=6.89e-09
+## bsim4_nf 
+  t=2n   ngspice=1.363536e-01       vacask=0.1363585686667668     |d|/3V=1.66e-06
+  t=3n   ngspice=1.185166e-01       vacask=0.11851655943893737    |d|/3V=1.35e-08
+  t=4n   ngspice=1.185165e-01       vacask=0.11851654891671466    |d|/3V=1.63e-08
+  t=6n   ngspice=1.185165e-01       vacask=0.11851654891927221    |d|/3V=1.63e-08
+  t=8n   ngspice=9.982439e-01       vacask=0.998243880477761      |d|/3V=6.51e-09
+  t=9n   ngspice=9.999847e-01       vacask=0.9999846947244232     |d|/3V=1.76e-09
+  t=12n  ngspice=9.999847e-01       vacask=0.9999846947233392     |d|/3V=1.76e-09
+  t=20n  ngspice=9.999847e-01       vacask=0.999984694720766      |d|/3V=1.76e-09
+  t=30n  ngspice=9.999847e-01       vacask=0.9999846947085739     |d|/3V=1.76e-09
 ## mos1 
   t=2n   ngspice=2.910894e+00       vacask=2.910709625356916      |d|/3V=6.15e-05
   t=3n   ngspice=9.338034e-01       vacask=0.9336988339826379     |d|/3V=3.49e-05
@@ -144,6 +177,36 @@ ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vaca
   t=12n  ngspice=3.043534e+00       vacask=3.043534049836556      |d|/3V=1.66e-08
   t=20n  ngspice=2.997642e+00       vacask=2.997642521002808      |d|/3V=1.74e-07
   t=30n  ngspice=3.015763e+00       vacask=3.015763445564895      |d|/3V=1.49e-07
+## bsim3 
+  t=2n   ngspice=1.670219e-01       vacask=0.1670209925171517     |d|/3V=3.02e-07
+  t=3n   ngspice=1.296852e-01       vacask=0.12968519450355587    |d|/3V=1.83e-09
+  t=4n   ngspice=1.286856e-01       vacask=0.12868557141634074    |d|/3V=9.53e-09
+  t=6n   ngspice=1.286330e-01       vacask=0.12863297021506798    |d|/3V=9.93e-09
+  t=8n   ngspice=2.880618e-01       vacask=0.2880592237038468     |d|/3V=8.59e-07
+  t=9n   ngspice=2.972051e+00       vacask=2.9720498792363257     |d|/3V=3.74e-07
+  t=12n  ngspice=2.999882e+00       vacask=2.999882459796131      |d|/3V=1.53e-07
+  t=20n  ngspice=2.999883e+00       vacask=2.999882515308098      |d|/3V=1.62e-07
+  t=30n  ngspice=2.999625e+00       vacask=2.999624819639841      |d|/3V=6.01e-08
+## bsim4 
+  t=2n   ngspice=1.343505e-01       vacask=0.1343502643858354     |d|/3V=7.85e-08
+  t=3n   ngspice=1.165575e-01       vacask=0.11655747238613286    |d|/3V=9.20e-09
+  t=4n   ngspice=1.165575e-01       vacask=0.11655745810460531    |d|/3V=1.40e-08
+  t=6n   ngspice=1.165575e-01       vacask=0.1165574581086105     |d|/3V=1.40e-08
+  t=8n   ngspice=9.982073e-01       vacask=0.9982073233244518     |d|/3V=7.77e-09
+  t=9n   ngspice=9.999844e-01       vacask=0.9999843793146732     |d|/3V=6.90e-09
+  t=12n  ngspice=9.999844e-01       vacask=0.999984379317708      |d|/3V=6.89e-09
+  t=20n  ngspice=9.999844e-01       vacask=0.9999843793209664     |d|/3V=6.89e-09
+  t=30n  ngspice=9.999844e-01       vacask=0.999984379302482      |d|/3V=6.90e-09
+## bsim4_nf 
+  t=2n   ngspice=1.363587e-01       vacask=0.1363585227510164     |d|/3V=5.91e-08
+  t=3n   ngspice=1.185166e-01       vacask=0.11851656000044514    |d|/3V=1.33e-08
+  t=4n   ngspice=1.185165e-01       vacask=0.11851654895577754    |d|/3V=1.63e-08
+  t=6n   ngspice=1.185165e-01       vacask=0.11851654895708785    |d|/3V=1.63e-08
+  t=8n   ngspice=9.982439e-01       vacask=0.9982438908060632     |d|/3V=3.06e-09
+  t=9n   ngspice=9.999847e-01       vacask=0.9999846946802974     |d|/3V=1.77e-09
+  t=12n  ngspice=9.999847e-01       vacask=0.999984694685842      |d|/3V=1.77e-09
+  t=20n  ngspice=9.999847e-01       vacask=0.9999846946918262     |d|/3V=1.77e-09
+  t=30n  ngspice=9.999847e-01       vacask=0.9999846946866136     |d|/3V=1.77e-09
 ## mos1 
   t=2n   ngspice=2.910912e+00       vacask=2.910887120727206      |d|/3V=8.29e-06
   t=3n   ngspice=9.337726e-01       vacask=0.9337622439328923     |d|/3V=3.45e-06

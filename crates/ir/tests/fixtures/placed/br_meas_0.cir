@@ -1,0 +1,12 @@
+placed br_meas sel=0
+.param sel=0
+v1 a 0 dc 1
+r1 a b 1k
+r2 b 0 1k
+d1 b 0 dm
+.model dm d is=1e-14
+.if (sel==1)
+.meas tran vb find v(b) at=1u
+.endif
+.tran 1u 2u
+.end

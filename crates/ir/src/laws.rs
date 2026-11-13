@@ -8,9 +8,9 @@
 //! (a question two builds answer differently); a point's variants exclude each other. Each row
 //! of the table (`Law::row`) gives the variant's point, the families whose models follow it, its
 //! member, its IR word and its point's exact rewriting (R92, R96, R93a: none, stated, negated,
-//! noted, guarded). *How many*: one set per design; `Law::COUNT` variants (40, two per point, 20
-//! points), one bit each in a `u64` (the compile-time assertions below fail the build when the
-//! enum outgrows 64 or a point gains a third variant). *Who writes*: a
+//! noted, guarded). *How many*: one set per design; `Law::COUNT` variants (45 in 22 points, two
+//! per point but F43's three), one bit each in a `u64` (the compile-time assertions below fail
+//! the build when the enum outgrows 64 or a point has fewer than two variants). *Who writes*: a
 //! reader, once per read, the constant of its simulator build (`Builder::set_laws`); the text's
 //! `laws` line; the generator; never a pass. *Who reads*: `features`, once per element or model
 //! row and once per expression node of dynamic form (R93a's function points) (O(the stated variants) ≤ `Law::COUNT`, each predicate O(the row's parameters and its one
@@ -20,13 +20,13 @@
 //! A built design states nothing, carries nothing and goes to any target under the target's law.
 //! Ceiling (R90): a design whose models follow two builds of one module cannot say so.
 //!
-//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R93a, R94, R94a, R95, R95a, R96 (on the `rulings`
+//! Cites: `rewrite/RULINGS.md` R86, R88, R90, R91, R92, R93a, R94, R94a, R95, R95a, R96, R102 (on the `rulings`
 //! branch); the
 //! runs in `crates/ir/tests/fixtures/bjt_substrate/` and `crates/ir/tests/fixtures/families/`.
 //! The carrier predicates are `laws_carry.rs`, the table's rows `laws_table.rs`.
 //!
 //! Contents:
-//! - `pub enum Law` (`ALL`, `COUNT`), `Law::member(self) -> CircuitExtra`,
+//! - `pub enum Law` (`ALL`, `COUNT`), `pub const LTSPICE_EXP_KNEE`, `Law::member(self) -> CircuitExtra`,
 //!   `Law::word(self) -> &'static str`, `Law::rewrite(self) -> Rewrite`
 //! - `pub enum Rewrite`, `pub struct Stated`
 //! - `pub struct Laws`, `Laws::EMPTY`, `Laws::of(&[Law]) -> Laws`, `Laws::with(self, Law) -> Laws`,
@@ -191,6 +191,13 @@ pub enum Law {
     ExpClamp1e99,
     /// Point R93a F43: the exact function (VACASK). Noted toward ngspice.
     ExpExact,
+    /// Point R93a F43, LTspice's (F82, LTspice 26.1.1, the same in `{…}` and a B source): exact
+    /// `e^x` up to the knee `k` = [`LTSPICE_EXP_KNEE`], above it the straight line
+    /// `e^k·(1 + x − k)` (no clamp: `exp(236)` = 6.01505852692e100, `exp(300)` = 6.20086770814e101,
+    /// `exp(710)` = 4.20717795946e102), the shape of ngspice's `ngbehavior=ps` `ExpLin14` with
+    /// another knee. Guarded toward a target with the exact law (`x > k ? e^k*(1+x-k) : exp(x)`),
+    /// noted toward ngspice's clamp.
+    ExpLin230,
     /// Point R93a F44, a behavioural `ln`, `log10` of 0: -1e99 (ngspice-45's B source). Carried by
     /// `ln` or `log10` in a root of dynamic form. Guarded (`x == 0 ? -1e99 : ln(x)`).
     LogZeroMinus1e99,
@@ -209,7 +216,31 @@ pub enum Law {
     AsinEdgeZero,
     /// Point R93a F46: fails loudly (VACASK).
     AsinEdgeFails,
+    /// Point R102, the temperature a design with no temperature statement runs at: 27 °C
+    /// (ngspice, VACASK, Xyce, LTspice, ESPice). Carried by the design when no `Env` sets a
+    /// temperature. Stated: the rule writes `temp` as a run-wide `Env` item.
+    DefaultTemp27,
+    /// Point R102: 25 °C (HSPICE; `hspice-2`, dialect-hspice 88cd9649).
+    DefaultTemp25,
+    /// Point R102, the nominal temperature (`tnom`) of a design with no nominal temperature
+    /// statement: 27 °C (ngspice, VACASK, Xyce, LTspice, ESPice). Carried by the design when no
+    /// `Env` sets `tnom`. Stated: the rule writes `tnom` as a run-wide `Env` item.
+    DefaultTnom27,
+    /// Point R102: 25 °C (HSPICE).
+    DefaultTnom25,
+    /// Point F86 (R96), the small-signal of BSIM4 at version 4.5 (the version gap itself is F85,
+    /// a writer's refusal): ngspice-45's 4.5 code, its AC
+    /// output conductance 2e-4 off the slope of its own DC current in saturation (gf180mcuD's
+    /// nfet_03v3, `families/gf180_n1/runs.out`; its 4.8 code 1.5e-7). Carried as F27, by a
+    /// MOSFET on a `Bsim4` model of version 4.5 (or an unresolved one). Noted both ways.
+    Bsim4v45SmallSignalHand,
+    /// The DC law's own derivative (ngspice's 4.8 code; VACASK, which has no 4.5).
+    Bsim4v45SmallSignalExact,
 }
+
+/// LTspice's `exp` knee (`Law::ExpLin230`): solved from F82's readings at x = 236 and 300
+/// (`e^k` = 8.749002899e99); the line through it reproduces the readings at 231 and 710 to 6e-12.
+pub const LTSPICE_EXP_KNEE: f64 = 230.124_863_945_9;
 
 /// A set of stated laws, one bit per [`Law`]. Two variants of one point may stand in the set;
 /// `check` refuses that design (`Violation::LawConflict`).
@@ -244,7 +275,8 @@ pub enum Rewrite {
 
 /// One parameter a stated variant fills in: its spellings in the family's own names (ngspice's
 /// and the pinned VACASK module's, which agree on every name below) and the value its absence
-/// means under the variant, as a function of the model's row.
+/// means under the variant, as a function of the model's row. For a design point (R102's
+/// default temperatures) the name is the run-wide `Env` field and the model is unused.
 #[derive(Clone, Copy, Debug)]
 pub struct Stated {
     /// The parameter's spellings; a model carries the point when it gives none of them.
@@ -260,6 +292,8 @@ pub(crate) enum Carrier<'a> {
     Model(&'a Model),
     /// An expression node in a root of dynamic form (R93a's function points).
     Node(crate::expr::Expr),
+    /// The design as a whole (R102's default temperatures).
+    Design,
 }
 
 /// A law point: the question its variants answer. `LawConflict`'s `arg` is its index.
@@ -285,6 +319,9 @@ pub(crate) enum Point {
     LogZero,
     DivGuard,
     AsinEdge,
+    DefaultTemp,
+    DefaultTnom,
+    Bsim4v45SmallSignal,
 }
 
 /// One variant's row: its point, the families whose models follow it, its member, its word,
@@ -298,7 +335,7 @@ pub(crate) struct Row {
 }
 
 /// Every point, in declaration order.
-const POINTS: [Point; 20] = [
+const POINTS: [Point; 23] = [
     Point::BcSatArea,
     Point::SubSatTemp,
     Point::DiodeWlMult,
@@ -319,16 +356,19 @@ const POINTS: [Point; 20] = [
     Point::LogZero,
     Point::DivGuard,
     Point::AsinEdge,
+    Point::DefaultTemp,
+    Point::DefaultTnom,
+    Point::Bsim4v45SmallSignal,
 ];
 
 // 40 variants: a `u64`, one bit each (the build fails here when the enum outgrows it)
 const _: () = assert!(Law::COUNT <= u64::BITS as usize);
 const _: () = assert!(size_of::<Laws>() == 8);
-const _: () = assert!(Law::COUNT == 2 * POINTS.len());
+const _: () = assert!(every_point_has_two_variants());
 
 impl Law {
     /// Every variant, in declaration order (its bit in [`Laws`]).
-    pub const ALL: [Law; 40] = [
+    pub const ALL: [Law; 47] = [
         Law::BcSatAreaTimesAreab,
         Law::BcSatAreabOnly,
         Law::SubSatLastFactor,
@@ -363,12 +403,19 @@ impl Law {
         Law::TrigExact,
         Law::ExpClamp1e99,
         Law::ExpExact,
+        Law::ExpLin230,
         Law::LogZeroMinus1e99,
         Law::LogZeroError,
         Law::DivGminGuard,
         Law::DivExact,
         Law::AsinEdgeZero,
         Law::AsinEdgeFails,
+        Law::DefaultTemp27,
+        Law::DefaultTemp25,
+        Law::DefaultTnom27,
+        Law::DefaultTnom25,
+        Law::Bsim4v45SmallSignalHand,
+        Law::Bsim4v45SmallSignalExact,
     ];
     /// Variant count.
     pub const COUNT: usize = Self::ALL.len();
@@ -541,4 +588,27 @@ pub(crate) fn draw(g: &mut Gen, features: &FeatureSet) -> Laws {
         "a drawn set states each point once"
     );
     set
+}
+
+// ---- private ----
+
+/// Whether each point has at least two variants (a point is a question two builds answer
+/// differently; F43 has three, R93a and LTspice).
+const fn every_point_has_two_variants() -> bool {
+    let mut p = 0;
+    while p < POINTS.len() {
+        let mut n = 0;
+        let mut k = 0;
+        while k < Law::COUNT {
+            if Law::ALL[k].row().point as usize == POINTS[p] as usize {
+                n += 1;
+            }
+            k += 1;
+        }
+        if n < 2 {
+            return false;
+        }
+        p += 1;
+    }
+    true
 }

@@ -149,6 +149,9 @@ pub struct Design {
     /// Whether the design holds a linearised analysis or none, and one that uses charges or none
     /// (`analysis::small_signal_design`, `analysis::charge_design`).
     pub(crate) analysis_reach: std::sync::OnceLock<(bool, bool)>,
+    /// Each definition's number in IR text (`text_expr::def_mark`): its place in item order,
+    /// the order `parse` creates definitions. Cleared with the derived caches.
+    pub(crate) def_order: std::sync::OnceLock<Vec<u32>>,
     /// How many times the definition classes were computed (`class::def_classes`): a count a
     /// test reads instead of a clock (`Design::class_computes`). Not part of equality.
     #[cfg(any(test, feature = "gen"))]
@@ -255,6 +258,7 @@ impl Design {
             element_names: std::sync::OnceLock::new(),
             name_index: std::sync::OnceLock::new(),
             analysis_reach: std::sync::OnceLock::new(),
+            def_order: std::sync::OnceLock::new(),
             #[cfg(any(test, feature = "gen"))]
             class_computes: crate::class::Computes::default(),
         }
@@ -574,6 +578,7 @@ impl Design {
         self.forms.take();
         self.name_index.take();
         self.analysis_reach.take();
+        self.def_order.take();
     }
 }
 

@@ -1,0 +1,55 @@
+F52 localised (R84a's method): the VACASK corpus deck demo/spice/dio.sim's diode, rs=1.0 is=1e-9 tt=1e-6 cjo=50n
+bv=5 ibv=1e-6, ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n against VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6
+(spice/diode.osdi). Run: `nix develop .#testing -c tests/fixtures/families/f52/run.sh` (checked).
+1. The DC law (dc_full_*, reltol 1e-9): equal to 1e-10 at 0.3 to 1.0 V. At the default reltol 1e-3 VACASK's operating
+   point through rs is 4.3e-4 off the converged current where ngspice's is 5e-7 off (0.6 V: 0.1189911 against
+   0.1190422): its convergence test accepts a looser solution.
+2. The charge law (ac_*, tight tolerances): re and im of i(v1) at 1 kHz and 100 kHz, forward 0.3 to 0.7 V and reverse
+   -0.5 V, with and without cjo: equal to 6e-11. Diffusion (tt·gd) and depletion capacitances are the same law.
+3. The transient (tr_*): i(v1) at 0.4 us (before the recovery edge) and 0.5 us (after it).
+   default tolerances: ngspice 1.115623 (stable from a 0.5 ns cap), VACASK 1.21375, 1.16662, 1.15695 at caps 0.5, 0.1,
+   0.02 ns (diffs-2's F52 numbers).
+   reltol 1e-6: VACASK 1.12909, 1.12198, 1.11791 (0.5, 0.1, 0.02 ns), 1.11610 at 4 ps; reltol 1e-8: 1.11659 (20 ps),
+   1.11597 (4 ps); ngspice 1.115613 throughout. VACASK converges to ngspice's value, at first order in the step (its
+   error falls 4.7x per fivefold refinement, 2.3e-3 to 4.9e-4 at reltol 1e-6), and its default tolerances leave 3.5 %.
+Verdict: no law differs (DC and charge equal to 1e-10). The difference is VACASK's integration of this deck: first-order
+convergence of the reverse recovery under its trapezoidal rule (the transit-time charge's implicit equation, F52) and a
+default convergence test 1e3 times looser than ngspice's at the same reltol; refined, both reach 1.1156. Class:
+convergence (R96 (3)), VACASK accused by its own refinement converging to ngspice's value.
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+dc_full_0.3 ngspice=-1.08501422126e-04 vacask=-0.0001085014221261088
+dc_full_0.5 ngspice=-4.44955431494e-02 vacask=-0.04449554314505661
+dc_full_0.6 ngspice=-1.19042169304e-01 vacask=-0.1190421693040067
+dc_full_0.7 ngspice=-2.04985574656e-01 vacask=-0.2049855746563112
+dc_full_1.0 ngspice=-4.82826633635e-01 vacask=-0.482826633613937
+ac_cj0_0.3_100k ngspice=[-4.18430134880e-03 -2.61378065982e-03 ] vacask=[-4.184301348803210e-03 -2.613780659822905e-03]
+ac_cj0_0.3_1k ngspice=[-4.17744147889e-03 -2.61379866536e-05 ] vacask=[-4.177441478892208e-03 -2.613798665358795e-05]
+ac_cj0_0.5_100k ngspice=[-6.82519009510e-01 -1.26149472819e-01 ] vacask=[-6.825190095491596e-01 -1.261494728107980e-01]
+ac_cj0_0.5_1k ngspice=[-6.32399955522e-01 -1.46064026534e-03 ] vacask=[-6.323999555615420e-01 -1.460640265273389e-03]
+ac_cj0_0.6_100k ngspice=[-8.59057984914e-01 -7.27497581358e-02 ] vacask=[-8.590579849143054e-01 -7.274975813576375e-02]
+ac_cj0_0.6_1k ngspice=[-8.21511643163e-01 -9.21299782894e-04 ] vacask=[-8.215116431635446e-01 -9.212997828934813e-04]
+ac_cj0_0.7_100k ngspice=[-9.14555052640e-01 -4.76714927219e-02 ] vacask=[-9.145550526396959e-01 -4.767149272188093e-02]
+ac_cj0_0.7_1k ngspice=[-8.87961634291e-01 -6.25085075300e-04 ] vacask=[-8.879616342908677e-01 -6.250850753002704e-04]
+ac_cj0_m0.5_100k ngspice=[-2.11652917415e-12 -1.32982986990e-12 ] vacask=[-2.116529174145398e-12 -1.329829869904403e-12]
+ac_cj0_m0.5_1k ngspice=[-2.11652917415e-12 -1.32982986990e-14 ] vacask=[-2.116529174145398e-12 -1.329829869904403e-14]
+ac_full_0.3_100k ngspice=[-5.76934111813e-03 -3.97833647307e-02 ] vacask=[-5.769341118131655e-03 -3.978336473071146e-02]
+ac_full_0.3_1k ngspice=[-4.17760023772e-03 -3.98470570011e-04 ] vacask=[-4.177600237724177e-03 -3.984705700114823e-04]
+ac_full_0.5_100k ngspice=[-6.85958742897e-01 -1.29697692896e-01 ] vacask=[-6.859587429358616e-01 -1.296976928877257e-01]
+ac_full_0.5_1k ngspice=[-6.32400421721e-01 -1.51817049939e-03 ] vacask=[-6.324004217600807e-01 -1.518170499313765e-03]
+ac_full_0.6_100k ngspice=[-8.59953236925e-01 -7.33776993356e-02 ] vacask=[-8.599532369250642e-01 -7.337769933553291e-02]
+ac_full_0.6_1k ngspice=[-8.21511787658e-01 -9.35191509794e-04 ] vacask=[-8.215117876580008e-01 -9.351915097930572e-04]
+ac_full_0.7_100k ngspice=[-9.14915278012e-01 -4.78919618899e-02 ] vacask=[-9.149152780116011e-01 -4.789196188987271e-02]
+ac_full_0.7_1k ngspice=[-8.87961696488e-01 -6.30634270949e-04 ] vacask=[-8.879616964878934e-01 -6.306342709493019e-04]
+ac_full_m0.5_100k ngspice=[-6.57540984733e-04 -2.56341300315e-02 ] vacask=[-6.575409847333624e-04 -2.563413003149349e-02]
+ac_full_m0.5_1k ngspice=[-6.57994748687e-08 -2.56509949252e-04 ] vacask=[-6.579947486873294e-08 -2.565099492524373e-04]
+tr_def_0.02n ngspice[i50=1.115623e+00 i40=1.482436e+00 ] vacask[0.4u 1.4830375233998392 0.5u 1.1569460830818319 ]
+tr_def_0.1n ngspice[i50=1.115624e+00 i40=1.482436e+00 ] vacask[0.4u 1.4830679416258636 0.5u 1.1666181833573355 ]
+tr_def_0.5n ngspice[i50=1.115741e+00 i40=1.482436e+00 ] vacask[0.4u 1.4832162476883635 0.5u 1.213754134029198 ]
+tr_t6_0.004n ngspice[i50=1.115613e+00 i40=1.482436e+00 ] vacask[0.4u 1.4824379401661054 0.5u 1.116104486104482 ]
+tr_t6_0.02n ngspice[i50=1.115613e+00 i40=1.482436e+00 ] vacask[0.4u 1.4824447452756917 0.5u 1.1179113268760288 ]
+tr_t8_0.004n ngspice[i50=1.115613e+00 i40=1.482436e+00 ] vacask[0.4u 1.4824379427002234 0.5u 1.1159670019523658 ]
+tr_t8_0.02n ngspice[i50=1.115613e+00 i40=1.482436e+00 ] vacask[0.4u 1.482444809914679 0.5u 1.1165912349123874 ]
+tr_tight_0.02n ngspice[i50=1.115613e+00 i40=1.482436e+00 ] vacask[0.4u 1.4824447452756917 0.5u 1.1179113268760288 ]
+tr_tight_0.1n ngspice[i50=1.115613e+00 i40=1.482436e+00 ] vacask[0.4u 1.4824776282963978 0.5u 1.1219766283084236 ]
+tr_tight_0.5n ngspice[i50=1.115627e+00 i40=1.482436e+00 ] vacask[0.4u 1.482638828044041 0.5u 1.1290923437002207 ]

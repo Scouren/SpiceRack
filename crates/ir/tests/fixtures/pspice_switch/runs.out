@@ -1,0 +1,30 @@
+R103: the PSpice switch (VSWITCH(Von Voff Ron Roff)) on ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n.
+Run: `nix develop .#testing -c tests/fixtures/pspice_switch/run.sh` (light lane). plain.cir is the
+XSPICE pswitch log=TRUE (ngspice-45 source hfvpfb0bgw9819wkb7kzpdaasbd0hd5r,
+src/xspice/icm/xtradev/pswitch/cfunc.mod:199-249: R = exp(logmean + c1·u − c3·u³), u = S − 1/2,
+c1 = 1.5·ln(Ron/Roff), c3 = 2·ln(Ron/Roff)); mode/vswitch.cir the PSpice VSWITCH that
+ngbehavior=ltpsa rewrites into it (src/frontend/inpcompat.c:1264-1417, defaults Ron=1 Roff=1e6
+Von=1 Voff=0). Oracle: the closed form of INV-semantics 6.19 (Xyce's VSWITCH, D117):
+Rs = exp(Lm + 0.75·Lr·(2S−1) − 0.25·Lr·(2S−1)³), S = (Vc−Voff)/(Von−Voff), clamped to [0, 1].
+Result: the two ngspice forms give the same bits at every point, and both equal Xyce's closed form
+to rounding (5e-16, 2e-15 at most): the PSpice switch, ngspice's pswitch log=TRUE and Xyce's
+VSWITCH are one law, ModelFamily::SwitchLogCubic (CurrentSwitchLogCubic for ISWITCH).
+ngspice's own clamps beyond the law: r_on below 1e-3 is raised to 1e-3, r_off above 1e12 lowered
+(cfunc.mod:176-177), Von = Voff is nudged apart by 1 mV (185-187), and the control port draws
+1e-12 S (r_cntl_in 1e12): a deck outside those bounds is not the family's law on ngspice.
+
+vc=-0.20  pswitch=1.000000000000000e+06  ltpsa_vswitch=1.000000000000000e+06  same_bits=True  xyce_6.19=9.999999999999995e+05  rel=4.7e-16
+vc=-0.10  pswitch=1.000000000000000e+06  ltpsa_vswitch=1.000000000000000e+06  same_bits=True  xyce_6.19=9.999999999999995e+05  rel=4.7e-16
+vc=+0.00  pswitch=1.000000000000000e+06  ltpsa_vswitch=1.000000000000000e+06  same_bits=True  xyce_6.19=9.999999999999995e+05  rel=4.7e-16
+vc=+0.10  pswitch=6.792036326171838e+05  ltpsa_vswitch=6.792036326171838e+05  same_bits=True  xyce_6.19=6.792036326171838e+05  rel=0.0e+00
+vc=+0.20  pswitch=2.376840286624875e+05  ltpsa_vswitch=2.376840286624875e+05  same_bits=True  xyce_6.19=2.376840286624874e+05  rel=2.4e-16
+vc=+0.30  pswitch=5.058246620031133e+04  ltpsa_vswitch=5.058246620031133e+04  same_bits=True  xyce_6.19=5.058246620031144e+04  rel=2.0e-15
+vc=+0.40  pswitch=7.726805850957009e+03  ltpsa_vswitch=7.726805850957009e+03  same_bits=True  xyce_6.19=7.726805850957014e+03  rel=5.9e-16
+vc=+0.50  pswitch=9.999999999999991e+02  ltpsa_vswitch=9.999999999999991e+02  same_bits=True  xyce_6.19=9.999999999999998e+02  rel=6.8e-16
+vc=+0.60  pswitch=1.294195841449987e+02  ltpsa_vswitch=1.294195841449987e+02  same_bits=True  xyce_6.19=1.294195841449987e+02  rel=0.0e+00
+vc=+0.70  pswitch=1.976969640111862e+01  ltpsa_vswitch=1.976969640111862e+01  same_bits=True  xyce_6.19=1.976969640111862e+01  rel=1.8e-16
+vc=+0.80  pswitch=4.207266283844447e+00  ltpsa_vswitch=4.207266283844447e+00  same_bits=True  xyce_6.19=4.207266283844445e+00  rel=4.2e-16
+vc=+0.90  pswitch=1.472312502432721e+00  ltpsa_vswitch=1.472312502432721e+00  same_bits=True  xyce_6.19=1.472312502432720e+00  rel=4.5e-16
+vc=+1.00  pswitch=1.000000000000000e+00  ltpsa_vswitch=1.000000000000000e+00  same_bits=True  xyce_6.19=9.999999999999996e-01  rel=4.4e-16
+vc=+1.10  pswitch=1.000000000000000e+00  ltpsa_vswitch=1.000000000000000e+00  same_bits=True  xyce_6.19=1.000000000000000e+00  rel=0.0e+00
+vc=+1.20  pswitch=1.000000000000000e+00  ltpsa_vswitch=1.000000000000000e+00  same_bits=True  xyce_6.19=1.000000000000000e+00  rel=0.0e+00

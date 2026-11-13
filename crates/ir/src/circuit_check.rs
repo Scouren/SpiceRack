@@ -34,7 +34,7 @@ use crate::id::{DefId, ExprId, ItemRef, NameId};
 use crate::model::{Model, ModelFamily, Polarity};
 use crate::passive::{IcMode, TcBase, TcLaw};
 use crate::source::DcRule;
-use crate::wave::{GivenZero, PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
+use crate::wave::{GivenZero, PreDelay, PulseLaw, PwlJoin, PwlRepeat, WaveKind, WaveRef};
 
 /// What is wrong with an element beyond its terminal count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -417,6 +417,9 @@ fn wave_ok(design: &Design, w: WaveRef, v: &mut Verdict) -> bool {
                 &[s.offset, s.amplitude],
                 &[s.freq, s.delay, s.damping, s.phase_deg],
             ) && paired(s.amplitude2, s.freq2)
+                // R100: every simulator holds a sine's t = delay value before its delay (diffs-2,
+                // f78efcca)
+                && s.pre == PreDelay::HoldDelayValue
         }),
         WaveKind::Exp => side::<Exp>(design, w.index, v)
             .is_none_or(|x| fits(x.given_zero, &[x.v1, x.v2], &[x.td1, x.tau1, x.td2, x.tau2])),

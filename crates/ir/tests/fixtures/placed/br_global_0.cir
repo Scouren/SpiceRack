@@ -1,0 +1,16 @@
+placed br_global sel=0
+.param sel=0
+.subckt s1 n
+r1 n gg 1k
+.ends
+v1 a 0 1
+x1 a s1
+vg gg 0 0
+.if (sel==1)
+.global gg
+.endif
+.control
+op
+print i(vg)
+.endc
+.end

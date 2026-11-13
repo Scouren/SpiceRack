@@ -182,6 +182,7 @@ fn every_row_of_the_tag_table() {
         BinOp::Eq,
         BinOp::And,
         BinOp::Or,
+        BinOp::Xor,
         BinOp::BitAnd,
         BinOp::Shl,
     ] {
@@ -388,7 +389,7 @@ fn typed_operators_meet_integer_literals_in_generated_designs() {
         let int = |e: ExprId| matches!(d.expr(e), Expr::Num(n) if d.num(n).form == NumForm::Int);
         for k in 0..d.expr_count_all() {
             let (is_typed, show) = match d.expr(ExprId(k as u32)) {
-                Expr::Binary(BinOp::DivTyped | BinOp::IntDiv, a, b) => (true, int(a) && int(b)),
+                Expr::Binary(BinOp::DivTyped, a, b) => (true, int(a) && int(b)),
                 Expr::Binary(
                     BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr,
                     a,

@@ -1,0 +1,10 @@
+r_sin1k_1u: a resistor alone (no state, no LTE), type="sine" sinedc=0 ampl=1 freq=1k, step=1u stop=1m, no maxstep
+load "spice/resistor.osdi"
+model rm sp_resistor
+model vsource vsource
+v1 (1 0) vsource type="sine" sinedc=0 ampl=1 freq=1k
+r1 (1 0) rm r=1k
+control
+  options rawfile="ascii"
+  analysis tran1 tran step=1u stop=1m
+endc

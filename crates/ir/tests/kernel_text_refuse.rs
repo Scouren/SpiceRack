@@ -148,7 +148,7 @@ fn a_text_that_states_an_invalid_design_is_refused() {
         ),
         // RunArgumentClass (R68/A42): a transient's stop that reads the temperature
         (
-            "file \"f0.sp\" deck\n  analysis tran stop=(1u * $temp) print_step=1n cap=none\n  param ok = 1\n",
+            "file \"f0.sp\" deck\n  analysis tran stop=(1u * $temp) print_step=1n cap=ngspice_rule\n  param ok = 1\n",
             1,
         ),
         // FieldDomain (R68/A42): an analysis's output with a part

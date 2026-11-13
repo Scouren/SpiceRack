@@ -349,7 +349,7 @@ mod tests {
                 b.wave(r)
             }
             WaveKind::Am => {
-                let r = am(b, AmModTime::Delay, PreDelay::Offset);
+                let r = am(b, AmModTime::Delay, PreDelay::Zero);
                 b.wave(r)
             }
             WaveKind::TrNoise => b.wave(TrNoise {
@@ -822,26 +822,14 @@ mod tests {
             let w = b.wave(spicerack_ir::wave::Sin { cycles, ..sin(one) });
             with_wave(b, t, w)
         }),
-        (X::SinPreOffset, |b, t, on| {
-            let one = n(b, 1);
-            let pre = if on { PreDelay::Offset } else { PreDelay::Zero };
-            let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
-            with_wave(b, t, w)
-        }),
+        // a sine holds its t = delay value (the only rule, R100); the neighbour is a pulse
         (X::SinPreHold, |b, t, on| {
-            let one = n(b, 1);
-            let pre = if on {
-                PreDelay::HoldDelayValue
+            let w = if on {
+                let one = n(b, 1);
+                b.wave(sin(one))
             } else {
-                PreDelay::Offset
+                wave_of(b, WaveKind::Pulse)
             };
-            let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
-            with_wave(b, t, w)
-        }),
-        (X::SinPreZero, |b, t, on| {
-            let one = n(b, 1);
-            let pre = if on { PreDelay::Zero } else { PreDelay::Offset };
-            let w = b.wave(spicerack_ir::wave::Sin { pre, ..sin(one) });
             with_wave(b, t, w)
         }),
         (X::SinSecondTone, |b, t, on| {
@@ -878,15 +866,6 @@ mod tests {
             let w = b.wave(r);
             with_wave(b, t, w)
         }),
-        (X::AmPreOffset, |b, t, on| {
-            let r = am(
-                b,
-                AmModTime::Delay,
-                if on { PreDelay::Offset } else { PreDelay::Zero },
-            );
-            let w = b.wave(r);
-            with_wave(b, t, w)
-        }),
         (X::AmPreHold, |b, t, on| {
             let r = am(
                 b,
@@ -904,7 +883,11 @@ mod tests {
             let r = am(
                 b,
                 AmModTime::Delay,
-                if on { PreDelay::Zero } else { PreDelay::Offset },
+                if on {
+                    PreDelay::Zero
+                } else {
+                    PreDelay::HoldDelayValue
+                },
             );
             let w = b.wave(r);
             with_wave(b, t, w)
@@ -1339,9 +1322,6 @@ mod tests {
         (X::ExpTd2FromTd1, |b, t, on| {
             exp_from(b, t, if on { TdFrom::Td1 } else { TdFrom::Zero })
         }),
-        (X::SffmPreOffset, |b, t, on| {
-            sffm_pre(b, t, if on { PreDelay::Offset } else { PreDelay::Zero })
-        }),
         (X::SffmPreHold, |b, t, on| {
             sffm_pre(
                 b,
@@ -1354,7 +1334,15 @@ mod tests {
             )
         }),
         (X::SffmPreZero, |b, t, on| {
-            sffm_pre(b, t, if on { PreDelay::Zero } else { PreDelay::Offset })
+            sffm_pre(
+                b,
+                t,
+                if on {
+                    PreDelay::Zero
+                } else {
+                    PreDelay::HoldDelayValue
+                },
+            )
         }),
         (X::DcGivenWithWave, |b, t, on| {
             let dc = n(b, 0);
@@ -1608,6 +1596,9 @@ mod tests {
         (X::ExpExact, |b, t, on| {
             func_point(b, t, on, Law::ExpExact, Some(Func::Exp))
         }),
+        (X::ExpLin230, |b, t, on| {
+            func_point(b, t, on, Law::ExpLin230, Some(Func::Exp))
+        }),
         (X::LogZeroMinus1e99, |b, t, on| {
             func_point(b, t, on, Law::LogZeroMinus1e99, Some(Func::Ln))
         }),
@@ -1626,7 +1617,67 @@ mod tests {
         (X::AsinEdgeFails, |b, t, on| {
             func_point(b, t, on, Law::AsinEdgeFails, Some(Func::Acos))
         }),
+        // R102: a design with no temperature (nominal temperature) statement against one with
+        // an `Env` stating it
+        (X::DefaultTemp27, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTemp27, true)
+        }),
+        (X::DefaultTemp25, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTemp25, true)
+        }),
+        (X::DefaultTnom27, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTnom27, false)
+        }),
+        (X::DefaultTnom25, |b, t, on| {
+            default_temp(b, t, on, Law::DefaultTnom25, false)
+        }),
+        // R96: a MOSFET on a BSIM4 model of version 4.5 against one of version 4.8, no analysis
+        (X::Bsim4v45SmallSignalHand, |b, t, on| {
+            bsim4_version(b, t, on, Law::Bsim4v45SmallSignalHand)
+        }),
+        (X::Bsim4v45SmallSignalExact, |b, t, on| {
+            bsim4_version(b, t, on, Law::Bsim4v45SmallSignalExact)
+        }),
     ];
+
+    /// Under `law`, a MOSFET `m1` on a BSIM4 model `m` of version 4.5 (`on`) or 4.8.
+    fn bsim4_version(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law) {
+        b.set_laws(Laws::of(&[law]));
+        let version = b.num(if on { 4.5 } else { 4.8 });
+        let name = b.name("m");
+        let row = spicerack_ir::Model {
+            version,
+            ..model(name, ModelFamily::Bsim4, Polarity::N)
+        };
+        b.model(t, row, Span::NONE);
+        let name = b.design().find_name("m");
+        let def = b.design().lookup(t, DefKind::Model, name);
+        let mut h = b.head("m1", &["d", "g", "s", "b"], Some("m"), &[], ExprId::NONE);
+        h.model = Ref { name, def };
+        b.semi(t, ElemKind::Mosfet, h, semi(), Span::NONE);
+    }
+
+    /// Under `law`, a design with a resistor and, off, an `Env` stating the temperature (`temp`)
+    /// or the nominal temperature; on, none (the other one stated, so only this point carries).
+    fn default_temp(b: &mut Builder<'_>, t: ScopeId, on: bool, law: Law, temp: bool) {
+        b.set_laws(Laws::of(&[law]));
+        let fifty = n(b, 50);
+        let (stated, other) = if temp {
+            (fifty, ExprId::NONE)
+        } else {
+            (ExprId::NONE, fifty)
+        };
+        if on {
+            let other_only = if temp {
+                (ExprId::NONE, fifty)
+            } else {
+                (fifty, ExprId::NONE)
+            };
+            b.env(t, other_only.0, other_only.1, Span::NONE);
+        } else {
+            b.env(t, stated, other, Span::NONE);
+        }
+    }
 
     /// A behavioural source `b1` under `law` whose expression is `f(v(a))` (a division `1/v(a)`
     /// when `f` is `None`); off, `sqrt(v(a))` (a product `1*v(a)`).
@@ -1917,7 +1968,7 @@ mod tests {
                     noise_seed: ExprId::NONE,
                     segments: spicerack_ir::List::EMPTY,
                     ceiling: spicerack_ir::tran::StepCeiling::Rule(
-                        spicerack_ir::tran::StepCap::None,
+                        spicerack_ir::tran::StepCap::NgspiceRule,
                     ),
                     uic: false,
                     startup: false,

@@ -38,7 +38,7 @@
 //! ref      = name                    bound by `link` after the whole text (exact name, from the
 //!                                    item's scope outward); unresolved if nothing matches
 //!          | name "?"                deliberately unresolved (def NONE)
-//!          | name "#" digits         bound to that definition (only when lookup binds elsewhere)
+//!          | name "#" digits         bound to the k-th definition in item order (only when lookup binds elsewhere)
 //! ```
 //!
 //! Kernel items (owners' items follow the same shape: keyword, then the row's fields in
@@ -71,7 +71,7 @@
 //! shift   = add { (" << " | " >> ") add }
 //! add     = mul { (" + " | " - ") mul }
 //! mul     = unary { (" * " | " / " | " // " | " /: ") unary }
-//!           (`//` is IntDiv, `/:` is DivTyped, A12 K1)
+//!           (`/:` is DivTyped, A12 K1)
 //! unary   = ("-" | "!" | "~") unary | primary
 //!           (a "-" glued to a digit where a unary may stand is a negative literal's sign; the
 //!           `Neg` of a literal is written "-(…)": `-1.5` and `-(1.5)` are two trees)
