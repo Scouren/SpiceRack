@@ -1,0 +1,13 @@
+sin100k_1u: RC, type="sine" sinedc=0 ampl=1 freq=100k, step=1u stop=1m, no maxstep
+load "spice/resistor.osdi"
+load "spice/capacitor.osdi"
+model rm sp_resistor
+model cm sp_capacitor
+model vsource vsource
+v1 (1 0) vsource type="sine" sinedc=0 ampl=1 freq=100k
+r1 (1 2) rm r=1k
+c1 (2 0) cm c=1n
+control
+  options rawfile="ascii"
+  analysis tran1 tran step=1u stop=1m
+endc

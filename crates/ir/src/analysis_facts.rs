@@ -532,6 +532,7 @@ fn possible(kind: AnalysisKind, b: &Builder<'_>, scope: ScopeId, features: &Feat
                         RunExtra::TranCapNgspice,
                         RunExtra::TranCapSpan50,
                         RunExtra::TranCapSpan10,
+                        RunExtra::TranCapVacask,
                     ]
                     .into_iter()
                     .any(has))

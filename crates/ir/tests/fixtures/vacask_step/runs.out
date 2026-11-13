@@ -1,0 +1,26 @@
+VACASK's default transient step ceiling (the lead's item on StepCap; diffs-2's TranCapNone row).
+Build: VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (source VACASK-36be560,
+/nix/store/bi08mp28cfvs7nvvmwh2bch0ddzr7cnn-source). Run: `nix develop .#testing -c
+tests/fixtures/vacask_step/run.sh` (../checked.sh). Each deck: 1 ms, no maxstep; steps.py reads the
+raw file's time points: count, first step, largest step, median step (s). r_* is a resistor alone
+(no reactive state, so no LTE limit: the step sits at its ceiling); the others an RC (1k, 1n).
+Source: lib/coretran.cpp:1020-1040: hmax = min(span, span/tran_minpts (50), maxstep if given,
+tran_ffmax (0.25)/(2·maxFreq)); lib/devvisrc.cpp:688-691: only a Sine source sets maxFreq.
+Result: the ceiling is min(span/50, 1/(8·f)): r_sin10k max 12.5 µs (1/(8·10k)), r_sin100k 1.25 µs,
+r_sin1k and r_dc 20 µs (span/50). The first step is 0.25·min(step, 1/(8·f)) and is not bounded by
+span/50: dc_100u's first step is 25 µs, which is diffs-2's "25 µs" (its tran_cap.sim, step=100u).
+So StepCap::SpanOver50 states VACASK only while no sine is faster than 50/(8·span); StepCap::VacaskRule
+states it always. Class: a step-control difference (VACASK against ngspice's min(tstep, span/50)).
+
+vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+dc_100u points=51 first=2.5e-05 max=2.5e-05 median=2e-05
+dc_1u points=59 first=2.5e-07 max=2e-05 median=2e-05
+r_dc_1u points=59 first=2.5e-07 max=2e-05 median=2e-05
+r_sin100k_1u points=1418 first=2.5e-07 max=1.25e-06 median=6.604e-07
+r_sin10k_100u points=145 first=3.125e-06 max=1.25e-05 median=6.496e-06
+r_sin10k_1u points=151 first=2.5e-07 max=1.25e-05 median=6.411e-06
+r_sin1k_1u points=59 first=2.5e-07 max=2e-05 median=2e-05
+sin100k_1u points=1699 first=2.5e-07 max=6.814e-07 median=5.854e-07
+sin10k_100u points=181 first=3.125e-06 max=1.005e-05 median=5.622e-06
+sin10k_1u points=187 first=2.5e-07 max=1.013e-05 median=5.688e-06
+sin1k_1u points=69 first=2.5e-07 max=2e-05 median=2e-05

@@ -28,10 +28,12 @@ pub enum RunExtra {
     TranInitialStep,
     /// A transient whose default step ceiling is ngspice's `min(print_step, span/50)`.
     TranCapNgspice,
-    /// A transient whose default step ceiling is `span/50` (Spectre, VACASK).
+    /// A transient whose default step ceiling is `span/50` (Spectre).
     TranCapSpan50,
     /// A transient whose default step ceiling is `span/10` (Xyce).
     TranCapSpan10,
+    /// A transient whose default step ceiling is VACASK's (`StepCeiling::Rule(StepCap::VacaskRule)`).
+    TranCapVacask,
     /// A transient that skips the operating point (`uic`).
     TranUic,
     /// A transient that ramps the DC sources (LTspice `startup`).
@@ -412,7 +414,7 @@ pub enum RunExtra {
 
 impl RunExtra {
     /// Every member, in declaration order (the order of `Feature::Run` indices).
-    pub const ALL: [RunExtra; 174] = [
+    pub const ALL: [RunExtra; 175] = [
         RunExtra::SeveralAnalyses,
         RunExtra::TranSimulatorStep,
         RunExtra::TranRecordStart,
@@ -421,6 +423,7 @@ impl RunExtra {
         RunExtra::TranCapNgspice,
         RunExtra::TranCapSpan50,
         RunExtra::TranCapSpan10,
+        RunExtra::TranCapVacask,
         RunExtra::TranUic,
         RunExtra::TranStartup,
         RunExtra::TranNoise,

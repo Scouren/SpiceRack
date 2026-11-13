@@ -29,6 +29,8 @@ meaning: an `Alter` changes the circuit for every run item after it. This is the
 
 **R98 (2026-11-13): no run-order item in a subcircuit.** `Violation::RunOrderInSubckt` (X0028, `state_order::order_in_subckt`, on a design whose handles hold): an `Alter`, a `Loop`, a `Reset`, a `Print`, a `Measure` (no reader produces either there; the lead on R98), or an `OptionRow`, `Env`, `NodeSet` or `Save` whose `holds` is `FromHere`, listed anywhere inside a subcircuit body. An `Analysis` there stays a placement: the ngspice reader reads `.op` in a `.subckt` as the deck's (R26, `run_in_subckt.sp`). A subcircuit is instantiated, not executed. Whole-run items there stay placements (R27). The generator draws none (`candidates`, `gen_holds`), so `Placed(Subckt, Loop | Alter | Reset | Print | Measure)` is unreachable by design.
 
+**VACASK's step ceiling (2026-11-13, the lead's item).** `StepCap::VacaskRule`: with no `maxstep` VACASK steps at most min(span/50, 1/(8·f)), `f` the highest frequency of a sine source (VACASK-36be560 `lib/coretran.cpp:1020-1040`, `lib/devvisrc.cpp:688-691`; runs `crates/ir/tests/fixtures/vacask_step/`). `SpanOver50` is now Spectre's alone. Feature `RunExtra::TranCapVacask`, IR text `cap=vacask_rule`. A rule may state it as a given ceiling where the sine frequencies are literals. `StepCap::None` was removed (R100: no simulator leaves the step uncapped).
+
 **Order (A14, R25).** Run items are listed in the order their source lists them; no reader
 permutes them and no writer reorders them. Analyses with no `Alter`, no loop boundary and no
 `FromHere` state item between them are independent: their order changes no number, only the

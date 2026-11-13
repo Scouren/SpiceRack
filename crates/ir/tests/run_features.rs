@@ -24,6 +24,7 @@ const CASES: &[(RunExtra, &str, &str)] = &[
     (RunExtra::TranCapNgspice, "  analysis tran stop=1u print_step=1n cap=ngspice_rule", "  analysis tran stop=1u print_step=1n cap=span_over50"),
     (RunExtra::TranCapSpan50, "  analysis tran stop=1u print_step=1n cap=span_over50", T),
     (RunExtra::TranCapSpan10, "  analysis tran stop=1u print_step=1n cap=span_over10", T),
+    (RunExtra::TranCapVacask, "  analysis tran stop=1u print_step=1n cap=vacask_rule", T),
     (RunExtra::TranUic, "  analysis tran stop=1u print_step=1n cap=ngspice_rule uic", T),
     (RunExtra::TranStartup, "  analysis tran stop=1u print_step=1n cap=ngspice_rule startup", T),
     (RunExtra::TranNoise, "  analysis tran stop=1u print_step=1n noise_fmax=1g noise_fmin=1meg cap=ngspice_rule", T),

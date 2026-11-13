@@ -106,10 +106,19 @@ pub enum StepCeiling {
 pub enum StepCap {
     /// `min(print_step, span/50)` (ngspice).
     NgspiceRule,
-    /// `span/50` (Spectre, VACASK).
+    /// `span/50` (Spectre).
     SpanOver50,
     /// `span/10` (Xyce).
     SpanOver10,
+    /// VACASK's default: min(span/50, 1/(8·f)) with `f` the highest frequency of the design's
+    /// sine sources (only `type="sine"` sets it; none, or a frequency of 0, leaves span/50).
+    /// VACASK-36be560 `lib/coretran.cpp:1020-1040` (`tran_minpts` 50, `tran_ffmax` 0.25 over
+    /// `2·maxFreq`), `lib/devvisrc.cpp:688-691`; runs in `tests/fixtures/vacask_step/`: a
+    /// resistor driven at 10 kHz steps at most 12.5 µs over 1 ms, at 100 kHz 1.25 µs, at 1 kHz
+    /// and at DC 20 µs. Its first step is 0.25·min(`step`, 1/(8·f)), not bounded by span/50
+    /// (25 µs for `step=100u` at DC). Where the sine frequencies are literals a rule may state it
+    /// exactly as a given ceiling; it is not `SpanOver50` once a sine is faster than 50/(8·span).
+    VacaskRule,
 }
 
 /// A Fourier analysis of the preceding transient's last periods (`.four`, Spectre `fourier`).
@@ -140,10 +149,11 @@ const _: () = assert!(size_of::<Four>() == 24);
 
 impl StepCap {
     /// Every rule, in declaration order.
-    pub const ALL: [StepCap; 3] = [
+    pub const ALL: [StepCap; 4] = [
         StepCap::NgspiceRule,
         StepCap::SpanOver50,
         StepCap::SpanOver10,
+        StepCap::VacaskRule,
     ];
     /// Rule count.
     pub const COUNT: usize = Self::ALL.len();
@@ -351,6 +361,7 @@ fn cap_feature(cap: StepCap) -> RunExtra {
         StepCap::NgspiceRule => RunExtra::TranCapNgspice,
         StepCap::SpanOver50 => RunExtra::TranCapSpan50,
         StepCap::SpanOver10 => RunExtra::TranCapSpan10,
+        StepCap::VacaskRule => RunExtra::TranCapVacask,
     }
 }
 
