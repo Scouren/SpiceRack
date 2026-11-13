@@ -51,7 +51,7 @@ const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
 const ELEMENTS: &str =
     "interim: dialect_ngspice_elements' fixtures (resistor, capacitor_inductor, controlled)";
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
-const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, sens, four, pss)";
+const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, four, noise, pss); W1305 refuses the generator's expression fields in a script deck, so the laws run on no generated script analysis of these kinds; waits for the IR generator to draw literal fields for an analysis written as a script command";
 const SCRIPT_FIELD: &str = "the generator draws an analysis field as an expression, which a script command cannot spell (W1305, settle script_tran_brace.sp); the control area's property builds script plans with number fields";
 const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VC_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
