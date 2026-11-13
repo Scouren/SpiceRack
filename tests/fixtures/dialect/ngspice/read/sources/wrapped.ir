@@ -1,0 +1,10 @@
+# codes: P1150 P1150
+file "wrapped.sp" deck
+  title "wrapped"
+  comment " oracle: settle/wrap_source_{1,2,3,4}.sp ({a}+{b} and 'a'+'b': 'unknown parameter (+)'; 'a+{b}' and {a+'b'}: v(n) = 3)"
+  param a = 1
+  param b = 2
+  opaque ngspice invalid "V1 n 0 {a}+{b}"
+  opaque ngspice invalid "V2 n 0 'a'+'b'"
+  element vsource V3 (n 0) dc=(a + b)
+  element vsource V4 (n 0) dc=(a + b)

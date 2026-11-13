@@ -23,7 +23,7 @@
 //! Contents: `pub(super) enum Grammar`, `pub(super) struct Scan`, `pub(super) enum Fit`
 //! (`negate`, `build`), `pub(super) struct Long` (`negate`),
 //! `pub(super) fn scan(text: &str, grammar: Grammar) -> Option<Scan>`,
-//! `pub(super) fn card(token: &str) -> Option<Scan>`,
+//! `pub(super) fn card(token: &str) -> Option<Scan>`, `pub(super) fn whole(&str) -> Option<Scan>`,
 //! `pub(super) fn spell(d: &ir::Design, lit: ir::Literal, grammar: Grammar, out: &mut String)`
 
 use crate::ir;
@@ -175,6 +175,14 @@ pub(super) fn card(token: &str) -> Option<Scan> {
     }
     s.len = token.len();
     Some(s)
+}
+
+/// A token that is one card number and nothing after it (a script word: `foreach v 1k`,
+/// `alter r1 2k`; R37: a long one's digits kept), or `None`.
+pub(super) fn whole(token: &str) -> Option<Scan> {
+    let digits = token.strip_prefix(['-', '+']).unwrap_or(token);
+    let s = scan(digits, Grammar::Inp)?;
+    (s.len == digits.len()).then(|| card(token)).flatten()
 }
 
 /// Appends `lit` as `grammar` spells it: the digits with `frac` of them after the point, then

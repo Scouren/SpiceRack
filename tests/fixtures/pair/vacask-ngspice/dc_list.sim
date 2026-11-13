@@ -1,0 +1,11 @@
+dc_list: a DC sweep of a divider's source over listed values, 0, 0.5, 1 and 1.5 V (an arithmetic list)
+load "spice/resistor.osdi"
+model vsource vsource
+model resistor sp_resistor
+v1 (in 0) vsource dc=0.0
+r1 (in out) resistor r=1k
+r2 (out 0) resistor r=3k
+control
+  sweep s1 instance="v1" parameter="dc" values=[0.0, 0.5, 1.0, 1.5]
+    analysis dc1 op
+endc

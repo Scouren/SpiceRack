@@ -119,6 +119,8 @@ pub(super) fn write(
 pub(super) fn admits(design: &ir::Design, diags: &mut ir::Diags) {
     // a value its evaluator cannot spell (W1007): one walk over every item
     write_structure::admits(design, diags);
+    // an alter, loop or DC axis of a device the design does not hold (R70): one walk
+    write_control::missing_targets(design, diags);
     // each item's place in its scope: `reachable` lists a scope's items in order (O(items))
     let mut at: std::collections::HashMap<ir::ScopeId, usize> = std::collections::HashMap::new();
     for (item, scope) in design.reachable() {

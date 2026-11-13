@@ -1,4 +1,6 @@
 script_mixed
+r1 a 0 1k
+.model dmod d
 .options reltol=1e-4
 .control
 alter r1 2k

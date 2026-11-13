@@ -47,6 +47,7 @@ mod read_run;
 mod read_sources;
 mod read_structure;
 mod tables;
+mod value;
 mod write;
 mod write_control;
 mod write_elements;

@@ -2,5 +2,6 @@
 file "foreach_loop.sp" deck
   title "foreach_loop"
   comment " oracle: S3-CONTROL V1, S5: a foreach word is the word as written (control.c:465) and the target keeps the last value (settle/subst.sp): Loop, KeepLast, Loop.name the variable (lead's Q3)"
+  element resistor r1 (a 0) value=1k
   loop sweep keep_last name=v (element_value r1) (list values=[1k, 2.2k])
     analysis op
