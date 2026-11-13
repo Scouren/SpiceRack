@@ -273,6 +273,13 @@ pub(super) const PASSES: &[Pass] = &[
         run: dc_axes_to_loops::dc_axis_model_param_to_loop,
     },
     Pass {
+        name: "dc_restart_to_loops",
+        removes: ir::Feature::Run(RunExtra::DcRestart),
+        requires: DC_LOOPS,
+        notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
+        run: dc_axes_to_loops::dc_restart_to_loops,
+    },
+    Pass {
         name: "alter_param_at_once_to_at_reset",
         removes: ir::Feature::Run(RunExtra::AlterParamAtOnce),
         requires: ir::FeatureSet::EMPTY

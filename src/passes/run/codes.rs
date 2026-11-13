@@ -188,9 +188,9 @@ pub(crate) const CODES: &[(ir::Code, ir::Info)] = &[
     (
         dc_axes_to_loops::DC_AXIS_KEPT,
         ir::Info {
-            title: "a DC axis over a device or model parameter the target cannot sweep",
+            title: "a DC analysis ngspice's .dc cannot state, and no loop of it is exact",
             cite: "rewrite/IR-RUN.md §1; INV-semantics 8.09",
-            explain: "The target's DC analysis sweeps a source, an element's value or the temperature, so this axis would become a loop of operating points. That is exact only for an analysis that restarts each point (a loop's points start afresh, a continued sweep from the previous point), that stands at its run's top with no analysis after it (the loop keeps its last value), whose peeled axes a loop can sweep, over values stated as decimal literals (no log grid). One of these fails, so the analysis is refused.",
+            explain: "ngspice's DC analysis sweeps a source, an element's value or the temperature, continuing its innermost axis point to point and starting each outer step afresh; this one asks otherwise, so it would become loops of operating points. That is exact only when every peeled axis starts afresh (a loop's pass reruns from the initial guess; an axis that carries the previous solve stays refused, R72), the analysis stands at its run's top with no analysis after it (the loops keep their last values), each peeled axis has a target a loop can sweep and values stated as decimal literals. One of these fails, so the analysis is refused.",
             kind: ir::Kind::Note,
         },
     ),

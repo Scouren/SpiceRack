@@ -142,6 +142,11 @@ fn a_loop_of_ops_is_no_continued_sweep() {
 }
 
 #[test]
+fn restart_loops_give_vacasks_afresh_points() {
+    dc_loops::restart_loops_give_vacasks_afresh_points();
+}
+
+#[test]
 fn dc_loops_give_the_points_vacask_gives() {
     dc_loops::dc_loops_give_the_points_vacask_gives();
 }
