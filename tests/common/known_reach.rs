@@ -13,7 +13,7 @@
 /// Strict both ways (`reach_every_kind_the_row_claims`).
 #[rustfmt::skip] // a table: one row per line
 pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
-    ("ngspice", "Elem(Inductor)", FIXPOINT, ELEMENTS),
+    ("ngspice", "Elem(Inductor)", "static_passives_with_their_own_keys_round_trip_by_meaning", INDUCTORS),
     ("ngspice", "Elem(ISource)", FIXPOINT, "interim: dialect_ngspice_sources' fixtures; W1150 (the positional card) refuses 138 of 140 generated current sources over 512 seeds, 120 with W1007"),
     ("ngspice", "Elem(Port)", FIXPOINT, SOURCES),
     ("ngspice", "Elem(Table)", "tables_with_number_points_round_trip_by_meaning", TABLE_POINTS),
@@ -44,6 +44,7 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
 const FIXPOINT: &str = "each_read_fixture_is_a_fixpoint_of_read_write_read";
 // Why, per area: every admitted generated design drops the kind by that area's refusal.
+const INDUCTORS: &str = "every admitted design of the round's generator drops its inductors by the elements area's refusal (W1100; the round integrator's row, 2cf26fba); static and dynamic inductors are built by the elements' covering properties (tests/dialect_ngspice_covering.rs)";
 const TABLE_POINTS: &str = "the generator draws a table point as an expression, which the table card cannot spell (W1100 Table; ngspice substitutes a braced point once, settle table_brace_point.sp: R74 (4)); tables with number points are built by the elements' covering property (tests/dialect_ngspice_covering.rs)";
 const SOURCES: &str = "interim: dialect_ngspice_sources' fixtures (pulse, pwl, sin, exp, sffm, am, noise, ac_forms, distof_port)";
 const RUN: &str = "interim: dialect_ngspice_run's fixtures (dc, four, noise, pss); W1305 refuses the generator's expression fields in a script deck, so the laws run on no generated script analysis of these kinds; waits for the IR generator to draw literal fields for an analysis written as a script command";
