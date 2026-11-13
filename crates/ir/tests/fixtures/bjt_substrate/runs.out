@@ -5,6 +5,7 @@ VACASK /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026 (its bjt
 the older /nix/store/g5ial84gcp2da9h7y63r4c6dc1iqip57-vacask-unstable-2026, vadng-pre-46, follows
 ngspice-45's law). Deck: one NPN, is=1e-15 bf=100 iss=1e-12 subs=1, c/b/e at 0 V, substrate at
 0.6 V (forward); tnom 27 C, reltol 1e-9; i(vs) the substrate source's current (A).
+Rechecked 2026-11-13 under R91b (../checked.sh: a run whose exit status is not 0 or whose output says it aborted, stepped too small or met a singular matrix gives refused(<why>), never a reading): every reading reproduced, none refused.
 
 T(C) ns ibe,ibc nr  ngspice-45      VACASK
 27   2  none    1   -1.08958e-07    -1.089581375125359e-07

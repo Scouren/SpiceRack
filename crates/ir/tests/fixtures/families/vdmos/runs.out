@@ -1,6 +1,7 @@
 Second reading of sp_vdmos against ngspice-45. Builds on PATH: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n (source
 hfvpfb0bgw9819wkb7kzpdaasbd0hd5r, devices/vdmos), VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (devices/spice/vdmos.va,
 ngspice-47-159 vadng-pre-48). Run: `nix develop .#testing -c tests/fixtures/families/vdmos/run.sh`. i(vd) in A.
+Rechecked 2026-11-13 under R91b (../../checked.sh: a run whose exit status is not 0 or whose output says it aborted, stepped too small or met a singular matrix gives refused(<why>), never a reading): every reading reproduced, none refused.
 
 deck               ngspice-45            VACASK                 lead
 v1_kp_given        -9.00000000000e+01    -90.00000000001057     control: kp=20 given

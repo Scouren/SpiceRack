@@ -88,9 +88,10 @@ pub enum Law {
     /// Point R91 F20: `m` once (the VACASK module the flake pins; the older build alike).
     DiodeWlMultOnce,
     /// Point R91 F22, a diode's sidewall depletion charge past its knee (`fcs`·`php`): with the
-    /// bottom junction's F1 (ngspice-45 `dioload.c:431`). Run (`l3_ramp_0.7`): 4.435741165180e-03
-    /// here against 8.544073680612274e-03 under `DiodeSidewallOwnF1`, equal below the knee
-    /// (`l3_ramp_0.3`). Carried by a diode with a perimeter (`pj` given and not literally 0, or
+    /// bottom junction's F1 (ngspice-45 `dioload.c:431`), whose charge jumps at the knee. Run
+    /// (`l3_ramp_0.7`, R91b): here the transient cannot cross the knee ("Timestep too small",
+    /// refused), against 8.544073680612274e-03 under `DiodeSidewallOwnF1` (the integral of C dv);
+    /// equal below the knee (`l3_ramp_0.3`). Carried by a diode with a perimeter (`pj` given and not literally 0, or
     /// `w` and `l` given on a level-3 or unresolved model) on a `Diode` or `DiodeLevel3` model
     /// whose `cjsw` is given and not literally 0, or on an unresolved model.
     DiodeSidewallBottomF1,
