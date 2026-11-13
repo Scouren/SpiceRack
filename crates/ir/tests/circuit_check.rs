@@ -1280,5 +1280,15 @@ mod tests {
             Vec::<Code>::new(),
             "top level"
         );
+        // across files (ngspice 1bee7f37, settle inst_cycle_inc: "unknown subckt: x1.xb.xa…"):
+        // a in the deck calls b of the included file, b calls a; each instance bound by the
+        // reader's rule (`#k`), since the neutral lookup does not see through an include
+        let across = concat!(
+            "  include \"inc.sp\"\n",
+            "  subckt a (p)\n    element instance xb (p) model=b#1\n",
+            "file \"inc.sp\" library\n",
+            "  subckt b (p)\n    element instance xa (p) model=a#0\n",
+        );
+        assert_eq!(codes_of(across), vec![cycle, cycle], "across files");
     }
 }
