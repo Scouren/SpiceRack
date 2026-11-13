@@ -1,0 +1,21 @@
+Second reading of sp_diode against ngspice-45 (the lead's family item). Builds the shell puts on PATH:
+ngspice-45 /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45 (source hfvpfb0bgw9819wkb7kzpdaasbd0hd5r-ngspice-45-source,
+src/spicelib/devices/dio), VACASK /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026 (devices/spice/diode.va,
+distilled from ngspice-47-159 vadng-pre-48). Run: `nix develop .#testing -c tests/fixtures/families/diode/run.sh`.
+Each lead has its control (where the reading says they agree).
+Rechecked 2026-11-13 under R91b (../../checked.sh: a run whose exit status is not 0 or whose output says it aborted, stepped too small or met a singular matrix gives refused(<why>), never a reading): every reading reproduced but
+l3_ramp_0.7 on ngspice-45, which is refused (R91b: its 4.435741165180e-03 was the last point printed after the abort,
+the sidewall charge at the knee, not a reading). VACASK's 8.544e-3 matches the analytic integral of C dv (R91b).
+
+deck            ngspice-45              VACASK                  lead
+l1_m1           -2.48562453922e-06      -2.48562453921619e-06   control: level 3, w=l=10u, m=1
+l1_m2           -9.94249665686e-06      -4.971248578432379e-06  level 3 area from w,l carries m, then is*area*m: m^2 (dio/diosetup.c:304, diotemp.c)
+l2_xom_given    2.169667609305e-06      2.169667609304785e-06   control: metal capacitor, xom=1e4 given
+l2_xom_absent   2.169667609305e-06      1.0000000235379853e-12  xom absent: ngspice 1e-6 m (diosetup.c:262), VACASK 1e4 m (diode.va:636)
+l3_ramp_0.3     3.188357887210e-03      0.0031883578872086704   control: sidewall junction below fcs*php
+l3_ramp_0.7     refused                 0.008544073680612274    beyond fcs*php the sidewall charge uses the bottom F1 (dioload.c:431) vs F1SW (diode.va:1112);
+                ngspice: "doAnalyses: TRAN:  Timestep too small; time = 5.77765e-07, timestep = 1.25e-21: trouble with node "a"" (exit 1)
+l4_ttt1_0.005   1.180463855727e+00      1.1804638557272855      control: transit-time factor 0.5
+l4_ttt1_0.01    1.126195826779e+00      1.1261960490808718      factor 0: ngspice 0, VACASK clamps to 1e-3 (diode.va: if factor<1e-3)
+l5_area_1       -2.48562453922e-06      -2.48562453921619e-06   control
+l5_area_0       -5.00000000000e-13      -2.48562453921619e-06   area=0: ngspice 0, VACASK warns and uses 1

@@ -9,7 +9,7 @@
 
 use spicerack_ir::{
     AcPart, AnalysisKind, DefKind, Edge, Event, EventKind, ExprId, List, OptionClass, OptionKey,
-    Probe, ProbeKind, SweepBounds, SweepEnd, SweepKind, SweepSpec, Target, TargetKind,
+    Probe, ProbeKind, SweepBounds, SweepCount, SweepEnd, SweepKind, SweepSpec, Target, TargetKind,
 };
 
 // ---- private ----
@@ -139,6 +139,7 @@ fn sweep_constructors_fill_exactly_their_fields() {
     let want = SweepSpec {
         kind: SweepKind::Lin,
         end: SweepEnd::Grid,
+        count: SweepCount::Plain,
         bounds: SweepBounds::StartStop,
         start: a,
         stop: b,

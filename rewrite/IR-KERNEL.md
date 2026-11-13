@@ -550,6 +550,16 @@ right, each `UnboundRead { item, expr, name, held }`. `held` marks a `Subckt` he
 which each instance's scope looks up (A29, IR text `name?`). The spine's strict read refuses
 the others.
 
+**F34 (2026-11-13): a reference stays inside its definition's subcircuit.** `Violation::RefScope`
+(X0027, `check_scopes::reference_scopes`): a resolved reference (a row's `Ref`, an expression's
+read or call) bound to a definition that lives in a subcircuit's body (a formal, a body
+parameter, function, model or subcircuit) stands in a scope inside that body, or in a file or
+section an include inside it reads (ngspice reads the included text where the include stands), or
+is the subcircuit's own head (a default reading a sibling formal); a read bound to a function's
+formal stands in that function. The trunk's ngspice reader bound `.subckt a w=1 / .param x='w*2'`
+to another subcircuit's `w`, invisible to every law that compares text. The IR text reader
+refuses such a row like every other `check` row (`refuse_invalid`).
+
 **A4: references are bound by a linker, not by the row's author.** `RowFacts` also has
 `map_refs` (each `Ref` the item holds, with the kind it expects; final signature in A9 above). `link(&mut Design, &mut Diags)` (`link.rs`) binds every unresolved `Ref` by
 exact name from the item's scope outward. It is the neutral rule: builders call it when they are

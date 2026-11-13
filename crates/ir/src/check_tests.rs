@@ -18,6 +18,10 @@ use crate::link::link;
 use crate::scope::Def;
 use crate::span::Span;
 
+// F34's shapes (`RefScope`): a child for the 500-line cap
+#[path = "check_scope_tests.rs"]
+mod scope_tests;
+
 /// A small valid deck: a param, a subcircuit with a body param, an if, a func, a load with
 /// its module, an include, a global, a comment and a title.
 struct Base {
@@ -94,7 +98,7 @@ fn a_valid_design_reports_nothing() {
 #[test]
 fn each_kernel_invariant_has_its_fixture() {
     type Break = fn(&mut Base);
-    let cases: [(Violation, Break); 18] = [
+    let cases: [(Violation, Break); 19] = [
         (Violation::HandleRange, |b| {
             let row = Param {
                 name: NameId(10_000),
@@ -239,6 +243,16 @@ fn each_kernel_invariant_has_its_fixture() {
             let m = bl.list(&[one]);
             bl.subckt(top, "t", &[], &[("w", m)], Span::NONE);
         }),
+        (Violation::RefScope, |b| {
+            // F34: `.subckt t w=1` whose body reads `w` bound to s's formal `w`
+            let top = b.d.file(crate::id::FileId(0)).top;
+            let theirs = b.d.lookup(b.sub_body, DefKind::Param, b.d.find_name("w"));
+            let mut bl = b.d.builder();
+            let one = bl.num(1.0);
+            let (_, body) = bl.subckt(top, "t", &["a"], &[("w", one)], Span::NONE);
+            let read = bl.param_ref_to(theirs);
+            bl.param(body, "y", read, Span::NONE);
+        }),
     ];
     for (want, break_it) in cases {
         let mut b = base();
@@ -253,6 +267,7 @@ fn each_kernel_invariant_has_its_fixture() {
         Violation::DuplicateElement,
         Violation::InstancePortCount,
         Violation::InstanceCycle,
+        Violation::LawConflict,
         // run-owned (run_check.rs has its fixtures)
         Violation::RunArgumentClass,
         Violation::TargetAlias,

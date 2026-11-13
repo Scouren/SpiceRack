@@ -273,11 +273,73 @@ pub enum CircuitExtra {
     /// A pulse, sine, exponential or SFFM under ngspice's zero rule
     /// (`GivenZero::SpiceDefault`).
     GivenZeroSpiceDefault,
+    // R90: a law's member, set at each row carrying its point when the design states the law
+    // (`laws.rs`: each `Law` variant's doc names its carriers and its runs)
+    /// A BJT carrying R86's point under `Law::BcSatAreaTimesAreab` (ngspice-45).
+    BjtBcSatAreaTimesAreab,
+    /// The same under `Law::BcSatAreabOnly` (the VACASK module the flake pins).
+    BjtBcSatAreabOnly,
+    /// A Gummel-Poon model carrying R88's point under `Law::SubSatLastFactor` (ngspice-45).
+    ModelSubSatLastFactor,
+    /// The same under `Law::SubSatEmissionNs` (the VACASK module the flake pins).
+    ModelSubSatEmissionNs,
+    /// A diode carrying R91 F20's point under `Law::DiodeWlMultTwice` (ngspice-45).
+    DiodeWlMultTwice,
+    /// The same under `Law::DiodeWlMultOnce` (the VACASK module the flake pins).
+    DiodeWlMultOnce,
+    /// A diode carrying R91 F22's point under `Law::DiodeSidewallBottomF1` (ngspice-45).
+    DiodeSidewallBottomF1,
+    /// The same under `Law::DiodeSidewallOwnF1` (the VACASK module the flake pins).
+    DiodeSidewallOwnF1,
+    /// A diode model carrying R92 F21's point under `Law::DiodeXomAbsent1e4` (ngspice-45).
+    DiodeXomAbsent1e4,
+    /// The same under `Law::DiodeXomAbsent1e14` (the VACASK module the flake pins).
+    DiodeXomAbsent1e14,
+    /// A VDMOS model carrying R92 F24's point under `Law::VdmosKpAbsent35` (ngspice-45).
+    VdmosKpAbsent35,
+    /// The same under `Law::VdmosKpAbsent20` (the VACASK module the flake pins).
+    VdmosKpAbsent20,
+    /// A VDMOS model carrying R92 F25's point under `Law::VdmosTcvthLowers` (ngspice-45).
+    VdmosTcvthLowers,
+    /// The same under `Law::VdmosTcvthRaises` (the VACASK module the flake pins).
+    VdmosTcvthRaises,
+    /// A VDMOS model carrying R92 F26's point under `Law::VdmosClampByN` (ngspice-45).
+    VdmosClampByN,
+    /// The same under `Law::VdmosClampByFc` (the VACASK module the flake pins).
+    VdmosClampByFc,
+    /// A MOSFET carrying R94 F27's point under `Law::MosSmallSignalHand` (ngspice-45).
+    MosSmallSignalHand,
+    /// The same under `Law::MosSmallSignalExact` (the VACASK modules the flake pins).
+    MosSmallSignalExact,
+    /// A MOSFET carrying R94 F28's point under `Law::Mos6SmallSignalAbsent` (ngspice-45).
+    Mos6SmallSignalAbsent,
+    /// The same under `Law::Mos6SmallSignalExact` (the VACASK module the flake pins).
+    Mos6SmallSignalExact,
+    /// A BJT carrying R94a F29's point under `Law::BjtIrbSmallSignalFrozen` (ngspice-45).
+    BjtIrbSmallSignalFrozen,
+    /// The same under `Law::BjtIrbSmallSignalExact` (the VACASK module the flake pins).
+    BjtIrbSmallSignalExact,
+    /// A VDMOS carrying R95 F30's point under `Law::VdmosMultChargesOff` (ngspice-45).
+    VdmosMultChargesOff,
+    /// The same under `Law::VdmosMultChargesCopies` (the VACASK module the flake pins).
+    VdmosMultChargesCopies,
+    /// A diode carrying R95 F31's point under `Law::DiodeIsrReverseNone` (ngspice-45).
+    DiodeIsrReverseNone,
+    /// The same under `Law::DiodeIsrReversePresent` (the VACASK module the flake pins).
+    DiodeIsrReversePresent,
+    /// A diode carrying R96's `isr` small-signal point under `Law::DiodeIsrSmallSignalHand` (ngspice-45).
+    DiodeIsrSmallSignalHand,
+    /// The same under `Law::DiodeIsrSmallSignalExact` (the VACASK module the flake pins).
+    DiodeIsrSmallSignalExact,
+    /// A diode model carrying R96's transit-time clamp point under `Law::DiodeTtFactorUnclamped` (ngspice-45).
+    DiodeTtFactorUnclamped,
+    /// The same under `Law::DiodeTtFactorClamped` (the VACASK module the flake pins).
+    DiodeTtFactorClamped,
 }
 
 impl CircuitExtra {
     /// Every member, in declaration order (the order of `Feature::Circuit` indices).
-    pub const ALL: [CircuitExtra; 109] = [
+    pub const ALL: [CircuitExtra; 139] = [
         CircuitExtra::MultResistor,
         CircuitExtra::MultCapacitor,
         CircuitExtra::MultInductor,
@@ -387,6 +449,36 @@ impl CircuitExtra {
         CircuitExtra::TcLawReciprocal,
         CircuitExtra::GivenZeroAsGiven,
         CircuitExtra::GivenZeroSpiceDefault,
+        CircuitExtra::BjtBcSatAreaTimesAreab,
+        CircuitExtra::BjtBcSatAreabOnly,
+        CircuitExtra::ModelSubSatLastFactor,
+        CircuitExtra::ModelSubSatEmissionNs,
+        CircuitExtra::DiodeWlMultTwice,
+        CircuitExtra::DiodeWlMultOnce,
+        CircuitExtra::DiodeSidewallBottomF1,
+        CircuitExtra::DiodeSidewallOwnF1,
+        CircuitExtra::DiodeXomAbsent1e4,
+        CircuitExtra::DiodeXomAbsent1e14,
+        CircuitExtra::VdmosKpAbsent35,
+        CircuitExtra::VdmosKpAbsent20,
+        CircuitExtra::VdmosTcvthLowers,
+        CircuitExtra::VdmosTcvthRaises,
+        CircuitExtra::VdmosClampByN,
+        CircuitExtra::VdmosClampByFc,
+        CircuitExtra::MosSmallSignalHand,
+        CircuitExtra::MosSmallSignalExact,
+        CircuitExtra::Mos6SmallSignalAbsent,
+        CircuitExtra::Mos6SmallSignalExact,
+        CircuitExtra::BjtIrbSmallSignalFrozen,
+        CircuitExtra::BjtIrbSmallSignalExact,
+        CircuitExtra::VdmosMultChargesOff,
+        CircuitExtra::VdmosMultChargesCopies,
+        CircuitExtra::DiodeIsrReverseNone,
+        CircuitExtra::DiodeIsrReversePresent,
+        CircuitExtra::DiodeIsrSmallSignalHand,
+        CircuitExtra::DiodeIsrSmallSignalExact,
+        CircuitExtra::DiodeTtFactorUnclamped,
+        CircuitExtra::DiodeTtFactorClamped,
     ];
     /// Member count.
     pub const COUNT: usize = Self::ALL.len();

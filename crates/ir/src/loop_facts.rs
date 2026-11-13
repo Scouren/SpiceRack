@@ -50,8 +50,9 @@ impl DetailFacts for SweepLoop {
         sweep_features(&self.sweep, SweepUse::Loop, set);
     }
 
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        (!target_valid(&self.target) || !sweep_valid(&self.sweep)).then_some(Violation::FieldDomain)
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        (!target_valid(&self.target) || !sweep_valid(design, &self.sweep, SweepUse::Loop))
+            .then_some(Violation::FieldDomain)
     }
 
     #[cfg(any(test, feature = "gen"))]

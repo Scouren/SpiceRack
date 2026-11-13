@@ -1,0 +1,12 @@
+bjt_rbconst off (80 C, m=3), sat (vgs=0.8, vds=0.1, vbs=-0.5), acd
+load "spice/bjt.osdi"
+model vs vsource
+model nm sp_bjt type=1 ibe=1e-16 ibc=2e-16 bf=100 br=2 nf=1 nr=1 vaf=50 var=20 ikf=10m ikr=5m ise=1e-14 ne=1.5 isc=1e-14 nc=2 rb=50 rc=5 re=1 cje=1p vje=0.75 mje=0.33 cjc=0.5p vjc=0.75 mjc=0.33 xcjc=0.8 cjs=0.3p vjs=0.7 mjs=0.5 tf=10p xtf=1 vtf=2 itf=10m tr=1n xtb=1.5 eg=1.11 xti=3 subs=1
+vd (d 0) vs dc=0.1 mag=1
+vg (g 0) vs dc=0.8
+vb (b 0) vs dc=-0.5
+q1 (d g 0 b) nm area=2 $mfactor=3
+control
+  options temp=80 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis ac1 ac from=1e9 to=1e9 mode="lin" points=1
+endc

@@ -27,7 +27,7 @@ use crate::controlled::{
 use crate::element::{DetailKind, ElemKind, MultLaw, NO_ROW};
 use crate::feature::{Feature, FeatureSet};
 use crate::r#gen::placeable;
-use crate::r#gen::{Gen, Reads};
+use crate::r#gen::{Gen, Params, Reads};
 use crate::id::{DefId, ExprId, ExprList, ItemRef, List, NameId, Ref, ScopeId};
 use crate::item::{DefKind, ItemKind, ScopeKind};
 use crate::letter::letter_of;
@@ -203,6 +203,15 @@ pub(crate) fn generate_element(
         MultLaw::NgspiceAppend => X::MultInstanceNgspiceAppend,
         MultLaw::Parallel => crate::circuit_tables::mult_class(kind, voltage),
     };
+    // R91: a diode sometimes gives `w`, `l` and `pj`, where the diode laws' points stand (a
+    // member only under a stated law, drawn from the set); drawn before `mult`, in text order,
+    // values before keys as `Words::params` creates them
+    let params = if kind == ElemKind::Diode && r.g.params != Params::TypedOnly && r.g.chance(2) {
+        let (w, l, pj) = (r.ex(), r.ex(), r.ex());
+        r.b.params(&[("w", w), ("l", l), ("pj", pj)])
+    } else {
+        List::EMPTY
+    };
     let mult = if mult_law == MultLaw::NgspiceAppend || r.maybe(mult_feature) {
         r.ex()
     } else {
@@ -212,7 +221,7 @@ pub(crate) fn generate_element(
         name,
         terminals,
         model,
-        params: List::EMPTY,
+        params,
         mult,
         mult_law,
     };

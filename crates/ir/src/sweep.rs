@@ -20,7 +20,8 @@
 //!   `SweepSpec::dec(ExprId, ExprId, ExprId) -> SweepSpec`,
 //!   `SweepSpec::oct(ExprId, ExprId, ExprId) -> SweepSpec`,
 //!   `SweepSpec::log(ExprId, ExprId, ExprId) -> SweepSpec`, `SweepSpec::list(ExprList) -> SweepSpec`,
-//!   `SweepSpec::ending(self, SweepEnd) -> SweepSpec`
+//!   `SweepSpec::ending(self, SweepEnd) -> SweepSpec`, `pub enum SweepCount`,
+//!   `pub fn on_grid(&Design, &SweepSpec) -> bool` (R99)
 //! - the run rows' sweep facts: `pub(crate) enum SweepUse`, `pub(crate) fn sweep_handles`,
 //!   `pub(crate) fn sweep_valid`, `pub(crate) fn sweep_features`, `pub(crate) fn dump_sweep`,
 //!   `pub(crate) fn parse_sweep`, `pub(crate) fn sweep_possible` (gen), `pub(crate) fn gen_sweep`
@@ -28,7 +29,7 @@
 //! A sweep's form is a feature per use (A24): `form_feature` is the table of
 //! `Sweep{Dc,Loop,Freq}{LinStep,LinPoints,Dec,Oct,Log,List}`.
 //!
-//! IR text: `(kind [on_stop] [center_span] [start=v] [stop=v] [step=v] [points=v]
+//! IR text: `(kind [on_stop | stretch | ng_decade] [ng_lin] [center_span] [start=v] [stop=v] [step=v] [points=v]
 //! [values=[v, …]])`, e.g. `(lin start=0 stop=5 step=0.1)`, `(dec on_stop start=1 stop=1g
 //! points=10)`, `(list values=[1, 2])`.
 
@@ -57,6 +58,8 @@ pub struct SweepSpec {
     pub kind: SweepKind,
     /// Where a range ends when its grid misses the stop value.
     pub end: SweepEnd,
+    /// How a linear frequency sweep's count is read (R99: ngspice's own law, or plain).
+    pub count: SweepCount,
     /// Whether `start`/`stop` hold the bounds or Spectre's centre and span.
     pub bounds: SweepBounds,
     /// The first value (`StartStop`) or the centre (`CenterSpan`); `NONE` for `List`.
@@ -92,16 +95,41 @@ pub enum SweepKind {
     List,
 }
 
-/// Where a range ends when stepping from `start` misses `stop`.
+/// Where a range ends when stepping from `start` misses `stop` (R99, F33). A sweep whose stop
+/// is provably on its grid ([`on_grid`]) ends there under every rule and states `Grid`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum SweepEnd {
-    /// On the last grid value at or before `stop` (ngspice `oct`, Xyce, Spectre, VACASK).
+    /// On the last value of the exact grid at or before `stop` (ngspice `oct`, Xyce, Spectre).
     Grid,
     /// On `stop` itself, appended after the last grid value that falls short of it (LTspice:
     /// `.step 1k 10k 4k` is 1k 5k 9k 10k; a log AC sweep ends on its stop frequency,
     /// `INV-semantics.md` 8.07).
     OnStop,
+    /// A `Dec` or `Oct` range whose interval count (the count per decade or octave times the
+    /// decades or octaves) is rounded up and the values spaced evenly in the logarithm so the
+    /// last is `stop` (VACASK's `dec` and `oct`, AC and DC: `dec 10 10 20k` is 35 values,
+    /// 12.5052, …, 20000; R99 law C).
+    Stretch,
+    /// ngspice's `dec`, one rule: over one decade or more the interval count rounded down, the
+    /// values spaced evenly in the logarithm so the last is `stop` (`dec 10 10 20k` is 34
+    /// values, 12.5902, …, 20000; R99 law F); under one decade the exact grid, `stop` not
+    /// reached (`dec 2 1k 5k`: 1000, 3162.28; law G). Only on a `Dec` range.
+    NgDecade,
+}
+
+/// How a linear frequency sweep's count of values is read (R97a, R99). A literal count is read
+/// by each reader into its plain meaning (ngspice's `lin 2` is one value at the start), so only
+/// a count that is not a literal states `NgLin`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum SweepCount {
+    /// The count is the number of values, ends included.
+    Plain,
+    /// ngspice-45's AC and S-parameter `lin`: a count of 2 runs one value (the start), 0 runs
+    /// ten, any other count that many (runs: `runrules`, R97a). Only on a `Lin` by count in a
+    /// frequency sweep whose count is not a literal.
+    NgLin,
 }
 
 /// How a range's two bounds are written.
@@ -229,9 +257,61 @@ impl SweepKind {
 
 impl SweepEnd {
     /// Every rule, in declaration order.
-    pub const ALL: [SweepEnd; 2] = [SweepEnd::Grid, SweepEnd::OnStop];
+    pub const ALL: [SweepEnd; 4] = [
+        SweepEnd::Grid,
+        SweepEnd::OnStop,
+        SweepEnd::Stretch,
+        SweepEnd::NgDecade,
+    ];
     /// Rule count.
     pub const COUNT: usize = Self::ALL.len();
+}
+
+impl SweepCount {
+    /// Every reading, in declaration order.
+    pub const ALL: [SweepCount; 2] = [SweepCount::Plain, SweepCount::NgLin];
+    /// Reading count.
+    pub const COUNT: usize = Self::ALL.len();
+}
+
+/// Whether the sweep's stop is provably on its grid, where every end rule gives the same
+/// values (R99): a `Dec` or `Oct` range by start and stop, both positive literal numbers whose
+/// ratio is an exact integer power of ten or two (either way up). Decided in integer arithmetic
+/// on the literals' digits, never in doubles; the count does not enter (base^(k/n) is rational
+/// only when n divides k). `false` for any other sweep, a read, a `Long` literal, or digits
+/// whose ratio overflows an `i128`. The one function every reader and rule asks.
+pub fn on_grid(design: &Design, s: &SweepSpec) -> bool {
+    let base: i128 = match s.kind {
+        SweepKind::Dec => 10,
+        SweepKind::Oct => 2,
+        SweepKind::Lin | SweepKind::Log | SweepKind::List => return false,
+    };
+    if s.bounds != SweepBounds::StartStop {
+        return false;
+    }
+    let (Some((m0, e0)), Some((m1, e1))) = (digits(design, s.start), digits(design, s.stop)) else {
+        return false;
+    };
+    // stop / start = (m1 / m0) * 10^(e1 - e0), as a fraction num / den in lowest terms
+    let shift = |m: i128, by: i32| 10i128.checked_pow(by as u32).and_then(|p| m.checked_mul(p));
+    let (num, den) = if e1 >= e0 {
+        (shift(m1, e1 - e0), Some(m0))
+    } else {
+        (Some(m1), shift(m0, e0 - e1))
+    };
+    let (Some(num), Some(den)) = (num, den) else {
+        return false;
+    };
+    let g = gcd(num, den);
+    let (num, den) = (num / g, den / g);
+    let power = |mut x: i128| {
+        // bounded: each pass divides x by base > 1
+        while x > 1 && x % base == 0 {
+            x /= base;
+        }
+        x == 1
+    };
+    (den == 1 && power(num)) || (num == 1 && power(den))
 }
 
 impl SweepBounds {
@@ -253,34 +333,43 @@ pub(crate) fn sweep_handles(s: &SweepSpec, out: &mut Vec<Handle>) {
     ]);
 }
 
-/// Whether the sweep reads exactly the fields its kind and bounds name (the struct doc).
-pub(crate) fn sweep_valid(s: &SweepSpec) -> bool {
+/// Whether the sweep reads exactly the fields its kind and bounds name (the struct doc), and
+/// its end rule and count reading stand where they mean something (R99: `Stretch` on a `Dec`
+/// or `Oct` off its grid, `NgDecade` on a `Dec` off its grid, `NgLin` on a frequency sweep's
+/// `Lin` by a count that is not a literal).
+pub(crate) fn sweep_valid(design: &Design, s: &SweepSpec, at: SweepUse) -> bool {
     let set = |e: ExprId| !e.is_none();
-    match s.kind {
-        SweepKind::Lin => {
-            set(s.start) && set(s.stop) && (set(s.step) != set(s.points)) && s.values.len == 0
+    let end_ok = match s.end {
+        SweepEnd::Grid | SweepEnd::OnStop => true,
+        SweepEnd::Stretch => {
+            matches!(s.kind, SweepKind::Dec | SweepKind::Oct) && !on_grid(design, s)
         }
-        SweepKind::Dec | SweepKind::Oct | SweepKind::Log => {
-            set(s.start) && set(s.stop) && !set(s.step) && set(s.points) && s.values.len == 0
+        SweepEnd::NgDecade => s.kind == SweepKind::Dec && !on_grid(design, s),
+    };
+    let count_ok = match s.count {
+        SweepCount::Plain => true,
+        SweepCount::NgLin => {
+            at == SweepUse::Freq
+                && s.kind == SweepKind::Lin
+                && set(s.points)
+                && !matches!(design.expr(s.points), crate::expr::Expr::Num(_))
         }
-        SweepKind::List => {
-            !set(s.start)
-                && !set(s.stop)
-                && !set(s.step)
-                && !set(s.points)
-                && s.values.len > 0
-                && s.end == SweepEnd::Grid
-                && s.bounds == SweepBounds::StartStop
-        }
-    }
+    };
+    end_ok && count_ok && fields_valid(s)
 }
 
 /// Adds the sweep's `RunExtra` features.
 pub(crate) fn sweep_features(s: &SweepSpec, at: SweepUse, set: &mut FeatureSet) {
     let mut add = |x: RunExtra| *set = set.with(Feature::Run(x));
     add(form_feature(at, form_of(s)));
-    if s.end == SweepEnd::OnStop {
-        add(RunExtra::SweepEndOnStop);
+    match s.end {
+        SweepEnd::Grid => {}
+        SweepEnd::OnStop => add(RunExtra::SweepEndOnStop),
+        SweepEnd::Stretch => add(RunExtra::SweepEndStretch),
+        SweepEnd::NgDecade => add(RunExtra::SweepEndNgDecade),
+    }
+    if s.count == SweepCount::NgLin {
+        add(RunExtra::SweepCountNgLin);
     }
     if s.bounds == SweepBounds::CenterSpan {
         add(RunExtra::SweepCenterSpan);
@@ -292,6 +381,9 @@ pub(crate) fn dump_sweep(design: &Design, ctx: &Ctx, s: &SweepSpec, out: &mut St
     out.push_str(" (");
     out.push_str(&word(s.kind));
     put_flag(out, s.end == SweepEnd::OnStop, "on_stop");
+    put_flag(out, s.end == SweepEnd::Stretch, "stretch");
+    put_flag(out, s.end == SweepEnd::NgDecade, "ng_decade");
+    put_flag(out, s.count == SweepCount::NgLin, "ng_lin");
     put_flag(out, s.bounds == SweepBounds::CenterSpan, "center_span");
     put_expr(out, design, ctx, "start", s.start);
     put_expr(out, design, ctx, "stop", s.stop);
@@ -314,8 +406,17 @@ pub(crate) fn parse_sweep(
     let kind = take_enum(words, &SweepKind::ALL, diags)?;
     let end = if take_word(words, "on_stop") {
         SweepEnd::OnStop
+    } else if take_word(words, "stretch") {
+        SweepEnd::Stretch
+    } else if take_word(words, "ng_decade") {
+        SweepEnd::NgDecade
     } else {
         SweepEnd::Grid
+    };
+    let count = if take_word(words, "ng_lin") {
+        SweepCount::NgLin
+    } else {
+        SweepCount::Plain
     };
     let bounds = if take_word(words, "center_span") {
         SweepBounds::CenterSpan
@@ -330,6 +431,7 @@ pub(crate) fn parse_sweep(
     close(words, diags).then_some(SweepSpec {
         kind,
         end,
+        count,
         bounds,
         start,
         stop,
@@ -385,11 +487,31 @@ pub(crate) fn gen_sweep(
         if has(RunExtra::SweepEndOnStop) && g.chance(3) {
             s.end = SweepEnd::OnStop;
         }
+        // R99: an end law only off the grid, a count law only on a count that is not a literal
+        let off_grid = !on_grid(b.design(), &s);
+        let dec_oct = matches!(kind, SweepKind::Dec | SweepKind::Oct);
+        if dec_oct && off_grid && has(RunExtra::SweepEndStretch) && g.chance(3) {
+            s.end = SweepEnd::Stretch;
+        }
+        if kind == SweepKind::Dec && off_grid && has(RunExtra::SweepEndNgDecade) && g.chance(3) {
+            s.end = SweepEnd::NgDecade;
+        }
+        let literal =
+            !s.points.is_none() && matches!(b.design().expr(s.points), crate::expr::Expr::Num(_));
+        let by_count = form == Form::LinPoints;
+        if at == SweepUse::Freq
+            && by_count
+            && !literal
+            && has(RunExtra::SweepCountNgLin)
+            && g.chance(3)
+        {
+            s.count = SweepCount::NgLin;
+        }
         if has(RunExtra::SweepCenterSpan) && g.chance(3) {
             s.bounds = SweepBounds::CenterSpan;
         }
     }
-    debug_assert!(sweep_valid(&s));
+    debug_assert!(sweep_valid(b.design(), &s, at));
     s
 }
 
@@ -403,11 +525,64 @@ pub(crate) fn sweep_possible(features: &FeatureSet, at: SweepUse) -> bool {
 
 // ---- private ----
 
+/// Whether the sweep reads exactly the fields its kind and bounds name.
+fn fields_valid(s: &SweepSpec) -> bool {
+    let set = |e: ExprId| !e.is_none();
+    match s.kind {
+        SweepKind::Lin => {
+            set(s.start) && set(s.stop) && (set(s.step) != set(s.points)) && s.values.len == 0
+        }
+        SweepKind::Dec | SweepKind::Oct | SweepKind::Log => {
+            set(s.start) && set(s.stop) && !set(s.step) && set(s.points) && s.values.len == 0
+        }
+        SweepKind::List => {
+            !set(s.start)
+                && !set(s.stop)
+                && !set(s.step)
+                && !set(s.points)
+                && s.values.len > 0
+                && s.end == SweepEnd::Grid
+                && s.bounds == SweepBounds::StartStop
+        }
+    }
+}
+
+/// A positive literal's digits as `(mantissa, power of ten)`, its value `mantissa × 10^power`
+/// exactly (`Mil`: the mantissa times 254 and the power less 7, 25.4e-6 = 254e-7); `None` for a
+/// read, a `Long` literal or a value not above zero.
+fn digits(design: &Design, e: ExprId) -> Option<(i128, i32)> {
+    let crate::expr::Expr::Num(k) = design.expr(e) else {
+        return None;
+    };
+    let l = design.num(k);
+    let power = i32::from(l.exp10) - i32::from(l.frac);
+    match l.form {
+        _ if l.mantissa <= 0 => None,
+        crate::literal::NumForm::Long => None,
+        crate::literal::NumForm::Mil => Some((i128::from(l.mantissa) * 254, power - 7)),
+        crate::literal::NumForm::Plain
+        | crate::literal::NumForm::Exponent
+        | crate::literal::NumForm::Scale
+        | crate::literal::NumForm::Int => Some((i128::from(l.mantissa), power)),
+    }
+}
+
+/// The greatest common divisor of two positive integers. Bounded: Euclid's steps are
+/// logarithmic in the smaller.
+fn gcd(mut a: i128, mut b: i128) -> i128 {
+    assert!(a > 0 && b > 0, "gcd of positive integers");
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    a
+}
+
 /// A range sweep of no kind yet: the fields every constructor shares.
 const fn range(start: ExprId, stop: ExprId) -> SweepSpec {
     SweepSpec {
         kind: SweepKind::Lin,
         end: SweepEnd::Grid,
+        count: SweepCount::Plain,
         bounds: SweepBounds::StartStop,
         start,
         stop,

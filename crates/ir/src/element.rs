@@ -299,6 +299,8 @@ pub struct CircuitDetails {
     pub(crate) trnoises: Vec<TrNoise>,
     pub(crate) trrandoms: Vec<TrRandom>,
     pub(crate) patterns: Vec<Pattern>,
+    /// The laws the design states (R90, `laws.rs`): one set, not a table.
+    pub(crate) laws: crate::laws::Laws,
 }
 
 const _: () = assert!(size_of::<ElemKind>() == 1);

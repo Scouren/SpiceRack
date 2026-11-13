@@ -1,0 +1,13 @@
+mes1 nom (27 C, m=1), lin (vgs=0.0, vds=0.2), acg
+.model nm nmf level=1 vt0=-1 alpha=2 beta=2.5e-3 lambda=0.05 b=0.3 rd=5 rs=5 cgs=1p cgd=0.5p pb=0.8 is=1e-14 fc=0.5
+vd d 0 dc 0.2
+vg g 0 dc 0.0 ac 1
+z1 d g 0 nm area=2
+.temp 27
+.options reltol=1e-9 abstol=1e-15
+.control
+set numdgt=12
+ac lin 1 1g 1g
+print mag(i(vd))
+.endc
+.end

@@ -44,7 +44,7 @@
 //!   `OptionRow`, `OptionClass`, `OptionKey`, `Measure`, `Print`, `PrintView`, `Save`, `Alter`,
 //!   `Loop`, `LoopEnd`, `LoopKind`, `Target`, `TargetKind`, `TargetList`, `AcPart`, `Probe`,
 //!   `ProbeKind`, `ProbeList`, `Statistics`, `Vary`, `VaryDist`, `SweepBounds`, `SweepEnd`,
-//!   `SweepKind`, `SweepSpec`
+//!   `SweepKind`, `SweepSpec`, `SweepCount`, `on_grid`
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -105,6 +105,9 @@ mod circuit_text;
 pub mod controlled;
 pub mod element;
 mod hierarchy;
+pub mod laws;
+mod laws_carry;
+mod laws_table;
 pub mod letter;
 pub mod library;
 pub mod line;
@@ -118,6 +121,7 @@ pub mod wave_eval;
 pub use build_circuit::ElemHead;
 pub use circuit_extra::CircuitExtra;
 pub use element::{DetailKind, ElemKind, Element, MultLaw, NO_ROW};
+pub use laws::{Law, Laws, Rewrite, Stated};
 pub use letter::{spice_letter, spice_letters};
 pub use library::DeviceLibrary;
 pub use model::{Model, ModelFamily, Polarity};
@@ -193,7 +197,7 @@ pub use run_extra::RunExtra;
 pub use span::Span;
 pub use state_order::{Listed, Setting, in_force, listed, run_walks};
 pub use stats::{Statistics, Vary, VaryDist};
-pub use sweep::{SweepBounds, SweepEnd, SweepKind, SweepSpec};
+pub use sweep::{SweepBounds, SweepCount, SweepEnd, SweepKind, SweepSpec, on_grid};
 pub use table::Table;
 pub use text::{dump, parse, parse_unchecked};
 

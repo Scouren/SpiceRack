@@ -79,9 +79,23 @@ impl R<'_, '_> {
                 value
             })
             .collect();
-        for value in values {
+        // R90: a model sometimes gives the parameters the law predicates read, where the laws
+        // differ (a member only under a stated law, drawn from the set; A28 item 5: `TypedOnly`
+        // draws no parameter list)
+        let lists = r.g.params != Params::TypedOnly;
+        let named: &[&str] = match crate::laws_carry::GEN_PARAMS.iter().find(|p| p.0 == family) {
+            Some(&(_, names)) if lists && r.g.chance(2) => names,
+            _ => &[],
+        };
+        let mut values = values;
+        values.extend(named.iter().map(|_| r.ex()));
+        let fresh = values.len() - named.len();
+        for &value in &values[..fresh] {
             let key = r.g.fresh_name(r.b);
             pairs.push((r.b.design().str(key).to_owned(), value));
+        }
+        for (k, name) in named.iter().enumerate() {
+            pairs.push(((*name).to_owned(), values[fresh + k]));
         }
         let params = if pairs.is_empty() {
             List::EMPTY

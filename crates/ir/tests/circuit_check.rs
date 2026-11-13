@@ -1104,6 +1104,26 @@ mod tests {
         assert_eq!(params, only(Violation::FieldDomain));
     }
 
+    /// R90: a design states one variant per law point; two of one point is `LawConflict` (once,
+    /// at no item), one of each point is legal.
+    #[test]
+    fn a_law_point_is_stated_once() {
+        use spicerack_ir::{Law, Laws};
+        let with = |laws: Laws| checked(move |b, _| b.set_laws(laws));
+        let both = Laws::of(&[Law::BcSatAreaTimesAreab, Law::BcSatAreabOnly]);
+        assert_eq!(with(both), only(Violation::LawConflict));
+        let twice = Laws::of(&[Law::DiodeSidewallBottomF1, Law::DiodeSidewallOwnF1])
+            .with(Law::SubSatLastFactor);
+        assert_eq!(with(twice), only(Violation::LawConflict));
+        let each = Laws::of(&[
+            Law::BcSatAreabOnly,
+            Law::SubSatLastFactor,
+            Law::DiodeWlMultOnce,
+            Law::DiodeSidewallBottomF1,
+        ]);
+        assert_eq!(with(each), Vec::<Code>::new());
+    }
+
     /// A model of a versioned family states its version (ng-models' L5 finding: "no version"
     /// means each simulator's own default); its neighbour, a family of one version with none
     /// stated, stays legal.

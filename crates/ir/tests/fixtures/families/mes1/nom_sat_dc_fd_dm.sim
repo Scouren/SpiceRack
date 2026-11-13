@@ -1,0 +1,11 @@
+mes1 nom (27 C, m=1), sat (vgs=-0.5, vds=3.0), dc
+load "spice/mes1.osdi"
+model vs vsource
+model nm sp_mes1 type=1 vt0=-1 alpha=2 beta=2.5e-3 lambda=0.05 b=0.3 rd=5 rs=5 cgs=1p cgd=0.5p pb=0.8 is=1e-14 fc=0.5
+vd (d 0) vs dc=2.99999
+vg (g 0) vs dc=-0.5
+z1 (d g 0) nm area=2
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis op1 op
+endc

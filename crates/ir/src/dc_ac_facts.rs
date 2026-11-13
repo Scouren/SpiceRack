@@ -110,7 +110,7 @@ impl DetailFacts for Dc {
         let ok = !axes.is_empty()
             && axes
                 .iter()
-                .all(|a| target_valid(&a.target) && sweep_valid(&a.sweep));
+                .all(|a| target_valid(&a.target) && sweep_valid(design, &a.sweep, SweepUse::Dc));
         domain_unless(ok)
     }
 
@@ -162,8 +162,8 @@ impl DetailFacts for Ac {
     fn features(&self, _design: &Design, set: &mut FeatureSet) {
         sweep_features(&self.sweep, SweepUse::Freq, set);
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
-        domain_unless(sweep_valid(&self.sweep))
+    fn fault(&self, design: &Design) -> Option<Violation> {
+        domain_unless(sweep_valid(design, &self.sweep, SweepUse::Freq))
     }
     #[cfg(any(test, feature = "gen"))]
     fn generate(
@@ -199,9 +199,11 @@ impl DetailFacts for Noise {
             RunExtra::NoiseCurrentOutput,
         );
     }
-    fn fault(&self, _design: &Design) -> Option<Violation> {
+    fn fault(&self, design: &Design) -> Option<Violation> {
         domain_unless(
-            output_valid(&self.output) && !self.source.is_none() && sweep_valid(&self.sweep),
+            output_valid(&self.output)
+                && !self.source.is_none()
+                && sweep_valid(design, &self.sweep, SweepUse::Freq),
         )
     }
     #[cfg(any(test, feature = "gen"))]

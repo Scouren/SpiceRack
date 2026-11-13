@@ -1,0 +1,10 @@
+passive r_value off (80 C, m=3), dc (1 V on a, 1 MHz)
+load "spice/resistor.osdi"
+model vs vsource
+model r sp_resistor
+vd (a 0) vs dc=1
+r1 (a 0) r r=1k tc1=1e-3 tc2=1e-5 $mfactor=3
+control
+  options temp=80 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis op1 op
+endc

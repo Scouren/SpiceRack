@@ -38,7 +38,7 @@ use crate::run_words::{
     take_key, take_name, take_names, take_word, word,
 };
 use crate::sweep::{
-    SweepBounds, SweepEnd, SweepKind, SweepSpec, dump_sweep, parse_sweep, sweep_handles,
+    SweepBounds, SweepCount, SweepEnd, SweepKind, SweepSpec, dump_sweep, parse_sweep, sweep_handles,
 };
 use crate::text::Words;
 use crate::text_expr::Ctx;
@@ -122,6 +122,7 @@ pub(crate) const PROBE: Probe = Probe {
 pub(crate) const SWEEP: SweepSpec = SweepSpec {
     kind: SweepKind::ALL[0],
     end: SweepEnd::ALL[0],
+    count: SweepCount::ALL[0],
     bounds: SweepBounds::ALL[0],
     start: ExprId::NONE,
     stop: ExprId::NONE,

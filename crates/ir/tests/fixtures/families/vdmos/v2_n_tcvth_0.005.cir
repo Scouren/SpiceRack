@@ -1,0 +1,13 @@
+vdmos nchan kp=20 vto=2 tcvth=0.005 at 100 C, vgs=4, vds=10
+.model mn vdmos kp=20 vto=2 tcvth=0.005
+vd d 0 10
+vg g 0 4
+m1 d g 0 mn
+.temp 100
+.options reltol=1e-9
+.control
+set numdgt=12
+op
+print i(vd)
+.endc
+.end

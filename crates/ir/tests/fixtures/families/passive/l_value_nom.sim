@@ -1,0 +1,13 @@
+passive l_value nom (27 C, m=1), ac (1 V on a, 1 MHz)
+load "spice/inductor.osdi"
+load "spice/resistor.osdi"
+model vs vsource
+model l sp_inductor
+model r sp_resistor
+rs (a b) r r=1
+vd (a 0) vs dc=1 mag=1
+l1 (b 0) l l=1u tc1=1e-3 tc2=1e-5
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis ac1 ac from=1e6 to=1e6 mode="lin" points=1
+endc
