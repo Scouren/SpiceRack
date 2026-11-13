@@ -125,6 +125,75 @@ fn a_subckt_inside_a_section_sees_the_sections_definitions_as_the_top() {
     assert_eq!(bound, Some(("sub.lib".into(), "s".into())));
 }
 
+#[test]
+fn vacask_resolves_a_relative_include_and_load_against_the_including_file_first() {
+    // settle b_include_cwd (R78): VACASK started in `run/` beside `sub/`, the deck `../sub/<d>`;
+    // `cwd/`'s files stand in `run/` as decoys (sib.inc p=4; myres.osdi a capacitor's module)
+    let cases = [
+        // a bare include: the including file's directory, the decoy ignored
+        ("deck", 2000.0),
+        // a bare load: the same (the decoy has no sp_resistor)
+        ("deck_load", 3000.0),
+        // a file an included file names: from that file's directory (inc/b.inc, not sub/b.inc)
+        ("deck_nested", 2000.0),
+        // a file only the working directory holds: read from there
+        ("deck_only_cwd", 4000.0),
+    ];
+    for (deck, want) in cases {
+        let out = in_subfolder(deck);
+        assert_eq!(
+            resistances(&out),
+            vec![("r1".to_string(), want)],
+            "{deck}: {out}"
+        );
+    }
+}
+
+/// What VACASK printed for `b_include_cwd/sub/<deck>.sim` started from a sibling `run/` that
+/// holds `cwd/`'s files, with VACASK's resistor module copied in `sub/` and its capacitor module
+/// in `run/`, both as `myres.osdi`.
+fn in_subfolder(deck: &str) -> String {
+    let root = Path::new(SETTLE).join("b_include_cwd");
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let (sub, run) = (dir.path().join("sub"), dir.path().join("run"));
+    std::fs::create_dir_all(sub.join("inc")).expect("sub/inc");
+    std::fs::create_dir_all(&run).expect("run");
+    for (from, to) in [("sub", &sub), ("sub/inc", &sub.join("inc")), ("cwd", &run)] {
+        for e in std::fs::read_dir(root.join(from)).expect("a settle folder") {
+            let p = e.expect("an entry").path();
+            if p.is_file() {
+                std::fs::copy(&p, to.join(p.file_name().unwrap())).expect("a settle file");
+            }
+        }
+    }
+    let modules = modules_dir();
+    std::fs::copy(modules.join("resistor.osdi"), sub.join("myres.osdi")).expect("resistor.osdi");
+    std::fs::copy(modules.join("capacitor.osdi"), run.join("myres.osdi")).expect("capacitor");
+    let done = Command::new("vacask")
+        .arg(format!("../sub/{deck}.sim"))
+        .current_dir(&run)
+        .output()
+        .expect("vacask not runnable: run in `nix develop .#testing`");
+    let mut out = String::from_utf8_lossy(&done.stdout).into_owned();
+    out.push_str(&String::from_utf8_lossy(&done.stderr));
+    out
+}
+
+/// VACASK's shipped SPICE modules: `<prefix>/lib/vacask/mod/spice` beside its binary.
+fn modules_dir() -> std::path::PathBuf {
+    let which = Command::new("sh")
+        .args(["-c", "command -v vacask"])
+        .output()
+        .expect("a shell");
+    let bin = String::from_utf8_lossy(&which.stdout).trim().to_string();
+    let bin = std::fs::canonicalize(&bin).expect("vacask on PATH: run in `nix develop .#testing`");
+    let prefix = bin
+        .parent()
+        .and_then(Path::parent)
+        .expect("<prefix>/bin/vacask");
+    prefix.join("lib/vacask/mod/spice")
+}
+
 /// b_incsec's three files as VACASK reads them (the libraries under the names it includes).
 fn read() -> ir::Design {
     read_files(&[

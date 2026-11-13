@@ -1,0 +1,8 @@
+b_include_only_cwd: a bare include of a file only the working directory holds from a deck in a subfolder
+load "spice/resistor.osdi"
+model rm sp_resistor
+include "only_cwd.inc"
+r1 (n 0) rm r=p*1k
+control
+  print instance("r1")
+endc
