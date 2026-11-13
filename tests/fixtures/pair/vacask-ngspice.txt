@@ -18,3 +18,6 @@ dc_device_param 2 refused:U0001:Run(DcAxisDeviceParam)+Run(SweepDcList) ruling=R
 dc_nested 2 refused:U0001:Run(DcOuterCarries) ruling=R75 # VACASK carries the solve across outer steps, ngspice cannot: refused even on a circuit with one operating point
 latch 2 refused:U0001:Run(DcOuterCarries) finding=F8 # R75: F8's wrong number is now a refusal toward ngspice
 latch_vdd 2 refused:U0001:Run(DcOuterCarries) finding=F8 # as latch
+mos3_ac 4 mismatch finding=F27 # R94: ngspice-45 level 3 small-signal gm is not the derivative of its DC law (ac i(vd) 4.9% apart; DC agrees)
+mos9_ac 4 mismatch finding=F27 # R94: as mos3_ac for level 9
+mos6_ac 4 target-fails finding=F28 # R94: ngspice-45 has no AC for MOS level 6 ("doAnalyses: matrix is singular"), its raw file ends in the header
