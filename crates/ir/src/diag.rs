@@ -315,6 +315,14 @@ fn violation_text(v: Violation) -> (&'static str, &'static str) {
             "a reference bound to a definition outside its reach",
             "a name read inside one subcircuit (or a file it includes) binds to its own definitions and its enclosing scopes' only, never to a sibling subcircuit's formal, parameter, function, model or subcircuit; a function's formal is read only in that function's body.",
         ),
+        Violation::RunOrderInSubckt => (
+            "a run-order item inside a subcircuit",
+            "an alter, a loop, a reset, a print, a measure, or an option, temperature, node set or save that holds from where it stands has a meaning only in the run's order; a subcircuit is instantiated, not executed, so no simulator gives it one there (R98).",
+        ),
+        Violation::StringOperand => (
+            "a string as an operand",
+            "a string is a value, or one side of `==` or `!=`; under any other operator, as a function's argument or as a condition it has no meaning: VACASK refuses it (\"Operation not supported for string and real.\"), ngspice has no string parameter.",
+        ),
         Violation::TargetAlias => (
             "a device-parameter target that names an element's value or a source's dc",
             "a resistor's r, a capacitor's c, an inductor's l is an element-value target and an independent source's dc a source-dc target: one meaning has one form, so the text reads back as what was written.",

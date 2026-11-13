@@ -93,6 +93,14 @@ fn from_handles(d: &Design, item: ItemRef) -> Vec<(ExprId, ExprUse)> {
     out
 }
 
+/// Whether `e` is a string or a list: a value no arithmetic wraps.
+fn text_value(d: &Design, e: ExprId) -> bool {
+    matches!(
+        d.expr(e),
+        spicerack_ir::Expr::Str(_) | spicerack_ir::Expr::List(_)
+    )
+}
+
 /// The (root, use) list `map_exprs` visits for `item`, on a copy.
 fn visited(d: &Design, item: ItemRef) -> Vec<(ExprId, ExprUse)> {
     let mut copy = d.clone();
@@ -287,7 +295,11 @@ fn a_rewrite_of_one_form_keeps_the_other() {
                 .map(|roots| roots.iter().map(|&(e, u)| root_form(&d, e, u)).collect())
                 .collect();
             let mut after = d.clone();
+            // a string or list root is a value, which no arithmetic wraps (StringOperand)
             rewrite_exprs_in(&mut after, form, &mut |b, e| {
+                if text_value(b.design(), e) {
+                    return None;
+                }
                 let once = b.unary(UnOp::Neg, e);
                 Some(b.unary(UnOp::Neg, once))
             });
@@ -300,7 +312,7 @@ fn a_rewrite_of_one_form_keeps_the_other() {
             for ((&item, old), kinds) in items.iter().zip(&before).zip(&forms) {
                 let new = visited(&after, item);
                 for ((&(o, _), &(n, _)), &f) in old.iter().zip(&new).zip(kinds) {
-                    if o.is_none() {
+                    if o.is_none() || text_value(&d, o) {
                         continue;
                     }
                     if f == form {

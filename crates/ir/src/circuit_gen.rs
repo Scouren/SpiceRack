@@ -288,7 +288,18 @@ impl R<'_, '_> {
                         self.has(X::CouplingCore)
                             || self.has(X::BuiltinMaster) && self.has_visible(ModelFamily::Mutual)
                     }
-                    Some(_) if BUILTINS.iter().any(|b| b.1 == kind) => self.has(X::BuiltinMaster),
+                    // an optional model named only where one is visible (never a fresh name)
+                    Some(_) if BUILTINS.iter().any(|b| b.1 == kind) => {
+                        self.has(X::BuiltinMaster) && self.has_fitting(kind)
+                    }
+                    Some(_)
+                        if matches!(
+                            kind,
+                            ElemKind::Resistor | ElemKind::Capacitor | ElemKind::Inductor
+                        ) =>
+                    {
+                        self.has_fitting(kind)
+                    }
                     Some(_) => true,
                     // names no master, so it needs no `ElementWithoutModel`
                     None => true,

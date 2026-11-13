@@ -4,7 +4,7 @@
 //!
 //! Cites: `rewrite/IR-IMPL.md` §2 (generator); `rewrite/AMEND-A12.md` C5; `circuit_gen.rs`.
 //!
-//! Contents: `R::terminals`, `R::reference`, `R::master`, `R::has_visible`, `R::element_names`,
+//! Contents: `R::terminals`, `R::reference`, `R::master`, `R::has_visible`, `R::has_fitting`, `R::element_names`,
 //! `R::element_name`, `R::bound_subckt`, `R::fresh_names`, `R::fitting_model`, `fn takes` (`pub(super)`)
 
 use super::{BUILTINS, NONE_REF, R};
@@ -164,10 +164,8 @@ impl R<'_, '_> {
                     .find(|b| b.1 == kind)
                     .expect("a builtin per kind")
                     .0;
-                match self.visible_model(family) {
-                    Some(r) => r,
-                    None => Ref::unresolved(self.g.fresh_name(self.b)),
-                }
+                // optional: bare, or bound (`can` saw one when bare is not allowed)
+                self.visible_model(family).unwrap_or(NONE_REF)
             }
             ElemKind::Coupling => {
                 let mutual = self.has(X::BuiltinMaster) && self.has_visible(ModelFamily::Mutual);
@@ -182,9 +180,12 @@ impl R<'_, '_> {
                     NONE_REF
                 }
             }
+            // optional: bare, or bound to a visible model of a family the kind takes, never a
+            // fresh name no statement defines (vacask-2, seed 1; `can` saw one when bare is not
+            // allowed)
             ElemKind::Resistor | ElemKind::Capacitor | ElemKind::Inductor => {
                 if !bare || self.g.chance(4) {
-                    self.fitting_reference(kind, DefKind::Model)
+                    self.fitting_model(kind).unwrap_or(NONE_REF)
                 } else {
                     NONE_REF
                 }
@@ -263,6 +264,16 @@ impl R<'_, '_> {
             return None;
         }
         Some(found[self.g.below(found.len() as u32) as usize])
+    }
+
+    /// Whether a model `kind` may name is visible here: of a family it takes, a builtin one only
+    /// with `BuiltinMaster` (as `fitting_model` finds, without drawing).
+    pub(super) fn has_fitting(&self, kind: ElemKind) -> bool {
+        ModelFamily::ALL.into_iter().any(|f| {
+            takes(kind, f)
+                && (builtin_kind(f).is_none() || self.has(X::BuiltinMaster))
+                && self.has_visible(f)
+        })
     }
 
     /// Whether a model of `family` is visible here (as `visible_model`, without drawing).

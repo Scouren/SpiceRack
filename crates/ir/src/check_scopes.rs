@@ -7,16 +7,17 @@
 //!
 //! Contents: crate: `pub(crate) fn files_and_scopes(&mut Out<'_>)`,
 //! `pub(crate) fn live_scopes(&Design) -> Vec<bool>`, `pub(crate) fn stale_definitions(&mut Out<'_>)`,
-//! `pub(crate) fn reference_scopes(&mut Out<'_>)` (F34)
+//! `pub(crate) fn reference_scopes(&mut Out<'_>)` (F34),
+//! `pub(crate) fn misplaced_strings(&Design, ExprId) -> Vec<ExprId>` (`StringOperand`)
 
 use std::collections::{HashMap, HashSet};
 
 use crate::check::{Out, Violation, table_len};
 use crate::design::Design;
-use crate::expr::Expr;
+use crate::expr::{BinOp, Expr};
 use crate::facts::{Handle, RowFacts};
 use crate::feature::{ExprWalk, expr_roots};
-use crate::id::{ItemRef, Ref, ScopeId};
+use crate::id::{ExprId, ItemRef, Ref, ScopeId};
 use crate::item::{DefKind, Include, ItemKind, ScopeKind, Section};
 
 /// Files, scopes and item lists: handle ranges, the tree's shape, each scope's owner.
@@ -188,6 +189,34 @@ pub(crate) fn reference_scopes(out: &mut Out<'_>) {
             }
         }
     }
+}
+
+/// The string operands of `node` that stand where a string has no meaning: under an operator
+/// other than `==`/`!=`, as a function's, a user call's or a draw's argument, or as a
+/// conditional's condition (`Violation::StringOperand`). A list's elements and a conditional's
+/// branches are values.
+pub(crate) fn misplaced_strings(d: &Design, node: ExprId) -> Vec<ExprId> {
+    let operands: Vec<ExprId> = match d.expr(node) {
+        Expr::Binary(BinOp::Eq | BinOp::Ne, ..) | Expr::List(_) => return Vec::new(),
+        Expr::Binary(_, a, b) => vec![a, b],
+        Expr::Unary(_, a) | Expr::Ternary(a, ..) => vec![a],
+        Expr::Call(_, l) | Expr::UserCall(_, l) | Expr::Draw(.., l) => d.exprs(l).to_vec(),
+        Expr::Num(_)
+        | Expr::Str(_)
+        | Expr::Param(_)
+        | Expr::V(..)
+        | Expr::I(_)
+        | Expr::Time
+        | Expr::Temp
+        | Expr::Freq
+        | Expr::TStep
+        | Expr::TStop
+        | Expr::Tnom => return Vec::new(),
+    };
+    operands
+        .into_iter()
+        .filter(|&k| matches!(d.expr(k), Expr::Str(_)))
+        .collect()
 }
 
 // ---- private ----
