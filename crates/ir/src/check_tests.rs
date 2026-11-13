@@ -98,7 +98,7 @@ fn a_valid_design_reports_nothing() {
 #[test]
 fn each_kernel_invariant_has_its_fixture() {
     type Break = fn(&mut Base);
-    let cases: [(Violation, Break); 20] = [
+    let cases: [(Violation, Break); 21] = [
         (Violation::HandleRange, |b| {
             let row = Param {
                 name: NameId(10_000),
@@ -263,6 +263,11 @@ fn each_kernel_invariant_has_its_fixture() {
             let (x, y) = (bl.string("a"), bl.string("a"));
             let eq = bl.binary(crate::expr::BinOp::Eq, x, y);
             bl.param(top, "e", eq, Span::NONE);
+        }),
+        (Violation::Misplaced, |b| {
+            // a load inside a subcircuit body: VACASK refuses it (P2008), no dialect has it
+            let mut bl = b.d.builder();
+            bl.load(b.sub_body, LoadKind::VerilogA, "x.va", Span::NONE);
         }),
     ];
     for (want, break_it) in cases {

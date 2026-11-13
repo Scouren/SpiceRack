@@ -1,0 +1,13 @@
+placed save in subckt
+.subckt s1 n
+r1 n m 1k
+r2 m 0 1k
+.save v(m)
+.ends
+v1 a 0 1
+x1 a s1
+.control
+op
+display
+.endc
+.end

@@ -217,7 +217,44 @@ fn the_full_set_runs_every_property() {
         ItemKind::Measure,
     ]
     .map(|k| Feature::Placed(ScopeKind::Subckt, k));
-    let unreachable: Vec<Feature> = titles.chain(run_order).collect();
+    // the census's placements no dialect expresses are `Misplaced` (the lead's ruling,
+    // 2026-11-13; rewrite/IR-PRUNE.md group 6)
+    use ItemKind as K;
+    let misplaced = [
+        (ScopeKind::Branch, K::Section),
+        (ScopeKind::Branch, K::Func),
+        (ScopeKind::Branch, K::Global),
+        (ScopeKind::Branch, K::DeviceLibrary),
+        (ScopeKind::Branch, K::Statistics),
+        (ScopeKind::Branch, K::Option),
+        (ScopeKind::Branch, K::Save),
+        (ScopeKind::Branch, K::Print),
+        (ScopeKind::Branch, K::Alter),
+        (ScopeKind::Branch, K::Loop),
+        (ScopeKind::Branch, K::Reset),
+        (ScopeKind::Branch, K::Elaborate),
+        (ScopeKind::Loop, K::Section),
+        (ScopeKind::Loop, K::Subckt),
+        (ScopeKind::Loop, K::If),
+        (ScopeKind::Loop, K::Include),
+        (ScopeKind::Loop, K::Load),
+        (ScopeKind::Loop, K::DeviceLibrary),
+        (ScopeKind::Loop, K::Global),
+        (ScopeKind::Loop, K::Param),
+        (ScopeKind::Loop, K::Func),
+        (ScopeKind::Loop, K::Model),
+        (ScopeKind::Loop, K::Statistics),
+        (ScopeKind::Loop, K::Element),
+        (ScopeKind::Section, K::Section),
+        (ScopeKind::Section, K::Elaborate),
+        (ScopeKind::Subckt, K::Section),
+        (ScopeKind::Subckt, K::Load),
+        (ScopeKind::Subckt, K::DeviceLibrary),
+        (ScopeKind::Subckt, K::Statistics),
+        (ScopeKind::Subckt, K::Elaborate),
+    ]
+    .map(|(s, k)| Feature::Placed(s, k));
+    let unreachable: Vec<Feature> = titles.chain(run_order).chain(misplaced).collect();
     // known gaps, a marker: none left (the run owner's generators reach `LoopOverOp`)
     let not_yet: [Feature; 0] = [];
     let goal = unreachable

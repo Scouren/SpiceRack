@@ -1,0 +1,70 @@
+ngspice /nix/store/4ssrcgdvyb8car0yxay8cwfa5wc89f1w-ngspice-45/bin/ngspice
+## br_control_0.cir
+CONTROL_IN_BRANCH
+v(b) = 4.988129e-01
+## br_func_0.cir
+v(b) = 8.000000e-01
+## br_global_0.cir
+i(vg) = 1.000000e-03
+## br_ic_0.cir
+0	2.000000e-10	0.000000e+00	
+1	4.000000e-10	0.000000e+00	
+2	8.000000e-10	0.000000e+00	
+3	1.600000e-09	0.000000e+00	
+4	3.200000e-09	0.000000e+00	
+5	6.400000e-09	0.000000e+00	
+## br_meas_0.cir
+Initial Transient Solution
+## br_options_0.cir
+v(b) = 3.793105e-01
+## br_print_0.cir
+0	0.000000e+00	0.000000e+00	
+1	5.000000e-01	5.000000e-01	
+2	1.000000e+00	1.000000e+00	
+## br_save_0.cir
+Name: op1 (Operating Point)
+    a                   : voltage, real, 1 long [default scale]
+## br_temp_0.cir
+v(b) = 4.988129e-01
+## br_tran_0.cir
+## br_control_1.cir
+CONTROL_IN_BRANCH
+v(b) = 4.988129e-01
+## br_func_1.cir
+v(b) = 8.000000e-01
+## br_global_1.cir
+i(vg) = 1.000000e-03
+## br_ic_1.cir
+0	2.000000e-10	6.999999e-01	
+1	4.000000e-10	6.999997e-01	
+2	8.000000e-10	6.999994e-01	
+3	1.600000e-09	6.999989e-01	
+4	3.200000e-09	6.999978e-01	
+5	6.400000e-09	6.999955e-01	
+## br_meas_1.cir
+Initial Transient Solution
+vb                  =  4.988129e-01
+## br_options_1.cir
+v(b) = 3.793105e-01
+## br_print_1.cir
+0	0.000000e+00	0.000000e+00	
+1	5.000000e-01	5.000000e-01	
+2	1.000000e+00	1.000000e+00	
+## br_save_1.cir
+Name: op1 (Operating Point)
+    a                   : voltage, real, 1 long [default scale]
+## br_temp_1.cir
+v(b) = 3.793105e-01
+## br_tran_1.cir
+Initial Transient Solution
+va                  =  1.000000e+00
+## lib_sections.cir
+CONTROL_IN_SECTION
+va                  =  1.000000e+00
+0	0.000000e+00	0.000000e+00	
+1	5.000000e-01	5.000000e-01	
+2	1.000000e+00	1.000000e+00	
+## sub_save.cir
+Name: op1 (Operating Point)
+    x1.m                : voltage, real, 1 long [default scale]
+rc=0

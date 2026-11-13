@@ -151,15 +151,21 @@ SPECTRE:114; `Family(SwitchHystSmooth)` LTSPICE:61; `Func(Atan2)`, `Func(Ramp)` 
 `Run(SweepFreqLog)`, `Run(SweepLoopLog)` SPECTRE:126; `Run(SweepEndNgDecade)` HSPICE:91;
 `Run(SweepEndOnStop)` LTSPICE:71; `Run(TranCapSpan10)` XYCE:84; `Run(TranStartup)` LTSPICE:69.
 
-**A spec names it as a lead not yet run (25), kept until its run:** `Circuit(AmModCarrierPhase)`
-SPECTRE:103; `Circuit(BehavRpar)` LTSPICE:99; `Circuit(CouplingCore)`, `Circuit(SwitchControlExpr)`,
-`Family(CoreJilesAtherton)`, `Family(CurrentSwitchLogCubic)`, `Family(SwitchLogCubic)` XYCE:131
-(and R103's runs for the switch); `Circuit(LineLengthVel)` SPECTRE:112; `Circuit(PwlRepeatCount)`,
-`Family(CurrentSwitchHystSmooth)` LTSPICE:100; `Elem(Module)` SPECTRE:143, HSPICE:128;
-`Family(DiodePspiceTemp)` SPECTRE:93; `Family(Hicum0)` XYCE:132; `Family(HspiceW)` HSPICE:123;
-`Family(VdmosRpi)` XYCE:133; `Func(ExpLin14)`, `Func(StepHalf)`, `FuncDyn(Sqr)` NGSPICE:63, :71;
-`Func(Idt)`, `Func(ToReal)` SPECTRE:62, VACASK:115, :514; `Option(GminDc)`, `Option(MaxStep)`,
-`Option(Search)` HSPICE:126; `Run(IcEveryOp)` XYCE:76, VACASK:296; `Run(NoiseRefSourceAc)` XYCE:97.
+**A spec names it as a lead not yet run (25), kept until its run.** Each is tagged with the dialect
+whose owner confirms, when that dialect's row lands, that its reader produces the member; if none
+does, the member is deleted then (the lead's ruling, 2026-11-13).
+- **Xyce:** `Circuit(CouplingCore)`, `Circuit(SwitchControlExpr)`, `Family(CoreJilesAtherton)`,
+  `Family(CurrentSwitchLogCubic)`, `Family(SwitchLogCubic)` XYCE:131 (and R103's runs for the
+  switch); `Family(Hicum0)` XYCE:132; `Family(VdmosRpi)` XYCE:133; `Run(IcEveryOp)` XYCE:76 (also
+  VACASK:296); `Run(NoiseRefSourceAc)` XYCE:97.
+- **LTspice:** `Circuit(BehavRpar)` LTSPICE:99; `Circuit(PwlRepeatCount)`,
+  `Family(CurrentSwitchHystSmooth)` LTSPICE:100.
+- **HSPICE:** `Family(HspiceW)` HSPICE:123; `Option(GminDc)`, `Option(MaxStep)`, `Option(Search)`
+  HSPICE:126; `Elem(Module)` HSPICE:128 (also SPECTRE:143).
+- **Spectre:** `Circuit(AmModCarrierPhase)` SPECTRE:103; `Circuit(LineLengthVel)` SPECTRE:112;
+  `Family(DiodePspiceTemp)` SPECTRE:93; `Func(Idt)`, `Func(ToReal)` SPECTRE:62 (also VACASK:115,
+  :514).
+- **ngspice:** `Func(ExpLin14)`, `Func(StepHalf)`, `FuncDyn(Sqr)` NGSPICE:63, :71.
 
 **No spec row yet, kept on the rulings or the member's own inventory citation (19):**
 `Extra(StringCompare)` (the strings runs, `crates/ir/tests/fixtures/strings/`: VACASK computes it);
@@ -172,7 +178,54 @@ E24); `Circuit(PwlJoinRamp)` (lt); `Circuit(SemiInitialOn)` (Spectre `region=on`
 `Run(McSampleList)`, `Run(NoiseAcSweep)`, `Run(TranSegments)` (hs); `DistDyn(Limit)` (the dynamic form
 of ngspice's `limit` draw, a member of the form grid, not one of its own).
 
-**Placements (58), not members:** an item kind listed in a scope kind that no reader writes there
-(`Placed(Branch|Loop|Section|Subckt, K)`). They are combinations of kept members; the ones no
-simulator gives a meaning are already refused (`RunOrderInSubckt` for the run-order kinds in a
-subcircuit, R98; a title outside a deck's top). The rest wait for the lead's call per kind.
+**Placements (58), not members:** decided in group 6.
+
+## Group 6: the placements (the lead's ruling, 2026-11-13)
+
+A placement `Placed(S, K)` the census found unproduced follows the members' rule: one no dialect
+expresses (trunk or goal-2 spec) is `Violation::Misplaced` (X0030, `check_scopes::misplaced`), at
+any depth; one some dialect expresses stays legal and each target that cannot write it refuses it.
+Runs: `crates/ir/tests/fixtures/placed/` (`run.sh`, `runs.out`, ngspice-45): a card in
+`.if (sel==1)` that the branch governs reads differently at sel=0 and 1; one ngspice keeps as if
+unconditional reads the same. ngspice-45 governs `.temp`, `.ic`, `.tran` and `.meas` by the branch,
+and keeps `.options`, `.func` (the last definition wins, like F77's `.param`), `.global`, `.print`,
+`.save` and `.control` whatever the condition.
+
+**Already no design (4):** `Placed(Branch|Loop|Section|Subckt, Title)`: `Builder::title` asserts a
+deck's top, IR text refuses it (P9001).
+
+**Already `RunOrderInSubckt` (5, R98):** `Placed(Subckt, Alter|Loop|Reset|Print|Measure)`.
+
+**Made `Misplaced` (31):**
+- Branch (12): `Section` (no dialect's branch holds a definition of a section: VACASK:100, :508,
+  SPECTRE:75, INV-constructs B13); `Func` (ngspice keeps it unconditional, `br_func`; Spectre's
+  functions are top level only, SPECTRE:65); `Global` (VACASK P2008, VACASK:348; ngspice keeps it
+  unconditional, `br_global`); `DeviceLibrary` (VACASK P2008: `load` in a branch); `Statistics`
+  (INV-constructs J1: refused in a branch); `Option` (ngspice unconditional, `br_options`; Spectre's
+  and VACASK's branches hold no options, SPECTRE:75, VACASK:100); `Save`, `Print` (ngspice
+  unconditional, `br_save`, `br_print`; the same rows); `Alter`, `Loop`, `Reset`, `Elaborate` (script
+  commands: ngspice runs a `.control` in a branch whatever the condition, `br_control`; no other
+  dialect has a run command in a branch).
+- Loop (12): `Section`, `Subckt`, `If`, `Include`, `Load`, `DeviceLibrary`, `Global`, `Param`,
+  `Func`, `Model`, `Statistics`, `Element`: a loop body holds run items only (`plan::Loop`): an
+  ngspice `foreach` body is script commands, Spectre's and VACASK's `sweep` wraps analyses
+  (SPECTRE:138, VACASK:276).
+- Section (2): `Section` (sections do not nest: VACASK:508 lists a section's contents without one;
+  a `.lib` inside a `.lib` section is a call, an `Include`); `Elaborate` (VACASK's command, never in a
+  section, VACASK:508).
+- Subckt (5): `Section` (as above); `Load`, `DeviceLibrary` (VACASK P2008, VACASK:348; no other
+  dialect loads inside a subcircuit); `Statistics` (INV-constructs J1: refused in a subcircuit);
+  `Elaborate` (as above).
+
+**Kept (18), with the dialect that expresses each:**
+- Branch: `Analysis`, `Env`, `NodeSet`, `Measure` (ngspice-45 governs them by the branch: `br_tran`,
+  `br_temp`, `br_ic`, `br_meas`); `Param` (Spectre SPECTRE:75, HSPICE INV-semantics 3.07); `Load`
+  (Spectre, INV-constructs B14, A17); `Include`, `Subckt` (VACASK:508, pl/br and pl/brs).
+- Loop: `Measure`, `Print` (ngspice: a `meas` or `print` command in a `foreach` body, the loop's
+  name being its variable, `plan::Loop`).
+- Section: `Alter`, `Loop`, `Reset` (ngspice: a `.control` in a `.lib` section runs where the
+  section is included, `lib_sections`); `Measure`, `Print` (the same run: `.meas`, `.print` in a
+  section act); `Save` (ngspice's `.lib` is textual, as the same run shows); `Statistics` (Spectre,
+  INV-constructs J1: at the top or in a section).
+- Subckt: `Save` (a whole-run `.save` in a `.subckt` saves `x1.m` on ngspice-45, `sub_save`; one
+  holding from here is `RunOrderInSubckt`).
