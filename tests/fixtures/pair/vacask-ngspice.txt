@@ -21,3 +21,4 @@ latch_vdd 2 refused:U0001:Run(DcOuterCarries) finding=F8 # as latch
 mos3_ac 4 mismatch finding=F27 # R94: ngspice-45 level 3 small-signal gm is not the derivative of its DC law (ac i(vd) 4.9% apart; DC agrees)
 mos9_ac 4 mismatch finding=F27 # R94: as mos3_ac for level 9
 mos6_ac 4 target-fails finding=F28 # R94: ngspice-45 has no AC for MOS level 6 ("doAnalyses: matrix is singular"), its raw file ends in the header
+diode_isr 4 mismatch finding=F31 # R95: as ngspice-vacask: op vd:flow(br) 1.66074e-9 (VACASK) vs 2.0199e-12 A (ngspice), tol 9.321e-12; held to the current floor since the vector typing fix, at the voltage floor (2e-6) it passed
