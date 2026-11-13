@@ -1,0 +1,6 @@
+file "a.sp" deck
+  analysis op
+  print dc (v (out))
+  loop sweep (param r) (list values=[1k, 2k])
+    analysis op
+    print dc (v (out))

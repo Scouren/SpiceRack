@@ -19,7 +19,7 @@
 //!
 //! Cites: `rewrite/SPINE.md` §4; `rewrite/DIALECT-VACASK.md` §6.
 //!
-//! Contents: `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod ic_next_only`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
+//! Contents: `pub mod dc_axes_to_loops`, `pub mod device_ic`, `pub mod drop_print`, `pub mod ic_next_only`, `pub mod inert_options`, `pub mod loop_end`, `pub mod names_dropped`, `pub mod names_given`, `pub mod run_items_together`, `pub mod save_set_to_all`, `pub mod sweep_forms`, `pub mod tran_ceiling_given`, `pub mod tran_first_step_to_print`, `pub mod tran_print_step`,
 //! `pub mod whole_run_state_first`,
 //! `pub(super) const PASSES: &[Pass]`, `pub(super) const CODES: &[(ir::Code, ir::Info)]` (its rows in
 //! `codes.rs`)
@@ -27,7 +27,9 @@
 mod codes;
 pub mod dc_axes_to_loops;
 pub mod device_ic;
+pub mod drop_print;
 pub mod ic_next_only;
+pub mod inert_options;
 pub mod loop_end;
 pub mod names_dropped;
 pub mod names_given;
@@ -279,6 +281,29 @@ pub(super) const PASSES: &[Pass] = &[
         notes: &[dc_axes_to_loops::DC_AXIS_KEPT],
         run: dc_axes_to_loops::dc_axis_model_param_to_loop,
     },
+    // one row per option proven inert (`inert_options.rs`)
+    inert(inert_options::INERT[0]),
+    inert(inert_options::INERT[1]),
+    inert(inert_options::INERT[2]),
+    inert(inert_options::INERT[3]),
+    inert(inert_options::INERT[4]),
+    inert(inert_options::INERT[5]),
+    inert(inert_options::INERT[6]),
+    inert(inert_options::INERT[7]),
+    inert(inert_options::INERT[8]),
+    inert(inert_options::INERT[9]),
+    inert(inert_options::INERT[10]),
+    inert(inert_options::INERT[11]),
+    inert(inert_options::INERT[12]),
+    inert(inert_options::INERT[13]),
+    inert(inert_options::INERT[14]),
+    Pass {
+        name: "drop_print",
+        removes: ir::Feature::Item(ir::ItemKind::Print),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[drop_print::PRINT_KEPT],
+        run: drop_print::drop_print,
+    },
     // after the `whole_run_*_first` rows: a move may interleave
     Pass {
         name: "run_items_together",
@@ -343,6 +368,17 @@ const fn to_from_here(
         requires: ir::FeatureSet::EMPTY.with(ir::Feature::Run(modes.1)),
         notes,
         run,
+    }
+}
+
+/// An `inert_options` row: it removes its key's `Option` feature and requires nothing.
+const fn inert(row: inert_options::Row) -> Pass {
+    Pass {
+        name: row.0,
+        removes: ir::Feature::Option(row.1),
+        requires: ir::FeatureSet::EMPTY,
+        notes: &[inert_options::OPTION_KEPT],
+        run: row.2,
     }
 }
 
