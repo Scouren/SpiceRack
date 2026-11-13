@@ -143,8 +143,7 @@ pub(super) const PROVEN: &[&str] = &[
     "capacitor",
     "inductor",
     // settle devices_semi (run semi): sp_diode (level 1) and sp_mos1, n and p, equal to
-    // ngspice-45's D and level-1 M. Not sp_bjt: with area 1.5 and no `ibc` it differs by 0.2 %
-    // (run semi_bjt; VD dev-spice "Known differences", base-collector saturation current).
+    // ngspice-45's D and level-1 M.
     "sp_diode",
     "sp_mos1",
     // F11: each a pair deck at step 4 (tests/fixtures/pair/vacask-ngspice/sp_*inv.sim).
@@ -157,6 +156,13 @@ pub(super) const PROVEN: &[&str] = &[
     // oracle agrees at span/2000).
     "sp_jfet2",
     "sp_mes1",
+    // Gummel-Poon by pair deck sp_bjtinv (area 1, all six steps); where the two builds differ
+    // (R86: base-collector saturation current under an area, run semi_bjt's 0.2 %; R94a: irb in
+    // small signal) the design states this build's law (`LAWS`) and legalize keeps them apart.
+    "sp_bjt",
+    // By pair deck sp_vdmosinv; F24-F26 (kp default, tcvth sign, body-diode clamp) and the
+    // multiplicity of charges are law points the design states (LAWS).
+    "sp_vdmos",
 ];
 
 /// A shipped module's parameter names, as `params.txt` lists them.

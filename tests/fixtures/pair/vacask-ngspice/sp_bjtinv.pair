@@ -1,0 +1,3 @@
+# Authored (F11): sp_bjt as Gummel-Poon, area 1, n and p, a switching and a small-signal stage; R86, R94a are law points the design states (crates/ir/src/laws.rs).
+owner = vacask
+proves = families::PROVEN

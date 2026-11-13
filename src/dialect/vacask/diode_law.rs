@@ -63,7 +63,7 @@ pub(super) fn admit(design: &ir::Design, at: ir::ItemRef, diags: &mut ir::Diags)
     }
     let area = design.semi(&e).area;
     if !area.is_none()
-        && matches!(design.expr(area), ir::Expr::Num(id) if design.num(id).value() == 0.0)
+        && matches!(design.expr(area), ir::Expr::Num(id) if design.literal_value(design.num(id)) == 0.0)
     {
         diags.push_at(WRITE_ZERO_AREA, design, at, 0);
     }

@@ -1,0 +1,5 @@
+# VACASK corpus demo/spice/vdmosinv.sim (F11: the shipped SPICE module as its IR family).
+owner = vacask
+proves = families::PROVEN
+# No tcvth and no $mfactor: each is a law point the two builds answer differently (F25
+# VdmosTcvthRaises, VdmosMultChargesCopies), which legalize refuses toward ngspice (R92, R96).
