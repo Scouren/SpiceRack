@@ -1,0 +1,12 @@
+subckt_mult (ngspice twin)
+* settle (ngspice-45, -b): i(v1) = -5.00000e-03 (ESPice --tokenizer=ngspice: -1e-3)
+.subckt cell a b
+r1 a b 1k
+.ends
+v1 1 0 1
+x1 1 0 cell m=5
+.control
+op
+print i(v1)
+.endc
+.end

@@ -1,0 +1,142 @@
+//! X, N and A cards → `Instance`, `ModuleModel` and `CodeModel` rows.
+//!
+//! - `X n1 … nk sub [params:] k=v …`: the last word before the parameters is the subcircuit,
+//!   and `k` is its port count when it is visible (R61, A36: else ngspice rejects the deck);
+//!   `m=` is the multiplier under ngspice's append law (`MultLaw::NgspiceAppend`, R31:
+//!   `inp_fix_subckt_multiplier` hands `m={m}` to the inner cards) unless the subcircuit
+//!   declares `m` (`inp_fix_inst_calls_for_numparam`, `found_mult_param`; INV 6.01), then it is a
+//!   parameter;
+//! - `N n1 … nk model k=v …` (OSDI, `inp2n.c`): every parameter is the module's own but `m`,
+//!   the multiplicity (OpenVAF's `$mfactor`; settle `osdi_mult.sp`: `m=2` doubles the current,
+//!   and a module that declares a parameter `m` rejects `m=`, `osdi_mult_own.sp`);
+//! - `A n1 … nk model` (XSPICE): typed only when every connection is a plain node; a port
+//!   modifier (`%v`, `%id`, `[ ]`, `~`) has no IR field (`Private`).
+//!
+//! Contents: `pub(super) fn x`, `pub(super) fn n`, `pub(super) fn a` (each
+//! `(lw: &mut Lower<'_, '_>, st: Stmt, card: Card, items: &[Item])`)
+
+use super::super::read::{Lower, Stmt};
+use super::{
+    Card, INSTANCE_CYCLE, Item, Kind, MALFORMED, PORT_COUNT, PRIVATE_FORM, TERMINALS, head,
+    push_done, val,
+};
+use crate::ir::{self, ElemKind as K};
+
+/// An X card.
+pub(super) fn x(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]) {
+    let params_word = |i: &Item| i.kind == Kind::Word && i.text.eq_ignore_ascii_case("params:");
+    let words = items
+        .iter()
+        .take_while(|i| i.kind == Kind::Word && !params_word(i) && i.text != "=")
+        .count();
+    let mut rest = &items[words..];
+    if rest.first().is_some_and(params_word) {
+        rest = &rest[1..];
+    }
+    if words == 0 || rest.iter().any(|i| i.kind != Kind::Assign) {
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
+    }
+    let sub = items[words - 1].text.clone();
+    let sub_head = lw.subckt_head(st, &sub);
+    if sub_head
+        .as_ref()
+        .is_some_and(|(ports, _)| *ports != words - 1)
+    {
+        // R61/A36: ngspice rejects the deck (settle instance_ports_short.sp, _long.sp)
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, PORT_COUNT);
+    }
+    if lw.subckt_cycle(st, &sub) {
+        // X0024: settle instance_self.sp, instance_cycle.sp ("unknown subckt: x1.xw.xw…")
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, INSTANCE_CYCLE);
+    }
+    let declares_m = sub_head.is_some_and(|(_, f)| f.iter().any(|p| p.eq_ignore_ascii_case("m")));
+    card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();
+    if too_many(lw, st, &card, K::Instance) {
+        return;
+    }
+    card.model = Some(sub);
+    if !keyed(lw, st, &mut card, rest, !declares_m) {
+        return;
+    }
+    let mut h = head(lw, st, &card);
+    if !h.mult.is_none() {
+        // inp_fix_subckt_multiplier: ngspice's append law, not parallel copies (R31)
+        h.mult_law = ir::MultLaw::NgspiceAppend;
+    }
+    let span = lw.span(st.node);
+    let item = lw.b.instance(st.scope, K::Instance, h, span);
+    push_done(lw, st, item, &card);
+}
+
+/// An N card.
+pub(super) fn n(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]) {
+    let words = items.iter().take_while(|i| i.kind == Kind::Word).count();
+    if words == 0 || items[words..].iter().any(|i| i.kind != Kind::Assign) {
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
+    }
+    card.nodes = items[..words - 1].iter().map(|i| i.text.clone()).collect();
+    if too_many(lw, st, &card, K::ModuleModel) {
+        return;
+    }
+    card.model = Some(items[words - 1].text.clone());
+    if !keyed(lw, st, &mut card, &items[words..], true) {
+        return;
+    }
+    let h = head(lw, st, &card);
+    let span = lw.span(st.node);
+    let item = lw.b.instance(st.scope, K::ModuleModel, h, span);
+    push_done(lw, st, item, &card);
+}
+
+/// An A card.
+pub(super) fn a(lw: &mut Lower<'_, '_>, st: Stmt, mut card: Card, items: &[Item]) {
+    let plain = |i: &Item| i.kind == Kind::Word && !i.text.contains(['%', '[', ']', '~']);
+    if items.is_empty() {
+        return lw.opaque(st, ir::OpaqueClass::InvalidInSource, MALFORMED);
+    }
+    if !items.iter().all(plain) {
+        return lw.opaque(st, ir::OpaqueClass::Private, PRIVATE_FORM);
+    }
+    let (model, nodes) = items.split_last().expect("one item");
+    card.nodes = nodes.iter().map(|i| i.text.clone()).collect();
+    if too_many(lw, st, &card, K::CodeModel) {
+        return;
+    }
+    card.model = Some(model.text.clone());
+    let h = head(lw, st, &card);
+    let span = lw.span(st.node);
+    let item = lw.b.instance(st.scope, K::CodeModel, h, span);
+    push_done(lw, st, item, &card);
+}
+
+// ---- private ----
+
+/// More terminals than an IR row of `kind` holds (255): ngspice runs such a card (a spice-bench
+/// deck's X line of 266 nodes), the IR cannot state it: `Unread` with [`TERMINALS`], pushed.
+fn too_many(lw: &mut Lower<'_, '_>, st: Stmt, card: &Card, kind: K) -> bool {
+    let over = card.nodes.len() > usize::from(kind.terminals().1);
+    if over {
+        lw.opaque(st, ir::OpaqueClass::Unread, TERMINALS);
+    }
+    over
+}
+
+/// Reads `k=v` parameters into `card` (`m` into `mult` when `mult` says so); on a refusal
+/// pushes the opaque and returns false.
+fn keyed(lw: &mut Lower<'_, '_>, st: Stmt, card: &mut Card, rest: &[Item], mult: bool) -> bool {
+    for it in rest {
+        let v = match val(lw, st, &it.value) {
+            Ok(v) => v,
+            Err(e) => {
+                lw.opaque(st, e.class, e.code);
+                return false;
+            }
+        };
+        if mult && it.text.eq_ignore_ascii_case("m") {
+            card.dups |= card.mult.replace(v).is_some();
+        } else {
+            card.param(&it.text, v);
+        }
+    }
+    true
+}

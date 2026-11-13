@@ -1,0 +1,83 @@
+hbac/two_poles_hspice.sp: ok
+hbnoise/lti_rc_hspice.sp: FAIL hbnoise_density at 10.0 = 1.6400866224929896e-17, expected 1.6510889514871e-17
+hbxf/two_poles_hspice.sp: ok
+hspice/ac_poi.sp: ok
+hspice/behavioural_sources.sp: FAIL status error, expected success ["error: netlist: a braced expression (HSPICE quotes expressions: '...'): e1 o1 0 value={2*v(a)+1}"]
+hspice/behavioural_time_delay.sp: FAIL status error, expected success ['error: netlist: unsupported HSPICE element: b6 o6 0 v=time*1e3']
+hspice/checks.sp: ok (checks unchecked)
+hspice/connect.sp: ok
+hspice/cshunt_delmax.sp: ok
+hspice/dc_dec_grid.sp: ok
+hspice/dc_poi_grid.sp: ok
+hspice/dc_start_stop.sp: ok
+hspice/dcvolt_uic.sp: ok
+hspice/fft_hann.sp: ok
+hspice/fft_kaiser.sp: ok
+hspice/fft_meas.sp: ok (checks unchecked)
+hspice/fft_rect.sp: ok
+hspice/gmindc.sp: ok
+hspice/gshunt.sp: ok
+hspice/hblin_mixer.sp: ok
+hspice/hblin_noise.sp: ok
+hspice/hspice_expressions.sp: ok
+hspice/laplace_source.sp: ok
+hspice/lin_line.sp: ok
+hspice/lin_mixed_mode.sp: ok
+hspice/lin_pad.sp: ok
+hspice/lin_rc_noise.sp: ok
+hspice/load_ic.sp: ok (checks unchecked)
+hspice/match_diode.sp: ok
+hspice/match_diode_is.sp: ok
+hspice/meas_events.sp: ok (checks unchecked)
+hspice/meas_forms.sp: ok (checks unchecked)
+hspice/meas_lstb.sp: ok (checks unchecked)
+hspice/meas_match.sp: ok (checks unchecked)
+hspice/meas_ptdnoise.sp: ok (checks unchecked)
+hspice/net_one_port.sp: ok
+hspice/net_tpad_y.sp: ok
+hspice/net_tpad_z.sp: ok
+hspice/noise_ac_sweep.sp: ok
+hspice/op_times.sp: ok
+hspice/param_distributions.sp: ok
+hspice/pattern_source.sp: ok
+hspice/pole_source.sp: ok
+hspice/pole_step.sp: ok
+hspice/port_series_z0.sp: ok
+hspice/power.sp: ok (checks unchecked)
+hspice/ptdnoise_diode.sp: ok (checks unchecked)
+hspice/ptdnoise_time_sweep.sp: ok (checks unchecked)
+hspice/pz_source.sp: ok (checks unchecked)
+hspice/resistor_default_tnom.sp: ok
+hspice/s_element.sp: ok
+hspice/s_element_tran.sp: ok
+hspice/sample_rc.sp: ok (checks unchecked)
+hspice/sample_rc_beta.sp: ok (checks unchecked)
+hspice/search_lib.sp: ok
+hspice/sffm_order.sp: ok
+hspice/sn_rc.sp: ok
+hspice/snac_rc.sp: ok
+hspice/snnoise_rc.sp: ok
+hspice/snxf_rc.sp: ok
+hspice/temp_list.sp: ok
+hspice/tnom_default.sp: ok
+hspice/tran_segments.sp: ok (checks unchecked)
+hspice/unknown_card.sp: ok (error as expected)
+hspice/value_modifier.sp: FAIL status error, expected success ["error: netlist: a braced expression (HSPICE quotes expressions: '...'): e1 o1 0 value={2*v(a)} scale=3"]
+hspice/vec_stim.sp: ok (checks unchecked)
+hspice/w_coupled_cpl.sp: ok
+hspice/w_element.sp: ok
+hspice/w_lossless_delay.sp: ok
+hspice/w_settle.sp: ok
+hspice/w_txl.sp: ok
+invalid/hspice_brace_behavioural.sp: ok (error as expected)
+invalid/hspice_brace_expression.sp: ok (error as expected)
+invalid/hspice_brace_measure.sp: ok (error as expected)
+invalid/hspice_exponent_scale.sp: ok (error as expected)
+invalid/hspice_percent_operator.sp: ok (error as expected)
+invalid/hspice_unary_not.sp: ok (error as expected)
+invalid/hspice_unquoted_expression.sp: ok (error as expected)
+syntax/hspice_suffix.sp: ok
+tran_noise/hspice_samples.sp: ok (checks unchecked)
+tran_noise/hspice_sde_flicker.sp: ok (checks unchecked)
+tran_noise/hspice_sde_rc.sp: ok (checks unchecked)
+summary: 78 ok, 4 FAIL of 82

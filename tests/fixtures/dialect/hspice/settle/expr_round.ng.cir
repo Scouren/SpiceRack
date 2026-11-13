@@ -1,0 +1,11 @@
+nint (ngspice twin: numparam nint)
+* settle (ngspice-45, -b): v(e0) = 2, v(e1) = -2, v(e2) = 0 (numparam nint: half to even)
+vs s 0 1
+ve0 e0 0 {nint(2.5)}
+ve1 e1 0 {nint(-2.5)}
+ve2 e2 0 {nint(-0.5)}
+.control
+op
+print v(e0) v(e1) v(e2)
+.endc
+.end

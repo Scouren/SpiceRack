@@ -43,7 +43,7 @@
 //!   `pub const PATH_AS_READ: ir::Code`,
 //!   `pub const INERT_DROPPED: ir::Code`, `pub const HINT_DROPPED: ir::Code`
 //! - `pub use sources::{DEPTH_MAX, Reference, Sources, relative_path, written_path}`; `pub mod facade`, `pub mod irtext`,
-//!   `pub mod ngspice`, `pub mod vacask`
+//!   `pub mod hspice`, `pub mod ngspice`, `pub mod vacask`
 //! - `pub fn by_name(name: &str) -> Option<&'static DialectRow>`
 //! - `pub fn read(src: &Sources, from: &DialectRow, policy: Policy, design: &mut ir::Design, diags: &mut ir::Diags)`
 //! - `pub fn legalize(design: &mut ir::Design, to: &DialectRow, diags: &mut ir::Diags)`
@@ -52,6 +52,7 @@
 //! - `pub fn info(code: ir::Code) -> Option<ir::Info>`, `pub fn refuses(code: ir::Code) -> bool`
 
 pub mod facade;
+pub mod hspice;
 pub mod irtext;
 pub mod ngspice;
 mod sources;
@@ -146,6 +147,12 @@ pub static BUILTIN: &[DialectRow] = &[
         text_family: "vacask",
         read: Some(&vacask::VACASK),
         write: Some(&vacask::VACASK),
+    },
+    DialectRow {
+        name: "hspice",
+        text_family: "hspice",
+        read: Some(&hspice::HSPICE),
+        write: Some(&hspice::HSPICE),
     },
 ];
 
@@ -440,6 +447,7 @@ pub fn info(code: ir::Code) -> Option<ir::Info> {
         .or_else(|| passes::info(code))
         .or_else(|| ir::diag::info(code))
         .or_else(|| ngspice::info(code))
+        .or_else(|| hspice::info(code))
 }
 
 /// Whether `code` refuses a deck: its row is a refusal, or no catalogue holds it (a missing

@@ -40,6 +40,20 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("vacask", "Wave(Exp)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Pwl)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Am)", "property_am_and_mutual_round_trip", VC_SOURCES),
+    ("hspice", "Item(Loop)", FIXPOINT, HS_LOOP),
+    ("hspice", "Elem(Port)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Elem(Table)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Elem(Behav)", FIXPOINT, HS_BEHAV),
+    ("hspice", "Wave(Pulse)", FIXPOINT, HS_SOURCES),
+    ("hspice", "Wave(Sin)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(Exp)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(Pwl)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(Sffm)", FIXPOINT, HS_SOURCES),
+    ("hspice", "Wave(Am)", FIXPOINT, HS_SOURCES),
+    ("hspice", "Wave(TrNoise)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Wave(TrRandom)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Family(Mesa)", FIXPOINT, HS_CARRIED),
+    ("hspice", "Family(CodeModel)", FIXPOINT, HS_CARRIED),
 ];
 
 /// ngspice's interim covering property (until round 7): each area's fixture fixpoint.
@@ -56,3 +70,8 @@ const VC_SOURCES: &str = "W2104 for sources (law L5 seed 1): VACASK takes a sour
 const VC_DRAWS: &str = "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws; none over REACH_SEEDS since FEATURES changed (Func(Atan2) left, R76a; the F11 families joined; the unproven families left, R41 a; jfet2 and mes1 proven) and moved every later draw";
 const VC_SOURCES_INTERIM: &str = "interim: dialect_vacask_sources' fixtures (sources, controlled, pulse, sine, exp, pwl); the generator names a source's model with a fresh name: waits for the generator binding it";
 const CODE_MODELS: &str = "the generator's code-model words name none of the build's (W1206); a seeded property of the build's code models covers it (tests/dialect_ngspice_models.rs)";
+// hspice (tests/dialect_hspice.rs's read fixtures; its gate is goal 2's)
+const HS_LOOP: &str = "interim: dialect_hspice's fixture dc_sweep_param; the generator's loops are no sweep tail (one parameter around one .dc, .ac or .tran: W4303)";
+const HS_BEHAV: &str = "interim: dialect_hspice's fixtures e_forms, e_max; the generator names a behavioural source with a B, which HSPICE has not (W4100 Letter: an E or G name is no writer's to invent)";
+const HS_SOURCES: &str = "interim: dialect_hspice's fixtures pulse_zero_rise, timed_op, sffm_order, am_form; the positional source card refuses the generator's sources (W4150)";
+const HS_CARRIED: &str = "interim: carried from the ngspice dialect's shape, no settle deck on ESPice yet (its HSPICE form is a lead)";
