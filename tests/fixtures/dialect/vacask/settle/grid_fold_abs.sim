@@ -1,0 +1,35 @@
+abs on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b221 (d221 0) v=abs(-2.5)
+r221 (d221 0) r r=1k
+b222 (d222 0) v=abs(-1.0)
+r222 (d222 0) r r=1k
+b223 (d223 0) v=abs(-0.5)
+r223 (d223 0) r r=1k
+b224 (d224 0) v=abs(-0.0)
+r224 (d224 0) r r=1k
+b225 (d225 0) v=abs(0.0)
+r225 (d225 0) r r=1k
+b226 (d226 0) v=abs(0.5)
+r226 (d226 0) r r=1k
+b227 (d227 0) v=abs(1.0)
+r227 (d227 0) r r=1k
+b228 (d228 0) v=abs(2.5)
+r228 (d228 0) r r=1k
+b229 (d229 0) v=abs(1e-3)
+r229 (d229 0) r r=1k
+b230 (d230 0) v=abs(1e3)
+r230 (d230 0) r r=1k
+b231 (d231 0) v=abs(-3)
+r231 (d231 0) r r=1k
+b232 (d232 0) v=abs(0)
+r232 (d232 0) r r=1k
+b233 (d233 0) v=abs(3)
+r233 (d233 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

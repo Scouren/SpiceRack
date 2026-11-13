@@ -1,0 +1,28 @@
+SPICE JFET level 1 inverter
+
+load "spice/jfet1.osdi"
+load "resistor.osdi"
+load "capacitor.osdi"
+
+model v vsource
+model r resistor
+model c capacitor
+
+// The corpus deck elaborates each inverter in turn; here both stand at the top.
+model nf sp_jfet1 type=1 vt0=-4 beta=2m lambda=0.05 rs=0.1 rd=0.1 cgs=10p cgd=20p kf=1e-14 af=1
+vddn (supn 0) v dc=10
+rdn (supn dn) r r=2k
+j1n (dn gn 0) nf $mfactor=2 area=3
+vinn (inn 0) v type="pulse" val0=-5 val1=0 delay=1n rise=0.1n fall=0.1n width=0.5u period=1u
+rinn (inn gn) r r=100
+
+model pf sp_jfet1 type=-1 vt0=-4 beta=2m lambda=0.05 rs=0.1 rd=0.1 cgs=10p cgd=20p kf=1e-14 af=1
+vddp (supp 0) v dc=10
+rdp (0 dp) r r=2k
+j1p (dp gp supp) pf $mfactor=2 area=3
+vinp (inp 0) v type="pulse" val0=10 val1=15 delay=1n rise=0.1n fall=0.1n width=0.5u period=1u
+rinp (inp gp) r r=100
+
+control
+  analysis tran1 tran step=0.1n stop=5u
+endc

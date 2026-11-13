@@ -103,6 +103,8 @@ pub(super) fn load(w: &mut Writer<'_, '_>, at: ir::ItemRef) {
     w.out.push_str("load ");
     string(d.str(row.path), w.out);
     // The load's modules: `map=` loads exactly those, each under its own name (VD cir-loading).
+    // ponytail: decides from the whole definition table, dead rows included (the class of the
+    // expression table's replaced rows); a live-definitions view replaces it in the `…_all()` round.
     let modules: Vec<ir::NameId> = d
         .definitions()
         .iter()

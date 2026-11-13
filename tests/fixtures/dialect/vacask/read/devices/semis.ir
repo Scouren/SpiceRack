@@ -9,7 +9,7 @@ file "semis.sim" deck
   device_library resistor
   device_library diode
   device_library mos1
-  device_library gummel_poon
+  load osdi "spice/bjt.osdi"
   model vs source_v
   model r resistor
   model dmod diode params=(is=1e-14 n=1.05 rs=10i cjo=1p)

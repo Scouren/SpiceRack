@@ -1,0 +1,21 @@
+atanh on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b145 (d145 0) v=atanh(-0.5*($temp/$temp))
+r145 (d145 0) r r=1k
+b146 (d146 0) v=atanh(-0.0*($temp/$temp))
+r146 (d146 0) r r=1k
+b147 (d147 0) v=atanh(0.0*($temp/$temp))
+r147 (d147 0) r r=1k
+b148 (d148 0) v=atanh(0.5*($temp/$temp))
+r148 (d148 0) r r=1k
+b151 (d151 0) v=atanh(1e-3*($temp/$temp))
+r151 (d151 0) r r=1k
+b154 (d154 0) v=atanh(0*($temp/$temp))
+r154 (d154 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

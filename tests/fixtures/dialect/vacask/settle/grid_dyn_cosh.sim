@@ -1,0 +1,33 @@
+cosh on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b91 (d91 0) v=cosh(-2.5*($temp/$temp))
+r91 (d91 0) r r=1k
+b92 (d92 0) v=cosh(-1.0*($temp/$temp))
+r92 (d92 0) r r=1k
+b93 (d93 0) v=cosh(-0.5*($temp/$temp))
+r93 (d93 0) r r=1k
+b94 (d94 0) v=cosh(-0.0*($temp/$temp))
+r94 (d94 0) r r=1k
+b95 (d95 0) v=cosh(0.0*($temp/$temp))
+r95 (d95 0) r r=1k
+b96 (d96 0) v=cosh(0.5*($temp/$temp))
+r96 (d96 0) r r=1k
+b97 (d97 0) v=cosh(1.0*($temp/$temp))
+r97 (d97 0) r r=1k
+b98 (d98 0) v=cosh(2.5*($temp/$temp))
+r98 (d98 0) r r=1k
+b99 (d99 0) v=cosh(1e-3*($temp/$temp))
+r99 (d99 0) r r=1k
+b101 (d101 0) v=cosh(-3*($temp/$temp))
+r101 (d101 0) r r=1k
+b102 (d102 0) v=cosh(0*($temp/$temp))
+r102 (d102 0) r r=1k
+b103 (d103 0) v=cosh(3*($temp/$temp))
+r103 (d103 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

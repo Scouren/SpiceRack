@@ -1,0 +1,35 @@
+atan on a grid, folded sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b65 (d65 0) v=atan(-2.5)
+r65 (d65 0) r r=1k
+b66 (d66 0) v=atan(-1.0)
+r66 (d66 0) r r=1k
+b67 (d67 0) v=atan(-0.5)
+r67 (d67 0) r r=1k
+b68 (d68 0) v=atan(-0.0)
+r68 (d68 0) r r=1k
+b69 (d69 0) v=atan(0.0)
+r69 (d69 0) r r=1k
+b70 (d70 0) v=atan(0.5)
+r70 (d70 0) r r=1k
+b71 (d71 0) v=atan(1.0)
+r71 (d71 0) r r=1k
+b72 (d72 0) v=atan(2.5)
+r72 (d72 0) r r=1k
+b73 (d73 0) v=atan(1e-3)
+r73 (d73 0) r r=1k
+b74 (d74 0) v=atan(1e3)
+r74 (d74 0) r r=1k
+b75 (d75 0) v=atan(-3)
+r75 (d75 0) r r=1k
+b76 (d76 0) v=atan(0)
+r76 (d76 0) r r=1k
+b77 (d77 0) v=atan(3)
+r77 (d77 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

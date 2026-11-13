@@ -1,0 +1,21 @@
+log on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b174 (d174 0) v=log(0.5*($temp/$temp))
+r174 (d174 0) r r=1k
+b175 (d175 0) v=log(1.0*($temp/$temp))
+r175 (d175 0) r r=1k
+b176 (d176 0) v=log(2.5*($temp/$temp))
+r176 (d176 0) r r=1k
+b177 (d177 0) v=log(1e-3*($temp/$temp))
+r177 (d177 0) r r=1k
+b178 (d178 0) v=log(1e3*($temp/$temp))
+r178 (d178 0) r r=1k
+b181 (d181 0) v=log(3*($temp/$temp))
+r181 (d181 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

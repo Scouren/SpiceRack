@@ -1,0 +1,7 @@
+sign in a behavioural source
+model vsource vsource
+vone (one 0) vsource dc=1
+b0 (d0 0) v=sign(2.0*v(one), -1.0)
+control
+  analysis op1 op
+endc

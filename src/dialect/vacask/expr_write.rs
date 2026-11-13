@@ -11,7 +11,7 @@
 //!
 //! Cites: VD expr-operators, expr-functions, expr-special; `rewrite/DIALECT-VACASK.md` §4.
 //!
-//! Contents: `NO_REAL`, `WIDE_INT`, `CODES`, `write_expr`, `write_behavioural`, `admit`, `string` (crate-private)
+//! Contents: `NO_REAL`, `NO_INT`, `NO_ATAN2`, `WIDE_INT`, `CODES`, `write_expr`, `write_behavioural`, `admit`, `string` (crate-private)
 
 use super::name::{self, Place};
 use super::number;
@@ -24,6 +24,15 @@ use crate::ir;
 /// dynamic form joins with a circuit-reading field.
 pub(super) const NO_REAL: ir::Code = ir::Code::new(b'W', 2006);
 
+/// An integer conversion a behavioural source cannot spell: `to_int` of anything but a parameter
+/// read (`$intparam(p)`, runs ip1, ip4); OpenVAF translates no `int` (settle beh_int, R76a).
+pub(super) const NO_INT: ir::Code = ir::Code::new(b'W', 2009);
+
+/// An `atan2` outside a behavioural source: VACASK's parameter evaluator computes another
+/// function (R76a; settle atan2, grid_static), so C's `atan2` (`FuncDyn`, of a parameter that
+/// reads `$temp`) has no spelling there.
+pub(super) const NO_ATAN2: ir::Code = ir::Code::new(b'W', 2010);
+
 /// An integer literal past 32 bits, which VACASK would wrap (run iw1).
 pub(super) const WIDE_INT: ir::Code = ir::Code::new(b'W', 2008);
 
@@ -35,6 +44,24 @@ pub(super) const CODES: &[(ir::Code, ir::Info)] = &[
             title: "a real conversion VACASK cannot spell",
             cite: "VD dev-builtin-behavioral; R40; DIALECT-VACASK Appendix A run b1",
             explain: "A VACASK behavioural source reads every parameter as a real and a parameter expression keeps the parameter's type; VACASK has no function that converts a value to real. So `to_real` is spelled only over a parameter read in a behavioural source's expression, and a parameter read there must be one.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        NO_INT,
+        ir::Info {
+            title: "an integer conversion a behavioural source cannot spell",
+            cite: "R56; R76a; DIALECT-VACASK Appendix A runs ip1, ip4; settle beh_int",
+            explain: "In a VACASK behavioural source an integer conversion is `$intparam(p)`, of one parameter's name; OpenVAF translates no `int` (\"'$rtoi' was not found in the current scope\"), so `to_int` of anything else has no spelling there.",
+            kind: ir::Kind::Refusal,
+        },
+    ),
+    (
+        NO_ATAN2,
+        ir::Info {
+            title: "an atan2 outside a behavioural source",
+            cite: "R76a; settle atan2, grid_static",
+            explain: "VACASK's parameter evaluator computes atan2(y, x) as atan(y/x) shifted by π when y < 0 (atan2(1, -1) is -0.785), its behavioural sources C's atan2; so C's atan2 is spelled in a behavioural source only.",
             kind: ir::Kind::Refusal,
         },
     ),
@@ -76,9 +103,10 @@ pub(super) fn write_behavioural(design: &ir::Design, e: ir::ExprId, out: &mut St
     write(design, e, true, out);
 }
 
-/// Appends a refusal, at its item, for each real conversion VACASK cannot spell ([`NO_REAL`])
-/// and each integer literal it would wrap ([`WIDE_INT`]), in item `at` (`handles`: a buffer the
-/// caller keeps across items).
+/// Appends a refusal, at its item, for each real or integer conversion VACASK cannot spell
+/// ([`NO_REAL`], [`NO_INT`]), each `atan2` outside a behavioural source ([`NO_ATAN2`]) and each
+/// integer literal it would wrap ([`WIDE_INT`]), in item `at` (`handles`: a buffer the caller
+/// keeps across items).
 pub(super) fn admit(
     design: &ir::Design,
     at: ir::ItemRef,
@@ -224,7 +252,9 @@ fn write(design: &ir::Design, e: ir::ExprId, behavioural: bool, out: &mut String
     }
 }
 
-/// What VACASK cannot spell in root `e`: an integer literal past 32 bits ([`WIDE_INT`]); a real
+/// What VACASK cannot spell in root `e`: an integer literal past 32 bits ([`WIDE_INT`]); in a
+/// behavioural source's expression a `to_int` of anything but a parameter read ([`NO_INT`]),
+/// elsewhere an `atan2` ([`NO_ATAN2`]); a real
 /// conversion it lacks ([`NO_REAL`]): in a behavioural source's expression (`circuit`) a
 /// `to_real` of anything but a parameter read; in any other field a `to_real`.
 fn refusal(design: &ir::Design, e: ir::ExprId, circuit: bool) -> Option<ir::Code> {
@@ -245,6 +275,13 @@ fn refusal(design: &ir::Design, e: ir::ExprId, circuit: bool) -> Option<ir::Code
                 let arg = design.exprs(args)[0];
                 if !circuit || !matches!(design.expr(arg), ir::Expr::Param(_)) {
                     return Some(NO_REAL);
+                }
+            }
+            ir::Expr::Call(ir::Func::Atan2, _) if !circuit => return Some(NO_ATAN2),
+            ir::Expr::Call(ir::Func::ToInt, args) if circuit => {
+                let arg = design.exprs(args)[0];
+                if !matches!(design.expr(arg), ir::Expr::Param(_)) {
+                    return Some(NO_INT);
                 }
             }
             ir::Expr::Unary(_, a) => todo.push(a),
@@ -345,6 +382,7 @@ fn function(func: ir::Func) -> &'static str {
         F::Asin => "asin",
         F::Acos => "acos",
         F::Atan => "atan",
+        // R76a: only a behavioural source holds `Atan2` (its dynamic form is C's).
         F::Atan2 => "atan2",
         F::Sinh => "sinh",
         F::Cosh => "cosh",
@@ -372,13 +410,16 @@ mod tests {
     use crate::syntax::{Lang, parse, tokenize};
 
     /// `text`'s first instance's `v=` value read in the behavioural context: the expression
-    /// written back, and whether its parameter read is wrapped in `to_real`.
+    /// written back, and whether its parameter read is wrapped in `to_real`. The design holds a
+    /// dead `to_real` row first (what a pass leaves when it replaces one), which must not count.
     fn behavioural(text: &str) -> (String, bool) {
         let lex = Lang::VACASK.lexicon().expect("a lexicon");
         let tokens = tokenize(text, lex);
         let ast = parse(&tokens, lex);
         let mut design = ir::Design::new();
         let mut b = design.builder();
+        let dead = b.param_ref("dead");
+        b.call(ir::Func::ToReal, &[dead]);
         let (file, top) = b.file("t.sim", ir::Role::Deck);
         let cst = Cst {
             tokens,
@@ -426,14 +467,23 @@ mod tests {
             taken: HashSet::new(),
             gap_token: 0,
             gap_end: 0,
+            folded: false,
         };
         let e = expr(&mut l, value, Context::Behavioural).expect("read");
-        let real = (0..design.expr_count()).any(|k| {
-            matches!(
-                design.expr(ir::ExprId(k as u32)),
-                ir::Expr::Call(ir::Func::ToReal, _)
-            )
-        });
+        // The tree under `e`, never the table: a replaced row stays in it.
+        let (mut todo, mut real) = (vec![e], false);
+        while let Some(x) = todo.pop() {
+            match design.expr(x) {
+                ir::Expr::Call(f, args) => {
+                    real |= f == ir::Func::ToReal;
+                    todo.extend_from_slice(design.exprs(args));
+                }
+                ir::Expr::Unary(_, a) => todo.push(a),
+                ir::Expr::Binary(_, a, b) => todo.extend([a, b]),
+                ir::Expr::Ternary(a, b, c) => todo.extend([a, b, c]),
+                _ => {}
+            }
+        }
         let mut out = String::new();
         write_behavioural(&design, e, &mut out);
         (out, real)
@@ -468,5 +518,36 @@ mod tests {
                 "{text}"
             );
         }
+    }
+
+    /// Oracle: settle beh_int (OpenVAF: "'$rtoi' was not found in the current scope") and runs
+    /// ip1, ip4 (`$intparam(p)` runs): in a behavioural source `to_int` is spelled over a
+    /// parameter read only; elsewhere (run85: `int(abs(int($temp+0.5)))` is 27) it is `int`.
+    #[test]
+    fn a_behavioural_to_int_is_of_a_parameter_read_only() {
+        let mut design = ir::Design::new();
+        let (of_v, of_p) = {
+            let mut b = design.builder();
+            let v = b.v("a", None);
+            let p = b.param_ref("p");
+            (b.call(ir::Func::ToInt, &[v]), b.call(ir::Func::ToInt, &[p]))
+        };
+        assert_eq!(refusal(&design, of_v, true), Some(NO_INT));
+        assert_eq!(refusal(&design, of_p, true), None);
+        assert_eq!(refusal(&design, of_v, false), None);
+    }
+
+    /// Oracle: settle atan2 and grid_static (a parameter's `atan2(1, -1)` is -0.785, a
+    /// behavioural source's 2.356, C's): C's `atan2` is spelled in a behavioural source only.
+    #[test]
+    fn atan2_is_spelled_in_a_behavioural_source_only() {
+        let mut design = ir::Design::new();
+        let e = {
+            let mut b = design.builder();
+            let (y, x) = (b.temp(), b.param_ref("p"));
+            b.call(ir::Func::Atan2, &[y, x])
+        };
+        assert_eq!(refusal(&design, e, false), Some(NO_ATAN2));
+        assert_eq!(refusal(&design, e, true), None);
     }
 }

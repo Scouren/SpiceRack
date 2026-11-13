@@ -1,0 +1,31 @@
+ceil on a grid, behavioural sources
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b247 (d247 0) v=ceil(-2.5*($temp/$temp))
+r247 (d247 0) r r=1k
+b248 (d248 0) v=ceil(-1.0*($temp/$temp))
+r248 (d248 0) r r=1k
+b249 (d249 0) v=ceil(-0.5*($temp/$temp))
+r249 (d249 0) r r=1k
+b250 (d250 0) v=ceil(-0.0*($temp/$temp))
+r250 (d250 0) r r=1k
+b252 (d252 0) v=ceil(0.5*($temp/$temp))
+r252 (d252 0) r r=1k
+b253 (d253 0) v=ceil(1.0*($temp/$temp))
+r253 (d253 0) r r=1k
+b254 (d254 0) v=ceil(2.5*($temp/$temp))
+r254 (d254 0) r r=1k
+b255 (d255 0) v=ceil(1e-3*($temp/$temp))
+r255 (d255 0) r r=1k
+b256 (d256 0) v=ceil(1e3*($temp/$temp))
+r256 (d256 0) r r=1k
+b257 (d257 0) v=ceil(-3*($temp/$temp))
+r257 (d257 0) r r=1k
+b259 (d259 0) v=ceil(3*($temp/$temp))
+r259 (d259 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc

@@ -90,6 +90,20 @@ fn every_corpus_file_reads_cleanly_and_is_a_fixpoint() {
             failed.push(format!("{rel}: X rows {:?}", diags.rows()));
             continue;
         }
+        // F11: in a deck, a module model whose module no definition binds is provided only by a
+        // plain `load` (one that loads every module of its file), never by a family's library
+        // (a library file's loads are its including deck's).
+        let reach = once.reachable();
+        let loads = reach.iter().any(|(at, _)| at.kind == ir::ItemKind::Load);
+        let orphan = reach.iter().any(|(at, _)| {
+            at.kind == ir::ItemKind::Model && {
+                let m: ir::Model = once.row(at.index);
+                m.family == ir::ModelFamily::Module && m.module.def == ir::DefId::NONE
+            }
+        });
+        if orphan && !loads && role == ir::Role::Deck {
+            failed.push(format!("{rel}: a module model no load provides"));
+        }
         let before = canonical(&once);
         // The zero gate (item 6b): every corpus statement is read, Private, Inert, a hint, or
         // invalid in source; none is left `Unread`.

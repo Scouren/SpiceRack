@@ -83,6 +83,10 @@ pub(super) struct Lower<'a, 'b, 's> {
     pub(super) gap_token: u32,
     /// The end of the gaps already searched (a byte of the tokenized text).
     pub(super) gap_end: u32,
+    /// The behavioural expression being read is literals only, which VACASK folds with its
+    /// parameter evaluator (settle atan2_forms: `v=atan2(0.5, -0.5)` is -0.785, C's 2.356;
+    /// R76a): its `atan2` is read in the static form.
+    pub(super) folded: bool,
 }
 
 /// Which area reads an instance statement.
@@ -312,6 +316,7 @@ pub(super) fn read(src: &Sources, out: &mut ir::Builder<'_>, diags: &mut ir::Dia
             taken: HashSet::new(),
             gap_token: 0,
             gap_end: 0,
+            folded: false,
         };
         let root = cst.ast.fields(cst.ast.root()).to_vec();
         l.body(*top, &root, None);

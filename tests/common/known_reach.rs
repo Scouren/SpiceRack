@@ -37,17 +37,24 @@ pub const KNOWN_REACH: &[(&str, &str, &str, &str)] = &[
     ("vacask", "Item(NodeSet)", VC_RUN_FIXPOINT, VC_ARGS),
     ("vacask", "Item(Save)", "generated_save_plans_read_back_to_their_meaning", "W2303: VACASK spells two save shapes only (R29/S12)"),
     ("vacask", "Elem(Resistor)", "proven_device_kinds_round_trip", "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws"),
+    ("vacask", "Elem(Capacitor)", "proven_device_kinds_round_trip", VC_DRAWS),
+    ("vacask", "Elem(Inductor)", "proven_device_kinds_round_trip", VC_DRAWS),
     ("vacask", "Elem(Coupling)", "property_am_and_mutual_round_trip", "the generator makes no coupling over seeds 0..512 (it needs two inductor names and a Mutual model), so none is generated, let alone refused"),
-    ("vacask", "Elem(VSource)", "property_am_and_mutual_round_trip", VC_SOURCES),
-    ("vacask", "Elem(Ccvs)", VC_FIXPOINT, VC_SOURCES_INTERIM),
-    ("vacask", "Elem(ModuleModel)", "proven_device_kinds_round_trip", "an instance of a user module needs its Load, a model of that module (W2104) and the module's own parameter names (W2102 on Gen's names)"),
+    ("vacask", "Elem(Vcvs)", "proven_device_kinds_round_trip", VC_DRAWS),
+    ("vacask", "Elem(Vccs)", "proven_device_kinds_round_trip", VC_DRAWS),
+    ("vacask", "Elem(Diode)", "proven_device_kinds_round_trip", VC_DRAWS),
+    ("vacask", "Elem(Mosfet)", "proven_device_kinds_round_trip", VC_DRAWS),
+    ("vacask", "Elem(Jfet)", "proven_device_kinds_round_trip", VC_DRAWS),
+    ("vacask", "Elem(Mesfet)", "proven_device_kinds_round_trip", VC_DRAWS),
     ("vacask", "Wave(Pulse)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Sin)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Exp)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Pwl)", VC_FIXPOINT, VC_SOURCES_INTERIM),
+    ("vacask", "Wave(Sffm)", VC_FIXPOINT, VC_SOURCES_INTERIM),
     ("vacask", "Wave(Am)", "property_am_and_mutual_round_trip", VC_SOURCES),
     ("vacask", "Analysis(Dc)", VC_RUN_FIXPOINT, VC_ARGS),
     ("vacask", "Analysis(Ac)", VC_RUN_FIXPOINT, VC_ARGS),
+    ("vacask", "Analysis(Tran)", VC_RUN_FIXPOINT, VC_ARGS),
     ("vacask", "Analysis(Noise)", VC_RUN_FIXPOINT, VC_ARGS),
     ("vacask", "Analysis(Xf)", VC_RUN_FIXPOINT, VC_ARGS),
     ("vacask", "Analysis(Sp)", VC_RUN_FIXPOINT, VC_ARGS),
@@ -66,6 +73,7 @@ const MODELS: &str = "interim: dialect_ngspice_models' fixture jfet_mes_hfet";
 const VC_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
 const VC_SOURCES: &str = "W2104 for sources (law L5 seed 1): VACASK takes a source's kind from its master, and the generator names a source's model with a fresh name no model statement defines, so every generated source is refused";
 const VC_RUN_FIXPOINT: &str = "every_reader_fixture_is_a_fixpoint_of_write_and_read";
+const VC_DRAWS: &str = "VACASK takes an instance's kind from its master: admits wants a visible model of the element's own proven family (W2104, W2108), which the generator rarely draws; none over REACH_SEEDS since FEATURES changed (Func(Atan2) left, R76a; the F11 families joined) and moved every later draw";
 const VC_ARGS: &str = "interim: dialect_vacask_run's fixtures (ac, small_signal, sweep_op, op_nodeset); W2313 refuses an analysis argument or sweep range reading a parameter or the temperature, which the generator draws freely: goes when A42's invariant and feature reach the generator";
 const VC_SOURCES_INTERIM: &str = "interim: dialect_vacask_sources' fixtures (sources, controlled, pulse, sine, exp, pwl); the generator names a source's model with a fresh name: waits for the generator binding it";
 const CODE_MODELS: &str = "the generator's code-model words name none of the build's (W1206); a seeded property of the build's code models covers it (tests/dialect_ngspice_models.rs)";

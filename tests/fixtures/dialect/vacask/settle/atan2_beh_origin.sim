@@ -1,0 +1,13 @@
+atan2 at the origin, behavioural
+load "resistor.osdi"
+model r resistor
+model vsource vsource
+vone (one 0) vsource dc=1
+b0 (d0 0) v=atan2(0.0*v(one), 0.0*v(one))
+b1 (d1 0) v=atan2(1.0*v(one), -0.0*v(one))
+r0 (d0 0) r r=1k
+r1 (d1 0) r r=1k
+control
+  options rawfile="ascii"
+  analysis op1 op
+endc
