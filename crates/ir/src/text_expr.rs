@@ -311,7 +311,7 @@ pub(crate) fn binary_prec(op: BinOp) -> u8 {
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => 8,
         BinOp::Shl | BinOp::Shr => 9,
         BinOp::Add | BinOp::Sub => 10,
-        BinOp::Mul | BinOp::Div | BinOp::IntDiv | BinOp::DivTyped => 11,
+        BinOp::Mul | BinOp::Div | BinOp::DivTyped => 11,
     }
 }
 
@@ -320,11 +320,9 @@ pub(crate) fn func_text(f: Func) -> &'static str {
     match f {
         Func::Abs => "abs",
         Func::Sqrt => "sqrt",
-        Func::SqrtAbs => "sqrt_abs",
         Func::Exp => "exp",
         Func::ExpLin14 => "exp_lin14",
         Func::Ln => "ln",
-        Func::LnAbs => "ln_abs",
         Func::Log10 => "log10",
         Func::Pow => "pow",
         Func::PowAbs => "pow_abs",
@@ -356,7 +354,6 @@ pub(crate) fn func_text(f: Func) -> &'static str {
         Func::Hypot => "hypot",
         Func::Fmod => "fmod",
         Func::Clamp => "clamp",
-        Func::Step => "step",
         Func::Ramp => "ramp",
         Func::Ddt => "ddt",
         Func::Idt => "idt",
@@ -416,7 +413,6 @@ fn binary_text(op: BinOp) -> &'static str {
         BinOp::Sub => " - ",
         BinOp::Mul => " * ",
         BinOp::Div => " / ",
-        BinOp::IntDiv => " // ",
         BinOp::Eq => " == ",
         BinOp::Ne => " != ",
         BinOp::Lt => " < ",

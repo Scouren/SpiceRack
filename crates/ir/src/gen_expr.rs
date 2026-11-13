@@ -461,7 +461,6 @@ fn typed(node: &Node) -> bool {
         node,
         Node::Binary(
             BinOp::DivTyped
-                | BinOp::IntDiv
                 | BinOp::BitAnd
                 | BinOp::BitOr
                 | BinOp::BitXor

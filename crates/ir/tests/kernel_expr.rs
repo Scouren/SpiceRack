@@ -57,7 +57,7 @@ fn every_tag_round_trips() {
         let call = b.call(Func::Pow, &[a, b2]);
         let uc = b.user_call("f", &[a]);
         let un = b.unary(UnOp::Neg, a);
-        let bin = b.binary(BinOp::IntDiv, a, b2);
+        let bin = b.binary(BinOp::DivTyped, a, b2);
         let ter = b.ternary(p, a, b2);
         let v1 = b.v("out", None);
         let v2 = b.v("out", Some("ref"));
@@ -81,7 +81,7 @@ fn every_tag_round_trips() {
     };
     assert_eq!((r, d.exprs(args)), (Ref::unresolved(n("f")), &[a][..]));
     assert_eq!(d.expr(un), Expr::Unary(UnOp::Neg, a));
-    assert_eq!(d.expr(bin), Expr::Binary(BinOp::IntDiv, a, b2));
+    assert_eq!(d.expr(bin), Expr::Binary(BinOp::DivTyped, a, b2));
     assert_eq!(d.expr(ter), Expr::Ternary(p, a, b2));
     assert_eq!(d.expr(v1), Expr::V(n("out"), NameId::NONE));
     assert_eq!(d.expr(v2), Expr::V(n("out"), n("ref")));

@@ -128,7 +128,6 @@ fn logs_roots_and_exponentials() {
     exact(call(Func::Abs, &[-2.0]), 2.0);
     exact(call(Func::Sqrt, &[4.0]), 2.0);
     out_of_domain(call(Func::Sqrt, &[-1.0]));
-    exact(call(Func::SqrtAbs, &[-4.0]), 2.0); // √|−4|
     exact(call(Func::Exp, &[0.0]), 1.0);
     out_of_domain(call(Func::Exp, &[1000.0])); // overflows: not finite
     near(call(Func::ExpLin14, &[14.0]), 1_202_604.284_164_776_8); // e¹⁴
@@ -137,8 +136,6 @@ fn logs_roots_and_exponentials() {
     exact(call(Func::Ln, &[1.0]), 0.0);
     out_of_domain(call(Func::Ln, &[0.0]));
     out_of_domain(call(Func::Ln, &[-1.0]));
-    exact(call(Func::LnAbs, &[-1.0]), 0.0); // ln|−1|
-    out_of_domain(call(Func::LnAbs, &[0.0]));
     near(call(Func::Log10, &[1000.0]), 3.0);
     out_of_domain(call(Func::Log10, &[-1.0]));
     out_of_domain(call(Func::Log10, &[0.0])); // never ln|x| or -inf
@@ -158,8 +155,6 @@ fn roundings_and_steps() {
     exact(call(Func::Sgn, &[-3.0]), -1.0);
     exact(call(Func::Sgn, &[0.0]), 0.0);
     exact(call(Func::Sgn, &[0.1]), 1.0);
-    exact(call(Func::Step, &[0.0]), 0.0); // 1 only for x > 0
-    exact(call(Func::Step, &[0.1]), 1.0);
     exact(call(Func::Ramp, &[-1.0]), 0.0);
     exact(call(Func::Ramp, &[2.0]), 2.0);
     exact(call(Func::Min, &[1.0, 2.0]), 1.0);
@@ -248,12 +243,6 @@ fn binary_operators() {
     exact(bin(BinOp::Div, 7.0, 2.0), 3.5);
     assert!(matches!(
         bin(BinOp::Div, 1.0, 0.0),
-        Err(Domain::DivideByZero(_))
-    ));
-    exact(bin(BinOp::IntDiv, 7.0, 2.0), 3.0);
-    exact(bin(BinOp::IntDiv, -7.0, 2.0), -3.0); // toward zero
-    assert!(matches!(
-        bin(BinOp::IntDiv, 1.0, 0.0),
         Err(Domain::DivideByZero(_))
     ));
     exact(bin(BinOp::Eq, 2.0, 2.0), 1.0);

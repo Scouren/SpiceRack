@@ -71,7 +71,7 @@
 //! shift   = add { (" << " | " >> ") add }
 //! add     = mul { (" + " | " - ") mul }
 //! mul     = unary { (" * " | " / " | " // " | " /: ") unary }
-//!           (`//` is IntDiv, `/:` is DivTyped, A12 K1)
+//!           (`/:` is DivTyped, A12 K1)
 //! unary   = ("-" | "!" | "~") unary | primary
 //!           (a "-" glued to a digit where a unary may stand is a negative literal's sign; the
 //!           `Neg` of a literal is written "-(…)": `-1.5` and `-(1.5)` are two trees)

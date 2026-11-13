@@ -117,9 +117,9 @@ arguments), `List` (a vector of values). Each tag's doc says how to read `a` and
 
 `Func` is closed and every member has one meaning, stated in its doc with its domain: `Abs Sqrt
 Exp Ln Log10 Pow PowAbs Min Max Floor Ceil Trunc RoundHalfAway RoundHalfEven Sgn Sin Cos Tan Asin
-Acos Atan Atan2 Sinh Cosh Tanh Asinh Acosh Atanh Hypot Fmod Clamp Step Ramp Ddt Idt Pwl`. Add a
+Acos Atan Atan2 Sinh Cosh Tanh Asinh Acosh Atanh Hypot Fmod Clamp Ramp Ddt Idt Pwl`. Add a
 member only for a meaning some dialect has natively and no tree of the others states exactly
-(`INV-constructs.md` §C, `INV-semantics.md` categories 1–2). `BinOp`: arithmetic, `IntDiv`,
+(`INV-constructs.md` §C, `INV-semantics.md` categories 1–2). `BinOp`: arithmetic,
 comparisons, logical and bitwise, shifts. `UnOp`: `Neg`, `Not`, `BitNot`.
 
 `eval.rs`: the reference evaluator `eval(&Design, ExprId, &dyn Bindings) -> Result<f64, Domain>`
@@ -134,7 +134,8 @@ fixes four things:
 
 1. **One member per native meaning; never an idiom.** ngspice's B-source `ln` is `|x|`'s
    logarithm. Encoding it as the tree `Ln(Abs(x))` breaks the law (written `ln(abs(x))`, it reads
-   back as `LnAbs(Abs(x))`). So it is its own member. A reader may still expand *sugar* into a
+   back as `LnAbs(Abs(x))`). So it is its own member. (2026-11-13: `LnAbs` and `SqrtAbs` removed
+   by R100's pruning, no reader produced either: ngspice-45's B-source `ln`, `sqrt` are not `|x|`'s, A11.) A reader may still expand *sugar* into a
    tree when its own writer spells that tree back to the same tree (Xyce `sign(x, y)` →
    `Mul(Abs(x), Sgn(y))`; LTspice's boolean `a ^ b` → `Ne(Gt(a, 0.5), Gt(b, 0.5))`).
 2. **`Func` members this adds** (evidence: `rewrite/INV-semantics.md` 2.04–2.10, when it lands;
@@ -145,7 +146,6 @@ fixes four things:
    - `PowRe`: the real part of the complex power, `|x|^y·cos(πy)` for `x < 0` (Xyce `**`, `pow`,
      `pwr`); equal to `Pow` wherever `Pow` is defined.
    - `Ln`, `Log10`, `Sqrt`, `Exp`: real functions, domain errors outside their domains.
-   - `LnAbs`, `SqrtAbs`: of `|x|` (ngspice B source `ln`/`log`, `sqrt`).
    - `ExpLin14`: `exp(x)` up to 14, the tangent line beyond (ngspice B source `exp`).
    - `RoundHalfEven` (ngspice `nint`), `RoundHalfAway` (Xyce, HSPICE, LTspice, Spectre, VACASK),
      `Trunc`, `Floor`, `Ceil`; `Fmod` takes the dividend's sign; `Clamp(x, lo, hi)`.
@@ -153,7 +153,8 @@ fixes four things:
    map each to the member (or draw, or literal) its own simulator means.
 3. **Operators.** `And`, `Or`, `Not` read "nonzero is true" and yield 0 or 1. There is no logical
    XOR (each reader expands it with its own truth rule). `BitAnd`, `BitOr`, `BitXor`, `BitNot`,
-   `Shl`, `Shr` are VACASK's integer operators. `IntDiv` truncates toward zero (ngspice `\`).
+   `Shl`, `Shr` are VACASK's integer operators. (`IntDiv` removed 2026-11-13, R100: no speaker;
+   ngspice's `\` is `Trunc(Abs(Div))`.)
 4. **Leaves for what a dialect leaves to the analysis.** `TStep` and `TStop` (the transient's
    step and stop: ngspice's meaning of a given-zero PULSE rise or a defaulted SFFM carrier) and
    `Tnom`, beside `Time`, `Temp`, `Freq`. A pass substitutes numbers when the design has one
