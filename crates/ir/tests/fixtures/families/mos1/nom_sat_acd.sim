@@ -1,7 +1,7 @@
 mos1 nom (27 C, m=1), sat (vgs=1.5, vds=3.0, vbs=-0.5), acd
 load "spice/mos1.osdi"
 model vs vsource
-model nm sp_mos1 type=1 vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 lambda=0.02 rd=10 rs=10 tox=20n cgso=3e-10 cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 fc=0.5
+model nm sp_mos1 type=1 vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 lambda=0.02 tox=20n cgso=3e-10 cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 fc=0.5 rd=10 rs=10
 vd (d 0) vs dc=3.0 mag=1
 vg (g 0) vs dc=1.5
 vb (b 0) vs dc=-0.5

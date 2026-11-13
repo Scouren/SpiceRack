@@ -1,0 +1,40 @@
+Load decks of sp_mos6 against ngspice-45, written by ../load.py mos6.
+Builds on PATH: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n (source hfvpfb0bgw9819wkb7kzpdaasbd0hd5r, devices/mos6),
+VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (devices/spice/mos6.va, ngspice-47-159 vadng-pre-48).
+Run: `nix develop .#testing -c tests/fixtures/families/load_run.sh mos6`. i(vd) in A, |i(vd)| at 1 GHz for acg/acd.
+nom is 27 C, m=1, the control of off (80 C, m=3); both give w, l, ad, as, pd, ps, a bulk at -0.5 V, junctions (cj, cjsw,
+js) and Meyer capacitances (tox, cgso, cgdo, cgbo). Regions: cut vgs=0.3 vds=2, lin vgs=3 vds=0.2, sat vgs=1.5 vds=3.
+The oracle of the AC readings (fd.py, last lines): nom_sat's operating point moved 1e-4 V on the gate and the drain
+(nom_sat_dc_fd_*), whose central differences are gm and gds of the DC law, against |i(vd)| at 1 kHz (nom_sat_*_1k).
+Result: the DC law agrees in every region (1e-5 at most, a cutoff current). ngspice-45 has no AC for level 6:
+its device table gives no AC load (devices/mos6/mos6init.c:43, `.DEVacLoad = NULL`), and every AC deck aborts with
+"doAnalyses: matrix is singular" (the internal drain and source nodes have no AC stamp), so its column is empty;
+VACASK's AC readings match its own central differences (6e-10, 2e-10). Class: an analysis one simulator lacks for
+a family (ngspice-45 cannot run AC, noise or any small-signal analysis on a level-6 MOSFET).
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+nom_cut_acd            ngspice=                       vacask=6.868012279113571e-05    rel= 
+nom_cut_acg            ngspice=                       vacask=1.884955147572036e-05    rel= 
+nom_cut_dc             ngspice=-2.50202636387e-12     vacask=-2.50199999997498e-12    rel=1.05e-05 
+nom_lin_acd            ngspice=                       vacask=0.0003752862726460776    rel= 
+nom_lin_acg            ngspice=                       vacask=0.00012598644308458378   rel= 
+nom_lin_dc             ngspice=-6.56080942648e-05     vacask=-6.560809426477573e-05   rel=3.70e-13 
+nom_sat_acd_1k         ngspice=                       vacask=6.649451043598342e-06    rel= 
+nom_sat_acd            ngspice=                       vacask=6.361631251162923e-05    rel= 
+nom_sat_acg_1k         ngspice=                       vacask=0.00029454501206550426   rel= 
+nom_sat_acg            ngspice=                       vacask=0.00029518747062805067   rel= 
+nom_sat_dc             ngspice=-1.59804793705e-04     vacask=-0.000159804793704848    rel=9.51e-13 
+nom_sat_dc_fd_dm       ngspice=-1.59804128760e-04     vacask=-0.0001598041287604686   rel=2.93e-12 
+nom_sat_dc_fd_dp       ngspice=-1.59805458651e-04     vacask=-0.0001598054586506771   rel=2.02e-12 
+nom_sat_dc_fd_gm       ngspice=-1.59775339654e-04     vacask=-0.0001597753396541268   rel=7.94e-13 
+nom_sat_dc_fd_gp       ngspice=-1.59834248657e-04     vacask=-0.0001598342486565028   rel=3.11e-12 
+off_cut_acd            ngspice=                       vacask=0.00020851827963292474   rel= 
+off_cut_acg            ngspice=                       vacask=5.65486541044442e-05     rel= 
+off_cut_dc             ngspice=-1.38424827156e-11     vacask=-1.384243559874571e-11   rel=3.40e-06 
+off_lin_acd            ngspice=                       vacask=0.0009677805304471744    rel= 
+off_lin_acg            ngspice=                       vacask=0.00037727188570478245   rel= 
+off_lin_dc             ngspice=-1.56505834345e-04     vacask=-0.000156505834345252    rel=1.61e-12 
+off_sat_acd            ngspice=                       vacask=0.0001923850235800861    rel= 
+off_sat_acg            ngspice=                       vacask=0.0007093268568236775    rel= 
+off_sat_dc             ngspice=-4.23667554950e-04     vacask=-0.000423667554949629    rel=8.76e-13 
+vacask: gm(fd) 2.9454501e-04 acg_1k 0.00029454501206550426 (6.30e-10);  gds(fd) 6.6494510e-06 acd_1k 6.649451043598342e-06 (1.79e-10)

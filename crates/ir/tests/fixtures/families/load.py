@@ -9,19 +9,33 @@ Both decks set reltol=1e-9 and abstol=1e-15: at VACASK's default abstol a cutoff
 -2.502e-12 at abstol 1e-15), the solver's tolerance and not the device's law."""
 import sys
 
+# every MOS level: junctions (cj, cjsw over ad/as/pd/ps) and Meyer capacitances (tox, cgso/cgdo/cgbo)
+CAPS = ('tox=20n cgso=3e-10 cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 '
+        'fc=0.5 rd=10 rs=10')
+# level -> its own parameters (each name checked present in both builds' parameter tables)
+MOS = {
+    1: 'vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 lambda=0.02',
+    2: 'vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 lambda=0.02 nsub=1e16 ucrit=1e4 uexp=0.1 vmax=5e4 '
+       'neff=1 xj=0.5u nfs=1e11 delta=0.5 ld=0.1u',
+    3: 'vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 nsub=1e16 vmax=5e4 xj=0.5u nfs=1e11 theta=0.05 eta=0.1 '
+       'kappa=0.2 delta=0.5 ld=0.1u',
+    6: 'vto=0.7 kv=2 nv=0.8 kc=5e-5 nc=1.2 lambda0=0.02 lambda1=0.01 gamma=0.5 gamma1=0.1 '
+       'sigma=0.01 phi=0.7',
+    9: 'vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 nsub=1e16 vmax=5e4 xj=0.5u nfs=1e11 theta=0.05 eta=0.1 '
+       'kappa=0.2 delta=0.5 ld=0.1u',
+}
 FAMILIES = {
-    # mos1: junctions (cj, cjsw over ad/as/pd/ps) and Meyer capacitances (tox, cgso/cgdo/cgbo)
-    'mos1': dict(
-        load='spice/mos1.osdi',
-        ng_model='.model nm nmos level=1 {p}',
-        va_model='model nm sp_mos1 type=1 {p}',
-        params='vto=0.7 kp=1e-4 gamma=0.5 phi=0.7 lambda=0.02 rd=10 rs=10 tox=20n cgso=3e-10 '
-               'cgdo=3e-10 cgbo=2e-10 cj=5e-4 mj=0.5 cjsw=2e-10 mjsw=0.33 pb=0.8 js=1e-4 fc=0.5',
+    f'mos{k}': dict(
+        load=f'spice/mos{k}.osdi',
+        ng_model=f'.model nm nmos level={k} {{p}}',
+        va_model=f'model nm sp_mos{k} type=1 {{p}}',
+        params=f'{own} {CAPS}',
         geometry='w=10u l=2u ad=20p as=20p pd=24u ps=24u',
         nodes='d g 0 b',
         # region: (vgs, vds); the bulk at -0.5 V throughout
         regions={'cut': (0.3, 2.0), 'lin': (3.0, 0.2), 'sat': (1.5, 3.0)},
-    ),
+    )
+    for k, own in MOS.items()
 }
 CONDITIONS = {'nom': (27, 1), 'off': (80, 3)}
 
@@ -79,6 +93,30 @@ def decks(name, f):
                       '  analysis op1 op' if reading == 'dc' else
                       '  analysis ac1 ac from=1e9 to=1e9 mode="lin" points=1', 'endc']
                 yield stem, '\n'.join(ng) + '\n', '\n'.join(va) + '\n'
+                if (cond, region, reading) == ('nom', 'sat', 'dc'):
+                    yield from probes(stem, vg, vd, '\n'.join(ng) + '\n', '\n'.join(va) + '\n')
+
+
+def probes(stem, vg, vd, ng, va):
+    """The oracle of an AC reading: the operating point moved by 1e-4 V either way on the gate
+    (`_fd_gp`, `_fd_gm`) and the drain (`_fd_dp`, `_fd_dm`), whose central differences are gm and
+    gds of the DC law both simulators share; and the AC readings at 1 kHz (`_acg_1k`, `_acd_1k`),
+    where the capacitances add under 1e-8 relative."""
+    h = 1e-4
+    for tag, (g, d) in {'gp': (vg + h, vd), 'gm': (vg - h, vd), 'dp': (vg, vd + h),
+                        'dm': (vg, vd - h)}.items():
+        yield (f'{stem}_fd_{tag}',
+               ng.replace(f'vd d 0 dc {vd}', f'vd d 0 dc {d!r}').replace(f'vg g 0 dc {vg}',
+                                                                        f'vg g 0 dc {g!r}'),
+               va.replace(f'vd (d 0) vs dc={vd}', f'vd (d 0) vs dc={d!r}')
+                 .replace(f'vg (g 0) vs dc={vg}', f'vg (g 0) vs dc={g!r}'))
+    for drive, src in (('acg', 'vg'), ('acd', 'vd')):
+        v = vg if src == 'vg' else vd
+        n = ng.replace(f'{src} {src[1]} 0 dc {v}', f'{src} {src[1]} 0 dc {v} ac 1')
+        a = va.replace(f'{src} ({src[1]} 0) vs dc={v}', f'{src} ({src[1]} 0) vs dc={v} mag=1')
+        n = n.replace('op\nprint i(vd)', 'ac lin 1 1k 1k\nprint mag(i(vd))')
+        a = a.replace('analysis op1 op', 'analysis ac1 ac from=1e3 to=1e3 mode="lin" points=1')
+        yield f'nom_sat_{drive}_1k', n, a
 
 
 def passive_decks():

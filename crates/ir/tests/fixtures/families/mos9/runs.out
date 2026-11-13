@@ -1,0 +1,40 @@
+Load decks of sp_mos9 against ngspice-45, written by ../load.py mos9 (the same cards as mos3; level 9 reads
+them as level 3 does, to 1e-13, on both simulators).
+Builds on PATH: ngspice-45 jfngv2gd3zvi5cmr9vrqfhnziipqd09n (source hfvpfb0bgw9819wkb7kzpdaasbd0hd5r, devices/mos9),
+VACASK dhxz6l3iac3r2b8n91kcz04a0j3hs4s6 (devices/spice/mos9.va, ngspice-47-159 vadng-pre-48).
+Run: `nix develop .#testing -c tests/fixtures/families/load_run.sh mos9`. i(vd) in A, |i(vd)| at 1 GHz for acg/acd.
+nom is 27 C, m=1, the control of off (80 C, m=3); both give w, l, ad, as, pd, ps, a bulk at -0.5 V, junctions (cj, cjsw,
+js) and Meyer capacitances (tox, cgso, cgdo, cgbo). Regions: cut vgs=0.3 vds=2, lin vgs=3 vds=0.2, sat vgs=1.5 vds=3.
+The oracle of the AC readings (fd.py, last lines): nom_sat's operating point moved 1e-4 V on the gate and the drain
+(nom_sat_dc_fd_*), whose central differences are gm and gds of the DC law, against |i(vd)| at 1 kHz (nom_sat_*_1k).
+Result: as mos3. The DC law agrees in every region; in saturation ngspice-45's level-9 gm and gds are not the
+derivatives of its own DC current (nom_sat at 1 kHz: 4.9e-2 and 1.7e-2 off the central differences), VACASK's are
+(1e-9). Class: ngspice-45's AC is not its DC law's linearisation.
+
+ngspice /nix/store/jfngv2gd3zvi5cmr9vrqfhnziipqd09n-ngspice-45/bin/ngspice  vacask /nix/store/dhxz6l3iac3r2b8n91kcz04a0j3hs4s6-vacask-unstable-2026/bin/vacask
+nom_cut_acd            ngspice=6.868012279111e-05     vacask=6.86801227911067e-05     rel=4.81e-14 
+nom_cut_acg            ngspice=1.884955147752e-05     vacask=1.884955147752027e-05    rel=1.44e-14 
+nom_cut_dc             ngspice=-2.76625944373e-12     vacask=-2.766239952558463e-12   rel=7.05e-06 
+nom_lin_acd            ngspice=8.168796444953e-04     vacask=0.0008168796444953038    rel=4.65e-15 
+nom_lin_acg            ngspice=1.351491744387e-04     vacask=0.0001351491744387244    rel=1.81e-13 
+nom_lin_dc             ngspice=-1.88238406376e-04     vacask=-0.0001882384063759536   rel=2.47e-13 
+nom_sat_acd_1k         ngspice=5.692839585865e-06     vacask=5.791659819744067e-06    rel=1.71e-02 
+nom_sat_acd            ngspice=6.352213422739e-05     vacask=6.353100691692824e-05    rel=1.40e-04 
+nom_sat_acg_1k         ngspice=2.408857102935e-04     vacask=0.00025338071858431026   rel=4.93e-02 
+nom_sat_acg            ngspice=2.416542369517e-04     vacask=0.00025411296141685175   rel=4.90e-02 
+nom_sat_dc             ngspice=-1.17453641923e-04     vacask=-0.0001174536419230301   rel=2.56e-13 
+nom_sat_dc_fd_dm       ngspice=-1.17453062755e-04     vacask=-0.0001174530627552665   rel=2.27e-12 
+nom_sat_dc_fd_dp       ngspice=-1.17454221087e-04     vacask=-0.0001174542210872305   rel=1.96e-12 
+nom_sat_dc_fd_gm       ngspice=-1.17428304739e-04     vacask=-0.0001174283047384531   rel=4.66e-12 
+nom_sat_dc_fd_gp       ngspice=-1.17478980882e-04     vacask=-0.0001174789808820938   rel=7.98e-13 
+off_cut_acd            ngspice=2.085182796315e-04     vacask=0.0002085182796314686    rel=1.51e-13 
+off_cut_acg            ngspice=5.654865429040e-05     vacask=5.6548654290459575e-05   rel=1.05e-12 
+off_cut_dc             ngspice=-3.99692501318e-11     vacask=-3.996927586175893e-11   rel=6.44e-07 
+off_lin_acd            ngspice=2.095065463701e-03     vacask=0.0020950654637008617    rel=6.60e-14 
+off_lin_acg            ngspice=3.824224075634e-04     vacask=0.0003824224075634296    rel=7.74e-14 
+off_lin_dc             ngspice=-4.65955698405e-04     vacask=-0.0004659556984053649   rel=7.83e-13 
+off_sat_acd            ngspice=1.922756340218e-04     vacask=0.0001922947079685       rel=9.92e-05 
+off_sat_acg            ngspice=6.470063526039e-04     vacask=0.0006768127201334539    rel=4.40e-02 
+off_sat_dc             ngspice=-3.31024312112e-04     vacask=-0.0003310243121115159   rel=1.46e-12 
+ngspice: gm(fd) 2.5338072e-04 acg_1k 0.0002408857102935 (4.93e-02);  gds(fd) 5.7916600e-06 acd_1k 5.692839585865e-06 (1.71e-02)
+vacask: gm(fd) 2.5338072e-04 acg_1k 0.00025338071858431026 (1.50e-09);  gds(fd) 5.7916598e-06 acd_1k 5.791659819744067e-06 (5.33e-11)
