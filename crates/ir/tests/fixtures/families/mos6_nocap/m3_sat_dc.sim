@@ -1,0 +1,12 @@
+mos6_nocap m3 (27 C, m=3), sat (vgs=1.5, vds=3.0, vbs=-0.5), dc
+load "spice/mos6.osdi"
+model vs vsource
+model nm sp_mos6 type=1 vto=0.7 kv=2 nv=0.8 kc=5e-5 nc=1.2 lambda0=0.02 lambda1=0.01 gamma=0.5 gamma1=0.1 sigma=0.01 phi=0.7
+vd (d 0) vs dc=3.0
+vg (g 0) vs dc=1.5
+vb (b 0) vs dc=-0.5
+m1 (d g 0 b) nm w=10u l=2u ad=20p as=20p pd=24u ps=24u $mfactor=3
+control
+  options temp=27 tnom=27 reltol=1e-9 abstol=1e-15 rawfile="ascii"
+  analysis op1 op
+endc

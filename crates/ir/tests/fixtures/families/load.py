@@ -1,6 +1,6 @@
 """load.py FAMILY: writes a family's load decks beside it, one ngspice deck (.cir) and one VACASK
 deck (.sim) per (condition, region, reading). Families: mos1, mos2, mos3, mos6, mos9 (a bulk at
--0.5 V), jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, diode_load and diode_noisr (two terminals),
+-0.5 V), mos6_nocap, jfet1, jfet2, mes1 (three terminals), bjt, bjt_rbconst, diode_load and diode_noisr (two terminals),
 vdmos_load, passive. Conditions: `nom` (27 C, m=1) is the control of `off` (80 C, m=3) and of
 `m3` (27 C, m=3); geometry is given in all. Readings: `dc` the operating-point current of `vd`,
 `acg` |i(vd)| at 1 GHz with the gate driven, `acd` |i(vd)| at 1 GHz with the drain driven.
@@ -42,6 +42,10 @@ FAMILIES = {
     )
     for k, own in MOS.items()
 }
+# F28's silent form (R91b): level 6 with no junction or Meyer capacitance and no series
+# resistance; ngspice-45 has no AC load for level 6 (mos6init.c:43), and with no capacitance or
+# internal node the AC matrix is not singular, so it prints 0
+FAMILIES['mos6_nocap'] = dict(FAMILIES['mos6'], params=MOS[6])
 # the JFETs and the MESFET: three terminals, an area for the geometry; region (vgs, vds)
 FAMILIES['jfet1'] = dict(
     load='spice/jfet1.osdi', letter='j', nodes='d g 0', geometry='area=2',
@@ -203,8 +207,9 @@ def passive_decks():
             yield f'{form}_{cond}', '\n'.join(ng) + '\n', '\n'.join(va) + '\n'
 
 
-name = sys.argv[1]
-rows = passive_decks() if name == 'passive' else decks(name, FAMILIES[name])
-for stem, ng, va in rows:
-    open(f'{name}/{stem}.cir', 'w').write(ng)
-    open(f'{name}/{stem}.sim', 'w').write(va)
+if __name__ == '__main__':
+    name = sys.argv[1]
+    rows = passive_decks() if name == 'passive' else decks(name, FAMILIES[name])
+    for stem, ng, va in rows:
+        open(f'{name}/{stem}.cir', 'w').write(ng)
+        open(f'{name}/{stem}.sim', 'w').write(va)
