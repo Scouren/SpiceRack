@@ -51,6 +51,7 @@ const SEEDS: std::ops::Range<u64> = 0..64;
 /// dialect branch lists its own rows here; the `ir` row fails none.
 #[rustfmt::skip] // a table: one row per line
 const KNOWN: &[(&str, &str, &str)] = &[
+    ("l5", "ngspice", "seed 9 Untyped: a script-only option (`option interp`) in a `.subckt` body, written as a `.control` block there, reads back as its own text (Script P1413, R98: ngspice runs such a block once, before the deck's, iff the subckt has an instance; settle control_in_subckt.sp). The design is an IR violation by R98 (X0028, ir-rewrite 7c373aa0): the row goes when that check and the generator change reach the trunk"),
     ("l5", "vacask", "seed 0 Untyped (the round's generator; on step2-vacask-b the row's seeds 1 and 38 hid it): a device_library of a family whose module is not proven (jfet_parker_skellern, vbic) is written `load \"spice/jfet2.osdi\"` / `load \"vbic_1p3.osdi\"` and reads back as a plain load (tables::library, da95fe25), so write_structure::admit lets through a library the reader cannot read back; and the literal 141.585peta reads back as 141.585e15. A finding for the VACASK writer (vacask); goes with its admit agreeing with tables::library"),
 ];
 
