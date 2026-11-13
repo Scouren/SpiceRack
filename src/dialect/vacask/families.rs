@@ -152,6 +152,11 @@ pub(super) const PROVEN: &[&str] = &[
     "sp_mos6",
     "sp_mos9",
     "sp_jfet1",
+    // The same, the transient with VACASK's step capped at ngspice's default (`maxstep` = the
+    // print step): uncapped they differ by VACASK's step control only (the pair's refinement
+    // oracle agrees at span/2000).
+    "sp_jfet2",
+    "sp_mes1",
 ];
 
 /// A shipped module's parameter names, as `params.txt` lists them.

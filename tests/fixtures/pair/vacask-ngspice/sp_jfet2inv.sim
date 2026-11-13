@@ -1,0 +1,40 @@
+SPICE JFET level 2 inverter
+
+load "spice/jfet2.osdi"
+load "resistor.osdi"
+load "capacitor.osdi"
+
+model v vsource
+model r resistor
+model c capacitor
+
+// The corpus deck elaborates each inverter in turn; here both stand at the top.
+model nf sp_jfet2 ( type=1
+acgam=0.11 beta=0.3 cgd=200f cgs=820f delta=0.1 fc=0.3
+hfeta=0.1 hfe1=0.05 hfe2=0.17 hfgam=0.09 hfg1=0.06 hfg2=0.01
+ibd=800p is=1.1p lfgam=0.03 lfg1=0.008 lfg2=0.0 mvst=0.04
+n=1.15 p=2.4 q=2.0 rs=0.7 rd=1 taud=10u taug=1m vbd=1.2 vbi=0.8
+vst=0.07 vto=-1.5 xc=0.2 xi=0.18 z=0.34 kf=1e-14 af=1
+)
+vddn (supn 0) v dc=3
+rdn (supn dn) r r=0.2k
+j1n (dn gn 0) nf $mfactor=2 area=3
+vinn (inn 0) v type="pulse" val0=-2 val1=0 delay=100p rise=10p fall=10p width=5n period=10n
+rinn (inn gn) r r=100
+
+model pf sp_jfet2 ( type=-1
+acgam=0.11 beta=0.3 cgd=200f cgs=820f delta=0.1 fc=0.3
+hfeta=0.1 hfe1=0.05 hfe2=0.17 hfgam=0.09 hfg1=0.06 hfg2=0.01
+ibd=800p is=1.1p lfgam=0.03 lfg1=0.008 lfg2=0.0 mvst=0.04
+n=1.15 p=2.4 q=2.0 rs=0.7 rd=1 taud=10u taug=1m vbd=1.2 vbi=0.8
+vst=0.07 vto=-1.5 xc=0.2 xi=0.18 z=0.34 kf=1e-14 af=1
+)
+vddp (supp 0) v dc=3
+rdp (0 dp) r r=0.2k
+j1p (dp gp supp) pf $mfactor=2 area=3
+vinp (inp 0) v type="pulse" val0=5 val1=3 delay=100p rise=10p fall=10p width=5n period=10n
+rinp (inp gp) r r=100
+
+control
+  analysis tran1 tran step=0.1n stop=5u maxstep=0.1n
+endc

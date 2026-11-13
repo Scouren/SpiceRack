@@ -547,10 +547,8 @@ vacask Family(Psp103) unspoken
 vacask Family(BsimBulk) unspoken
 vacask Family(Vdmos) owed from=ngspice
 vacask Family(VdmosRpi) unspoken
-vacask Family(JfetParkerSkellern) owed from=ngspice
 vacask Family(JfetShockley) unspoken
 vacask Family(JfetHspice2) unspoken
-vacask Family(Mesfet) owed from=ngspice
 vacask Family(Gaas) unspoken
 vacask Family(Mesa) owed from=ngspice
 vacask Family(Hfet1) owed from=ngspice
