@@ -1,0 +1,11 @@
+* the section formal_scope_lib.sp calls: two subcircuits with one formal name w
+.lib sec
+.subckt a 1 2 w=1
+.param x={w}
+r1 1 2 {2*x}
+.ends
+.subckt b 1 2 w=1
+.param y={w}
+r1 1 2 {3*y}
+.ends
+.endl

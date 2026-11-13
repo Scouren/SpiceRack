@@ -1,0 +1,14 @@
+# codes:
+file "formal_scope.sp" deck
+  title "formal_scope"
+  comment " oracle: settle formal_scope.sp (a formal binds in its own subckt; the top reads the top w; F34: the reader bound every subckt's formal w to the last one, b's)"
+  param w = 9
+  subckt a (1 2) w=1
+    param x = w * 2
+    element resistor r1 (1 2) value=x
+  subckt b (1 2) w=1
+    param y = w * 3
+    element resistor r1 (1 2) value=y
+  param t = w * 5
+  element instance x1 (n 0) model=a
+  element instance x2 (m 0) model=b params=(w=4)

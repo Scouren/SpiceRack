@@ -35,6 +35,7 @@ const READ: &[&str] = &[
     "expr_power",
     "expr_ternary",
     "expr_ternary_deep",
+    "formal_scope",
     "func",
     "func_arity",
     "funcs_a11",
