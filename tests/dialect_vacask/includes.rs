@@ -114,6 +114,23 @@ fn a_control_print_sees_a_var_and_no_circuit_parameter() {
 }
 
 #[test]
+fn vacask_rejects_an_undefined_read_only_in_a_selected_section() {
+    // R63a: sel.lib's section b reads an undefined `zz`, so does c, and d includes c. A deck
+    // selecting a runs; selecting b, or d (c through a chain), is rejected
+    let out = vacask("b_strict_sel_a");
+    assert!(out.contains("Running analysis 'op1'."), "{out}");
+    assert!(!out.contains("not defined"), "{out}");
+    for (deck, read) in [("b_strict_sel_b", "pb=zz*2"), ("b_strict_sel_d", "pc=zz*3")] {
+        let out = vacask(deck);
+        assert!(
+            out.contains("Variable or constant 'zz' not defined."),
+            "{deck}: {out}"
+        );
+        assert!(out.contains(read), "{deck}: {out}");
+    }
+}
+
+#[test]
 fn the_reader_binds_a_read_and_a_master_through_an_included_section() {
     let d = read();
     // section mc of lib.lib reads dfl's pd and pt
