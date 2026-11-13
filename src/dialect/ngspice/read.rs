@@ -517,7 +517,7 @@ fn lower(lw: &mut Lower<'_, '_>, top: ir::ScopeId) {
         let depth = lw.frames.len();
         let before = lw.b.design().items(st.scope).len();
         lw.framed = false;
-        dispatch(lw, st);
+        super::mode::lower(lw, st, dispatch);
         statements += 1;
         let pushed = lw.b.design().items(st.scope).len() > before;
         assert!(

@@ -313,6 +313,7 @@ fn sources(deck: &str) -> Sources {
         &[deck],
         ir::Role::Deck,
         row().read.expect("a reader"),
+        None,
         &mut |p| std::fs::read_to_string(dir.join(p)).ok(),
     )
 }

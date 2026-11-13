@@ -1,0 +1,7 @@
+file "a.sp" deck
+  element vsource v1 (a 0) dc=1
+  element resistor r1 (a b) value=1k
+  element capacitor c1 (b 0) value=1u ic=0.5 ic_mode=uic_only
+  element inductor l1 (b c) value=1m ic=1m ic_mode=uic_only
+  element resistor r2 (c 0) value=1k
+  analysis tran stop=1m print_step=10u max_step=10u uic
