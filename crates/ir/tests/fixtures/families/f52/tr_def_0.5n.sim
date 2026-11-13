@@ -1,0 +1,10 @@
+tr_def_0.5n
+load "spice/diode.osdi"
+model v vsource
+model d sp_diode rs=1.0 is=1e-9 tt=1e-6 cjo=50n bv=5 ibv=1e-6
+v1 (1 0) v type="pulse" val0=1 val1=-1 delay=0.2u rise=1n fall=1n width=1
+d1 (1 0) d
+control
+  options rawfile="ascii"
+  analysis tran1 tran step=0.1u stop=1u maxstep=0.5n
+endc
