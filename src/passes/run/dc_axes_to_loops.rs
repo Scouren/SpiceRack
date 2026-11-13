@@ -97,7 +97,9 @@ fn convert(design: &mut ir::Design, diags: &mut ir::Diags, kind: TargetKind) {
             let later = order[k + 1..]
                 .iter()
                 .any(|(i, _)| i.kind == ir::ItemKind::Analysis);
-            let peeled = (dc.restart && scope == top && !later)
+            // R75: a loop's points start afresh, so every peeled axis must (`DcAxis::afresh`)
+            let afresh = axes[inner..].iter().all(|x| x.afresh);
+            let peeled = (afresh && scope == top && !later)
                 .then(|| peel(design, &axes[inner..]))
                 .flatten();
             match peeled {

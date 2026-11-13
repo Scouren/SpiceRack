@@ -21,8 +21,6 @@ use crate::feature::FeatureSet;
 use crate::r#gen::{Gen, Reads};
 use crate::id::{ExprId, ScopeId};
 use crate::periodic::{FreqAxis, Pac, Pnoise, Pstb, Pxf, Stb};
-#[cfg(any(test, feature = "gen"))]
-use crate::probe::gen_probe;
 use crate::probe::{dump_probe, parse_probe, probe_features, probe_handles};
 use crate::run_exprs::Roots;
 use crate::run_extra::RunExtra;
@@ -167,7 +165,7 @@ impl DetailFacts for Pnoise {
         features: &FeatureSet,
     ) -> Option<Self> {
         after_base(b, scope)?;
-        let output = gen_probe(g, b, features, true);
+        let output = crate::dc_ac_facts::gen_output(g, b, features);
         let source = g.fresh_name(b);
         let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let (sidebands, relharm, axis) = gen_side(g, b, features);
@@ -242,7 +240,7 @@ impl DetailFacts for Pxf {
         features: &FeatureSet,
     ) -> Option<Self> {
         after_base(b, scope)?;
-        let output = gen_probe(g, b, features, true);
+        let output = crate::dc_ac_facts::gen_output(g, b, features);
         let sweep = gen_sweep(g, b, features, SweepUse::Freq);
         let (sidebands, relharm, axis) = gen_side(g, b, features);
         Some(Pxf {

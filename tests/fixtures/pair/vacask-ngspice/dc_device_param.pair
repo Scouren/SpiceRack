@@ -1,0 +1,3 @@
+# A DC axis over a device parameter: the loops of operating points dc_axes_to_loops writes, joined by the U0416 notes.
+owner = runrules
+proves = dc_axis_device_param_to_loop

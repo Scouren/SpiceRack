@@ -21,7 +21,8 @@
 //! `pub fn readers() -> impl Iterator`, `pub fn writers() -> impl Iterator`,
 //! `pub fn one_file(design: &ir::Design, file: ir::FileId) -> String`,
 //! `pub fn canonical(design: &ir::Design) -> String`,
-//! `pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool`
+//! `pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool`,
+//! `pub fn uncatalogued(rows: &[ir::Diag]) -> Vec<String>`
 
 use std::collections::BTreeMap;
 
@@ -101,6 +102,7 @@ pub fn admitted(
         let mut trial = design.clone();
         let mut diags = ir::Diags::new();
         dialect::legalize(&mut trial, row, &mut diags);
+        catalogued(diags.rows(), "legalize");
         let refusing: Vec<ir::Diag> = diags
             .rows()
             .iter()
@@ -134,6 +136,7 @@ pub fn write_all(design: &ir::Design, row: &DialectRow) -> Sources {
         let path = design.str(design.file(f).path).to_string();
         src.add(&path, &dialect::write(design, f, row, &mut diags));
     }
+    catalogued(diags.rows(), "write");
     src.set_form(match design.file(entry).role {
         ir::Role::Deck => ir::Role::Deck,
         ir::Role::Library | ir::Role::VerilogA | ir::Role::Missing => ir::Role::Library,
@@ -146,6 +149,7 @@ pub fn read_all(row: &DialectRow, src: &Sources) -> ir::Design {
     let mut design = ir::Design::new();
     let mut diags = ir::Diags::new();
     dialect::read(src, row, Policy::Lenient, &mut design, &mut diags);
+    catalogued(diags.rows(), "read");
     design
 }
 
@@ -160,6 +164,7 @@ pub fn read_text(row: &DialectRow, text: &str) -> (ir::Design, ir::Diags) {
         &mut design,
         &mut diags,
     );
+    catalogued(diags.rows(), "read");
     (design, diags)
 }
 
@@ -204,7 +209,26 @@ pub fn same_meaning(a: &ir::Design, b: &ir::Design) -> bool {
     normal(a).eq_meaning(&normal(b))
 }
 
+/// The codes of `rows` that no catalogue holds (`dialect::info`: the spine's, each dialect's,
+/// the passes', the IR's), one `CODE at item` per row.
+pub fn uncatalogued(rows: &[ir::Diag]) -> Vec<String> {
+    rows.iter()
+        .filter(|d| dialect::info(d.code).is_none())
+        .map(|d| format!("{} at {:?}", d.code, d.item))
+        .collect()
+}
+
 // ---- private ----
+
+/// Asserts every code a law run emits (at `step`) has a catalogue row: a code with none is
+/// shown to the user as a number with no title.
+fn catalogued(rows: &[ir::Diag], step: &str) {
+    let missing = uncatalogued(rows);
+    assert!(
+        missing.is_empty(),
+        "{step} emitted codes no catalogue holds: {missing:?}"
+    );
+}
 
 /// Drops the items `rows` name from their listing scopes (`Editor::remove_item`, so their
 /// definitions leave the index too); `Err` with the code of a row that
@@ -233,4 +257,18 @@ fn drop_named(design: &mut ir::Design, rows: &[ir::Diag]) -> Result<(), String> 
         editor.remove_item(*scope, *item);
     }
     Ok(())
+}
+
+/// The catalogue assertion's self-test: a code no catalogue holds is named; a catalogued one
+/// is not.
+#[test]
+fn a_code_with_no_catalogue_row_is_named() {
+    let row = |code| ir::Diag {
+        code,
+        span: ir::Span::NONE,
+        item: ir::ItemRef::NONE,
+        arg: 0,
+    };
+    let rows = [row(ir::Code::new(b'W', 9998)), row(ir::diag::UNSUPPORTED)];
+    assert_eq!(uncatalogued(&rows).len(), 1, "{:?}", uncatalogued(&rows));
 }

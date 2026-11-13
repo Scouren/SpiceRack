@@ -215,7 +215,8 @@ above could not say, so its final shape is (as implemented in `facts.rs`):
 ```rust
 fn handles(&self, design: &Design, out: &mut Vec<Handle>);
 fn map_refs(design: &mut Design, at: ItemRef, f: &mut dyn FnMut(&mut Ref, DefKind));
-fn refs(&self, design: &Design, at: ItemRef, out: &mut Vec<(Ref, DefKind)>); // M5: read twin
+// M5's read twin is the handles: `Handle::Ref(Ref, DefKind)` lists exactly the references
+// `map_refs` visits, in its order (`Design::item_refs` reads them off; audit 2026-11-12 row 5)
 fn features(&self, design: &Design, at: ItemRef, scope: ScopeId, set: &mut FeatureSet);
 fn check(&self, design: &Design, at: ItemRef, scope: ScopeId, out: &mut Diags);
 fn dump(&self, design: &Design, ctx: &text::Ctx, out: &mut String);
@@ -357,6 +358,12 @@ power exactly, as an `Exponent` (none for `Mil`); a real zero is `Literal::ZERO`
 zero `0i`; `None` for a shape, power or value no literal states. IR text reads its numbers
 through it (`text_lex::number_parts` splits the word). Oracles: hand-worked cases, and Rust's
 decimal parser on 10^4 random significands (`tests/kernel_literal.rs`).
+The writer half: `literal::write_digits(mantissa: i128, frac, out)` (the sign, the digits, the
+point) and `literal::write_power(exp10, form, letters, out)` (nothing, `e<exp10>`, or the letter
+a dialect's own `letters` table holds for a `Scale` power, `e<exp10>` when it holds none); `Mil`,
+`Int` and a point on a whole number stay each dialect's. IR text writes through both, its letter
+table `text_expr::LETTERS` shared with its lexer. Oracle: the spellings the ngspice and VACASK
+dialects' own tests pin, from their letter tables.
 
 **The builder's undo (2026-11-12, the dialects' audit row 5).** `Builder::mark() -> Mark` and
 `Builder::truncate(Mark)` (`mark.rs`): a mark holds every table's length (the kernel's, the 26
@@ -442,7 +449,7 @@ for the one and kept for the other. Property: with a wrapping rule of `-(-e)`, t
 **A25 (2026-11-12): a row names its item (R48).** `Diag.item: ItemRef` (`ItemRef::NONE` when a
 row is about no item) and `Diags::push_at(code, design, item, arg)`, which takes the span from
 the item. `check`, `check_legal` and every row's own check push at the item, so a design built
-with no spans (Python, a generator) still says which item a refusal is about. `Diag` is 28 bytes. `FormalNotConstant` counts a `$tnom` default (VACASK run c3). `Extra::SubcktConstantParam`: a `Param`
+with no spans (Python, a generator) still says which item a refusal is about. `Diag` is 28 bytes. An item read from IR text has the span its row's reader gives it: a kernel row's is its line from the keyword to the end; a circuit or run row's is the one word after the keyword (its kind word: `resistor`, `tran`). `FormalNotConstant` counts a `$tnom` default (VACASK run c3). `Extra::SubcktConstantParam`: a `Param`
 listed in a `Subckt` body whose value is a constant (no parameter read, no `$tnom`, class
 `Constant`; VACASK reads it as a formal). The generator lists no `Param` in a subcircuit body
 unless the set has it.

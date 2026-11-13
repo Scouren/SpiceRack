@@ -228,7 +228,13 @@ fn bad_read(row: &DialectRow, text: &str) -> Option<String> {
         );
         let at = diags.len();
         ir::check(&design, &mut diags);
-        diags.rows()[at..].to_vec()
+        // a reader code no catalogue holds is shown as a bare number: a failure too
+        let bare: Vec<ir::Code> = diags.rows()[..at]
+            .iter()
+            .map(|d| d.code)
+            .filter(|&c| spicerack::dialect::info(c).is_none())
+            .collect();
+        (diags.rows()[at..].to_vec(), bare)
     }));
     match read {
         Err(p) => {
@@ -236,7 +242,11 @@ fn bad_read(row: &DialectRow, text: &str) -> Option<String> {
             let msg = msg.or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()));
             Some(format!("panic: {}", msg.unwrap_or_default()))
         }
-        Ok(found) => {
+        Ok((_, bare)) if !bare.is_empty() => {
+            let codes: Vec<String> = bare.iter().map(|c| c.to_string()).collect();
+            Some(format!("codes no catalogue holds: {}", codes.join(" ")))
+        }
+        Ok((found, _)) => {
             let codes: Vec<String> = found.iter().map(|d| d.code.to_string()).collect();
             (!codes.is_empty()).then(|| format!("ir::check: {}", codes.join(" ")))
         }

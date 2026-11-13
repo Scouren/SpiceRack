@@ -44,7 +44,8 @@
 //! Contents:
 //! - `pub struct Builder<'d>`, `Builder::design(&self) -> &Design`,
 //!   `Builder::element_named(&mut self, ScopeId, NameId) -> Option<ItemRef>`; crate:
-//!   `pub(crate) fn element_index(&Design) -> FxMap<(ScopeId, NameId), ItemRef>`
+//!   `pub(crate) fn element_index(&Design) -> FxMap<(ScopeId, NameId), ItemRef>`,
+//!   `pub(crate) fn pooled<T: Copy>(&mut Vec<T>, &[T]) -> List<T>`
 //! - files and pools: `Builder::file(&mut self, &str, Role) -> (FileId, ScopeId)`,
 //!   `Builder::name(&mut self, &str) -> NameId`, `Builder::text(&mut self, &str) -> TextId`,
 //!   `Builder::names(&mut self, &[&str]) -> NameList`,
@@ -545,6 +546,21 @@ pub(crate) fn element_index(d: &Design) -> crate::names::FxMap<(ScopeId, NameId)
     names
 }
 
+/// Appends `items` to `pool` and returns their range. Asserts `POOL_MAX`. The one pool append (the run
+/// rows' builders use it too).
+pub(crate) fn pooled<T: Copy>(pool: &mut Vec<T>, items: &[T]) -> List<T> {
+    if items.is_empty() {
+        return List::EMPTY; // the one empty list: equality does not depend on how it was made
+    }
+    let start = pool.len();
+    assert!(
+        start + items.len() <= POOL_MAX,
+        "a pool holds at most POOL_MAX elements"
+    );
+    pool.extend_from_slice(items);
+    List::range(start as u32, items.len() as u32)
+}
+
 // ---- private ----
 
 impl Builder<'_> {
@@ -596,18 +612,4 @@ impl Builder<'_> {
             stack.extend_from_slice(&kids);
         }
     }
-}
-
-/// Appends `items` to `pool` and returns their range. Asserts `POOL_MAX`.
-fn pooled<T: Copy>(pool: &mut Vec<T>, items: &[T]) -> List<T> {
-    if items.is_empty() {
-        return List::EMPTY; // the one empty list: equality does not depend on how it was made
-    }
-    let start = pool.len();
-    assert!(
-        start + items.len() <= POOL_MAX,
-        "a pool holds at most POOL_MAX elements"
-    );
-    pool.extend_from_slice(items);
-    List::range(start as u32, items.len() as u32)
 }

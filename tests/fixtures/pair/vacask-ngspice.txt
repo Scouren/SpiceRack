@@ -11,8 +11,10 @@
 #       __topinst__", every op at a=1 (corpus test/test_cblock.sim). Owner: the VACASK reader
 #       (an AlterParam target), or the IR (a device alter naming no element), then the ngspice
 #       writer (alterparam and reset).
-alter_toplevel 2 refused:W1401 finding=F7 # R70: the reader now reads alter instance("__topinst__") a=2.0 as a design-parameter alter; the ngspice writer refuses it (W1401, a parameter alter where other script state holds) until the alter-effect feature and its rule exist
+alter_toplevel 2 refused:U0001,W1401:Run(AlterParamAtOnce) finding=F7 # the IR round: VACASK's alter takes effect at once, ngspice's alterparam at the next reset; no rule converts it yet (W1401 beside it)
 case_names 2 refused:U0001:Extra(CaseSensitiveNames) pass=rename_collisions # r1/R1 and out/OUT, which ngspice would fold to one (REWRITE-PLAN §3.1, §4.4)
 dc_sweep_pulse 2 refused:U0001:Item(Opaque) ruling=R64 # R64a: the reader keeps a dc sweep of a pulse source Private (P2314)
-latch 4 mismatch finding=F8 # R75; reported as "dc: sweep grid changed (14 -> 14 points)": the outer axis (rin) has no vector in ngspice's plot to pair the grid by; the values differ too (latch_vdd shows them)
-latch_vdd 4 mismatch finding=F8 # R75: dc a at vin=2 of outer step 2 (vdd 5.1): 3.02 V VACASK vs 2.55 V ngspice
+dc_device_param 2 refused:U0001:Run(DcAxisDeviceParam)+Run(SweepDcList) ruling=R75 # runrules: a continued sweep over a diode's area; dc_axes_to_loops fires only on a restarting DC (R72), so the axis stays (its U0415 note) until R75's per-axis continuation
+dc_nested 2 refused:U0001:Run(DcOuterCarries) ruling=R75 # VACASK carries the solve across outer steps, ngspice cannot: refused even on a circuit with one operating point
+latch 2 refused:U0001:Run(DcOuterCarries) finding=F8 # R75: F8's wrong number is now a refusal toward ngspice
+latch_vdd 2 refused:U0001:Run(DcOuterCarries) finding=F8 # as latch

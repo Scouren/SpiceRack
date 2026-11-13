@@ -88,7 +88,9 @@ pub fn transpile(src: &Sources, from: &DialectRow, to: &DialectRow, policy: Poli
   `Kind::Refusal` row refuses the deck, and a step is not run after a refusal. `Policy::Strict`
   turns an `Opaque` of class `Unread` into a refusal (`S0101`) and refuses, at its item, each
   parameter read no definition binds (`S0104`, the name as the argument; `ir::unbound_reads`,
-  a formal default's held read aside: R63, A38); `Lenient` keeps both (a writer of the same
+  a formal default's held read aside: R63, A38) and each run item (alter, loop, analysis,
+  elaborate) whose target nothing defines (`S0105`, the name as the argument: R70, A43);
+  `Lenient` keeps them all (a writer of the same
   text family copies the opaque; the read stays unresolved).
 - Every branch on which work happens is in these four functions.
 
@@ -121,7 +123,8 @@ header. `mod.rs` chains the four in `GROUPS`.
 **Order is meaning.** `legalize` loops: the features the design uses and the target lacks;
 every pass in `GROUPS` order, then the group's own order, that removes one of them and whose
 `requires` are legal for the target, runs (the first such pass per feature per round), then `ir::check`;
-repeat until nothing is missing or a round changes nothing (bounded by the pass count + 1,
+repeat until nothing is missing or a round changes nothing (a rule run again on a later round
+reports its note at an item once: R69 d; bounded by the pass count + 1,
 asserted). A feature is legal for the target (A32, `passes::legal`) when the target has it, or
 a registered pass removes it and that pass's `requires` are legal in turn: the least fixed
 point, computed once per call, so a chain (`round_half_even_to_away` then
@@ -151,7 +154,7 @@ any other edge, a pass of one group importing another group included.
 strict `KNOWN` list; a law that runs on no generated design for a pass fails for it), over
 generated designs that use the pass's `removes` and over ones that do not: P1 `ir::check` is
 clean after it (so a pass that drops a defining item through `items_mut` instead of
-`Editor::remove_item` fails P1 on the stale definition, X0018: intended); P2 every item still carrying `removes` (by `ir::check_legal`, matched by `Diag::item`, never by span: a generated item has none) has a note of the
+`Editor::remove_item` fails P1 on the stale definition, X0018: intended); P2 every item still carrying `removes` (by `ir::check_legal`, matched by `Diag::item`, never by span: a generated item has none) has exactly one note of the
 pass at it, every other has lost it (`check_legal` reports the run owner's design-level features at their items, `analysis::feature_items`); P3 the output uses nothing outside the input's features
 plus `requires`, a function, operator or draw in its static and its dynamic member counted as
 one (R65, A39: a pass that merges two roots or drops a function's only dynamic caller moves

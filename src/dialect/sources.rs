@@ -16,6 +16,8 @@
 //!   `Sources::form(&self) -> ir::Role`,
 //!   `Sources::load(entries: &[&str], form: ir::Role, reader: &dyn Read, loader: &mut dyn FnMut(&str) -> Option<String>) -> Sources`
 //! - `Reference::path(&self) -> &str`, `Reference::resolve(&self, from: &str) -> String`
+//! - `pub fn relative_path(from: &str, to: &str) -> Option<String>`,
+//!   `pub fn written_path(design: &ir::Design, from: ir::FileId, path: &str) -> Result<String, String>`
 
 use std::collections::{HashSet, VecDeque};
 use std::path::{Component, Path, PathBuf};
@@ -166,24 +168,76 @@ impl Reference {
     }
 
     /// The path, relative to the directory of `from` (the naming file's path) unless it is
-    /// absolute, with `.` and `..` folded.
+    /// absolute, with `.` and `..` folded; a `..` above the root is kept (`../x`).
     pub fn resolve(&self, from: &str) -> String {
         let dir = Path::new(from).parent().unwrap_or(Path::new(""));
         normalize(&dir.join(self.path()).to_string_lossy())
     }
 }
 
+/// The text a writer spells for a reference from the file keyed `from` to the file keyed `to`
+/// (R78): `to` relative to `from`'s directory, with `..` segments where `to` is not below it, so
+/// the written files keep the source tree's layout. `None` when that cannot be stated: either
+/// key absolute, or above the root (a key the loader kept a leading `..` in); the writer then
+/// spells the path as it was read, with a note.
+///
+/// Why relative to the including file and nothing stronger (R78a): ngspice-45 resolves a
+/// relative include against the working directory first, then against the including file's
+/// directory (`settle/include_cwd/` on `step2-ngspice` 4f3de43f: `ngspice -b sub/deck.sp` reads
+/// a file of that name in the working directory when one stands there). So this spelling works
+/// from every working directory that holds no file of that name, and from none that does.
+/// VACASK resolves in the other order (R78b): the including file's directory first, then the
+/// working directory, a nested include from its own file's directory (`settle/b_include_cwd/` on
+/// `step2-vacask-b` 883dc82b), so there the spelling holds from every working directory.
+pub fn relative_path(from: &str, to: &str) -> Option<String> {
+    let above = |k: &str| k.starts_with('/') || k == ".." || k.starts_with("../");
+    if above(from) || above(to) {
+        return None;
+    }
+    let dir: Vec<&str> = from.split('/').collect::<Vec<_>>().split_last()?.1.to_vec();
+    let target: Vec<&str> = to.split('/').collect();
+    let common = dir.iter().zip(&target).take_while(|(a, b)| a == b).count();
+    let mut out: Vec<&str> = vec![".."; dir.len() - common];
+    out.extend_from_slice(&target[common..]);
+    Some(out.join("/"))
+}
+
+/// The text a writer spells, in file `from` of `design`, for an include, library or load path
+/// `path` as the IR holds it (R78): when `path` is a file of the design (a reader stores the key
+/// of a file it resolved), that key relative to `from`'s directory ([`relative_path`]); a path
+/// that names no file of the design is spelled as it was read. `Err(path)` when the file's key
+/// cannot be stated relative to `from`: the writer spells `path` as read and notes it
+/// ([`super::PATH_AS_READ`]).
+///
+/// # Errors
+/// `Err` with the path as read, for a key above the root or an absolute one.
+pub fn written_path(design: &ir::Design, from: ir::FileId, path: &str) -> Result<String, String> {
+    let to = design.find_file(path);
+    if to.is_none() {
+        return Ok(path.to_string());
+    }
+    let from_key = design.str(design.file(from).path);
+    let to_key = design.str(design.file(to).path);
+    relative_path(from_key, to_key).ok_or_else(|| path.to_string())
+}
+
 // ---- private ----
 
-/// `path` with `.` dropped and `..` folded into its parent (`resolve::normalize`'s rule).
+/// `path` with `.` dropped and `..` folded into its parent. A `..` with no parent left to fold
+/// (it climbs above the root) is kept, so the path names no file under the root, never a
+/// different one (`a/deck.sp`'s `../lib.inc` from root `a/` is `../lib.inc`, not `lib.inc`).
 fn normalize(path: &str) -> String {
     let mut out = PathBuf::new();
     for c in Path::new(path).components() {
         match c {
             Component::CurDir => {}
-            Component::ParentDir => {
-                out.pop();
-            }
+            Component::ParentDir => match out.components().next_back() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir | Component::Prefix(_)) => {}
+                _ => out.push(".."),
+            },
             c => out.push(c),
         }
     }

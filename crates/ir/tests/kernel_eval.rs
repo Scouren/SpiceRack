@@ -141,6 +141,8 @@ fn logs_roots_and_exponentials() {
     out_of_domain(call(Func::LnAbs, &[0.0]));
     near(call(Func::Log10, &[1000.0]), 3.0);
     out_of_domain(call(Func::Log10, &[-1.0]));
+    out_of_domain(call(Func::Log10, &[0.0])); // never ln|x| or -inf
+    exact(call(Func::Sqrt, &[0.0]), 0.0); // the edge is in the domain
 }
 
 #[test]
@@ -162,6 +164,7 @@ fn roundings_and_steps() {
     exact(call(Func::Ramp, &[2.0]), 2.0);
     exact(call(Func::Min, &[1.0, 2.0]), 1.0);
     exact(call(Func::Max, &[1.0, 2.0]), 2.0);
+    exact(call(Func::Min, &[3.0, 2.5]), 2.5); // mixed: the value unchanged (its type: kernel_typed)
     exact(call(Func::Clamp, &[5.0, 0.0, 2.0]), 2.0);
     exact(call(Func::Clamp, &[-5.0, 0.0, 2.0]), 0.0);
     out_of_domain(call(Func::Clamp, &[1.0, 2.0, 0.0])); // lo > hi
@@ -187,6 +190,25 @@ fn trigonometry_and_its_domains() {
     near(call(Func::Atan2, &[1.0, -1.0]), 3.0 * FRAC_PI_4); // second quadrant
     exact(call(Func::Atan2, &[0.0, 0.0]), 0.0);
     near(call(Func::Atan2, &[0.0, -1.0]), PI);
+    // R76: the negative x axis and the third quadrant (VACASK's atan2 differs on the first:
+    // tests/fixtures/funcs/atan2_vacask.out prints -0 for atan2(0, -1), -0.785398 for (1, -1)).
+    // A literal -0 is the one zero (`b.num(-0.0)` is 0); a computed one, `-(0)`, keeps its sign
+    let at_neg_zero = |x: f64| {
+        ev(|b| {
+            let zero = b.num(0.0);
+            let y = b.unary(UnOp::Neg, zero);
+            let x = b.num(x);
+            b.call(Func::Atan2, &[y, x])
+        })
+    };
+    near(call(Func::Atan2, &[-0.0, -1.0]), PI); // the literal: +0
+    near(at_neg_zero(-1.0), -PI);
+    near(call(Func::Atan2, &[-1.0, -1.0]), -3.0 * FRAC_PI_4);
+    let below = at_neg_zero(1.0).unwrap();
+    assert!(
+        below == 0.0 && below.is_sign_negative(),
+        "atan2(-0, 1) is -0, got {below}"
+    );
     exact(call(Func::Sinh, &[0.0]), 0.0);
     exact(call(Func::Cosh, &[0.0]), 1.0);
     exact(call(Func::Tanh, &[0.0]), 0.0);

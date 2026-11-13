@@ -50,7 +50,7 @@
 //!   `Design::branches(&self, BranchList) -> &[Branch]`, `Design::text(&self, TextId) -> &str`,
 //!   `Design::detail<D: DetailRow>(&self, u32) -> D`,
 //!   `Design::expr(&self, ExprId) -> Expr`, `Design::num(&self, NumId) -> Literal`,
-//!   `Design::expr_count(&self) -> usize`,
+//!   `Design::expr_count(&self) -> usize`, `Design::class_computes(&self) -> u32` (gen),
 //!   `Design::definitions(&self) -> &[Def]`, `Design::def(&self, DefId) -> Def`,
 //!   `Design::eq_ignoring_spans(&self, &Design) -> bool`,
 //!   `Design::eq_meaning(&self, &Design) -> bool`, `Design::children(&self, ExprId, &mut Vec<ExprId>)`
@@ -142,6 +142,10 @@ pub struct Design {
     /// demand, extended by every element push and cleared where `editor` hands out its door and
     /// by each Editor mutation that can move or rename an element. Not part of equality.
     pub(crate) element_names: std::sync::OnceLock<crate::names::FxMap<(ScopeId, NameId), ItemRef>>,
+    /// How many times the definition classes were computed (`class::def_classes`): a count a
+    /// test reads instead of a clock (`Design::class_computes`). Not part of equality.
+    #[cfg(any(test, feature = "gen"))]
+    pub(crate) class_computes: crate::class::Computes,
 }
 
 /// A row type that is an item: it names its kind and its table. Implemented here for every
@@ -173,7 +177,7 @@ pub trait DetailRow: Copy + 'static {
 }
 
 macro_rules! item_rows {
-    ($($row:ty => $kind:ident, $field:ident;)*) => {
+    (() $($kind:ident => $row:ty, $field:ident;)*) => {
         $(
             impl ItemRow for $row {
                 const KIND: ItemKind = ItemKind::$kind;
@@ -193,34 +197,7 @@ macro_rules! item_rows {
     };
 }
 
-item_rows! {
-    Title => Title, titles;
-    Comment => Comment, comments;
-    Include => Include, includes;
-    Global => Global, globals;
-    Load => Load, loads;
-    Opaque => Opaque, opaques;
-    Subckt => Subckt, subckts;
-    Section => Section, sections;
-    If => If, ifs;
-    Param => Param, params;
-    Func => Func, funcs;
-    Model => Model, models;
-    DeviceLibrary => DeviceLibrary, device_libraries;
-    Statistics => Statistics, statistics;
-    Element => Element, elements;
-    Analysis => Analysis, analyses;
-    Loop => Loop, loops;
-    Alter => Alter, alters;
-    OptionRow => Option, options;
-    Env => Env, envs;
-    NodeSet => NodeSet, node_sets;
-    Save => Save, saves;
-    Print => Print, prints;
-    Measure => Measure, measures;
-    Elaborate => Elaborate, elaborates;
-    Reset => Reset, resets;
-}
+with_item_kinds!(item_rows!());
 
 impl Design {
     /// An empty design: no file, the name `0` interned as [`NameId::GROUND`].
@@ -269,6 +246,8 @@ impl Design {
             classes: std::sync::OnceLock::new(),
             forms: std::sync::OnceLock::new(),
             element_names: std::sync::OnceLock::new(),
+            #[cfg(any(test, feature = "gen"))]
+            class_computes: crate::class::Computes::default(),
         }
     }
 
@@ -446,6 +425,16 @@ impl Design {
         (l.form == NumForm::Long).then(|| (self.long_text(l), NumForm::ALL[l.frac as usize]))
     }
 
+    /// How many times this design computed its definition classes (behind the `gen` feature):
+    /// the test hook that holds the builder and `check` to one computation per design state, a
+    /// count instead of a clock (the round-4 regression recomputed them after every push).
+    #[cfg(any(test, feature = "gen"))]
+    pub fn class_computes(&self) -> u32 {
+        self.class_computes
+            .0
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Expression row count; ids `0..expr_count()` are valid.
     pub fn expr_count(&self) -> usize {
         self.exprs.tags.len()
@@ -471,12 +460,15 @@ impl Design {
     }
 
     /// Appends every `Ref` `item` owns (header, detail rows, pools) with the kind its field
-    /// expects, in `Editor::map_refs`'s order, changing nothing (one exhaustive dispatch over
-    /// `ItemKind` to `RowFacts::refs`). Asserts `item` is in range.
+    /// expects, in `Editor::map_refs`'s order, changing nothing: the `Handle::Ref` entries of
+    /// `item_handles`. Asserts `item` is in range.
     pub fn item_refs(&self, item: ItemRef, out: &mut Vec<(Ref, DefKind)>) {
-        let rows = for_kind!(item.kind, R => R::table(self).len());
-        assert!((item.index as usize) < rows, "an item in range");
-        for_kind!(item.kind, R => self.row::<R>(item.index).refs(self, item, out))
+        let mut handles = Vec::new();
+        self.item_handles(item, &mut handles);
+        out.extend(handles.into_iter().filter_map(|h| match h {
+            Handle::Ref(r, kind) => Some((r, kind)),
+            _ => None,
+        }));
     }
 
     /// Structural equality: every table, pool, list and id equal, literals field by field

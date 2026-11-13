@@ -477,7 +477,7 @@ fn file_line(
     if kw != "file" {
         return false;
     }
-    let Some(path) = w.string(diags) else {
+    let Some(path) = w.path(diags) else {
         return false;
     };
     let role = match w.next() {
@@ -548,25 +548,26 @@ fn if_conditions(
     Some(conds)
 }
 
-/// Writes the fields of `item`'s row (after its keyword): kernel rows with their context
-/// (`item_text`), the owners' rows through their `RowFacts::dump`.
+/// Writes the fields of `item`'s row (after its keyword) through its `RowFacts::dump`, a load
+/// with the modules the dump collected once (`RowFacts::dump` of a load collects its own:
+/// O(definitions) per load).
 fn write_fields(d: &Design, item: ItemRef, ctx: &Ctx, modules: &[NameId], out: &mut String) {
     fn owner<R: RowFacts>(d: &Design, ctx: &Ctx, out: &mut String) {
         d.row::<R>(ctx.item.index).dump(d, ctx, out);
     }
     let i = item.index;
     match item.kind {
-        ItemKind::Title => item_text::dump_title(&d.row(i), d, item, ctx, out),
-        ItemKind::Comment => item_text::dump_comment(&d.row(i), d, item, ctx, out),
-        ItemKind::Include => item_text::dump_include(&d.row(i), d, item, ctx, out),
-        ItemKind::Global => item_text::dump_global(&d.row(i), d, item, ctx, out),
+        ItemKind::Title => owner::<crate::item::Title>(d, ctx, out),
+        ItemKind::Comment => owner::<crate::item::Comment>(d, ctx, out),
+        ItemKind::Include => owner::<crate::item::Include>(d, ctx, out),
+        ItemKind::Global => owner::<crate::item::Global>(d, ctx, out),
         ItemKind::Load => item_text::dump_load(&d.row(i), d, modules, out),
-        ItemKind::Opaque => item_text::dump_opaque(&d.row(i), d, item, ctx, out),
-        ItemKind::Subckt => item_text::dump_subckt(&d.row(i), d, item, ctx, out),
-        ItemKind::Section => item_text::dump_section(&d.row(i), d, item, ctx, out),
-        ItemKind::If => item_text::dump_if(&d.row(i), d, item, ctx, out),
-        ItemKind::Param => item_text::dump_param(&d.row(i), d, item, ctx, out),
-        ItemKind::Func => item_text::dump_func(&d.row(i), d, item, ctx, out),
+        ItemKind::Opaque => owner::<crate::item::Opaque>(d, ctx, out),
+        ItemKind::Subckt => owner::<crate::item::Subckt>(d, ctx, out),
+        ItemKind::Section => owner::<crate::item::Section>(d, ctx, out),
+        ItemKind::If => owner::<crate::item::If>(d, ctx, out),
+        ItemKind::Param => owner::<crate::item::Param>(d, ctx, out),
+        ItemKind::Func => owner::<crate::item::Func>(d, ctx, out),
         ItemKind::Model => owner::<crate::model::Model>(d, ctx, out),
         ItemKind::DeviceLibrary => owner::<crate::library::DeviceLibrary>(d, ctx, out),
         ItemKind::Statistics => owner::<crate::stats::Statistics>(d, ctx, out),

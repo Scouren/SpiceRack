@@ -10,7 +10,8 @@
 //!
 //! Contents: `pub enum Listed`, `pub const fn listed(ItemKind) -> Listed`, `pub enum Setting`,
 //! `pub fn run_walks(&Design) -> Vec<(ScopeId, Vec<(ItemRef, ScopeId)>)>`,
-//! `pub fn in_force(&Design, &[(ItemRef, ScopeId)], usize, Setting) -> ItemRef`; crate:
+//! `pub fn in_force(&Design, &[(ItemRef, ScopeId)], usize, Setting) -> ItemRef` (a parameter
+//! and a device too, R70); crate:
 //! `pub(crate) fn state_order_features`, `pub(crate) fn interleaved_features`,
 //! `pub(crate) fn design_check`, `pub(crate) fn node_set_mix`,
 //! `pub(crate) fn run_append_ok` (gen)
@@ -24,7 +25,7 @@ use crate::diag::Diags;
 use crate::feature::Feature;
 #[cfg(any(test, feature = "gen"))]
 use crate::feature::FeatureSet;
-use crate::id::{FileId, ItemRef, NameId, ScopeId};
+use crate::id::{DefId, FileId, ItemRef, NameId, ScopeId};
 #[cfg(any(test, feature = "gen"))]
 use crate::item::ScopeKind;
 use crate::item::{ItemKind, Role};
@@ -33,7 +34,8 @@ use crate::option::{
 };
 use crate::option_key::OptionKey;
 use crate::output::Save;
-use crate::reset::{Reset, Restorable};
+use crate::plan::{Alter, AlterEffect, TargetKind};
+use crate::reset::{Reset, ResetSet, Restorable};
 use crate::run_extra::RunExtra;
 
 /// How an item counts in a file top's order (`RunInterleaved`, A22).
@@ -59,6 +61,17 @@ pub enum Setting {
     Temp,
     /// The nominal temperature (`Env::tnom`).
     Tnom,
+    /// A design parameter, as alters of it set it (R70/A43): an `AtOnce` alter from where it
+    /// stands, an `AtReset` one from the first full reset after it (a reset of every class); a
+    /// partial reset does not apply it, and no reset undoes a parameter alter. A stated gap:
+    /// a `TargetKind::SubcktParam` alter (a subcircuit's default for one of its parameters) is
+    /// not answered; it would need a setting keyed by the subcircuit and the parameter's name,
+    /// and the rule for instances that give the parameter themselves.
+    Param(DefId),
+    /// A top-level element's value (`NameId::NONE` as the parameter) or one of its device
+    /// parameters, as alters of it set it: from where the alter stands until a reset of
+    /// `Restorable::Values`.
+    Device(NameId, NameId),
 }
 
 /// A node set's identity for `node_set_mix`: its kind, node path and reference path.
@@ -169,10 +182,15 @@ pub fn in_force(
     what: Setting,
 ) -> ItemRef {
     assert!(at < order.len(), "a position in the walk");
+    if let Setting::Param(def) = what {
+        return param_in_force(design, &order[..at], def);
+    }
     let class = match what {
         Setting::Option(_) | Setting::Private(..) => Restorable::Options,
         Setting::Temp => Restorable::Temp,
         Setting::Tnom => Restorable::Tnom,
+        Setting::Device(..) => Restorable::Values,
+        Setting::Param(_) => unreachable!("answered above"),
     };
     let mut from_here = ItemRef::NONE;
     for &(item, _) in &order[..at] {
@@ -415,7 +433,7 @@ fn four_counts(design: &Design, out: &mut Diags) {
 fn count_from_option(design: &Design, item: ItemRef) -> bool {
     let row = crate::analysis::Analysis::table(design).get(item.index);
     row.kind == crate::analysis::AnalysisKind::Four
-        && crate::analysis_facts::detail_get::<crate::tran::Four>(design, row.detail)
+        && crate::circuit_text::get_row::<crate::tran::Four>(design, row.detail)
             .is_some_and(|f| f.harmonics.is_none())
 }
 
@@ -440,6 +458,39 @@ fn sets(design: &Design, item: ItemRef, what: Setting) -> Option<Applies> {
             let row = Env::table(design).get(item.index);
             (!row.tnom.is_none()).then_some(row.holds)
         }
+        (ItemKind::Alter, Setting::Device(element, parameter)) => {
+            let t = Alter::table(design).get(item.index).target;
+            let device = matches!(t.kind, TargetKind::ElementValue | TargetKind::DeviceParam);
+            let named = t.path.len == 0 && t.a.name == element && t.b == parameter;
+            (device && named).then_some(Applies::FromHere)
+        }
         _ => None, // else: only an option row or an env sets one of these
     }
+}
+
+/// `in_force` of a parameter over the walk before a point (`Setting::Param`): the last `AtOnce`
+/// alter of it, or the last `AtReset` one a full reset after it has applied. O(walk length).
+fn param_in_force(design: &Design, before: &[(ItemRef, ScopeId)], def: DefId) -> ItemRef {
+    let (mut held, mut waiting) = (ItemRef::NONE, ItemRef::NONE);
+    for &(item, _) in before {
+        match item.kind {
+            ItemKind::Alter => {
+                let row = Alter::table(design).get(item.index);
+                if row.target.kind == TargetKind::Param && row.target.a.def == def {
+                    match row.effect {
+                        AlterEffect::AtOnce => (held, waiting) = (item, ItemRef::NONE),
+                        AlterEffect::AtReset => waiting = item,
+                    }
+                }
+            }
+            ItemKind::Reset
+                if waiting != ItemRef::NONE
+                    && Reset::table(design).get(item.index).restores == ResetSet::ALL =>
+            {
+                (held, waiting) = (waiting, ItemRef::NONE);
+            }
+            _ => {}
+        }
+    }
+    held
 }
