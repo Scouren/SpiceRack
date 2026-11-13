@@ -1,0 +1,15 @@
+* the kit of inc_lib_chain.sp
+.LIB a
+.lib 'inc_lib_chain.lib' b
+.ENDL
+.LIB b
+.lib 'inc_lib_chain.lib' c
+.ENDL
+.LIB c
+.subckt leaf p q
+R1 p q 2k
+.ends
+.ENDL
+.LIB d
+.lib 'inc_lib_chain.lib' c
+.ENDL
