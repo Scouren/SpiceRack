@@ -289,9 +289,17 @@ pub fn kind(p: &RawData) -> &'static str {
 }
 
 /// A vector's name as every simulator here spells it: lower case, `v(x)`
-/// as `x`, a branch current as `<device>#branch`, hierarchy joined by `.`.
+/// as `x`, a branch current as `<device>#branch` (a coupled inductor's under
+/// its inductor), hierarchy joined by `.`.
 pub fn normal(name: &str) -> String {
     let n = name.trim().to_ascii_lowercase().replace(':', ".");
+    // Xyce's coupled inductor: `ymil!<k>_<l>#branch`, the current of inductor `<l>`.
+    // ponytail: a coupling name with `_` in it splits wrong; top level only.
+    if let Some(rest) = n.strip_prefix("ymil!")
+        && let Some((_, l)) = rest.split_once('_')
+    {
+        return l.to_string();
+    }
     if let Some(dev) = n.strip_suffix(".flow(br)") {
         return format!("{dev}#branch");
     }
@@ -667,6 +675,11 @@ mod tests {
         }
         for n in ["i(v1)", "V1#branch", "v1:flow(br)"] {
             assert_eq!(normal(n), "v1#branch");
+        }
+        // Xyce names a coupled inductor's current after its mutual-inductor device
+        // (xyce-2, the pair deck coupled.cir): `YMIL!K1_L1#branch` is ngspice's `l1#branch`.
+        for n in ["YMIL!K1_L1#branch", "i(l1)"] {
+            assert_eq!(normal(n), "l1#branch");
         }
         assert_eq!(normal("X1:N2"), "x1.n2");
     }
